@@ -1,0 +1,153 @@
+import { acquire } from "./claims.js";
+import type { GitHub, Issue } from "./github.js";
+import { kindOf, stateOf, type Outcome, type State } from "./machine.js";
+import { sliceBranch, specPath, storyBranch } from "./text.js";
+
+export interface Ctx {
+  github: GitHub;
+  now: () => Date;
+  session: string;
+  headSha: () => Promise<string>;
+}
+
+/**
+ * Applies an outcome to an issue whose claim this session holds: labels,
+ * comment, closing, and the automatic transitions that follow.
+ * Returns extra lines to report.
+ */
+export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, word: string, note?: string): Promise<string[]> {
+  const { github } = ctx;
+  const n = issue.number;
+  const from = stateOf(issue) ?? "triage";
+  const comment = [`psdd: ${from} → ${outcome.to === "not-planned" ? "closed as not planned" : outcome.to}${word ? ` (${word})` : ""}`];
+  const spec = await specLink(ctx, issue);
+  if (spec) comment.push("", `Spec: ${spec}`);
+  if (note) comment.push("", note);
+
+  if (outcome.to === "not-planned" || outcome.to === "closed") {
+    await github.removeLabels(n, ["in-progress", "needs-human", ...(stateOf(issue) ? [stateOf(issue)!] : [])]);
+    await github.comment(n, comment.join("\n"));
+    await github.closeIssue(n, outcome.to === "closed" ? "completed" : "not_planned");
+  } else {
+    const add: string[] = [outcome.to];
+    if (kindOf(issue) === "new") {
+      add.push("type:story");
+      await github.assign(n, [await github.currentUser()]);
+    }
+    if (outcome.needsHuman) {
+      add.push("needs-human");
+      comment.push("", `This needs a human: ${outcome.needsHuman}.`);
+    }
+    const state = stateOf(issue);
+    const remove = ["in-progress", ...(outcome.needsHuman ? [] : ["needs-human"])];
+    if (state && state !== outcome.to) remove.push(state);
+    await github.removeLabels(n, remove);
+    await github.addLabels(n, add);
+    await github.comment(n, comment.join("\n"));
+  }
+
+  const report: string[] = [];
+  if (kindOf(issue) === "story" && outcome.to === "implementation") {
+    const branch = storyBranch(n, issue.title);
+    if (!(await github.branchExists(branch))) {
+      await github.createBranch(branch, await github.defaultBranch());
+      report.push(`Created the story branch ${branch}.`);
+    }
+  }
+  if (kindOf(issue) === "slice" && outcome.to === "closed") {
+    report.push(...(await afterSliceMerged(ctx, n)));
+  }
+  return report;
+}
+
+async function specLink(ctx: Ctx, issue: Issue): Promise<string | null> {
+  let story = kindOf(issue) === "story" ? issue : null;
+  if (kindOf(issue) === "slice") {
+    const p = await ctx.github.parentOf(issue.number);
+    if (p) story = await ctx.github.getIssue(p);
+  }
+  if (!story) return null;
+  return `${await ctx.github.repoUrl()}/blob/${await ctx.headSha()}/${specPath(story.number, story.title)}`;
+}
+
+/** Changes labels on an issue this session does not hold, by taking a short claim. */
+async function withShortClaim(ctx: Ctx, n: number, fn: () => Promise<void>): Promise<boolean> {
+  const user = await ctx.github.currentUser();
+  const got = await acquire(ctx.github, n, { holder: user, session: ctx.session, since: ctx.now().toISOString() }, ctx.now());
+  if (!got.ok) return false;
+  try {
+    await fn();
+  } finally {
+    await ctx.github.deleteClaim(n);
+  }
+  return true;
+}
+
+async function setState(ctx: Ctx, issue: Issue, to: State, why: string) {
+  const from = stateOf(issue);
+  if (from) await ctx.github.removeLabels(issue.number, [from]);
+  await ctx.github.addLabels(issue.number, [to]);
+  await ctx.github.comment(issue.number, `psdd: ${from} → ${to} (automatic)\n\n${why}`);
+}
+
+/**
+ * Brings blocked / ready-for-agent in line with native blocked-by relations
+ * for the open slices of a story. Returns lines describing changes.
+ */
+export async function syncBlocked(ctx: Ctx, story: number): Promise<string[]> {
+  const lines: string[] = [];
+  for (const slice of await ctx.github.subIssues(story)) {
+    const state = stateOf(slice);
+    if (slice.state !== "open" || (state !== "blocked" && state !== "ready-for-agent")) continue;
+    const open = (await ctx.github.blockedBy(slice.number)).filter((b) => b.state === "open");
+    const want: State = open.length ? "blocked" : "ready-for-agent";
+    if (want === state) continue;
+    const why = open.length
+      ? `Blocked by ${open.map((b) => `#${b.number}`).join(", ")}.`
+      : "All blockers are closed.";
+    if (await withShortClaim(ctx, slice.number, () => setState(ctx, slice, want, why))) {
+      lines.push(`#${slice.number} is now ${want}.`);
+    }
+  }
+  return lines;
+}
+
+async function afterSliceMerged(ctx: Ctx, slice: number): Promise<string[]> {
+  const { github } = ctx;
+  const storyNumber = await github.parentOf(slice);
+  if (!storyNumber) return [];
+  const lines = await syncBlocked(ctx, storyNumber);
+  const slices = await github.subIssues(storyNumber);
+  const story = await github.getIssue(storyNumber);
+  if (slices.every((s) => s.state === "closed") && stateOf(story) === "implementation") {
+    const branch = storyBranch(story.number, story.title);
+    const base = await github.defaultBranch();
+    const moved = await withShortClaim(ctx, storyNumber, async () => {
+      const pr =
+        (await github.findPullRequest(branch)) ??
+        (await github.createPullRequest({
+          head: branch,
+          base,
+          title: story.title,
+          body: `Closes #${story.number}\n\nSpec: ${specPath(story.number, story.title)}`,
+        }));
+      await setState(ctx, story, "needs-review", `Every slice is merged into ${branch}. Story PR: #${pr.number}.`);
+    });
+    if (moved) lines.push(`Every slice is merged. Story #${storyNumber} is now in needs-review.`);
+  }
+  return lines;
+}
+
+/** Precondition for finishing a merge: the slice PR is merged. */
+export async function sliceMergeRefusal(github: GitHub, slice: Issue): Promise<string[] | null> {
+  const head = sliceBranch(slice.number, slice.title);
+  const pr = await github.findPullRequest(head);
+  if (!pr) return [`No PR from ${head} was found. Open and merge it before running psdd done ${slice.number}.`];
+  if (pr.state !== "merged") {
+    return [
+      `PR #${pr.number} from ${head} is not merged yet.`,
+      `Merge it into ${pr.base} (resolve conflicts if needed), then run psdd done ${slice.number}.`,
+    ];
+  }
+  return null;
+}
