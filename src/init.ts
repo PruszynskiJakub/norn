@@ -5,7 +5,7 @@ import type { GitHub } from "./github.js";
 import { FLAGS, STATES } from "./machine.js";
 
 /** Skills psdd briefings name. */
-export const SKILLS = ["triage", "refine", "clarify", "plan", "slice", "tdd", "review", "qa", "merge", "resolve", "deliver"] as const;
+export const SKILLS = ["triage", "refine", "clarify", "plan", "slice", "implement", "review", "qa", "merge", "resolve", "deliver", "tdd", "interview", "codebase-design"] as const;
 
 const DESCRIPTIONS: Record<string, [string, string]> = {
   "needs-refinement": ["c5def5", "Triaged; the spec is being refined"],
@@ -14,7 +14,7 @@ const DESCRIPTIONS: Record<string, [string, string]> = {
   "needs-slicing": ["c5def5", "Plan done; slices to be created"],
   blocked: ["b60205", "Has an open native blocked-by relation"],
   "ready-for-agent": ["0e8a16", "Unblocked, can be picked up"],
-  implementation: ["1d76db", "Story: slices in progress. Slice: tdd"],
+  implementation: ["1d76db", "Story: slices in progress. Slice: implement"],
   "needs-review": ["5319e7", "Code review of the slice PR or the story PR"],
   "changes-requested": ["d93f0b", "Review asked for changes"],
   "needs-qa": ["5319e7", "QA by agent (mode:afk) or human (mode:hil)"],

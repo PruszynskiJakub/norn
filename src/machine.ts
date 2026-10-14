@@ -41,7 +41,7 @@ export interface Step {
   outcomes: Record<string, Outcome>;
 }
 
-/** States that send an issue back for another round of tdd. */
+/** States that send an issue back for another round of implement. */
 export const FIX_STATES: readonly State[] = ["changes-requested", "qa-failed"];
 
 export function stateOf(issue: Issue): State | null {
@@ -96,7 +96,7 @@ export function stepFor(issue: Issue): Step | null {
   if (kind === "story" && (state === "changes-requested" || state === "qa-failed")) {
     return {
       name: "fixing",
-      skill: "tdd",
+      skill: "implement",
       attended: false,
       outcomes: { "": { to: "needs-review", means: "fixes committed on the story branch, back to review" } },
     };
@@ -158,7 +158,7 @@ export function stepFor(issue: Issue): Step | null {
   if (kind === "slice" && (state === "ready-for-agent" || state === "implementation" || state === "changes-requested" || state === "qa-failed")) {
     return {
       name: "implementation",
-      skill: "tdd",
+      skill: "implement",
       attended: false,
       enterAs: "implementation",
       outcomes: { "": { to: "needs-review", means: "implementation done, PR open" } },

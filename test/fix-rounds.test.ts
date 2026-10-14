@@ -14,7 +14,7 @@ function sliceWithRounds(rounds: number, state = "needs-review") {
   return w;
 }
 
-/** One fix round through psdd: tdd back to review, then review requests changes. Returns the review's done. */
+/** One fix round through psdd: implement back to review, then review requests changes. Returns the review's done. */
 async function fixRound(w: ReturnType<typeof setup>) {
   await w.psdd("take", "131");
   await w.psdd("done", "131");
@@ -23,7 +23,7 @@ async function fixRound(w: ReturnType<typeof setup>) {
 }
 
 describe("fix-round limit", () => {
-  test("the third failure still goes back to tdd", async () => {
+  test("the third failure still goes back to implement", async () => {
     const w = sliceWithRounds(2);
     await w.psdd("take", "131");
 
@@ -33,7 +33,7 @@ describe("fix-round limit", () => {
     expect(w.github.labels(131)).not.toContain("needs-human");
   });
 
-  test("after 3 fix rounds, a failure sets needs-human instead of going back to tdd", async () => {
+  test("after 3 fix rounds, a failure sets needs-human instead of going back to implement", async () => {
     const w = sliceWithRounds(3);
     await w.psdd("take", "131");
 
@@ -43,7 +43,7 @@ describe("fix-round limit", () => {
     expect(w.github.comments(131).at(-1)).toContain(
       'psdd: needs-human — escalated: "Redis client times out in tests" (3 fix rounds reached)',
     );
-    expect(res.stdout).toContain("#131 has reached 3 fix rounds, so it now needs a human instead of another round of tdd.");
+    expect(res.stdout).toContain("#131 has reached 3 fix rounds, so it now needs a human instead of another round of implement.");
   });
 
   test("QA failures count toward the same limit", async () => {

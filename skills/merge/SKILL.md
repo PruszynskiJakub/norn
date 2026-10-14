@@ -1,11 +1,12 @@
 ---
 name: merge
-description: psdd step for a slice in merge-queue; merges the slice PR into the story branch. Invoke when a psdd briefing names merge.
+description: Bring a branch up to date with its target and merge it, resolving conflicts by the intent of both sides. Use when merging a PR or resolving merge conflicts.
 ---
 
 # Merge
 
-1. In the slice worktree your briefing names, bring the slice branch up to date with the story branch: merge the story branch into it and resolve conflicts, keeping both sides' intent. Read the other slice's spec section when its change conflicts with yours.
-2. Run the full test suite green, then push.
-3. Merge the PR: `gh pr merge <pr> --merge`.
-4. Done when the PR shows as merged. Finish with `psdd done <slice>`; psdd closes the slice and unblocks its dependents.
+1. Fetch and merge the target branch into the branch being merged.
+2. **Resolve each conflict by intent.** For each hunk, find the primary sources on both sides: the commit messages, both PRs, both slice issues and their acceptance criteria. Preserve both intents where possible. Where they are incompatible, follow the spec and note the trade-off in the merge commit. Resolve to existing behaviour only; when no resolution fits without new behaviour, stop and hand it to a person. Otherwise always finish the merge.
+3. Run the repo's checks (typecheck, the full test suite, formatting) and fix anything the merge broke. Push, then merge the PR.
+
+Done when the PR shows as merged.

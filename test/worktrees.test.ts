@@ -19,11 +19,14 @@ describe("take names the worktree", () => {
         "",
         "Invoke the skill: refine",
         "Spec to work on: .agents/specs/123-rate-limiting/spec.md",
+        "Read the issue: gh issue view 123 --comments",
+        "Commit the spec on 123-rate-limiting and push it, so the link psdd posts resolves.",
         "",
         "When the user agrees refinement is finished, run one of:",
         "  psdd done 123 clear       (no open questions, moves on to planning)",
         "  psdd done 123 questions   (open questions, moves to clarification)",
         "",
+        "On a long step, run psdd take 123 again now and then: it keeps your claim fresh.",
         "If you have to stop, run: psdd release 123",
         'If something is wrong and a person is needed, run: psdd escalate 123 "reason"',
         "",
@@ -55,7 +58,8 @@ describe("take names the worktree", () => {
     expect(res.stdout).toContain(
       "  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-131 -b 123-rate-limiting-131 origin/123-rate-limiting",
     );
-    expect(res.stdout).toContain("Open one PR from 123-rate-limiting-131 into 123-rate-limiting.");
+    expect(res.stdout).toContain("Open one PR from 123-rate-limiting-131 into 123-rate-limiting if there is none yet:");
+    expect(res.stdout).toContain('  gh pr create --base 123-rate-limiting --head 123-rate-limiting-131 --title "Per-key limits" --body "Part of #123. Slice #131."');
   });
 
   test("when the branch already exists locally, the worktree is added on it without -b", async () => {
