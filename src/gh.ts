@@ -184,7 +184,8 @@ export class GhGitHub implements GitHub {
     return { number: pr.number, head: input.head, base: input.base, state: "open" as const, body: input.body };
   }
 
-  async createClaim(n: number, record: ClaimRecord) {
+  /** A parentless commit whose message and claim.json are the record. */
+  private async claimCommit(record: ClaimRecord) {
     const content = JSON.stringify(record);
     const tree = await this.api<{ sha: string }>("POST", `${REPO}/git/trees`, {
       tree: [{ path: "claim.json", mode: "100644", type: "blob", content }],
@@ -194,13 +195,21 @@ export class GhGitHub implements GitHub {
       tree: tree.sha,
       parents: [],
     });
+    return commit.sha;
+  }
+  async createClaim(n: number, record: ClaimRecord) {
+    const sha = await this.claimCommit(record);
     try {
-      await this.api("POST", `${REPO}/git/refs`, { ref: `refs/psdd/claims/${n}`, sha: commit.sha });
+      await this.api("POST", `${REPO}/git/refs`, { ref: `refs/psdd/claims/${n}`, sha });
       return true;
     } catch (e) {
       if (e instanceof GhError && e.status === 422) return false;
       throw e;
     }
+  }
+  async refreshClaim(n: number, record: ClaimRecord) {
+    const sha = await this.claimCommit(record);
+    await this.api("PATCH", `${REPO}/git/refs/psdd/claims/${n}`, { sha, force: true });
   }
   async readClaim(n: number) {
     const ref = await this.find<{ object: { sha: string } }>(`${REPO}/git/ref/psdd/claims/${n}`);

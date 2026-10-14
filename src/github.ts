@@ -66,6 +66,8 @@ export interface GitHub {
 
   /** Atomically create refs/psdd/claims/<issue>. False when it already exists. */
   createClaim(number: number, record: ClaimRecord): Promise<boolean>;
+  /** Points the existing claim ref at a new record, e.g. a later `since`. */
+  refreshClaim(number: number, record: ClaimRecord): Promise<void>;
   readClaim(number: number): Promise<ClaimRecord | null>;
   deleteClaim(number: number): Promise<void>;
 }

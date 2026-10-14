@@ -66,6 +66,20 @@ describe("GhGitHub claims", () => {
     await expect(new GhGitHub(exec).createClaim(131, { holder: "a", session: "s", since: "x" })).rejects.toThrow("HTTP 401");
   });
 
+  test("refreshClaim force-moves the ref to a new claim commit", async () => {
+    const { exec, calls } = scripted((c) => {
+      if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t2" } };
+      if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c2" } };
+      if (path(c).endsWith("/git/refs/psdd/claims/131")) return { stdout: { ref: "refs/psdd/claims/131" } };
+    });
+
+    await new GhGitHub(exec).refreshClaim(131, { holder: "a", session: "s", since: "2026-10-13T15:00:00.000Z" });
+
+    const ref = calls.find((c) => path(c).endsWith("/git/refs/psdd/claims/131"))!;
+    expect(method(ref)).toBe("PATCH");
+    expect(ref.input).toEqual({ sha: "c2", force: true });
+  });
+
   test("readClaim follows the ref to its commit; a missing ref is no claim", async () => {
     const { exec } = scripted((c) => {
       if (path(c) === "repos/{owner}/{repo}/git/ref/psdd/claims/131") return { stdout: { object: { sha: "c1" } } };

@@ -137,7 +137,8 @@ async function withShortClaim(ctx: Ctx, n: number, fn: () => Promise<void>): Pro
   try {
     await fn();
   } finally {
-    await ctx.github.deleteClaim(n);
+    // A claim this session already held stays held.
+    if (!got.reacquired) await ctx.github.deleteClaim(n);
   }
   return true;
 }

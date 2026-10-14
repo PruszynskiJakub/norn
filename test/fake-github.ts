@@ -132,6 +132,10 @@ export class FakeGitHub implements GitHub {
     this.claims.set(n, { ...record });
     return true;
   }
+  async refreshClaim(n: number, record: ClaimRecord) {
+    if (!this.claims.has(n)) throw new Error(`fake: no claim on #${n}`);
+    this.claims.set(n, { ...record });
+  }
   async readClaim(n: number) {
     return this.claims.get(n) ?? null;
   }

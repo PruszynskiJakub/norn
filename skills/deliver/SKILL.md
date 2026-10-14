@@ -25,5 +25,6 @@ Done when you have given the user the report: what is merged, what is waiting an
 ## Rules
 
 - Each phase goes to a new subagent; your own context stays for orchestration.
+- A claim not renewed for `claims.staleAfter` (2h by default) counts as abandoned. Tell subagents on long steps to run `psdd take <issue>` again now and then; it refreshes their claim.
 - Change state only through psdd. Labels, branches and PRs belong to psdd and the subagents.
 - Items marked "needs a human" are for people; leave them to them and carry on with the rest.
