@@ -1,5 +1,4 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { hostname } from "node:os";
 import { ghFailureMessage, run } from "./cli.js";
@@ -18,7 +17,6 @@ try {
     session: sessionId(process.env, hostname(), root),
     nonce: () => randomBytes(2).toString("hex"),
     notify: makeNotifier(),
-    headSha: async () => execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
     cwd: root,
     installSkills,
   });

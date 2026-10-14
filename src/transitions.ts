@@ -66,7 +66,6 @@ export interface Ctx {
   session: string;
   /** A short random string, e.g. to make each agent's PSDD_SESSION unique. */
   nonce: () => string;
-  headSha: () => Promise<string>;
   /** Story slugs read during this command; see slug.ts. */
   slugs: Slugs;
 }
@@ -166,7 +165,9 @@ async function specLink(ctx: Ctx, issue: Issue): Promise<string | null> {
     if (p) story = await ctx.github.getIssue(p);
   }
   if (!story) return null;
-  return `${await ctx.github.repoUrl()}/blob/${await ctx.headSha()}/${specPath(story.number, await storySlug(ctx, story))}`;
+  // The spec lives on the story branch; a local HEAD may be main or an unpushed commit.
+  const slug = await storySlug(ctx, story);
+  return `${await ctx.github.repoUrl()}/blob/${storyBranch(story.number, slug)}/${specPath(story.number, slug)}`;
 }
 
 /** Changes labels on an issue this session does not hold, by taking a short claim. */
