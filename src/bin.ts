@@ -14,7 +14,7 @@ try {
     github: new GhGitHub(),
     workspace: new LocalWorkspace(root, process.env, runCommand, process.cwd()),
     now: () => new Date(),
-    session: sessionId(process.env, hostname(), process.cwd()),
+    session: sessionId(process.env, hostname(), root),
     notify: makeNotifier(),
     headSha: async () => execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
     cwd: root,

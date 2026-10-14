@@ -29,6 +29,8 @@ export interface StartItem {
   worktree: string | null;
   /** Under herdr, the agent starts in the worktree's pane, so the worktree is made first. */
   createWorktree: string | null;
+  /** Under plain git, the PSDD_SESSION to start the item's agent with, so each agent is its own session. */
+  session: string | null;
 }
 
 export interface WaitItem {
@@ -173,6 +175,7 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     branch: loc?.branch ?? null,
     worktree: loc ? join(ctx.workspace.root, loc.worktree) : null,
     createWorktree,
+    session: ctx.config.provider === "git" ? `psdd-${n}` : null,
     kind: kindOf(issue) === "slice" ? "slice" : "story",
     title: issue.title,
     state,
@@ -236,6 +239,7 @@ export function renderNext(r: NextReport): string {
       if (r.provider === "herdr" && s.worktree) {
         out.push(`    Start an agent: herdr agent start psdd-${s.issue} --kind claude --pane <pane of ${s.worktree}>`);
       }
+      if (s.session && s.worktree) out.push(`    Start an agent in ${s.worktree} with PSDD_SESSION=${s.session} set.`);
       out.push(`    Start it with: ${s.command}`);
     }
   }

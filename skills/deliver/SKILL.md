@@ -13,7 +13,7 @@ You are the orchestrator. Every phase of the story's work happens in a fresh sub
 2. Start one fresh subagent per listed item, up to the limit `psdd next` gives:
    - **herdr:** create the worktree with the listed command if needed, then `herdr agent start psdd-<issue> --kind claude --pane <pane>` in the worktree's pane, with the prompt below.
    - **Claude Code:** a new subagent (not worktree isolation) with the prompt below.
-   - **git:** a new agent session started in the worktree, with the prompt below.
+   - **git:** a new agent session started in the worktree with `PSDD_SESSION=psdd-<issue>` set, as `psdd next` lists it, with the prompt below. The variable makes each agent its own psdd session.
 
    Prompt for each subagent: `Work in <worktree>. Run psdd take <issue>, follow its briefing to the end, and finish with the psdd command it gives.`
 3. Wait for the subagents to finish. Under herdr: `herdr agent wait psdd-<issue> --until done --until blocked`. Then go back to step 1.

@@ -166,6 +166,14 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     w.workspace.env = {};
     const res = await w.psdd("next", "123");
     expect(res.stdout.replace(/\s+/g, " ")).toContain("each in a new agent session started in the item's worktree:");
+    expect(res.stdout).toContain("    Start an agent in /repo/.agents/worktrees/123-rate-limiting-131 with PSDD_SESSION=psdd-131 set.");
+    expect(JSON.parse((await w.psdd("next", "123", "--json")).stdout).start[0]).toMatchObject({ issue: 131, session: "psdd-131" });
+  });
+
+  test("under Claude Code no PSDD_SESSION is given: the Claude Code session id names the session", async () => {
+    const w = prdExample();
+    const res = await w.psdd("next", "123");
+    expect(res.stdout).not.toContain("PSDD_SESSION");
   });
 
   test("--json carries each item's branch and worktree", async () => {
