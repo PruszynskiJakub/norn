@@ -5,7 +5,7 @@ import { ghFailureMessage, run } from "./cli.js";
 import { sessionId } from "./env.js";
 import { GhError, GhGitHub } from "./gh.js";
 import { installSkills } from "./install-skills.js";
-import { LocalWorkspace, runCommand } from "./local-workspace.js";
+import { LocalWorkspace, RootError, runCommand } from "./local-workspace.js";
 import { makeNotifier } from "./notifier.js";
 
 try {
@@ -25,6 +25,9 @@ try {
 } catch (e) {
   if (e instanceof GhError) {
     process.stdout.write(ghFailureMessage(process.argv.slice(2), e.message) + "\n");
+    process.exitCode = 1;
+  } else if (e instanceof RootError) {
+    process.stdout.write(e.message + "\n");
     process.exitCode = 1;
   } else throw e;
 }

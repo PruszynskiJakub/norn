@@ -17,6 +17,9 @@ export const runCommand: Run = (cmd, args, env) =>
     child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
   });
 
+/** psdd cannot tell which checkout to work in. A refusal for the user, not a crash. */
+export class RootError extends Error {}
+
 /** The developer's machine, via git and herdr. */
 export class LocalWorkspace implements Workspace {
   constructor(
@@ -35,13 +38,13 @@ export class LocalWorkspace implements Workspace {
    */
   static async findRoot(cwd: string, run: Run = runCommand): Promise<string> {
     const r = await run("git", ["-C", cwd, "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir", "--show-toplevel"]);
-    if (r.code !== 0) throw new Error(`Not inside a git repository's checkout: ${cwd}`);
+    if (r.code !== 0) throw new RootError(`Not inside a git repository's checkout: ${cwd}`);
     const [gitDir, commonDir, toplevel] = r.stdout.trim().split("\n");
     if (gitDir === commonDir) return toplevel;
     const configured = await run("git", ["--git-dir", commonDir, "config", "--get", "core.worktree"]);
     if (configured.code === 0 && configured.stdout.trim()) return resolve(commonDir, configured.stdout.trim());
     if (basename(commonDir) === ".git") return dirname(commonDir);
-    throw new Error(`Cannot find the main checkout of ${commonDir} from this worktree. Run psdd from the main checkout.`);
+    throw new RootError(`Cannot find the main checkout of ${commonDir} from this worktree. Run psdd from the main checkout.`);
   }
 
   private async must(cmd: string, args: string[]) {

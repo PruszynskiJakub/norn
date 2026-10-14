@@ -17,7 +17,7 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 - Two sessions taking over the same stale claim can no longer both hold it.
 - `psdd done` on a merge refuses a slice PR that does not target the story branch.
 - Lists are read without `gh api --slurp`, so gh older than 2.48 works.
-- Printed commands are shell-quoted; worktree paths compare correctly on Windows; the main checkout is found for submodules and `--separate-git-dir` clones.
+- Printed commands are shell-quoted, including the slice title in the briefing's `gh pr create`; worktree paths compare correctly on Windows; the main checkout is found from anywhere in a submodule. In a `--separate-git-dir` clone or a bare repository with worktrees, psdd runs from the main checkout only, and elsewhere says so instead of crashing.
 - An existing worktree is brought up to date in the briefing; a slice relabelled by `take` is still briefed as rework.
 - `psdd next` no longer says the user was notified when notifications are off, gives the create command under plain git, clears state labels from closed issues, keeps worktrees with uncommitted changes, ignores sub-issues that are not slices, and closes a story whose PR merged into a non-default base.
 - The resolve step's comment says `needs-human resolved`.
