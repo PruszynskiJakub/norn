@@ -1,6 +1,6 @@
 {
   "name": "psdd",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "CLI for the SDD process: GitHub labels as the only source of truth",
   "type": "module",
   "bin": {

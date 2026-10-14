@@ -4,6 +4,8 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.1.2] - 2026-10-14
+
 ### Added
 
 - psdd builds itself when installed from git (`npm install -D github:PruszynskiJakub/ai-engine#<tag>`).
@@ -47,6 +49,7 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/PruszynskiJakub/ai-engine/releases/tag/v0.1.0
