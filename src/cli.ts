@@ -10,7 +10,7 @@ import { notifyNeedsHuman } from "./notify.js";
 import { loadConfig, providerRefusal } from "./config.js";
 import { status } from "./status.js";
 import { storySlug, type Slugs } from "./slug.js";
-import { hhmm, specPath } from "./text.js";
+import { hhmm, sh, specPath } from "./text.js";
 import {
   applyOutcome,
   ensureStoryBranch,
@@ -87,7 +87,7 @@ export function ghFailureMessage(argv: string[], error: string): string {
   if (cmd && n && /^\d+$/.test(n)) {
     lines.push(
       `See where things stand with: psdd status ${n} (for a slice, psdd status <its story> shows the whole story)`,
-      `Check gh auth status and that you are inside the repository, then retry: psdd ${argv.map((a) => (/[\s"']/.test(a) ? JSON.stringify(a) : a)).join(" ")}`,
+      `Check gh auth status and that you are inside the repository, then retry: psdd ${argv.map(sh).join(" ")}`,
     );
   } else {
     lines.push("Check gh auth status and that you are inside the repository, then retry the command.");

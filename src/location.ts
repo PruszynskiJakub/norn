@@ -2,7 +2,7 @@ import { join } from "node:path";
 import type { GitHub, Issue } from "./github.js";
 import { kindOf } from "./machine.js";
 import { storySlug, type Slugs } from "./slug.js";
-import { sliceBranch, storyBranch, worktreePath } from "./text.js";
+import { sh, sliceBranch, storyBranch, worktreePath } from "./text.js";
 import type { Provider, Workspace } from "./workspace.js";
 
 /** Where an issue's work happens: its branch, the branch it starts from, and its worktree. */
@@ -55,10 +55,13 @@ export async function branchAt(loc: Location, workspace: Workspace, github: GitH
  * herdr ignores --base for an existing local branch and otherwise tracks the
  * base, so a new branch is made with git first and handed to herdr.
  */
-export function createWorktreeCommand(provider: Provider, loc: Location, root: string, at: BranchAt): string {
-  const path = join(root, loc.worktree);
+export function createWorktreeCommand(provider: Provider, loc: Location, absRoot: string, at: BranchAt): string {
+  // Every interpolated word is quoted, so a checkout under e.g. "/Users/Jane Doe" still works.
+  const root = sh(absRoot);
+  const path = sh(join(absRoot, loc.worktree));
   const git = `git -C ${root}`;
-  const { branch, base } = loc;
+  const branch = sh(loc.branch);
+  const base = sh(loc.base);
   const herdr = (extra: string) => `herdr worktree create --cwd ${root} --branch ${branch}${extra} --path ${path} --no-focus`;
   const add = provider === "herdr" ? herdr("") : `${git} worktree add ${path} ${branch}`;
   if (at.local) return at.remote ? `${git} fetch origin ${branch} && ${add} && git -C ${path} merge --ff-only origin/${branch}` : add;

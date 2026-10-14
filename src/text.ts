@@ -16,6 +16,14 @@ export function specPath(n: number, slug: string) {
   return `${specDir(n, slug)}/spec.md`;
 }
 
+/**
+ * Quotes a word for a POSIX shell command psdd prints. Plain paths and refs
+ * stay as they are; anything else, e.g. a path with a space, is single-quoted.
+ */
+export function sh(word: string) {
+  return /^[A-Za-z0-9_\-.\/:=@%+,]+$/.test(word) ? word : `'${word.replace(/'/g, `'\\''`)}'`;
+}
+
 /** Hard-wraps prose to the given width, keeping existing line breaks. */
 export function wrap(text: string, width = 76) {
   return text
