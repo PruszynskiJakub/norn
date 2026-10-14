@@ -138,11 +138,12 @@
 {
   "baseBranch": "main",
   "worktrees": { "provider": "auto" },
-  "claims": { "staleAfter": "2h" }
+  "claims": { "staleAfter": "2h" },
+  "deliver": { "maxParallel": 2, "maxFixRounds": 3 }
 }
 
 // .agents/psdd.config.local.json (gitignored, per developer)
-{ "worktrees": { "provider": "herdr" } }</code></pre>
+{ "worktrees": { "provider": "herdr" }, "notifications": "auto" }</code></pre>
 <ul>
   <li><strong>Provider</strong> is <code>auto</code>, <code>herdr</code>, <code>claude-code</code> or <code>git</code>. <code>auto</code> uses the detection in the Worktrees table, in order: herdr first, then Claude Code, then plain git.</li>
   <li><strong>Environment variables are a safety check.</strong> If the provider is <code>herdr</code> but <code>HERDR_ENV</code> is not set, psdd refuses and tells the agent to start from a herdr pane or switch the provider in the local file.</li>
@@ -192,6 +193,7 @@ release:  gh api -X DELETE repos/:owner/:repo/git/refs/psdd/claims/&lt;issue&gt;
     <tr><td><code>needs-qa</code> with <code>mode:afk</code></td><td>qa</td></tr>
     <tr><td><code>merge-queue</code> on a slice</td><td>merge, with conflict resolution</td></tr>
     <tr><td><code>needs-human</code></td><td>resolve</td></tr>
+    <tr><td>story after slicing, started by the user</td><td>deliver (orchestrates the others)</td></tr>
   </tbody>
 </table></div>
 
@@ -205,6 +207,55 @@ release:  gh api -X DELETE repos/:owner/:repo/git/refs/psdd/claims/&lt;issue&gt;
   <li>A human records the QA result through their agent, which calls psdd.</li>
 </ol>
 <p>The main agent never edits labels directly. It only calls psdd.</p>
+
+<h2 id="unattended-delivery">Unattended delivery: the deliver skill</h2>
+<p><code>deliver &lt;story id&gt;</code> runs a story unattended from <code>implementation</code> until it needs a human. The user starts it once slicing is done.</p>
+<ol>
+  <li>Ask psdd for work: <code>psdd next &lt;story&gt;</code>.</li>
+  <li>Start a fresh subagent per actionable item in its worktree (a herdr agent under herdr), at most 2 at a time.</li>
+  <li>Wait for subagents to finish (under herdr, with <code>herdr agent wait --until done|blocked</code>), then go back to step 1.</li>
+  <li>When an item gets <code>needs-human</code>, psdd notifies the user (see <a href="#notifications">Notifications</a>) and the orchestrator carries on with everything not blocked by it.</li>
+  <li>Once all slices are merged into the story branch, run story review the same way, plus tdd fixes if review asks for changes.</li>
+  <li>Stop when the story reaches <code>needs-qa</code> (always a human) or when only items waiting for a human remain. End with a report: what is done, what is waiting, and who needs to act.</li>
+</ol>
+<p><strong>Rules for the orchestrator</strong></p>
+<ul>
+  <li>Never do a phase's work itself. Every phase gets a new subagent.</li>
+  <li>Never touch labels, branches or PRs. Only call psdd.</li>
+  <li>Never take an item flagged <code>needs-human</code>.</li>
+</ul>
+<p><strong>Limits</strong></p>
+<ul>
+  <li><strong>Parallelism:</strong> at most 2 subagents at once (<code>deliver.maxParallel</code>).</li>
+  <li><strong>Fix rounds:</strong> after 3 rounds of <code>changes-requested</code> or <code>qa-failed</code> on the same issue, psdd sets <code>needs-human</code> instead of sending it back to tdd (<code>deliver.maxFixRounds</code>). psdd counts rounds from the issue's label history, so it keeps no state of its own.</li>
+</ul>
+<p><strong>When nothing is left to do,</strong> <code>psdd next</code> says so explicitly:</p>
+<pre><code>Story #123 "Rate limiting": nothing left that you can do.
+
+Waiting for a human:
+  - #129 QA in mode:hil.
+  - #131 escalated: "Redis client times out in tests" (3 fix rounds reached).
+
+Stop here and report to the user. psdd has already notified them.</code></pre>
+
+<h2 id="notifications">Notifications</h2>
+<p>psdd sends local notifications itself, so they fire whatever agent tool is in use and do not depend on the orchestrator remembering.</p>
+<p><strong>Events (more may be added later)</strong></p>
+<ul>
+  <li><strong><code>needs-human</code> is set:</strong> an escalation, a <code>mode:hil</code> slice reaching QA, an issue hitting the fix-round limit, or the story reaching story QA.</li>
+  <li><strong><code>deliver</code> stops:</strong> <code>psdd next</code> reports nothing left to do, with a summary of what is waiting.</li>
+</ul>
+<p>The title says who must act on what ("psdd: #131 needs you"). The body gives the reason and the issue link.</p>
+<p><strong>Delivery</strong> is chosen per developer in <code>.agents/psdd.config.local.json</code> with <code>"notifications"</code>:</p>
+<div class="table-wrap"><table>
+  <thead><tr><th>Value</th><th>Delivery</th></tr></thead>
+  <tbody>
+    <tr><td><code>auto</code> (default)</td><td>herdr inside herdr, otherwise the operating system</td></tr>
+    <tr><td><code>herdr</code></td><td><code>herdr notification show "&lt;title&gt;" --body "&lt;reason&gt;" --sound request</code></td></tr>
+    <tr><td><code>os</code></td><td>macOS <code>osascript</code>, Linux <code>notify-send</code>, Windows toast (e.g. through <code>node-notifier</code>)</td></tr>
+    <tr><td><code>none</code></td><td>Off. The GitHub label and comment remain</td></tr>
+  </tbody>
+</table></div>
 
 <h2 id="cli">CLI</h2>
 <p>psdd answers in prose written as instructions to the agent. The agent reports outcomes and psdd chooses the next state. It is written in Node/TypeScript and installed through <code>npx</code>.</p>
@@ -290,6 +341,7 @@ Do not work on it. Run psdd next 123 and pick a different item.</code></pre>
   <li>Slice issues created: story goes to <code>implementation</code>.</li>
   <li>A slice merges: dependents with no open blockers go from <code>blocked</code> to <code>ready-for-agent</code>.</li>
   <li>The last slice PR merges into the story branch: story goes to <code>needs-review</code>.</li>
+  <li>An issue reaches its fix-round limit: it gets <code>needs-human</code> instead of going back to tdd.</li>
 </ul>
 
 </main>

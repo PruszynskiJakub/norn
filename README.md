@@ -1,4 +1,10 @@
-# psdd
+# ai-engine
+
+## Rules
+
+1. **The owner of an issue is responsible for it end to end.** The owner is the issue's GitHub assignee, and an issue has exactly one assignee. Responsibility covers all related issues and PRs, including slices.
+
+## psdd
 
 CLI for the SDD process. The developer's LLM calls it to run work through the process; GitHub labels, native relations, comments and branches are the only state. See `PRD.html`.
 
@@ -18,7 +24,7 @@ Run `psdd` with no arguments for every command. Add `--json` for scripts.
 - The session holding a claim is `PSDD_SESSION`, else `CLAUDE_CODE_SESSION_ID`, else host and directory.
 - `psdd init` copies the skills bundled in `skills/`. Set `PSDD_SKILLS_SOURCE=<repo>` to install with `npx skills add <repo>` first.
 
-## Develop
+### Develop
 
 ```sh
 npm test          # vitest, against an in-memory GitHub and a scripted gh
