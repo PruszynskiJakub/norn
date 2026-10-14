@@ -156,8 +156,8 @@ async function noStepRefusal(issue: Issue, github: GitHub): Promise<string[]> {
   if (kindOf(issue) === "story" && state === "merge-queue") {
     const owner = issue.assignees[0] ? `@${issue.assignees[0]}` : "unassigned";
     return [
-      `Story #${n} is in merge-queue. Only the story owner (${owner}) merges the story PR into main;`,
-      "GitHub then closes the story through the PR link. Do not merge it yourself.",
+      `Story #${n} is in merge-queue. Only the story owner (${owner}) merges the story PR;`,
+      `once it is merged, psdd next ${n} closes the story if GitHub has not. Do not merge it yourself.`,
     ];
   }
   if (state === "blocked") {

@@ -205,6 +205,23 @@ export function stateLabels(issue: Issue, keep?: string): State[] {
 }
 
 /**
+ * Closes a story in merge-queue whose story PR is merged. GitHub closes it
+ * through `Closes #N` only for PRs into the default branch, so a baseBranch like
+ * develop would leave it open for good. Returns whether the story was closed.
+ */
+export async function closeMergedStory(ctx: Ctx, story: Issue): Promise<boolean> {
+  if (story.state !== "open" || stateOf(story) !== "merge-queue") return false;
+  const branch = storyBranch(story.number, await storySlug(ctx, story));
+  const pr = await ctx.github.findPullRequest(branch);
+  if (!pr || pr.state !== "merged") return false;
+  return withShortClaim(ctx, story.number, async () => {
+    await ctx.github.comment(story.number, `psdd: merge-queue → closed (automatic)\n\nThe story PR #${pr.number} is merged into ${pr.base}.`);
+    await ctx.github.closeIssue(story.number, "completed");
+    await ctx.github.removeLabels(story.number, ["in-progress", ...stateLabels(story)]);
+  });
+}
+
+/**
  * Removes the state labels a closed issue still carries, e.g. merge-queue on a
  * story GitHub closed through its PR. Returns whether it changed anything.
  */

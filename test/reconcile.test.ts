@@ -104,3 +104,31 @@ describe("the story branch is made before slicing ends", () => {
     expect(JSON.parse(res.stdout).slices).toEqual({ total: 2, merged: 2 });
   });
 });
+
+describe("a story whose PR does not close it", () => {
+  test("with baseBranch develop, next closes the story once its PR is merged", async () => {
+    const w = setup();
+    w.workspace.files.set(".agents/psdd.config.json", JSON.stringify({ baseBranch: "develop" }));
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "merge-queue"], assignees: ["alice"] });
+    w.github.prs.push({ number: 60, head: "123-rate-limiting", base: "develop", state: "merged" });
+
+    const res = await w.psdd("next", "123", "--json");
+
+    expect(w.github.issues.get(123)!.state).toBe("closed");
+    expect(w.github.issues.get(123)!.stateReason).toBe("completed");
+    expect(w.github.labels(123)).toEqual(["type:story"]);
+    expect(w.github.comments(123).at(-1)).toContain("The story PR #60 is merged into develop.");
+    expect(JSON.parse(res.stdout)).toMatchObject({ closed: true, nothingLeft: true, state: null });
+    expect(w.notifications).toEqual([]);
+  });
+
+  test("while the story PR is open, the story keeps waiting for its owner", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "merge-queue"], assignees: ["alice"] });
+    w.github.prs.push({ number: 60, head: "123-rate-limiting", base: "main", state: "open" });
+
+    await w.psdd("next", "123");
+
+    expect(w.github.issues.get(123)!.state).toBe("open");
+  });
+});

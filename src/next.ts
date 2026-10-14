@@ -4,12 +4,13 @@ import { join } from "node:path";
 import { branchAt, checkedOutElsewhere, createWorktreeCommand, locate } from "./location.js";
 import type { Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
-import { kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
+import { STATES, kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
 import { storySlug } from "./slug.js";
 import { hhmm, storyBranch, wrap } from "./text.js";
 import {
   bestEffort,
   clearClosedState,
+  closeMergedStory,
   ensureStoryBranch,
   needsHumanReason,
   promoteStory,
@@ -89,6 +90,12 @@ async function reconcile(ctx: Ctx, storyNumber: number): Promise<string[]> {
     else if (branch.created) notes.push(`Created the story branch ${branch.branch}.`);
   }
   notes.push(...(await bestEffort("move the story on", storyNumber, () => promoteStory(ctx, storyNumber))));
+  notes.push(...(await bestEffort("close the merged story", storyNumber, async () => {
+    if (!(await closeMergedStory(ctx, story))) return [];
+    story.state = "closed";
+    story.labels = story.labels.filter((l) => !(STATES as readonly string[]).includes(l));
+    return [`The story PR is merged. Closed story #${storyNumber}.`];
+  })));
   const closed = (await slicesOf(github, storyNumber)).filter((s) => s.state === "closed");
   if (story.state === "closed") closed.push(story);
   for (const issue of closed) {

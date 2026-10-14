@@ -122,7 +122,8 @@ describe("story transitions around slices", () => {
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "merge-queue"], assignees: ["bob"] });
     const res = await w.psdd("take", "123");
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("Only the story owner (@bob) merges the story PR into main");
+    expect(res.stdout).toContain("Only the story owner (@bob) merges the story PR;");
+    expect(res.stdout).toContain("psdd next 123 closes the story if GitHub has not");
     expect(w.github.claim(123)).toBeNull();
   });
 
