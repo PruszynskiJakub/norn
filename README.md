@@ -21,7 +21,7 @@ npm install -D github:PruszynskiJakub/ai-engine#v0.1.2
 npm 11 warns that psdd's `prepare` script is not covered by `allowScripts`; the build still runs. `npm install-scripts approve psdd` silences it.
 
 ```sh
-npx psdd init            # skills, .agents/specs/, team config, .gitignore, labels
+npx psdd init            # skills, agent instructions, .agents/specs/, team config, .gitignore, labels
 npx psdd next 123        # what can be done on story #123 now
 npx psdd take 131        # claim #131 and get its briefing
 npx psdd done 131 [outcome] ["note"]
@@ -38,8 +38,9 @@ Run `psdd` with no arguments for every command. Add `--json` for scripts.
 - Once slicing is done, the `deliver` skill runs the story unattended until it needs a human. After `deliver.maxFixRounds` rounds of changes-requested or qa-failed, an issue gets needs-human instead of another round; once a person resolves it, it gets a fresh budget.
 - psdd notifies you locally whenever it sets needs-human, and when `psdd next` finds nothing left to do.
 - The session holding a claim is `PSDD_SESSION`, else `CLAUDE_CODE_SESSION_ID`, else the herdr pane (`HERDR_PANE_ID`), else host and repository root. Under the git provider, `psdd next` gives each agent its own `PSDD_SESSION` to start with. Known limit: Claude Code subagents share their parent's session id, so under the claude-code provider the deliver orchestrator and its subagents are one session; use herdr for per-agent isolation.
-- Skills carry the craft and know nothing of psdd; the `take` briefing carries the process around them (what to read, where to commit and push, how to create slices and PRs, and which finish command each result maps to). `deliver` is the exception: it drives psdd.
-- `psdd init` copies the skills bundled in `skills/`: one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver) and the reference skills they use (`interview`, `codebase-design`, `tdd`). `codebase-design`, `tdd` and the step skills' approach are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). Set `PSDD_SKILLS_SOURCE=<repo>` to install with `npx skills add <repo>` first.
+- Skills carry the craft and know nothing of psdd; the `take` briefing carries the process around them (what to read, where to commit and push, how to create slices and PRs, and which finish command each result maps to). `drive` and `deliver` are the exceptions: they run psdd. `drive <issue>` takes an issue through the attended steps with you, from triage to slicing, then offers `deliver`; `deliver <story>` runs the rest unattended.
+- `psdd init` writes a short psdd section between `<!-- psdd:start -->` and `<!-- psdd:end -->` into `AGENTS.md` and `CLAUDE.md`, whichever exist (with neither, it creates `AGENTS.md` and a `CLAUDE.md` that imports it), so any agent in the project finds the process. Running `init` again refreshes that section.
+- `psdd init` copies the skills bundled in `skills/`: one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve), the process skills (drive, deliver) and the reference skills they use (`interview`, `codebase-design`, `tdd`). `codebase-design`, `tdd` and the step skills' approach are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). Set `PSDD_SKILLS_SOURCE=<repo>` to install with `npx skills add <repo>` first.
 
 ### Try it in a sandbox
 
@@ -50,15 +51,15 @@ You need Node 20+, git, Claude Code, `gh` logged in (`gh auth status`) and read 
    gh repo create psdd-sandbox --private --clone --add-readme && cd psdd-sandbox
    npm init -y && echo node_modules >> .gitignore
    ```
-2. Install psdd and set it up. `init` installs the skills into `skills/` (linked into `.claude/skills/`), creates `.agents/specs/` and `.agents/psdd.config.json`, gitignores `.agents/worktrees/` and the local config, and creates the labels on the repository.
+2. Install psdd and set it up. `init` installs the skills into `skills/` (linked into `.claude/skills/`), writes the psdd section into `AGENTS.md` and `CLAUDE.md`, creates `.agents/specs/` and `.agents/psdd.config.json`, gitignores `.agents/worktrees/` and the local config, and creates the labels on the repository.
    ```sh
    npm install -D github:PruszynskiJakub/ai-engine#v0.1.2
    npx psdd init
    git add -A && git commit -m "Set up psdd" && git push
    ```
 3. Open an issue for something small, for example `gh issue create --title "Add a greet command" --body "Print Hello, <name>"`.
-4. Start Claude Code in the sandbox and ask: `Run psdd take <issue> and follow the briefing.` Triage, refine, clarify, plan and slice are attended: the agent prepares each call and you decide. Each step ends with the `psdd done <issue> <outcome>` the briefing gives (triage `accept`, refine `clear` or `questions`), and `psdd next <issue>` says what comes next. Slicing creates the slices as sub-issues and moves the story to implementation.
-5. Ask Claude Code: `deliver <story>`. It implements, reviews, QAs and merges the slices into the story branch in fresh subagents, then reviews the story. It stops at story QA, which is always yours, or when only items waiting for a person are left; `psdd status <story>` shows them. For a `needs-human` issue or a `mode:hil` QA, run `psdd take <issue>` with your agent and finish with the command it gives.
+4. Start Claude Code in the sandbox and ask: `drive <issue>`. Triage, refine, clarify, plan and slice are attended: the agent prepares each call and you decide. Each step ends with the `psdd done <issue> <outcome>` the briefing gives (triage `accept`, refine `clear` or `questions`), and drive moves on to the next step. Slicing creates the slices as sub-issues and moves the story to implementation.
+5. When drive offers it, agree to start `deliver <story>` (or ask for it yourself). It implements, reviews, QAs and merges the slices into the story branch in fresh subagents, then reviews the story. It stops at story QA, which is always yours, or when only items waiting for a person are left; `psdd status <story>` shows them. For a `needs-human` issue or a `mode:hil` QA, ask your agent `drive <issue>`.
 6. After story QA passes, merge the story PR into `main` yourself (`gh pr merge`). The next `psdd next <story>` removes the worktrees.
 
 To start over, delete the repository: `gh repo delete psdd-sandbox --yes` (needs `gh auth refresh -s delete_repo` once).

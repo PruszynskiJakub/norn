@@ -4,6 +4,11 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- The `drive` skill: `drive <issue>` takes an issue through its attended steps with the user, from triage to slicing, then offers `deliver`.
+- `psdd init` writes a psdd section into `AGENTS.md` and `CLAUDE.md` (creating `AGENTS.md` and a `CLAUDE.md` that imports it when neither exists), so agents find the process without being told.
+
 ## [0.1.2] - 2026-10-14
 
 ### Added

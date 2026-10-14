@@ -5,7 +5,7 @@ import type { GitHub } from "./github.js";
 import { FLAGS, STATES } from "./machine.js";
 
 /** Skills psdd briefings name. */
-export const SKILLS = ["triage", "refine", "clarify", "plan", "slice", "implement", "review", "qa", "merge", "resolve", "deliver", "tdd", "interview", "codebase-design"] as const;
+export const SKILLS = ["triage", "refine", "clarify", "plan", "slice", "implement", "review", "qa", "merge", "resolve", "drive", "deliver", "tdd", "interview", "codebase-design"] as const;
 
 const DESCRIPTIONS: Record<string, [string, string]> = {
   "needs-refinement": ["c5def5", "Triaged; the spec is being refined"],
@@ -68,6 +68,7 @@ export async function init({ github, cwd, installSkills }: InitDeps): Promise<{ 
     writeFileSync(teamConfig, JSON.stringify(config, null, 2) + "\n");
   }
   ensureGitignored(cwd, [".agents/worktrees/", LOCAL_CONFIG]);
+  const instructed = writeAgentInstructions(cwd);
 
   await github.ensureLabels(labelDefinitions());
 
@@ -79,9 +80,10 @@ export async function init({ github, cwd, installSkills }: InitDeps): Promise<{ 
       "  - .agents/specs/ for story specs",
       `  - ${TEAM_CONFIG} with the team settings (each developer can override in ${LOCAL_CONFIG})`,
       "  - .agents/worktrees/ and the local config in .gitignore",
+      `  - how to work with psdd in ${instructed.join(" and ")}`,
       `  - ${labelDefinitions().length} labels on the repository`,
       "",
-      "Commit skills/, .claude/skills/, .agents/ and .gitignore. Then start a story with: psdd next <story>",
+      `Commit skills/, .claude/skills/, .agents/, .gitignore and ${instructed.join(", ")}. Then ask your agent: drive <issue>`,
     ],
   };
 }
@@ -103,4 +105,51 @@ function ensureGitignored(cwd: string, entries: string[]) {
   if (!missing.length) return;
   if (text && !text.endsWith("\n")) text += "\n";
   writeFileSync(file, text + missing.map((e) => e + "\n").join(""));
+}
+
+const START = "<!-- psdd:start -->";
+const END = "<!-- psdd:end -->";
+
+/** What an agent in this project needs to know to find the process. */
+export const AGENT_INSTRUCTIONS = [
+  START,
+  "## psdd",
+  "",
+  "This repository runs its work through psdd. GitHub labels, relations, comments and branches hold the state, and only psdd changes them.",
+  "",
+  "- To work on an issue, use the drive skill: `drive <issue>`. It takes the issue through the attended steps with the user.",
+  "- To run a sliced story unattended, use the deliver skill: `deliver <story>`.",
+  "- Without the skills: `psdd next <issue>` says what can be done now, and `psdd take <issue>` claims an item and gives the briefing to follow to the end. Use `npx psdd` if `psdd` is not on the PATH.",
+  "- Never change psdd's labels, claims or branches by hand.",
+  END,
+].join("\n");
+
+/**
+ * Writes AGENT_INSTRUCTIONS into each of AGENTS.md and CLAUDE.md that exists,
+ * replacing an earlier psdd block; with neither, creates AGENTS.md and a CLAUDE.md
+ * that imports it. A CLAUDE.md that imports AGENTS.md is left alone.
+ */
+function writeAgentInstructions(cwd: string): string[] {
+  const agents = join(cwd, "AGENTS.md");
+  const claude = join(cwd, "CLAUDE.md");
+  if (!existsSync(agents) && !existsSync(claude)) {
+    writeFileSync(agents, AGENT_INSTRUCTIONS + "\n");
+    writeFileSync(claude, "@AGENTS.md\n");
+    return ["AGENTS.md", "CLAUDE.md"];
+  }
+  const written: string[] = [];
+  for (const [name, file] of [["AGENTS.md", agents], ["CLAUDE.md", claude]] as const) {
+    if (!existsSync(file)) continue;
+    const text = readFileSync(file, "utf8");
+    if (name === "CLAUDE.md" && existsSync(agents) && /^@AGENTS\.md\s*$/m.test(text)) continue;
+    const start = text.indexOf(START);
+    const end = text.indexOf(END, start);
+    const next =
+      start !== -1 && end !== -1
+        ? text.slice(0, start) + AGENT_INSTRUCTIONS + text.slice(end + END.length)
+        : (text ? text.replace(/\n*$/, "\n\n") : "") + AGENT_INSTRUCTIONS + "\n";
+    writeFileSync(file, next);
+    written.push(name);
+  }
+  return written;
 }
