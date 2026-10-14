@@ -105,3 +105,34 @@ describe("a fresh fix budget after a person resolves the limit", () => {
     expect(w.github.labels(131)).toContain("needs-human");
   });
 });
+
+describe("multi-line notes", () => {
+  const bullets = "- burst limits have no test\n- Redis client times out";
+
+  test("a bulleted review note keeps the needs-human line whole, and the budget still resets", async () => {
+    const w = sliceWithRounds(3);
+    await w.psdd("take", "131");
+    await w.psdd("done", "131", "request-changes", bullets);
+
+    const last = w.github.comments(131).at(-1)!;
+    expect(last).toContain('psdd: needs-human — escalated: "- burst limits have no test - Redis client times out" (3 fix rounds reached)');
+    expect(last).toContain(`\n\n${bullets}`);
+
+    await w.psdd("take", "131");
+    await w.psdd("done", "131");
+    for (let round = 1; round <= 3; round++) {
+      await fixRound(w);
+      expect(w.github.labels(131), `round ${round}`).not.toContain("needs-human");
+    }
+  });
+
+  test("a multi-line escalate reason gives a single-line marker and keeps the full text", async () => {
+    const w = sliceWithRounds(0, "implementation");
+    await w.psdd("take", "131");
+    await w.psdd("escalate", "131", "CI is down\nsee the run log");
+
+    const last = w.github.comments(131).at(-1)!;
+    expect(last.split("\n")[0]).toBe('psdd: needs-human — escalated: "CI is down see the run log"');
+    expect(last).toContain("\n\nCI is down\nsee the run log");
+  });
+});

@@ -17,6 +17,7 @@ import {
   fixRounds,
   followUps,
   needsHumanLine,
+  oneLine,
   sliceMergeRefusal,
   type Ctx,
 } from "./transitions.js";
@@ -263,7 +264,7 @@ async function done(n: number, word: string | undefined, note: string | undefine
     const rounds = fixRounds(await github.listComments(n)) + 1;
     if (rounds > deps.config.maxFixRounds) {
       const max = deps.config.maxFixRounds;
-      applied = { ...outcome, needsHuman: `${note ? `escalated: "${note}" ` : ""}${fixLimitReason(max)}` };
+      applied = { ...outcome, needsHuman: `${note ? `escalated: "${oneLine(note)}" ` : ""}${fixLimitReason(max)}` };
       limitLines.push(`#${n} has reached ${max} fix rounds, so it now needs a human instead of another round of tdd.`);
     }
   }
@@ -287,8 +288,10 @@ async function escalate(n: number, reason: string | undefined, deps: Env): Promi
   const { github } = deps;
   await github.removeLabels(n, ["in-progress"]);
   await github.addLabels(n, ["needs-human"]);
-  await github.comment(n, needsHumanLine(`escalated: "${reason}"`));
-  await notifyNeedsHuman(deps, n, `escalated: "${reason}"`);
+  const why = `escalated: "${oneLine(reason)}"`;
+  // The full reason keeps its line breaks in its own paragraph; the marker line stays single-line.
+  await github.comment(n, [needsHumanLine(why), ...(reason.includes("\n") ? ["", reason] : [])].join("\n"));
+  await notifyNeedsHuman(deps, n, why);
   await github.deleteClaim(n);
   return ok([
     `#${n} now needs a human. The claim is released.`,

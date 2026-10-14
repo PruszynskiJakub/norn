@@ -12,7 +12,12 @@ import { notifyNeedsHuman, type Notify } from "./notify.js";
 export const NEEDS_HUMAN_MARK = "psdd: needs-human — ";
 
 export function needsHumanLine(reason: string) {
-  return `${NEEDS_HUMAN_MARK}${reason}`;
+  return `${NEEDS_HUMAN_MARK}${oneLine(reason)}`;
+}
+
+/** Collapses a free-form note onto one line, so the marker line psdd reads back stays whole. */
+export function oneLine(text: string) {
+  return text.replace(/\s+/g, " ").trim();
 }
 
 /** The reason psdd last gave for needs-human on an issue, read back from its comments. */
