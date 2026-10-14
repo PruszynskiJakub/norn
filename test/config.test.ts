@@ -77,6 +77,31 @@ describe("configuration", () => {
     expect((await w.psdd("take", "123")).exitCode).toBe(0);
   });
 
+  test.each([
+    [{ claims: { staleAfter: "10m" } }, "claims.staleAfter"],
+    [{ deliver: { maxFixRounds: 5 } }, "deliver.maxFixRounds"],
+  ])("%j in the local file is refused: it binds the whole team", async (local, key) => {
+    const w = storyIn("needs-plan");
+    w.workspace.files.set(LOCAL, JSON.stringify(local));
+    const res = await w.psdd("take", "123");
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain(`${LOCAL}: ${key} is shared by the team; set it in ${TEAM}`);
+  });
+
+  test("deliver.maxParallel stays a per-developer setting", async () => {
+    const w = storyIn("needs-plan");
+    w.workspace.files.set(LOCAL, JSON.stringify({ deliver: { maxParallel: 4 } }));
+    expect((await w.psdd("take", "123")).exitCode).toBe(0);
+  });
+
+  test("claims.staleAfter below 10m is refused", async () => {
+    const w = storyIn("needs-plan");
+    w.workspace.files.set(TEAM, JSON.stringify({ claims: { staleAfter: "0s" } }));
+    const res = await w.psdd("take", "123");
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain(`${TEAM}: claims.staleAfter must be at least 10m`);
+  });
+
   test("a config the CLI cannot read is refused with the file and the problem", async () => {
     const w = storyIn("needs-plan");
     w.workspace.files.set(TEAM, JSON.stringify({ worktrees: { provider: "tmux" } }));

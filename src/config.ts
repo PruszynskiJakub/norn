@@ -27,6 +27,11 @@ const PROVIDERS = ["auto", "herdr", "claude-code", "git"] as const;
 const NOTIFICATIONS = ["auto", "herdr", "os", "none"];
 const ENV_FOR: Record<Provider, string | null> = { herdr: "HERDR_ENV", "claude-code": "CLAUDECODE", git: null };
 const UNITS: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
+const MIN_STALE_AFTER_MS = 10 * UNITS.m;
+
+function toMs(duration: string) {
+  return Number(duration.slice(0, -1)) * UNITS[duration.slice(-1)];
+}
 
 interface Raw {
   baseBranch?: string;
@@ -52,6 +57,15 @@ function check(file: string, raw: unknown): string[] {
   const stale = (r.claims as Raw["claims"])?.staleAfter;
   if (stale !== undefined && !/^\d+[smhd]$/.test(String(stale))) {
     problems.push(`${file}: claims.staleAfter must be a duration like 90m or 2h`);
+  } else if (stale !== undefined && toMs(stale) < MIN_STALE_AFTER_MS) {
+    problems.push(`${file}: claims.staleAfter must be at least 10m, or live claims get taken over`);
+  }
+  // These bind every developer's sessions alike, so one person's local file must not change them.
+  if (file === LOCAL_CONFIG) {
+    if (stale !== undefined) problems.push(`${file}: claims.staleAfter is shared by the team; set it in ${TEAM_CONFIG}`);
+    if ((r.deliver as Raw["deliver"])?.maxFixRounds !== undefined) {
+      problems.push(`${file}: deliver.maxFixRounds is shared by the team; set it in ${TEAM_CONFIG}`);
+    }
   }
   if ("notifications" in r) {
     if (file === TEAM_CONFIG) problems.push(`${file}: notifications is set per developer in ${LOCAL_CONFIG}`);
@@ -90,7 +104,7 @@ export async function loadConfig(workspace: Workspace): Promise<Loaded> {
   const merged = {
     baseBranch: local.raw.baseBranch ?? team.raw.baseBranch ?? DEFAULT_TEAM_CONFIG.baseBranch,
     provider: local.raw.worktrees?.provider ?? team.raw.worktrees?.provider ?? "auto",
-    staleAfter: local.raw.claims?.staleAfter ?? team.raw.claims?.staleAfter ?? DEFAULT_TEAM_CONFIG.claims.staleAfter,
+    staleAfter: team.raw.claims?.staleAfter ?? DEFAULT_TEAM_CONFIG.claims.staleAfter,
   };
   const notifications = local.raw.notifications ?? "auto";
   const channel: Channel | null =
@@ -101,10 +115,10 @@ export async function loadConfig(workspace: Workspace): Promise<Loaded> {
     config: {
       baseBranch: merged.baseBranch,
       provider,
-      staleAfterMs: Number(merged.staleAfter.slice(0, -1)) * UNITS[merged.staleAfter.slice(-1)],
+      staleAfterMs: toMs(merged.staleAfter),
       maxParallel: local.raw.deliver?.maxParallel ?? team.raw.deliver?.maxParallel ?? DEFAULT_TEAM_CONFIG.deliver.maxParallel,
       notifications: channel,
-      maxFixRounds: local.raw.deliver?.maxFixRounds ?? team.raw.deliver?.maxFixRounds ?? DEFAULT_TEAM_CONFIG.deliver.maxFixRounds,
+      maxFixRounds: team.raw.deliver?.maxFixRounds ?? DEFAULT_TEAM_CONFIG.deliver.maxFixRounds,
     },
   };
 }
