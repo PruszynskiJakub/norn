@@ -4,6 +4,10 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- psdd builds itself when installed from git (`npm install -D github:PruszynskiJakub/ai-engine#<tag>`).
+
 ## [0.1.1] - 2026-10-14
 
 ### Changed

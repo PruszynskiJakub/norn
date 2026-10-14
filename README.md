@@ -12,6 +12,14 @@ psdd is tested on Claude Code. Other agents are supported but not tested.
 
 CLI for the SDD process. The developer's LLM calls it to run work through the process; GitHub labels, native relations, comments and branches are the only state. See `PRD.html`.
 
+psdd is not on npm. Install it from this repository (you need read access to it) by a release tag; npm builds it on install:
+
+```sh
+npm install -D github:PruszynskiJakub/ai-engine#v0.1.2
+```
+
+npm 11 warns that psdd's `prepare` script is not covered by `allowScripts`; the build still runs. `npm install-scripts approve psdd` silences it.
+
 ```sh
 npx psdd init            # skills, .agents/specs/, team config, .gitignore, labels
 npx psdd next 123        # what can be done on story #123 now
