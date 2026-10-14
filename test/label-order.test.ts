@@ -33,16 +33,30 @@ describe("a failure between label calls never leaves an issue without a state", 
     restore();
   });
 
-  test("the next transition removes every leftover state label", async () => {
+  test("an issue left with two state labels is refused and reported, never briefed as its old step", async () => {
     const w = await sliceInImplementation();
     const restore = failRemovals(w);
     await w.psdd("done", "127").catch(() => {});
     restore();
-    // Left with implementation and needs-review: psdd still briefs it, and the next done cleans up.
-    await w.psdd("take", "127");
-    await w.psdd("done", "127");
+    // Left with implementation and needs-review: either could be real, so psdd briefs neither.
+    expect(w.github.labels(127)).toEqual(expect.arrayContaining(["implementation", "needs-review"]));
 
-    expect(w.github.labels(127).filter((l) => ["implementation", "needs-review", "ready-for-agent"].includes(l))).toEqual(["needs-review"]);
+    const take = await w.psdd("take", "127");
+    expect(take.exitCode).toBe(1);
+    expect(take.stdout).toContain("#127 has more than one state label (implementation, needs-review); a person must remove the stale one.");
+    expect(w.github.claim(127)).toBeNull();
+
+    const next = JSON.parse((await w.psdd("next", "123", "--json")).stdout);
+    expect(next.waiting).toContainEqual({
+      issue: 127,
+      reason: "ambiguous-state",
+      detail: "has more than one state label (implementation, needs-review); a person must remove the stale one",
+    });
+    expect(next.start.map((s: { issue: number }) => s.issue)).not.toContain(127);
+    expect(next.message).toContain("Waiting for a human:");
+
+    const status = await w.psdd("status", "123");
+    expect(status.stdout).toContain("implementation + needs-review (more than one state label)");
   });
 
   test("take adds the step's state before removing the old one", async () => {

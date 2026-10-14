@@ -2,7 +2,7 @@ import { parseArgs } from "./args.js";
 import { briefing, finishCommands } from "./briefing.js";
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
-import { FIX_STATES, kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
+import { FIX_STATES, ambiguousStates, kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
 import { computeNext, notAStory, notifyWaiting, renderNext } from "./next.js";
 import { init } from "./init.js";
 import { locate } from "./location.js";
@@ -150,6 +150,8 @@ async function noStepRefusal(issue: Issue, github: GitHub): Promise<string[]> {
   const state = stateOf(issue);
   const story = kindOf(issue) === "slice" ? await github.parentOf(n) : n;
   const pick = story ? `Run psdd next ${story} and pick a different item.` : "Pick a different item.";
+  const ambiguous = ambiguousStates(issue);
+  if (ambiguous) return [`#${n} ${ambiguous}.`, pick];
   if (kindOf(issue) === "story" && state === "implementation") {
     return [`Story #${n} is in implementation. Its label follows its slices; there is no step to take on the story itself.`, `Run psdd next ${n} to see its slices.`];
   }

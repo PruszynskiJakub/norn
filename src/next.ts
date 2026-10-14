@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { branchAt, checkedOutElsewhere, createWorktreeCommand, locate } from "./location.js";
 import type { Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
-import { STATES, kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
+import { STATES, ambiguousStates, kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
 import { storySlug } from "./slug.js";
 import { hhmm, storyBranch, wrap } from "./text.js";
 import {
@@ -40,7 +40,7 @@ export interface StartItem {
 
 export interface WaitItem {
   issue: number;
-  reason: "blocked" | "needs-human" | "held" | "owner-merge" | "no-state";
+  reason: "blocked" | "needs-human" | "held" | "owner-merge" | "no-state" | "ambiguous-state";
   detail: string;
 }
 
@@ -169,6 +169,11 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
 async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   const n = issue.number;
   const state = stateOf(issue);
+  const ambiguous = ambiguousStates(issue);
+  if (ambiguous) {
+    report.waiting.push({ issue: n, reason: "ambiguous-state", detail: ambiguous });
+    return;
+  }
   if (issue.labels.includes("needs-human")) {
     const fallback = state === "needs-qa" ? (kindOf(issue) === "story" ? "story QA" : "QA in mode:hil") : "see its latest comment";
     const why = (await needsHumanReason(ctx.github, n)) ?? fallback;
@@ -226,7 +231,7 @@ function waitLine(w: WaitItem) {
 }
 
 /** Waiting items only a person can move on. */
-const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "owner-merge", "no-state"];
+const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "owner-merge", "no-state", "ambiguous-state"];
 
 function renderNothingLeft(r: NextReport): string {
   const human = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));

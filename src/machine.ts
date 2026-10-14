@@ -48,6 +48,17 @@ export function stateOf(issue: Issue): State | null {
   return (STATES as readonly string[]).find((s) => issue.labels.includes(s)) as State | null ?? null;
 }
 
+/** Every state label on the issue. More than one means a label change failed halfway. */
+export function statesOf(issue: Issue): State[] {
+  return STATES.filter((s) => issue.labels.includes(s));
+}
+
+/** Why an issue with more than one state label cannot be acted on; null when it has at most one. */
+export function ambiguousStates(issue: Issue): string | null {
+  const states = statesOf(issue);
+  return states.length > 1 ? `has more than one state label (${states.join(", ")}); a person must remove the stale one` : null;
+}
+
 export function kindOf(issue: Issue): "story" | "slice" | "new" {
   if (issue.labels.includes("type:slice")) return "slice";
   if (issue.labels.includes("type:story")) return "story";
@@ -60,6 +71,8 @@ export async function slicesOf(github: { subIssues(parent: number): Promise<Issu
 }
 
 export function stepFor(issue: Issue): Step | null {
+  // Two state labels: either could be the real one, so psdd briefs neither.
+  if (ambiguousStates(issue)) return null;
   const kind = kindOf(issue);
   const state = stateOf(issue);
   const hil = kind === "story" || issue.labels.includes("mode:hil");
