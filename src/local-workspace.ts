@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
 import { samePath, type Provider, type Workspace } from "./workspace.js";
 
 export type Run = (cmd: string, args: string[]) => Promise<{ code: number; stdout: string; stderr: string }>;
@@ -25,11 +25,22 @@ export class LocalWorkspace implements Workspace {
     public cwd: string = root,
   ) {}
 
-  /** The main checkout's root, also from inside a linked worktree. */
+  /**
+   * The main checkout's root, also from inside a linked worktree. The parent of
+   * the git directory is only right for an ordinary .git: a submodule's lives in
+   * the superproject's .git/modules and records its checkout as core.worktree.
+   * git worktree list names the git directory itself in those layouts, so it
+   * cannot be used either.
+   */
   static async findRoot(cwd: string, run: Run = runCommand): Promise<string> {
-    const r = await run("git", ["-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"]);
-    if (r.code !== 0) throw new Error(`Not inside a git repository: ${cwd}`);
-    return dirname(r.stdout.trim());
+    const r = await run("git", ["-C", cwd, "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir", "--show-toplevel"]);
+    if (r.code !== 0) throw new Error(`Not inside a git repository's checkout: ${cwd}`);
+    const [gitDir, commonDir, toplevel] = r.stdout.trim().split("\n");
+    if (gitDir === commonDir) return toplevel;
+    const configured = await run("git", ["--git-dir", commonDir, "config", "--get", "core.worktree"]);
+    if (configured.code === 0 && configured.stdout.trim()) return resolve(commonDir, configured.stdout.trim());
+    if (basename(commonDir) === ".git") return dirname(commonDir);
+    throw new Error(`Cannot find the main checkout of ${commonDir} from this worktree. Run psdd from the main checkout.`);
   }
 
   private async must(cmd: string, args: string[]) {

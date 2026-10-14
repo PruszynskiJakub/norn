@@ -75,9 +75,33 @@ describe("LocalWorkspace", () => {
     expect(await ws.readFile(".agents/psdd.config.local.json")).toBeNull();
   });
 
+  /** git as seen from a directory: rev-parse prints git-dir, common dir and toplevel; core.worktree as configured. */
+  function repoAt(gitDir: string, commonDir: string, toplevel: string, coreWorktree?: string) {
+    return scripted((_, args) => {
+      if (args.includes("rev-parse")) return { stdout: `${gitDir}\n${commonDir}\n${toplevel}\n` };
+      if (args.includes("core.worktree")) return coreWorktree ? { stdout: `${coreWorktree}\n` } : { code: 1 };
+    }).run;
+  }
+
+  test("in the main checkout, the root is its toplevel", async () => {
+    expect(await LocalWorkspace.findRoot("/repo/src", repoAt("/repo/.git", "/repo/.git", "/repo"))).toBe("/repo");
+  });
+
   test("the root is the main checkout, even when run from a worktree", async () => {
-    const { run } = scripted(() => ({ stdout: "/repo/.git\n" }));
+    const run = repoAt("/repo/.git/worktrees/123-x", "/repo/.git", "/repo/.agents/worktrees/123-x");
     expect(await LocalWorkspace.findRoot("/repo/.agents/worktrees/123-x", run)).toBe("/repo");
+  });
+
+  test("a submodule's root is its checkout, not the superproject's .git/modules", async () => {
+    expect(await LocalWorkspace.findRoot("/super/app", repoAt("/super/.git/modules/app", "/super/.git/modules/app", "/super/app"))).toBe("/super/app");
+    const fromWorktree = repoAt("/super/.git/modules/app/worktrees/x", "/super/.git/modules/app", "/super/app-x", "../../../app");
+    expect(await LocalWorkspace.findRoot("/super/app-x", fromWorktree)).toBe("/super/app");
+  });
+
+  test("a repo cloned with --separate-git-dir uses its toplevel; from a linked worktree it cannot be found and says so", async () => {
+    expect(await LocalWorkspace.findRoot("/sep", repoAt("/elsewhere/sep.git", "/elsewhere/sep.git", "/sep"))).toBe("/sep");
+    const fromWorktree = repoAt("/elsewhere/sep.git/worktrees/x", "/elsewhere/sep.git", "/sep-x");
+    await expect(LocalWorkspace.findRoot("/sep-x", fromWorktree)).rejects.toThrow("Run psdd from the main checkout.");
   });
 });
 
