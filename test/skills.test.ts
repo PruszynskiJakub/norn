@@ -17,3 +17,11 @@ describe("bundled skills", () => {
     for (const name of SKILLS) expect(existsSync(join(cwd, "skills", name, "SKILL.md"))).toBe(true);
   });
 });
+
+describe("the deliver skill matches what psdd next says", () => {
+  test("it does not promise a notification psdd may not have sent", () => {
+    const md = readFileSync(join(BUNDLED_SKILLS, "deliver", "SKILL.md"), "utf8");
+    expect(md).not.toContain("psdd has already notified the user of anything waiting for them.");
+    expect(md).toContain("if notifications are off it says nothing about it");
+  });
+});
