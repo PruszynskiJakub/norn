@@ -4,7 +4,6 @@ export class FakeGitHub implements GitHub {
   issues = new Map<number, Issue>();
   claims = new Map<number, ClaimRecord>();
   commentsByIssue = new Map<number, string[]>();
-  labelEvents = new Map<number, string[]>();
   parents = new Map<number, number>();
   blockers = new Map<number, number[]>();
   branches = new Set<string>(["main"]);
@@ -47,16 +46,16 @@ export class FakeGitHub implements GitHub {
   async repoUrl() {
     return "https://github.com/acme/app";
   }
+  defaultBranchName = "main";
+  async defaultBranch() {
+    return this.defaultBranchName;
+  }
   async getIssue(n: number) {
     return structuredClone(this.mustGet(n));
   }
   async addLabels(n: number, labels: string[]) {
     const i = this.mustGet(n);
     for (const l of labels) if (!i.labels.includes(l)) i.labels.push(l);
-    this.labelEvents.set(n, [...(this.labelEvents.get(n) ?? []), ...labels]);
-  }
-  async labelHistory(n: number) {
-    return [...(this.labelEvents.get(n) ?? [])];
   }
   async removeLabels(n: number, labels: string[]) {
     const i = this.mustGet(n);
@@ -127,6 +126,10 @@ export class FakeGitHub implements GitHub {
     if (this.claims.has(n)) return false;
     this.claims.set(n, { ...record });
     return true;
+  }
+  async refreshClaim(n: number, record: ClaimRecord) {
+    if (!this.claims.has(n)) throw new Error(`fake: no claim on #${n}`);
+    this.claims.set(n, { ...record });
   }
   async readClaim(n: number) {
     return this.claims.get(n) ?? null;

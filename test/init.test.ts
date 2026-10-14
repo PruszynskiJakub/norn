@@ -76,6 +76,15 @@ describe("psdd init: configuration and worktrees", () => {
     );
   });
 
+  test("the base branch is the repository's default branch", async () => {
+    const { w, cwd, psdd } = project();
+    w.github.defaultBranchName = "master";
+
+    await psdd("init");
+
+    expect(JSON.parse(readFileSync(join(cwd, ".agents", "psdd.config.json"), "utf8")).baseBranch).toBe("master");
+  });
+
   test("keeps an existing team config and does not repeat gitignore entries", async () => {
     const { cwd, psdd } = project();
     mkdirSync(join(cwd, ".agents"), { recursive: true });

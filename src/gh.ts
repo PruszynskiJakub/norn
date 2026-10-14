@@ -90,6 +90,9 @@ export class GhGitHub implements GitHub {
   async repoUrl() {
     return (await this.api<{ html_url: string }>("GET", REPO)).html_url;
   }
+  async defaultBranch() {
+    return (await this.api<{ default_branch: string }>("GET", REPO)).default_branch;
+  }
   async getIssue(n: number) {
     return toIssue(await this.rawIssue(n));
   }
@@ -104,10 +107,6 @@ export class GhGitHub implements GitHub {
         if (!(e instanceof GhError && e.status === 404)) throw e;
       }
     }
-  }
-  async labelHistory(n: number) {
-    const events = await this.paginate<{ event: string; label?: { name: string } }>(`${REPO}/issues/${n}/events`);
-    return events.filter((e) => e.event === "labeled" && e.label).map((e) => e.label!.name);
   }
   async assign(n: number, users: string[]) {
     await this.api("POST", `${REPO}/issues/${n}/assignees`, { assignees: users });
@@ -181,7 +180,8 @@ export class GhGitHub implements GitHub {
     return { number: pr.number, head: input.head, base: input.base, state: "open" as const, body: input.body };
   }
 
-  async createClaim(n: number, record: ClaimRecord) {
+  /** A parentless commit whose message and claim.json are the record. */
+  private async claimCommit(record: ClaimRecord) {
     const content = JSON.stringify(record);
     const tree = await this.api<{ sha: string }>("POST", `${REPO}/git/trees`, {
       tree: [{ path: "claim.json", mode: "100644", type: "blob", content }],
@@ -191,13 +191,21 @@ export class GhGitHub implements GitHub {
       tree: tree.sha,
       parents: [],
     });
+    return commit.sha;
+  }
+  async createClaim(n: number, record: ClaimRecord) {
+    const sha = await this.claimCommit(record);
     try {
-      await this.api("POST", `${REPO}/git/refs`, { ref: `refs/psdd/claims/${n}`, sha: commit.sha });
+      await this.api("POST", `${REPO}/git/refs`, { ref: `refs/psdd/claims/${n}`, sha });
       return true;
     } catch (e) {
       if (e instanceof GhError && e.status === 422) return false;
       throw e;
     }
+  }
+  async refreshClaim(n: number, record: ClaimRecord) {
+    const sha = await this.claimCommit(record);
+    await this.api("PATCH", `${REPO}/git/refs/psdd/claims/${n}`, { sha, force: true });
   }
   async readClaim(n: number) {
     const ref = await this.find<{ object: { sha: string } }>(`${REPO}/git/ref/psdd/claims/${n}`);

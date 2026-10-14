@@ -5,11 +5,21 @@ import type { GitHub, Issue } from "./github.js";
 import { FIX_STATES, kindOf, stateOf, stepFor, type State } from "./machine.js";
 import { computeNext, notAStory, notifyWaiting, renderNext } from "./next.js";
 import { init } from "./init.js";
+import { locate } from "./location.js";
 import { notifyNeedsHuman } from "./notify.js";
 import { loadConfig, providerRefusal } from "./config.js";
 import { status } from "./status.js";
-import { hhmm, specPath } from "./text.js";
-import { applyOutcome, needsHumanLine, removeWorktreeOf, sliceMergeRefusal, type Ctx } from "./transitions.js";
+import { hhmm, specPath, storyBranch } from "./text.js";
+import {
+  applyOutcome,
+  ensureStoryBranch,
+  fixLimitReason,
+  fixRounds,
+  followUps,
+  needsHumanLine,
+  sliceMergeRefusal,
+  type Ctx,
+} from "./transitions.js";
 
 export type Deps = Omit<Ctx, "config"> & {
   cwd: string;
@@ -63,6 +73,25 @@ const NEEDS_NUMBER: Record<string, string> = {
   status: "psdd status <story>",
 };
 
+/**
+ * What to print when a gh call fails partway through a command. Earlier calls
+ * may already have changed GitHub, so it never claims nothing was done.
+ */
+export function ghFailureMessage(argv: string[], error: string): string {
+  const { positionals } = parseArgs(argv);
+  const [cmd, n] = positionals;
+  const lines = ["GitHub refused a call. Some changes from this command may already be applied.", error];
+  if (cmd && n && /^\d+$/.test(n)) {
+    lines.push(
+      `See where things stand with: psdd status ${n} (for a slice, psdd status <its story> shows the whole story)`,
+      `Check gh auth status and that you are inside the repository, then retry: psdd ${argv.map((a) => (/[\s"']/.test(a) ? JSON.stringify(a) : a)).join(" ")}`,
+    );
+  } else {
+    lines.push("Check gh auth status and that you are inside the repository, then retry the command.");
+  }
+  return lines.join("\n");
+}
+
 /** Commands that name or touch worktrees, and so need the provider to match the environment. */
 const USES_WORKTREES = new Set(["take", "next", "done"]);
 
@@ -102,7 +131,7 @@ async function dispatch(argv: string[], input: Deps): Promise<Result> {
       const r = await notAStory(deps.github, n);
       if (r) return refuse(r);
       const report = await computeNext(deps, n);
-      if (report.nothingLeft) await notifyWaiting(deps, report);
+      if (report.nothingLeft && !report.closed) await notifyWaiting(deps, report);
       return ok([renderNext(report)], { ...report });
     }
     case "add-slice":
@@ -165,11 +194,16 @@ async function take(n: number, deps: Env): Promise<Result> {
   await github.addLabels(n, ["in-progress"]);
   let staleNote: string | null = null;
   if (claim.tookOver) {
-    const removed = await removeWorktreeOf(deps, issue);
-    staleNote = `The previous holder's claim was stale (since ${hhmm(claim.tookOver.since)})${removed ? "; its worktree was removed." : "."}`;
+    // The holder may only be slow, and its worktree holds its commits: keep it, never remove it here.
+    const loc = await locate(issue, github, deps.config.baseBranch);
+    const kept = loc && (await deps.workspace.worktreeExists(loc.worktree));
+    staleNote = `The previous holder's claim was stale (since ${hhmm(claim.tookOver.since)})${
+      kept ? `; its worktree is kept with what it left. Check git status there before you start.` : "."
+    }`;
   }
   const lines = await briefing(issue, step, deps);
   if (staleNote) lines.splice(lines.indexOf(""), 0, "", staleNote);
+  if (claim.reacquired) lines.unshift(`You already held #${n}; the claim is refreshed. Here is its briefing again.`, "");
   return ok(lines, {
     issue: n,
     state: stateOf(issue),
@@ -215,20 +249,30 @@ async function done(n: number, word: string | undefined, note: string | undefine
     const r = await sliceMergeRefusal(github, issue);
     if (r) return refuse(r);
   }
+  const preLines: string[] = [];
+  if (kindOf(issue) === "story" && outcome.to === "implementation") {
+    const branch = await ensureStoryBranch(deps, issue);
+    if (!branch.ok) return refuse(branch.lines);
+    if (branch.created) preLines.push(`Created the story branch ${storyBranch(n, issue.title)}.`);
+  }
 
   let applied = outcome;
   const limitLines: string[] = [];
-  if (FIX_STATES.includes(outcome.to as State)) {
-    const history = await github.labelHistory(n);
-    const rounds = history.filter((l) => FIX_STATES.includes(l as State)).length + 1;
+  // A round starts when review or QA sends the issue back; resolving needs-human stays put and is no round.
+  if (FIX_STATES.includes(outcome.to as State) && stateOf(issue) !== outcome.to) {
+    const rounds = fixRounds(await github.listComments(n)) + 1;
     if (rounds > deps.config.maxFixRounds) {
       const max = deps.config.maxFixRounds;
-      applied = { ...outcome, needsHuman: `escalated: "${note}" (${max} fix rounds reached)` };
+      applied = { ...outcome, needsHuman: `${note ? `escalated: "${note}" ` : ""}${fixLimitReason(max)}` };
       limitLines.push(`#${n} has reached ${max} fix rounds, so it now needs a human instead of another round of tdd.`);
     }
   }
-  const extra = [...limitLines, ...(await applyOutcome(deps, issue, applied, word ?? "", note))];
-  await github.deleteClaim(n);
+  try {
+    await applyOutcome(deps, issue, applied, word ?? "", note);
+  } finally {
+    await github.deleteClaim(n);
+  }
+  const extra = [...limitLines, ...preLines, ...(await followUps(deps, issue, applied))];
   if (kindOf(issue) === "story" && outcome.to === "implementation") {
     extra.push(`To run the story unattended until it needs a human, the user can start the deliver skill: deliver ${n}`);
   }

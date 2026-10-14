@@ -13,9 +13,9 @@ describe("take names the worktree", () => {
         'You now hold story #123 "Rate limiting". Its step is refinement. This step',
         "is attended: the user takes part, and you do not decide on your own.",
         "",
-        "Work in: .agents/worktrees/123-rate-limiting (branch 123-rate-limiting)",
+        "Work in: /repo/.agents/worktrees/123-rate-limiting (branch 123-rate-limiting)",
         "It does not exist yet. Create it first:",
-        "  git worktree add .agents/worktrees/123-rate-limiting -b 123-rate-limiting main",
+        "  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting -b 123-rate-limiting origin/main",
         "",
         "Invoke the skill: refine",
         "Spec to work on: .agents/specs/123-rate-limiting/spec.md",
@@ -39,7 +39,7 @@ describe("take names the worktree", () => {
 
     const res = await w.psdd("take", "123");
 
-    expect(res.stdout).toContain("Work in: .agents/worktrees/123-rate-limiting (branch 123-rate-limiting)\n\nInvoke");
+    expect(res.stdout).toContain("Work in: /repo/.agents/worktrees/123-rate-limiting (branch 123-rate-limiting)\n\nInvoke");
     expect(res.stdout).not.toContain("does not exist");
   });
 
@@ -51,9 +51,9 @@ describe("take names the worktree", () => {
 
     const res = await w.psdd("take", "131");
 
-    expect(res.stdout).toContain("Work in: .agents/worktrees/123-rate-limiting-131 (branch 123-rate-limiting-131)");
+    expect(res.stdout).toContain("Work in: /repo/.agents/worktrees/123-rate-limiting-131 (branch 123-rate-limiting-131)");
     expect(res.stdout).toContain(
-      "  git worktree add .agents/worktrees/123-rate-limiting-131 -b 123-rate-limiting-131 123-rate-limiting",
+      "  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-131 -b 123-rate-limiting-131 origin/123-rate-limiting",
     );
     expect(res.stdout).toContain("Open one PR from 123-rate-limiting-131 into 123-rate-limiting.");
   });
@@ -65,7 +65,46 @@ describe("take names the worktree", () => {
 
     const res = await w.psdd("take", "123");
 
-    expect(res.stdout).toContain("  git worktree add .agents/worktrees/123-rate-limiting 123-rate-limiting\n");
+    expect(res.stdout).toContain("  git -C /repo worktree add /repo/.agents/worktrees/123-rate-limiting 123-rate-limiting\n");
+  });
+
+  test("a branch only on GitHub, like a story branch psdd made, is fetched and then checked out", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
+    w.github.branches.add("123-rate-limiting");
+
+    const res = await w.psdd("take", "123");
+
+    expect(res.stdout).toContain(
+      "  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add /repo/.agents/worktrees/123-rate-limiting 123-rate-limiting\n",
+    );
+  });
+
+  test("a branch checked out in another checkout gets no create command, which could not work", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
+    w.workspace.localBranches.add("123-rate-limiting");
+    w.workspace.checkedOut.set("123-rate-limiting", "/repo");
+
+    const res = await w.psdd("take", "123");
+
+    expect(res.stdout).toContain(
+      "Work in: /repo/.agents/worktrees/123-rate-limiting (branch 123-rate-limiting)\nBranch 123-rate-limiting is checked out at /repo; work there or switch that checkout to another branch.\n",
+    );
+    expect(res.stdout).not.toContain("worktree add");
+  });
+
+  test("the commands work from inside another worktree: absolute paths, git run against the main checkout", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+    w.github.parents.set(131, 123);
+    w.workspace.cwd = "/repo/.agents/worktrees/123-rate-limiting";
+
+    const res = await w.psdd("take", "131");
+
+    expect(res.stdout).toContain("Work in: /repo/.agents/worktrees/123-rate-limiting-131 (branch 123-rate-limiting-131)");
+    expect(res.stdout).toContain("git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-131");
   });
 });
 
@@ -82,22 +121,43 @@ describe("worktree cleanup", () => {
     return w;
   }
 
-  test("when a slice merges, psdd removes its worktree with the configured tool", async () => {
+  test("done on a merged slice leaves its worktree; the next psdd next removes it with the configured tool", async () => {
     const w = mergingSlice();
     await w.psdd("take", "127");
 
     const res = await w.psdd("done", "127");
 
+    expect(w.workspace.removed).toEqual([]);
+    expect(res.stdout).toContain("Its worktree .agents/worktrees/123-rate-limiting-127 is removed by the next psdd next 123.");
+
+    const next = await w.psdd("next", "123");
+
     expect(w.workspace.removed).toEqual([{ path: ".agents/worktrees/123-rate-limiting-127", provider: "claude-code" }]);
-    expect(res.stdout).toContain("Removed the worktree .agents/worktrees/123-rate-limiting-127.");
+    expect(next.stdout).toContain("Slice #127 is merged. Removed its worktree .agents/worktrees/123-rate-limiting-127.");
   });
 
   test("a slice with no local worktree merges without removing anything", async () => {
     const w = mergingSlice();
     w.workspace.worktrees.clear();
     await w.psdd("take", "127");
-    await w.psdd("done", "127");
+    const res = await w.psdd("done", "127");
+    await w.psdd("next", "123");
     expect(w.workspace.removed).toEqual([]);
+    expect(res.stdout).not.toContain("worktree");
+  });
+
+  test("a worktree that cannot be removed is reported by next, and the rest of next still runs", async () => {
+    const w = mergingSlice();
+    w.github.issues.get(127)!.state = "closed";
+    w.workspace.removeWorktree = async () => {
+      throw new Error("git worktree remove failed: locked");
+    };
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("Could not remove the worktree of #127: git worktree remove failed: locked");
+    expect(res.stdout).toContain("Slice #128");
   });
 
   test("the story worktree is removed once the story has merged into main", async () => {
@@ -111,7 +171,7 @@ describe("worktree cleanup", () => {
     expect(res.stdout).toContain("Story #123 is merged and closed. Removed its worktree .agents/worktrees/123-rate-limiting.");
   });
 
-  test("taking over a stale claim cleans up the worktree the crashed session left behind", async () => {
+  test("taking over a stale claim keeps the worktree the previous holder left, and says so", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
     w.setNow("2026-10-13T08:00:00Z");
@@ -122,8 +182,22 @@ describe("worktree cleanup", () => {
 
     const res = await w.psdd("take", "123");
 
-    expect(w.workspace.removed.map((r) => r.path)).toEqual([".agents/worktrees/123-rate-limiting"]);
-    expect(res.stdout).toContain("The previous holder's claim was stale (since 08:00); its worktree was removed.");
-    expect(res.stdout).toContain("  git worktree add .agents/worktrees/123-rate-limiting 123-rate-limiting\n");
+    expect(w.workspace.removed).toEqual([]);
+    expect(res.stdout).toContain(
+      "The previous holder's claim was stale (since 08:00); its worktree is kept with what it left. Check git status there before you start.",
+    );
+    expect(res.stdout).not.toContain("does not exist");
+  });
+
+  test("next never removes the worktree it is running in", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", state: "closed", labels: ["type:story", "merge-queue"] });
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
+    w.workspace.cwd = "/repo/.agents/worktrees/123-rate-limiting/src";
+
+    const res = await w.psdd("next", "123");
+
+    expect(w.workspace.removed).toEqual([]);
+    expect(res.stdout).toContain("Could not remove the worktree of #123: psdd is running inside it");
   });
 });

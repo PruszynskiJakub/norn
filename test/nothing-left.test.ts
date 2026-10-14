@@ -9,6 +9,7 @@ function stuckStory() {
   gh.seedIssue({ number: 129, title: "Dashboard", labels: ["type:slice", "mode:hil", "needs-qa", "needs-human"] });
   gh.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "changes-requested", "needs-human"] });
   for (const s of [127, 129, 131]) gh.parents.set(s, 123);
+  gh.branches.add("123-rate-limiting");
   gh.commentsByIssue.set(129, ["psdd: needs-review → needs-qa (approve)\n\npsdd: needs-human — QA in mode:hil"]);
   gh.commentsByIssue.set(131, [
     'psdd: needs-review → changes-requested (request-changes)\n\npsdd: needs-human — escalated: "Redis client times out in tests" (3 fix rounds reached)',
@@ -71,5 +72,28 @@ describe("psdd next when nothing is left", () => {
     const report = JSON.parse((await w.psdd("next", "123", "--json")).stdout);
     expect(report.nothingLeft).toBe(true);
     expect(report.waiting[1]).toMatchObject({ issue: 131, reason: "needs-human", detail: 'escalated: "Redis client times out in tests" (3 fix rounds reached)' });
+  });
+});
+
+describe("psdd next on a closed story", () => {
+  test("ends delivery without telling anyone to wait, and notifies no one", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", state: "closed", stateReason: "completed", labels: ["type:story", "merge-queue"] });
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toBe('Story #123 "Rate limiting" is closed. Nothing left that you can do.');
+    expect(w.notifications).toEqual([]);
+    const json = JSON.parse((await w.psdd("next", "123", "--json")).stdout);
+    expect(json).toMatchObject({ closed: true, nothingLeft: true });
+  });
+
+  test("a story closed as not planned says so", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", state: "closed", stateReason: "not_planned", labels: ["type:story"] });
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toBe('Story #123 "Rate limiting" is closed as not planned. Nothing left that you can do.');
   });
 });

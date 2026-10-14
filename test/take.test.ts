@@ -61,6 +61,37 @@ describe("stale claims", () => {
   });
 });
 
+describe("taking an issue this session already holds", () => {
+  test("briefs again and refreshes the claim instead of refusing", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+    w.setNow("2026-10-13T10:00:00Z");
+    await w.psdd("take", "131");
+    w.setNow("2026-10-13T11:30:00Z");
+
+    const res = await w.psdd("take", "131");
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toMatch(/^You already held #131; the claim is refreshed\. Here is its briefing again\.\n\nYou now hold slice #131/);
+    expect(w.github.claim(131)).toMatchObject({ session: "session-1", since: "2026-10-13T11:30:00.000Z" });
+  });
+
+  test("a refreshed claim is not stale two hours after it was first taken", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 7 });
+    w.setNow("2026-10-13T10:00:00Z");
+    await w.as("slow-session")("take", "7");
+    w.setNow("2026-10-13T11:30:00Z");
+    await w.as("slow-session")("take", "7");
+    w.setNow("2026-10-13T12:30:00Z");
+
+    const res = await w.psdd("take", "7");
+
+    expect(res.exitCode).toBe(1);
+    expect(w.github.claim(7)).toMatchObject({ session: "slow-session" });
+  });
+});
+
 describe("the PRD's refusal", () => {
   test("a slice held elsewhere is refused with the PRD's wording", async () => {
     const w = setup();

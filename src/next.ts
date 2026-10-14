@@ -1,11 +1,20 @@
 import { isStale } from "./claims.js";
 import { send } from "./notify.js";
-import { createWorktreeCommand, locate } from "./location.js";
+import { join } from "node:path";
+import { branchAt, checkedOutElsewhere, createWorktreeCommand, locate } from "./location.js";
 import type { Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
 import { kindOf, stateOf, stepFor, type State } from "./machine.js";
 import { hhmm, storyBranch, wrap } from "./text.js";
-import { needsHumanReason, removeWorktreeOf, syncBlocked, type Ctx } from "./transitions.js";
+import {
+  bestEffort,
+  ensureStoryBranch,
+  needsHumanReason,
+  promoteStory,
+  removeWorktreeOf,
+  syncBlocked,
+  type Ctx,
+} from "./transitions.js";
 
 export interface StartItem {
   issue: number;
@@ -20,6 +29,10 @@ export interface StartItem {
   worktree: string | null;
   /** Under herdr, the agent starts in the worktree's pane, so the worktree is made first. */
   createWorktree: string | null;
+  /** Under herdr, where the item's branch is checked out instead, so no worktree can be made for it. */
+  checkedOutAt: string | null;
+  /** Under plain git, the PSDD_SESSION to start the item's agent with, unique per listing, so each agent is its own session. */
+  session: string | null;
 }
 
 export interface WaitItem {
@@ -38,8 +51,11 @@ export interface NextReport {
   slices: { total: number; merged: number };
   /** Housekeeping psdd did, e.g. a removed worktree. */
   notes: string[];
-  /** Nothing can start and nothing is running: only people can move the story on. */
+  /** Nothing can start and nothing is running: only people can move the story on, or the story is closed. */
   nothingLeft: boolean;
+  /** The story is closed: merged, or closed as not planned. Nothing waits for anyone. */
+  closed: boolean;
+  notPlanned: boolean;
   start: StartItem[];
   waiting: WaitItem[];
 }
@@ -54,10 +70,42 @@ const DESCRIBE: Partial<Record<State, string>> = {
   "merge-queue": "is in merge-queue",
 };
 
-/** What can be done on a story now. Syncs blocked labels first. */
+/**
+ * Catches the story up with what earlier commands left undone or could not do:
+ * the story branch, moving on once every slice is merged, and removing the
+ * worktrees of closed items. Returns notes on what changed or failed.
+ */
+async function reconcile(ctx: Ctx, storyNumber: number): Promise<string[]> {
+  const { github } = ctx;
+  const notes: string[] = [];
+  const story = await github.getIssue(storyNumber);
+  if (story.state === "open" && stateOf(story) === "implementation") {
+    const branch = await ensureStoryBranch(ctx, story).catch((e: Error) => ({ ok: false as const, lines: [`Could not create the story branch: ${e.message}`] }));
+    if (!branch.ok) notes.push(...branch.lines);
+    else if (branch.created) notes.push(`Created the story branch ${storyBranch(storyNumber, story.title)}.`);
+  }
+  notes.push(...(await bestEffort("move the story on", storyNumber, () => promoteStory(ctx, storyNumber))));
+  const closed = (await github.subIssues(storyNumber)).filter((s) => s.state === "closed");
+  if (story.state === "closed") closed.push(story);
+  for (const issue of closed) {
+    try {
+      const removed = await removeWorktreeOf(ctx, issue);
+      if (!removed) continue;
+      notes.push(issue.number === storyNumber
+        ? `Story #${storyNumber} is merged and closed. Removed its worktree ${removed}.`
+        : `Slice #${issue.number} is merged. Removed its worktree ${removed}.`);
+    } catch (e) {
+      notes.push(`Could not remove the worktree of #${issue.number}: ${(e as Error).message}`);
+    }
+  }
+  return notes;
+}
+
+/** What can be done on a story now. Syncs blocked labels and catches up on housekeeping first. */
 export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextReport> {
   const { github } = ctx;
   await syncBlocked(ctx, storyNumber);
+  const notes = await reconcile(ctx, storyNumber);
   const story = await github.getIssue(storyNumber);
   const slices = await github.subIssues(storyNumber);
   const report: NextReport = {
@@ -70,12 +118,13 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
     slices: { total: slices.length, merged: slices.filter((s) => s.state === "closed").length },
     start: [],
     waiting: [],
-    notes: [],
+    notes,
     nothingLeft: false,
+    closed: story.state === "closed",
+    notPlanned: story.stateReason === "not_planned",
   };
-  if (story.state === "closed") {
-    const removed = await removeWorktreeOf(ctx, story);
-    if (removed) report.notes.push(`Story #${storyNumber} is merged and closed. Removed its worktree ${removed}.`);
+  if (report.closed) {
+    report.nothingLeft = true;
     return report;
   }
   if (stateOf(story) === "merge-queue") {
@@ -120,14 +169,21 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   }
   const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
   let createWorktree: string | null = null;
+  let checkedOutAt: string | null = null;
   if (loc && ctx.config.provider === "herdr" && !(await ctx.workspace.worktreeExists(loc.worktree))) {
-    createWorktree = createWorktreeCommand("herdr", loc, ctx.workspace.root, await ctx.workspace.localBranchExists(loc.branch));
+    checkedOutAt = await ctx.workspace.branchCheckedOutAt(loc.branch);
+    if (!checkedOutAt) {
+      createWorktree = createWorktreeCommand("herdr", loc, ctx.workspace.root, await branchAt(loc, ctx.workspace, ctx.github));
+    }
   }
   report.start.push({
     issue: n,
     branch: loc?.branch ?? null,
-    worktree: loc?.worktree ?? null,
+    worktree: loc ? join(ctx.workspace.root, loc.worktree) : null,
     createWorktree,
+    checkedOutAt,
+    // Fresh for every agent: a new agent on an item whose claim went stale must not pass for the old holder.
+    session: ctx.config.provider === "git" ? `psdd-${n}-${ctx.nonce()}` : null,
     kind: kindOf(issue) === "slice" ? "slice" : "story",
     title: issue.title,
     state,
@@ -153,6 +209,9 @@ function renderNothingLeft(r: NextReport): string {
 }
 
 export function renderNext(r: NextReport): string {
+  if (r.closed) {
+    return [...r.notes, `Story #${r.story} "${r.title}" is closed${r.notPlanned ? " as not planned" : ""}. Nothing left that you can do.`].join("\n");
+  }
   if (r.nothingLeft) return renderNothingLeft(r);
   const out: string[] = [];
   if (r.notes.length) out.push(...r.notes, "");
@@ -185,9 +244,11 @@ export function renderNext(r: NextReport): string {
       out.push(`  - ${what} ${desc}`);
       if (s.worktree) out.push(`    Worktree: ${s.worktree}`);
       if (s.createWorktree) out.push(`    Create the worktree: ${s.createWorktree}`);
+      if (s.checkedOutAt && s.branch) out.push(`    ${checkedOutElsewhere(s.branch, s.checkedOutAt)}`);
       if (r.provider === "herdr" && s.worktree) {
         out.push(`    Start an agent: herdr agent start psdd-${s.issue} --kind claude --pane <pane of ${s.worktree}>`);
       }
+      if (s.session && s.worktree) out.push(`    Start an agent in ${s.worktree} with PSDD_SESSION=${s.session} set.`);
       out.push(`    Start it with: ${s.command}`);
     }
   }

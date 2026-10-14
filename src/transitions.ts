@@ -1,6 +1,7 @@
+import { join, sep } from "node:path";
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
-import { kindOf, stateOf, type Outcome, type State } from "./machine.js";
+import { FIX_STATES, kindOf, stateOf, type Outcome, type State } from "./machine.js";
 import { locate } from "./location.js";
 import { sliceBranch, specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
@@ -24,6 +25,32 @@ export async function needsHumanReason(github: GitHub, n: number): Promise<strin
   return null;
 }
 
+export function fixLimitReason(max: number) {
+  return `(${max} fix rounds reached)`;
+}
+
+const FIX_LIMIT = new RegExp(`^${NEEDS_HUMAN_MARK}.*\\(\\d+ fix rounds reached\\)$`, "m");
+const TRANSITION = /^psdd: (\S+) → (\S+)/;
+
+/**
+ * Fix rounds that count toward the limit, read from psdd's transition comments:
+ * entries into a fix state from another state, since the last time the limit
+ * escalated. A person resolving that escalation so starts a fresh budget; the
+ * needs-human of QA in mode:hil does not reset it.
+ */
+export function fixRounds(comments: string[]): number {
+  let rounds = 0;
+  for (const body of comments) {
+    if (FIX_LIMIT.test(body)) {
+      rounds = 0;
+      continue;
+    }
+    const m = TRANSITION.exec(body);
+    if (m && m[1] !== m[2] && FIX_STATES.includes(m[2] as State)) rounds++;
+  }
+  return rounds;
+}
+
 export interface Ctx {
   github: GitHub;
   notify: Notify;
@@ -31,15 +58,16 @@ export interface Ctx {
   config: Config;
   now: () => Date;
   session: string;
+  /** A short random string, e.g. to make each agent's PSDD_SESSION unique. */
+  nonce: () => string;
   headSha: () => Promise<string>;
 }
 
 /**
  * Applies an outcome to an issue whose claim this session holds: labels,
- * comment, closing, and the automatic transitions that follow.
- * Returns extra lines to report.
+ * comment and closing. The automatic transitions that follow are in followUps.
  */
-export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, word: string, note?: string): Promise<string[]> {
+export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, word: string, note?: string): Promise<void> {
   const { github } = ctx;
   const n = issue.number;
   const from = stateOf(issue) ?? "triage";
@@ -70,21 +98,53 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
     await github.comment(n, comment.join("\n"));
     if (outcome.needsHuman) await notifyNeedsHuman(ctx, n, outcome.needsHuman);
   }
+}
 
-  const report: string[] = [];
-  if (kindOf(issue) === "story" && outcome.to === "implementation") {
-    const branch = storyBranch(n, issue.title);
-    if (!(await github.branchExists(branch))) {
-      await github.createBranch(branch, ctx.config.baseBranch);
-      report.push(`Created the story branch ${branch}.`);
-    }
+/**
+ * The automatic transitions after an outcome, run once its claim is released.
+ * Each is best effort: psdd next repeats them, so a failure is only reported.
+ */
+export async function followUps(ctx: Ctx, issue: Issue, outcome: Outcome): Promise<string[]> {
+  if (kindOf(issue) !== "slice" || outcome.to !== "closed") return [];
+  const story = await ctx.github.parentOf(issue.number);
+  if (!story) return [];
+  const lines: string[] = [];
+  const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
+  if (loc && (await ctx.workspace.worktreeExists(loc.worktree))) {
+    lines.push(`Its worktree ${loc.worktree} is removed by the next psdd next ${story}.`);
   }
-  if (kindOf(issue) === "slice" && outcome.to === "closed") {
-    const removed = await removeWorktreeOf(ctx, issue);
-    if (removed) report.push(`Removed the worktree ${removed}.`);
-    report.push(...(await afterSliceMerged(ctx, n)));
+  lines.push(...(await bestEffort("unblock the slices waiting on it", story, () => syncBlocked(ctx, story))));
+  lines.push(...(await bestEffort("move the story on", story, () => promoteStory(ctx, story))));
+  return lines;
+}
+
+/** Runs fn; a failure becomes a report line instead of an error. */
+export async function bestEffort(what: string, story: number, fn: () => Promise<string[]>): Promise<string[]> {
+  try {
+    return await fn();
+  } catch (e) {
+    return [`Could not ${what}: ${(e as Error).message}. psdd next ${story} will retry this.`];
   }
-  return report;
+}
+
+export type Ensured = { ok: true; created: boolean } | { ok: false; lines: string[] };
+
+/** Creates the story branch from the base branch unless it is already on GitHub. */
+export async function ensureStoryBranch(ctx: Ctx, story: Issue): Promise<Ensured> {
+  const branch = storyBranch(story.number, story.title);
+  if (await ctx.github.branchExists(branch)) return { ok: true, created: false };
+  const base = ctx.config.baseBranch;
+  if (!(await ctx.github.branchExists(base))) {
+    return {
+      ok: false,
+      lines: [
+        `The story branch ${branch} would start from ${base}, but ${base} does not exist on GitHub.`,
+        `Set baseBranch in .agents/psdd.config.json to the repository's default branch and run the command again.`,
+      ],
+    };
+  }
+  await ctx.github.createBranch(branch, base);
+  return { ok: true, created: true };
 }
 
 async function specLink(ctx: Ctx, issue: Issue): Promise<string | null> {
@@ -105,7 +165,8 @@ async function withShortClaim(ctx: Ctx, n: number, fn: () => Promise<void>): Pro
   try {
     await fn();
   } finally {
-    await ctx.github.deleteClaim(n);
+    // A claim this session already held stays held.
+    if (!got.reacquired) await ctx.github.deleteClaim(n);
   }
   return true;
 }
@@ -139,14 +200,13 @@ export async function syncBlocked(ctx: Ctx, story: number): Promise<string[]> {
   return lines;
 }
 
-async function afterSliceMerged(ctx: Ctx, slice: number): Promise<string[]> {
+/** Once every slice is merged, opens the story PR and moves the story to needs-review. */
+export async function promoteStory(ctx: Ctx, storyNumber: number): Promise<string[]> {
   const { github } = ctx;
-  const storyNumber = await github.parentOf(slice);
-  if (!storyNumber) return [];
-  const lines = await syncBlocked(ctx, storyNumber);
+  const lines: string[] = [];
   const slices = await github.subIssues(storyNumber);
   const story = await github.getIssue(storyNumber);
-  if (slices.every((s) => s.state === "closed") && stateOf(story) === "implementation") {
+  if (story.state === "open" && slices.length && slices.every((s) => s.state === "closed") && stateOf(story) === "implementation") {
     const branch = storyBranch(story.number, story.title);
     const base = ctx.config.baseBranch;
     const moved = await withShortClaim(ctx, storyNumber, async () => {
@@ -182,10 +242,18 @@ export async function sliceMergeRefusal(github: GitHub, slice: Issue): Promise<s
   return null;
 }
 
-/** Removes the issue's local worktree, if there is one. Returns its path when removed. */
+/**
+ * Removes the issue's local worktree, if there is one. Returns its path when removed.
+ * Throws rather than remove the worktree psdd is running in.
+ */
 export async function removeWorktreeOf(ctx: Ctx, issue: Issue): Promise<string | null> {
   const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
   if (!loc || !(await ctx.workspace.worktreeExists(loc.worktree))) return null;
+  const abs = join(ctx.workspace.root, loc.worktree);
+  const cwd = ctx.workspace.cwd;
+  if (cwd === abs || cwd.startsWith(abs + sep)) {
+    throw new Error(`psdd is running inside it; run psdd next from another directory to remove it`);
+  }
   await ctx.workspace.removeWorktree(loc.worktree, ctx.config.provider);
   return loc.worktree;
 }

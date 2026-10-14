@@ -31,11 +31,11 @@ export interface GitHub {
   currentUser(): Promise<string>;
   /** e.g. https://github.com/acme/app */
   repoUrl(): Promise<string>;
+  /** The repository's default branch, e.g. main. */
+  defaultBranch(): Promise<string>;
   getIssue(number: number): Promise<Issue>;
   addLabels(number: number, labels: string[]): Promise<void>;
   removeLabels(number: number, labels: string[]): Promise<void>;
-  /** Names of labels added to the issue, oldest first (from its timeline). */
-  labelHistory(number: number): Promise<string[]>;
   assign(number: number, users: string[]): Promise<void>;
   comment(number: number, body: string): Promise<void>;
   /** Comment bodies, oldest first. */
@@ -64,6 +64,8 @@ export interface GitHub {
 
   /** Atomically create refs/psdd/claims/<issue>. False when it already exists. */
   createClaim(number: number, record: ClaimRecord): Promise<boolean>;
+  /** Points the existing claim ref at a new record, e.g. a later `since`. */
+  refreshClaim(number: number, record: ClaimRecord): Promise<void>;
   readClaim(number: number): Promise<ClaimRecord | null>;
   deleteClaim(number: number): Promise<void>;
 }

@@ -22,6 +22,7 @@ export class LocalWorkspace implements Workspace {
     public root: string,
     public env: Record<string, string | undefined>,
     private run: Run = runCommand,
+    public cwd: string = root,
   ) {}
 
   /** The main checkout's root, also from inside a linked worktree. */
@@ -51,6 +52,18 @@ export class LocalWorkspace implements Workspace {
     return out.split("\n").includes(`worktree ${join(this.root, rel)}`);
   }
 
+  async branchCheckedOutAt(branch: string) {
+    const out = await this.must("git", ["-C", this.root, "worktree", "list", "--porcelain"]);
+    // Porcelain entries are blank-line separated: "worktree <path>", "HEAD <sha>", "branch refs/heads/<b>".
+    for (const entry of out.split("\n\n")) {
+      const lines = entry.split("\n");
+      if (lines.includes(`branch refs/heads/${branch}`)) {
+        return lines.find((l) => l.startsWith("worktree "))?.slice("worktree ".length) ?? null;
+      }
+    }
+    return null;
+  }
+
   async localBranchExists(branch: string) {
     return (await this.run("git", ["-C", this.root, "show-ref", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;
   }
@@ -59,7 +72,7 @@ export class LocalWorkspace implements Workspace {
     const path = join(this.root, rel);
     if (provider === "herdr") {
       const list = JSON.parse(await this.must("herdr", ["worktree", "list", "--cwd", this.root])) as {
-        result: { worktrees: { path: string; open_workspace_id: string | null }[] };
+        result: { worktrees: { path: string; open_workspace_id?: string | null }[] };
       };
       const id = list.result.worktrees.find((w) => w.path === path)?.open_workspace_id;
       if (id) {

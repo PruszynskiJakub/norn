@@ -25,6 +25,16 @@ describe("LocalWorkspace", () => {
     expect(await ws.worktreeExists(".agents/worktrees/124-y")).toBe(false);
   });
 
+  test("branchCheckedOutAt finds the worktree whose entry has the branch", async () => {
+    const { run } = scripted(() => ({
+      stdout: "worktree /repo\nHEAD abc\nbranch refs/heads/123-x\n\nworktree /repo/.agents/worktrees/124-y\nHEAD def\nbranch refs/heads/124-y\n\nworktree /tmp/d\nHEAD 012\ndetached\n",
+    }));
+    const ws = new LocalWorkspace("/repo", {}, run);
+    expect(await ws.branchCheckedOutAt("123-x")).toBe("/repo");
+    expect(await ws.branchCheckedOutAt("124-y")).toBe("/repo/.agents/worktrees/124-y");
+    expect(await ws.branchCheckedOutAt("123-x-1")).toBeNull();
+  });
+
   test("localBranchExists asks git for the branch ref", async () => {
     const { run, calls } = scripted((_, args) => ({ code: args.includes("refs/heads/123-x") ? 0 : 1 }));
     const ws = new LocalWorkspace("/repo", {}, run);
