@@ -218,12 +218,13 @@ async function done(n: number, word: string | undefined, note: string | undefine
 
   let applied = outcome;
   const limitLines: string[] = [];
-  if (FIX_STATES.includes(outcome.to as State)) {
+  // A round starts when review or QA sends the issue back; resolving needs-human stays put and is no round.
+  if (FIX_STATES.includes(outcome.to as State) && stateOf(issue) !== outcome.to) {
     const history = await github.labelHistory(n);
     const rounds = history.filter((l) => FIX_STATES.includes(l as State)).length + 1;
     if (rounds > deps.config.maxFixRounds) {
       const max = deps.config.maxFixRounds;
-      applied = { ...outcome, needsHuman: `escalated: "${note}" (${max} fix rounds reached)` };
+      applied = { ...outcome, needsHuman: `${note ? `escalated: "${note}" ` : ""}(${max} fix rounds reached)` };
       limitLines.push(`#${n} has reached ${max} fix rounds, so it now needs a human instead of another round of tdd.`);
     }
   }

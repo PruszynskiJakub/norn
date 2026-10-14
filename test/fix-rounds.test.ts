@@ -49,4 +49,18 @@ describe("fix-round limit", () => {
     await w.psdd("done", "131", "request-changes", "Still flaky");
     expect(w.github.labels(131)).toContain("needs-human");
   });
+
+  test("resolving needs-human after the limit clears it and is no new round", async () => {
+    const w = sliceWithRounds(4, "changes-requested");
+    w.github.issues.get(131)!.labels.push("needs-human");
+    await w.psdd("take", "131");
+
+    const res = await w.psdd("done", "131");
+
+    expect(res.exitCode).toBe(0);
+    expect(w.github.labels(131)).toContain("changes-requested");
+    expect(w.github.labels(131)).not.toContain("needs-human");
+    expect(res.stdout).not.toContain("fix rounds");
+    expect(w.github.comments(131).join("\n")).not.toContain("undefined");
+  });
 });
