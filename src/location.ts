@@ -93,7 +93,11 @@ export async function workInLines(loc: Location, workspace: Workspace, github: G
     }
     const at = await branchAt(loc, workspace, github);
     lines.push("It does not exist yet. Create it first:", `  ${createWorktreeCommand(provider, loc, workspace.root, at)}`);
-  } else if (await github.branchExists(loc.branch)) {
+    return lines;
+  }
+  // An earlier session may have stopped partway and left its work here.
+  if (await workspace.worktreeDirty(loc.worktree)) lines.push("It has uncommitted changes, e.g. from an earlier session. Check git status there before you start.");
+  if (await github.branchExists(loc.branch)) {
     // Others push here too, e.g. slices merged into the story branch; catch up before starting.
     lines.push("Bring it up to date first:", `  ${updateWorktreeCommand(loc, workspace.root)}`);
   }

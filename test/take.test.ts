@@ -91,6 +91,25 @@ describe("taking over a stopped session of your own", () => {
     expect(w.github.claim(123)).toMatchObject({ holder: "bob", session: "bobs-session" });
   });
 
+  test("taken fresh after the earlier session released it, the briefing names its uncommitted work", async () => {
+    const w = heldByMyOtherSession();
+    await w.as("stopped-session")("take", "123");
+    await w.psdd("take", "123", "--takeover");
+    await w.psdd("release", "123");
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
+    w.workspace.dirty.add(".agents/worktrees/123-rate-limiting");
+
+    const res = await w.as("worktree-agent")("take", "123");
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain(
+      [
+        "Work in: /repo/.agents/worktrees/123-rate-limiting (branch 123-rate-limiting)",
+        "It has uncommitted changes, e.g. from an earlier session. Check git status there before you start.",
+      ].join("\n"),
+    );
+  });
+
   test("--takeover on an unheld issue is an ordinary take", async () => {
     const w = heldByMyOtherSession();
 

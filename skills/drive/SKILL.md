@@ -21,11 +21,10 @@ You take the issue through psdd one step at a time, with the user. psdd says wha
 3. Go back to step 1 with the story.
 4. The rest runs without the user. Tell them what `psdd next` lists and offer to start the deliver skill: `deliver <story>`. Start it only when they agree.
 5. Report: where the story is, what is waiting and why, and who needs to act. The reasons come from `psdd status <story>` and the "Waiting for a human" list.
-6. Hand over (herdr only). Create the worktree with the listed command if needed. Find its pane: `herdr worktree list --cwd <repo root>` gives the worktree's `open_workspace_id`, and `herdr pane list --workspace <id>` its pane. Run the listed `herdr agent start`, `herdr agent prompt` and `herdr agent focus` commands with that pane. Tell the user the story goes on with the agent in that workspace, and stop. The new agent runs this skill from the worktree.
+6. Hand over (herdr only). Create the worktree with the listed command if needed. Find its pane: `herdr worktree list --cwd <repo root>` gives the worktree's `open_workspace_id`, and `herdr pane list --workspace <id>` its pane. Run the listed `herdr agent start`, `herdr agent prompt` and `herdr agent focus` commands with that pane. If the pane list shows an agent in the pane already, skip `agent start` and use the pane id in place of the agent name. Tell the user the story goes on with the agent in that workspace, and stop. The new agent runs this skill from the worktree.
 7. Pick up a stopped session. An earlier session of the user's holds the item, e.g. one they closed partway through a step. Ask the user whether that session is still running.
    - Still running: tell them to carry on there, and stop.
-   - Stopped, and they want to go on: run `psdd take <item> --takeover` and continue as in step 2. Check `git status` in the worktree first if the briefing says to: the earlier session's work is there.
-   - Stopped, and they want to drop the step: run `psdd take <item> --takeover`, then `psdd release <item>`. The item keeps its state for whoever takes it next.
+   - Stopped: run `psdd take <item> --takeover`, then `psdd release <item>`. The item is free again, in the same state, with the earlier session's work kept in its worktree. If the user wants to go on, go back to step 1: `psdd next` says where to take it, which under herdr is a hand-off to the worktree. Otherwise stop.
 
 Done when the user has the report, has started deliver, or the story has been handed over or left to a running session.
 
