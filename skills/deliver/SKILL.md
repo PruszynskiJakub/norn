@@ -28,3 +28,4 @@ Done when you have given the user the report: what is merged, what is waiting an
 - A claim not renewed for `claims.staleAfter` (2h by default) counts as abandoned. Tell subagents on long steps to run `psdd take <issue>` again now and then; it refreshes their claim.
 - Change state only through psdd. Labels, branches and PRs belong to psdd and the subagents.
 - Items marked "needs a human" are for people; leave them to them and carry on with the rest.
+- Known limit: under Claude Code, subagents share your psdd session. Give each item to exactly one subagent, and never let a subagent run `psdd done`, `release` or `escalate` on an item other than its own.
