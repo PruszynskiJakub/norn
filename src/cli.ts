@@ -19,6 +19,7 @@ import {
   needsHumanLine,
   oneLine,
   sliceMergeRefusal,
+  stateLabels,
   type Ctx,
 } from "./transitions.js";
 
@@ -187,12 +188,15 @@ async function take(n: number, deps: Env): Promise<Result> {
     return refuse(await noStepRefusal(issue, github));
   }
   const state = stateOf(issue);
+  // The new state goes on before the old one comes off, so a failure in between never leaves the issue without a state.
   if (step.enterAs && step.enterAs !== state) {
-    if (state) await github.removeLabels(n, [state]);
-    await github.addLabels(n, [step.enterAs]);
-    issue.labels = [...issue.labels.filter((l) => l !== state), step.enterAs];
+    const old = stateLabels(issue, step.enterAs);
+    await github.addLabels(n, [step.enterAs, "in-progress"]);
+    await github.removeLabels(n, old);
+    issue.labels = [...issue.labels.filter((l) => !(old as string[]).includes(l)), step.enterAs];
+  } else {
+    await github.addLabels(n, ["in-progress"]);
   }
-  await github.addLabels(n, ["in-progress"]);
   let staleNote: string | null = null;
   if (claim.tookOver) {
     // The holder may only be slow, and its worktree holds its commits: keep it, never remove it here.
@@ -286,8 +290,8 @@ async function escalate(n: number, reason: string | undefined, deps: Env): Promi
   const notHeld = await checkHeld(n, deps);
   if (notHeld) return notHeld;
   const { github } = deps;
-  await github.removeLabels(n, ["in-progress"]);
   await github.addLabels(n, ["needs-human"]);
+  await github.removeLabels(n, ["in-progress"]);
   const why = `escalated: "${oneLine(reason)}"`;
   // The full reason keeps its line breaks in its own paragraph; the marker line stays single-line.
   await github.comment(n, [needsHumanLine(why), ...(reason.includes("\n") ? ["", reason] : [])].join("\n"));

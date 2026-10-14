@@ -1,7 +1,7 @@
 import { join, sep } from "node:path";
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
-import { FIX_STATES, kindOf, stateOf, type Outcome, type State } from "./machine.js";
+import { FIX_STATES, STATES, kindOf, stateOf, type Outcome, type State } from "./machine.js";
 import { locate } from "./location.js";
 import { sliceBranch, specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
@@ -81,10 +81,12 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
   if (spec) comment.push("", `Spec: ${spec}`);
   if (note) comment.push("", note);
 
+  // The new state is written before the old labels go, so a failure in between
+  // leaves an issue psdd can still act on, never one with no state.
   if (outcome.to === "not-planned" || outcome.to === "closed") {
-    await github.removeLabels(n, ["in-progress", "needs-human", ...(stateOf(issue) ? [stateOf(issue)!] : [])]);
     await github.comment(n, comment.join("\n"));
     await github.closeIssue(n, outcome.to === "closed" ? "completed" : "not_planned");
+    await github.removeLabels(n, ["in-progress", "needs-human", ...stateLabels(issue)]);
   } else {
     const add: string[] = [outcome.to];
     if (kindOf(issue) === "new") {
@@ -95,12 +97,10 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
       add.push("needs-human");
       comment.push("", needsHumanLine(outcome.needsHuman));
     }
-    const state = stateOf(issue);
-    const remove = ["in-progress", ...(outcome.needsHuman ? [] : ["needs-human"])];
-    if (state && state !== outcome.to) remove.push(state);
-    await github.removeLabels(n, remove);
+    const remove = ["in-progress", ...(outcome.needsHuman ? [] : ["needs-human"]), ...stateLabels(issue, outcome.to)];
     await github.addLabels(n, add);
     await github.comment(n, comment.join("\n"));
+    await github.removeLabels(n, remove);
     if (outcome.needsHuman) await notifyNeedsHuman(ctx, n, outcome.needsHuman);
   }
 }
@@ -178,9 +178,17 @@ async function withShortClaim(ctx: Ctx, n: number, fn: () => Promise<void>): Pro
 
 async function setState(ctx: Ctx, issue: Issue, to: State, why: string) {
   const from = stateOf(issue);
-  if (from) await ctx.github.removeLabels(issue.number, [from]);
   await ctx.github.addLabels(issue.number, [to]);
   await ctx.github.comment(issue.number, `psdd: ${from} → ${to} (automatic)\n\n${why}`);
+  await ctx.github.removeLabels(issue.number, stateLabels(issue, to));
+}
+
+/**
+ * Every state label on the issue except `keep`. A failed removal can leave two
+ * state labels; removing all of them on the next transition cleans that up.
+ */
+export function stateLabels(issue: Issue, keep?: string): State[] {
+  return STATES.filter((s) => s !== keep && issue.labels.includes(s));
 }
 
 /**

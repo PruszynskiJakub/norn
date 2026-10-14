@@ -37,7 +37,7 @@ export interface StartItem {
 
 export interface WaitItem {
   issue: number;
-  reason: "blocked" | "needs-human" | "held" | "owner-merge";
+  reason: "blocked" | "needs-human" | "held" | "owner-merge" | "no-state";
   detail: string;
 }
 
@@ -154,13 +154,18 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     report.waiting.push({ issue: n, reason: "needs-human", detail: why });
     return;
   }
+  if (!state) {
+    // Not skipped silently: with no state psdd cannot brief it, and delivery must not report nothing left.
+    report.waiting.push({ issue: n, reason: "no-state", detail: "has no state label; a person must set one" });
+    return;
+  }
   if (state === "blocked") {
     const open = (await ctx.github.blockedBy(n)).filter((b) => b.state === "open");
     report.waiting.push({ issue: n, reason: "blocked", detail: `is blocked by ${open.map((b) => `#${b.number}`).join(", ")}` });
     return;
   }
   const step = stepFor(issue);
-  if (!step || !state) return;
+  if (!step) return;
   const claim = await ctx.github.readClaim(n);
   if (claim && !isStale(claim, ctx.now(), ctx.config.staleAfterMs)) {
     const who = claim.session === ctx.session ? "this session" : "another session";
@@ -198,8 +203,11 @@ function waitLine(w: WaitItem) {
   return w.reason === "needs-human" ? `  - #${w.issue} needs a human: ${w.detail}. Do not take it.` : `  - #${w.issue} ${w.detail}.`;
 }
 
+/** Waiting items only a person can move on. */
+const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "owner-merge", "no-state"];
+
 function renderNothingLeft(r: NextReport): string {
-  const human = r.waiting.filter((w) => w.reason === "needs-human" || w.reason === "owner-merge");
+  const human = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));
   const blocked = r.waiting.filter((w) => w.reason === "blocked");
   const out = [...r.notes, `Story #${r.story} "${r.title}": nothing left that you can do.`];
   if (human.length) out.push("Waiting for a human:", ...human.map((w) => `  - #${w.issue} ${w.detail}.`));
@@ -273,7 +281,7 @@ export async function notAStory(github: GitHub, n: number): Promise<string[] | n
 
 /** Delivery stops: tell the user what waits for them. */
 export async function notifyWaiting(ctx: Ctx, r: NextReport) {
-  const waiting = r.waiting.filter((w) => w.reason === "needs-human" || w.reason === "owner-merge");
+  const waiting = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));
   await send(ctx, {
     title: `psdd: story #${r.story} is waiting for you`,
     body: waiting.map((w) => `#${w.issue} ${w.detail}`).join("\n") || "Nothing left to do on the story.",
