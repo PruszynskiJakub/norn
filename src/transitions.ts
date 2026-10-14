@@ -254,9 +254,20 @@ export async function sliceMergeRefusal(ctx: Ctx, slice: Issue): Promise<string[
   const storyNumber = await github.parentOf(slice.number);
   if (!storyNumber) return [`#${slice.number} is not a sub-issue of a story.`];
   const story = await github.getIssue(storyNumber);
-  const head = sliceBranch(story.number, await storySlug(ctx, story), slice.number);
+  const slug = await storySlug(ctx, story);
+  const head = sliceBranch(story.number, slug, slice.number);
+  const base = storyBranch(story.number, slug);
   const pr = await github.findPullRequest(head);
   if (!pr) return [`No PR from ${head} was found. Open and merge it before running psdd done ${slice.number}.`];
+  // A slice PR into anything but the story branch skips story review and misses the story PR.
+  if (pr.base !== base) {
+    return [
+      `PR #${pr.number} from ${head} targets ${pr.base}, not the story branch ${base}.`,
+      pr.state === "merged"
+        ? `Its changes are not on ${base}, and a person must sort that out. Run: psdd escalate ${slice.number} "slice PR #${pr.number} was merged into ${pr.base}, not ${base}"`
+        : `Retarget it with: gh pr edit ${pr.number} --base ${base}, then merge it and run psdd done ${slice.number}.`,
+    ];
+  }
   if (pr.state !== "merged") {
     return [
       `PR #${pr.number} from ${head} is not merged yet.`,
