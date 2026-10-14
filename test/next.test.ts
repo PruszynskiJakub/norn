@@ -16,6 +16,7 @@ function prdExample() {
   for (const s of [125, 126, 131, 128, 127, 132, 129]) gh.parents.set(s, 123);
   gh.blockers.set(131, [125]);
   gh.blockers.set(132, [131]);
+  gh.branches.add("123-rate-limiting");
   return w;
 }
 

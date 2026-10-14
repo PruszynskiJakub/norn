@@ -47,6 +47,10 @@ export class FakeGitHub implements GitHub {
   async repoUrl() {
     return "https://github.com/acme/app";
   }
+  defaultBranchName = "main";
+  async defaultBranch() {
+    return this.defaultBranchName;
+  }
   async getIssue(n: number) {
     return structuredClone(this.mustGet(n));
   }

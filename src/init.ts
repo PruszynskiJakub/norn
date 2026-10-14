@@ -63,7 +63,10 @@ export async function init({ github, cwd, installSkills }: InitDeps): Promise<{ 
   if (readdirSync(specs).length === 0) writeFileSync(join(specs, ".gitkeep"), "");
 
   const teamConfig = join(cwd, TEAM_CONFIG);
-  if (!existsSync(teamConfig)) writeFileSync(teamConfig, JSON.stringify(DEFAULT_TEAM_CONFIG, null, 2) + "\n");
+  if (!existsSync(teamConfig)) {
+    const config = { ...DEFAULT_TEAM_CONFIG, baseBranch: await github.defaultBranch() };
+    writeFileSync(teamConfig, JSON.stringify(config, null, 2) + "\n");
+  }
   ensureGitignored(cwd, [".agents/worktrees/", LOCAL_CONFIG]);
 
   await github.ensureLabels(labelDefinitions());

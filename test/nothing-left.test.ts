@@ -9,6 +9,7 @@ function stuckStory() {
   gh.seedIssue({ number: 129, title: "Dashboard", labels: ["type:slice", "mode:hil", "needs-qa", "needs-human"] });
   gh.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "changes-requested", "needs-human"] });
   for (const s of [127, 129, 131]) gh.parents.set(s, 123);
+  gh.branches.add("123-rate-limiting");
   gh.commentsByIssue.set(129, ["psdd: needs-review → needs-qa (approve)\n\npsdd: needs-human — QA in mode:hil"]);
   gh.commentsByIssue.set(131, [
     'psdd: needs-review → changes-requested (request-changes)\n\npsdd: needs-human — escalated: "Redis client times out in tests" (3 fix rounds reached)',

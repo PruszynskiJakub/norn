@@ -31,6 +31,8 @@ export interface GitHub {
   currentUser(): Promise<string>;
   /** e.g. https://github.com/acme/app */
   repoUrl(): Promise<string>;
+  /** The repository's default branch, e.g. main. */
+  defaultBranch(): Promise<string>;
   getIssue(number: number): Promise<Issue>;
   addLabels(number: number, labels: string[]): Promise<void>;
   removeLabels(number: number, labels: string[]): Promise<void>;

@@ -82,22 +82,43 @@ describe("worktree cleanup", () => {
     return w;
   }
 
-  test("when a slice merges, psdd removes its worktree with the configured tool", async () => {
+  test("done on a merged slice leaves its worktree; the next psdd next removes it with the configured tool", async () => {
     const w = mergingSlice();
     await w.psdd("take", "127");
 
     const res = await w.psdd("done", "127");
 
+    expect(w.workspace.removed).toEqual([]);
+    expect(res.stdout).toContain("Its worktree .agents/worktrees/123-rate-limiting-127 is removed by the next psdd next 123.");
+
+    const next = await w.psdd("next", "123");
+
     expect(w.workspace.removed).toEqual([{ path: ".agents/worktrees/123-rate-limiting-127", provider: "claude-code" }]);
-    expect(res.stdout).toContain("Removed the worktree .agents/worktrees/123-rate-limiting-127.");
+    expect(next.stdout).toContain("Slice #127 is merged. Removed its worktree .agents/worktrees/123-rate-limiting-127.");
   });
 
   test("a slice with no local worktree merges without removing anything", async () => {
     const w = mergingSlice();
     w.workspace.worktrees.clear();
     await w.psdd("take", "127");
-    await w.psdd("done", "127");
+    const res = await w.psdd("done", "127");
+    await w.psdd("next", "123");
     expect(w.workspace.removed).toEqual([]);
+    expect(res.stdout).not.toContain("worktree");
+  });
+
+  test("a worktree that cannot be removed is reported by next, and the rest of next still runs", async () => {
+    const w = mergingSlice();
+    w.github.issues.get(127)!.state = "closed";
+    w.workspace.removeWorktree = async () => {
+      throw new Error("git worktree remove failed: locked");
+    };
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("Could not remove the worktree of #127: git worktree remove failed: locked");
+    expect(res.stdout).toContain("Slice #128");
   });
 
   test("the story worktree is removed once the story has merged into main", async () => {

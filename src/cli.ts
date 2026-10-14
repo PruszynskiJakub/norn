@@ -8,8 +8,16 @@ import { init } from "./init.js";
 import { notifyNeedsHuman } from "./notify.js";
 import { loadConfig, providerRefusal } from "./config.js";
 import { status } from "./status.js";
-import { hhmm, specPath } from "./text.js";
-import { applyOutcome, needsHumanLine, removeWorktreeOf, sliceMergeRefusal, type Ctx } from "./transitions.js";
+import { hhmm, specPath, storyBranch } from "./text.js";
+import {
+  applyOutcome,
+  ensureStoryBranch,
+  followUps,
+  needsHumanLine,
+  removeWorktreeOf,
+  sliceMergeRefusal,
+  type Ctx,
+} from "./transitions.js";
 
 export type Deps = Omit<Ctx, "config"> & {
   cwd: string;
@@ -215,6 +223,12 @@ async function done(n: number, word: string | undefined, note: string | undefine
     const r = await sliceMergeRefusal(github, issue);
     if (r) return refuse(r);
   }
+  const preLines: string[] = [];
+  if (kindOf(issue) === "story" && outcome.to === "implementation") {
+    const branch = await ensureStoryBranch(deps, issue);
+    if (!branch.ok) return refuse(branch.lines);
+    if (branch.created) preLines.push(`Created the story branch ${storyBranch(n, issue.title)}.`);
+  }
 
   let applied = outcome;
   const limitLines: string[] = [];
@@ -228,8 +242,12 @@ async function done(n: number, word: string | undefined, note: string | undefine
       limitLines.push(`#${n} has reached ${max} fix rounds, so it now needs a human instead of another round of tdd.`);
     }
   }
-  const extra = [...limitLines, ...(await applyOutcome(deps, issue, applied, word ?? "", note))];
-  await github.deleteClaim(n);
+  try {
+    await applyOutcome(deps, issue, applied, word ?? "", note);
+  } finally {
+    await github.deleteClaim(n);
+  }
+  const extra = [...limitLines, ...preLines, ...(await followUps(deps, issue, applied))];
   if (kindOf(issue) === "story" && outcome.to === "implementation") {
     extra.push(`To run the story unattended until it needs a human, the user can start the deliver skill: deliver ${n}`);
   }

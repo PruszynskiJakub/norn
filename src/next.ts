@@ -5,7 +5,15 @@ import type { Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
 import { kindOf, stateOf, stepFor, type State } from "./machine.js";
 import { hhmm, storyBranch, wrap } from "./text.js";
-import { needsHumanReason, removeWorktreeOf, syncBlocked, type Ctx } from "./transitions.js";
+import {
+  bestEffort,
+  ensureStoryBranch,
+  needsHumanReason,
+  promoteStory,
+  removeWorktreeOf,
+  syncBlocked,
+  type Ctx,
+} from "./transitions.js";
 
 export interface StartItem {
   issue: number;
@@ -54,10 +62,42 @@ const DESCRIBE: Partial<Record<State, string>> = {
   "merge-queue": "is in merge-queue",
 };
 
-/** What can be done on a story now. Syncs blocked labels first. */
+/**
+ * Catches the story up with what earlier commands left undone or could not do:
+ * the story branch, moving on once every slice is merged, and removing the
+ * worktrees of closed items. Returns notes on what changed or failed.
+ */
+async function reconcile(ctx: Ctx, storyNumber: number): Promise<string[]> {
+  const { github } = ctx;
+  const notes: string[] = [];
+  const story = await github.getIssue(storyNumber);
+  if (story.state === "open" && stateOf(story) === "implementation") {
+    const branch = await ensureStoryBranch(ctx, story).catch((e: Error) => ({ ok: false as const, lines: [`Could not create the story branch: ${e.message}`] }));
+    if (!branch.ok) notes.push(...branch.lines);
+    else if (branch.created) notes.push(`Created the story branch ${storyBranch(storyNumber, story.title)}.`);
+  }
+  notes.push(...(await bestEffort("move the story on", storyNumber, () => promoteStory(ctx, storyNumber))));
+  const closed = (await github.subIssues(storyNumber)).filter((s) => s.state === "closed");
+  if (story.state === "closed") closed.push(story);
+  for (const issue of closed) {
+    try {
+      const removed = await removeWorktreeOf(ctx, issue);
+      if (!removed) continue;
+      notes.push(issue.number === storyNumber
+        ? `Story #${storyNumber} is merged and closed. Removed its worktree ${removed}.`
+        : `Slice #${issue.number} is merged. Removed its worktree ${removed}.`);
+    } catch (e) {
+      notes.push(`Could not remove the worktree of #${issue.number}: ${(e as Error).message}`);
+    }
+  }
+  return notes;
+}
+
+/** What can be done on a story now. Syncs blocked labels and catches up on housekeeping first. */
 export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextReport> {
   const { github } = ctx;
   await syncBlocked(ctx, storyNumber);
+  const notes = await reconcile(ctx, storyNumber);
   const story = await github.getIssue(storyNumber);
   const slices = await github.subIssues(storyNumber);
   const report: NextReport = {
@@ -70,14 +110,10 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
     slices: { total: slices.length, merged: slices.filter((s) => s.state === "closed").length },
     start: [],
     waiting: [],
-    notes: [],
+    notes,
     nothingLeft: false,
   };
-  if (story.state === "closed") {
-    const removed = await removeWorktreeOf(ctx, story);
-    if (removed) report.notes.push(`Story #${storyNumber} is merged and closed. Removed its worktree ${removed}.`);
-    return report;
-  }
+  if (story.state === "closed") return report;
   if (stateOf(story) === "merge-queue") {
     const owner = story.assignees[0] ? `@${story.assignees[0]}` : "the story owner";
     report.waiting.push({

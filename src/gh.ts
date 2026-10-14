@@ -90,6 +90,9 @@ export class GhGitHub implements GitHub {
   async repoUrl() {
     return (await this.api<{ html_url: string }>("GET", REPO)).html_url;
   }
+  async defaultBranch() {
+    return (await this.api<{ default_branch: string }>("GET", REPO)).default_branch;
+  }
   async getIssue(n: number) {
     return toIssue(await this.rawIssue(n));
   }
