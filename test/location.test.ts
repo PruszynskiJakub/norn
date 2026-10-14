@@ -28,17 +28,17 @@ describe("herdr worktree commands", () => {
     );
   });
 
-  test("a local branch also on GitHub is fast-forwarded first", () => {
+  test("a local branch also on GitHub is fast-forwarded inside the new worktree", () => {
     expect(createWorktreeCommand("herdr", slice, "/repo", { local: true, remote: true })).toBe(
-      `git -C /repo fetch origin 123-rate-limiting-131:123-rate-limiting-131 && herdr worktree create --cwd /repo --branch 123-rate-limiting-131 --path ${path} --no-focus`,
+      `git -C /repo fetch origin 123-rate-limiting-131 && herdr worktree create --cwd /repo --branch 123-rate-limiting-131 --path ${path} --no-focus && git -C ${path} merge --ff-only origin/123-rate-limiting-131`,
     );
   });
 });
 
 describe("git worktree commands for a local branch", () => {
-  test("also on GitHub: fast-forwarded from origin before the worktree is added", () => {
+  test("also on GitHub: fast-forwarded from origin inside the new worktree, keeping local commits", () => {
     expect(createWorktreeCommand("git", slice, "/repo", { local: true, remote: true })).toBe(
-      `git -C /repo fetch origin 123-rate-limiting-131:123-rate-limiting-131 && git -C /repo worktree add ${path} 123-rate-limiting-131`,
+      `git -C /repo fetch origin 123-rate-limiting-131 && git -C /repo worktree add ${path} 123-rate-limiting-131 && git -C ${path} merge --ff-only origin/123-rate-limiting-131`,
     );
   });
 

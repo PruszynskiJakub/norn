@@ -80,6 +80,20 @@ describe("take names the worktree", () => {
     );
   });
 
+  test("a branch checked out in another checkout gets no create command, which could not work", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
+    w.workspace.localBranches.add("123-rate-limiting");
+    w.workspace.checkedOut.set("123-rate-limiting", "/repo");
+
+    const res = await w.psdd("take", "123");
+
+    expect(res.stdout).toContain(
+      "Work in: /repo/.agents/worktrees/123-rate-limiting (branch 123-rate-limiting)\nBranch 123-rate-limiting is checked out at /repo; work there or switch that checkout to another branch.\n",
+    );
+    expect(res.stdout).not.toContain("worktree add");
+  });
+
   test("the commands work from inside another worktree: absolute paths, git run against the main checkout", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });

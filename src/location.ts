@@ -41,8 +41,10 @@ export async function branchAt(loc: Location, workspace: Workspace, github: GitH
 /**
  * The command that creates the worktree with the given tool. Paths are absolute
  * and git runs against the main checkout, so it works from any directory.
- * - A local branch that is also on GitHub is fast-forwarded first, e.g. a story
- *   branch behind slices merged there; the fetch refuses if it has diverged.
+ * - A local branch that is also on GitHub is fast-forwarded inside the new
+ *   worktree, e.g. a story branch behind slices merged there. A branch ahead of
+ *   GitHub keeps its commits; one that has diverged gets its worktree, and the
+ *   failing --ff-only says so.
  * - A branch only on GitHub is fetched and checked out with its commits.
  * - A new branch starts from the base as it is on GitHub, without tracking it.
  * herdr ignores --base for an existing local branch and otherwise tracks the
@@ -54,7 +56,7 @@ export function createWorktreeCommand(provider: Provider, loc: Location, root: s
   const { branch, base } = loc;
   const herdr = (extra: string) => `herdr worktree create --cwd ${root} --branch ${branch}${extra} --path ${path} --no-focus`;
   const add = provider === "herdr" ? herdr("") : `${git} worktree add ${path} ${branch}`;
-  if (at.local) return at.remote ? `${git} fetch origin ${branch}:${branch} && ${add}` : add;
+  if (at.local) return at.remote ? `${git} fetch origin ${branch} && ${add} && git -C ${path} merge --ff-only origin/${branch}` : add;
   if (at.remote) {
     return provider === "herdr"
       ? `${git} fetch origin ${base} ${branch} && ${herdr(` --base origin/${branch}`)}`
@@ -76,8 +78,18 @@ export function detectProvider(env: Record<string, string | undefined>): Provide
 export async function workInLines(loc: Location, workspace: Workspace, github: GitHub, provider: Provider): Promise<string[]> {
   const lines = [`Work in: ${join(workspace.root, loc.worktree)} (branch ${loc.branch})`];
   if (!(await workspace.worktreeExists(loc.worktree))) {
+    const elsewhere = await workspace.branchCheckedOutAt(loc.branch);
+    if (elsewhere) {
+      lines.push(checkedOutElsewhere(loc.branch, elsewhere));
+      return lines;
+    }
     const at = await branchAt(loc, workspace, github);
     lines.push("It does not exist yet. Create it first:", `  ${createWorktreeCommand(provider, loc, workspace.root, at)}`);
   }
   return lines;
+}
+
+/** git checks a branch out in one worktree only, so no create command can work. */
+export function checkedOutElsewhere(branch: string, path: string) {
+  return `Branch ${branch} is checked out at ${path}; work there or switch that checkout to another branch.`;
 }

@@ -1,7 +1,7 @@
 import { isStale } from "./claims.js";
 import { send } from "./notify.js";
 import { join } from "node:path";
-import { branchAt, createWorktreeCommand, locate } from "./location.js";
+import { branchAt, checkedOutElsewhere, createWorktreeCommand, locate } from "./location.js";
 import type { Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
 import { kindOf, stateOf, stepFor, type State } from "./machine.js";
@@ -29,6 +29,8 @@ export interface StartItem {
   worktree: string | null;
   /** Under herdr, the agent starts in the worktree's pane, so the worktree is made first. */
   createWorktree: string | null;
+  /** Under herdr, where the item's branch is checked out instead, so no worktree can be made for it. */
+  checkedOutAt: string | null;
   /** Under plain git, the PSDD_SESSION to start the item's agent with, unique per listing, so each agent is its own session. */
   session: string | null;
 }
@@ -167,14 +169,19 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   }
   const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
   let createWorktree: string | null = null;
+  let checkedOutAt: string | null = null;
   if (loc && ctx.config.provider === "herdr" && !(await ctx.workspace.worktreeExists(loc.worktree))) {
-    createWorktree = createWorktreeCommand("herdr", loc, ctx.workspace.root, await branchAt(loc, ctx.workspace, ctx.github));
+    checkedOutAt = await ctx.workspace.branchCheckedOutAt(loc.branch);
+    if (!checkedOutAt) {
+      createWorktree = createWorktreeCommand("herdr", loc, ctx.workspace.root, await branchAt(loc, ctx.workspace, ctx.github));
+    }
   }
   report.start.push({
     issue: n,
     branch: loc?.branch ?? null,
     worktree: loc ? join(ctx.workspace.root, loc.worktree) : null,
     createWorktree,
+    checkedOutAt,
     // Fresh for every agent: a new agent on an item whose claim went stale must not pass for the old holder.
     session: ctx.config.provider === "git" ? `psdd-${n}-${ctx.nonce()}` : null,
     kind: kindOf(issue) === "slice" ? "slice" : "story",
@@ -237,6 +244,7 @@ export function renderNext(r: NextReport): string {
       out.push(`  - ${what} ${desc}`);
       if (s.worktree) out.push(`    Worktree: ${s.worktree}`);
       if (s.createWorktree) out.push(`    Create the worktree: ${s.createWorktree}`);
+      if (s.checkedOutAt && s.branch) out.push(`    ${checkedOutElsewhere(s.branch, s.checkedOutAt)}`);
       if (r.provider === "herdr" && s.worktree) {
         out.push(`    Start an agent: herdr agent start psdd-${s.issue} --kind claude --pane <pane of ${s.worktree}>`);
       }

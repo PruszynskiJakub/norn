@@ -52,6 +52,18 @@ export class LocalWorkspace implements Workspace {
     return out.split("\n").includes(`worktree ${join(this.root, rel)}`);
   }
 
+  async branchCheckedOutAt(branch: string) {
+    const out = await this.must("git", ["-C", this.root, "worktree", "list", "--porcelain"]);
+    // Porcelain entries are blank-line separated: "worktree <path>", "HEAD <sha>", "branch refs/heads/<b>".
+    for (const entry of out.split("\n\n")) {
+      const lines = entry.split("\n");
+      if (lines.includes(`branch refs/heads/${branch}`)) {
+        return lines.find((l) => l.startsWith("worktree "))?.slice("worktree ".length) ?? null;
+      }
+    }
+    return null;
+  }
+
   async localBranchExists(branch: string) {
     return (await this.run("git", ["-C", this.root, "show-ref", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;
   }

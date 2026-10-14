@@ -145,6 +145,18 @@ describe("--json", () => {
 });
 
 describe("next names how to start fresh agents for the worktree tool", () => {
+  test("herdr: a branch checked out elsewhere is named instead of a create command", async () => {
+    const w = prdExample();
+    w.workspace.env = { HERDR_ENV: "1" };
+    w.workspace.checkedOut.set("123-rate-limiting-131", "/repo");
+
+    const res = await w.psdd("next", "123");
+    const s131 = res.stdout.slice(res.stdout.indexOf("Slice #131"), res.stdout.indexOf("Slice #128"));
+
+    expect(s131).toContain("    Branch 123-rate-limiting-131 is checked out at /repo; work there or switch that checkout to another branch.");
+    expect(s131).not.toContain("Create the worktree");
+  });
+
   test("herdr: create the worktree if missing, then a new herdr agent in its pane", async () => {
     const w = prdExample();
     w.workspace.env = { HERDR_ENV: "1" };

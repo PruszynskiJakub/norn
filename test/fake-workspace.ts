@@ -15,6 +15,11 @@ export class FakeWorkspace implements Workspace {
   async worktreeExists(rel: string) {
     return this.worktrees.has(rel);
   }
+  /** Branch → absolute path of the checkout that has it checked out. */
+  checkedOut = new Map<string, string>();
+  async branchCheckedOutAt(branch: string) {
+    return this.checkedOut.get(branch) ?? null;
+  }
   async localBranchExists(branch: string) {
     return this.localBranches.has(branch);
   }
