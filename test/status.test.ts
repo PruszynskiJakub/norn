@@ -26,7 +26,7 @@ describe("psdd status", () => {
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toBe(
       [
-        'Story #123 "Rate limiting": implementation · owner @alice · branch story/123-rate-limiting',
+        'Story #123 "Rate limiting": implementation · owner @alice · branch 123-rate-limiting',
         "Slices (1 of 3 merged):",
         '  #127 "Redis store"      merged',
         '  #131 "Per-key limits"   implementation · mode:hil · held since 14:02',

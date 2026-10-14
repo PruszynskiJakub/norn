@@ -57,3 +57,33 @@ describe("psdd init", () => {
     expect(res.stdout).toContain("Missing skills: triage");
   });
 });
+
+describe("psdd init: configuration and worktrees", () => {
+  test("creates the team config with defaults and gitignores worktrees and the local config", async () => {
+    const { cwd, psdd } = project();
+    writeFileSync(join(cwd, ".gitignore"), "node_modules\n");
+
+    await psdd("init");
+
+    expect(JSON.parse(readFileSync(join(cwd, ".agents", "psdd.config.json"), "utf8"))).toEqual({
+      baseBranch: "main",
+      worktrees: { provider: "auto" },
+      claims: { staleAfter: "2h" },
+    });
+    expect(readFileSync(join(cwd, ".gitignore"), "utf8")).toBe(
+      "node_modules\n.agents/worktrees/\n.agents/psdd.config.local.json\n",
+    );
+  });
+
+  test("keeps an existing team config and does not repeat gitignore entries", async () => {
+    const { cwd, psdd } = project();
+    mkdirSync(join(cwd, ".agents"), { recursive: true });
+    writeFileSync(join(cwd, ".agents", "psdd.config.json"), '{ "baseBranch": "develop" }\n');
+
+    await psdd("init");
+    await psdd("init");
+
+    expect(readFileSync(join(cwd, ".agents", "psdd.config.json"), "utf8")).toBe('{ "baseBranch": "develop" }\n');
+    expect(readFileSync(join(cwd, ".gitignore"), "utf8")).toBe(".agents/worktrees/\n.agents/psdd.config.local.json\n");
+  });
+});

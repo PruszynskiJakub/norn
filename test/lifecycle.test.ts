@@ -34,7 +34,7 @@ test("a story runs from new issue to its story PR, driven only through psdd", as
 
   const runSlice = async (n: number, title: string, hil: boolean) => {
     await step("take", String(n));
-    gh.prs.push({ number: n + 5000, head: `slice/${n}-${title}`, base: "story/123-rate-limiting", state: "open" });
+    gh.prs.push({ number: n + 5000, head: `123-rate-limiting-${n}`, base: "123-rate-limiting", state: "open" });
     await step("done", String(n));
     await step("take", String(n));
     await step("done", String(n), "approve");
@@ -57,6 +57,6 @@ test("a story runs from new issue to its story PR, driven only through psdd", as
   await step("done", "123", "pass");
   expect(gh.labels(123).sort()).toEqual(["merge-queue", "type:story"]);
   expect(await step("next", "123")).toContain("waits for its owner (@alice)");
-  expect(gh.prs.find((p) => p.head === "story/123-rate-limiting")).toMatchObject({ base: "main" });
+  expect(gh.prs.find((p) => p.head === "123-rate-limiting")).toMatchObject({ base: "main" });
   expect([...gh.claims.keys()]).toEqual([]);
 });

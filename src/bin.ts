@@ -5,16 +5,17 @@ import { run } from "./cli.js";
 import { sessionId } from "./env.js";
 import { GhError, GhGitHub } from "./gh.js";
 import { installSkills } from "./install-skills.js";
-
-const cwd = process.cwd();
+import { LocalWorkspace } from "./local-workspace.js";
 
 try {
+  const root = await LocalWorkspace.findRoot(process.cwd());
   const res = await run(process.argv.slice(2), {
     github: new GhGitHub(),
+    workspace: new LocalWorkspace(root, process.env),
     now: () => new Date(),
-    session: sessionId(process.env, hostname(), cwd),
+    session: sessionId(process.env, hostname(), process.cwd()),
     headSha: async () => execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
-    cwd,
+    cwd: root,
     installSkills,
   });
   process.stdout.write(res.stdout + "\n");

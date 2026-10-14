@@ -5,15 +5,19 @@ import type { GitHub, Issue } from "./github.js";
 import { kindOf, stateOf, stepFor } from "./machine.js";
 import { computeNext, notAStory, renderNext } from "./next.js";
 import { init } from "./init.js";
+import { loadConfig, providerRefusal } from "./config.js";
 import { status } from "./status.js";
 import { hhmm, specPath } from "./text.js";
-import { applyOutcome, sliceMergeRefusal, type Ctx } from "./transitions.js";
+import { applyOutcome, removeWorktreeOf, sliceMergeRefusal, type Ctx } from "./transitions.js";
 
-export type Deps = Ctx & {
+export type Deps = Omit<Ctx, "config"> & {
   cwd: string;
   /** Installs the psdd skills into <cwd>/skills/. */
   installSkills: (cwd: string) => Promise<void>;
 };
+
+/** Deps plus the loaded configuration, as every command after loading sees them. */
+type Env = Deps & Ctx;
 
 export interface Result {
   stdout: string;
@@ -58,20 +62,30 @@ const NEEDS_NUMBER: Record<string, string> = {
   status: "psdd status <story>",
 };
 
-async function dispatch(argv: string[], deps: Deps): Promise<Result> {
+/** Commands that name or touch worktrees, and so need the provider to match the environment. */
+const USES_WORKTREES = new Set(["take", "next", "done"]);
+
+async function dispatch(argv: string[], input: Deps): Promise<Result> {
   const { positionals, flags } = parseArgs(argv);
   const [cmd, ...rest] = positionals;
   if (!cmd || !(cmd in NEEDS_NUMBER || cmd === "init")) return { exitCode: 2, stdout: USAGE };
   if (cmd in NEEDS_NUMBER && !/^\d+$/.test(rest[0] ?? "")) {
     return { exitCode: 2, stdout: `Give the issue number explicitly:\n  ${NEEDS_NUMBER[cmd]}` };
   }
+  if (cmd === "init") {
+    const r = await init(input);
+    return r.ok ? ok(r.lines) : refuse(r.lines);
+  }
+  const loaded = await loadConfig(input.workspace);
+  if (!loaded.ok) return refuse(loaded.lines);
+  const deps = { ...input, config: loaded.config };
+  if (USES_WORKTREES.has(cmd)) {
+    const r = providerRefusal(deps.config, deps.workspace.env);
+    if (r) return refuse(r);
+  }
   switch (cmd) {
-    case "init": {
-      const r = await init(deps);
-      return r.ok ? ok(r.lines) : refuse(r.lines);
-    }
     case "status": {
-      const { lines, data } = await status(deps.github, Number(rest[0]), deps.now());
+      const { lines, data } = await status(deps.github, Number(rest[0]), deps.now(), deps.config.staleAfterMs);
       return ok(lines, data);
     }
     case "take":
@@ -119,13 +133,13 @@ async function noStepRefusal(issue: Issue, github: GitHub): Promise<string[]> {
   return [`#${n} (${state ?? "no state"}) has no step psdd can brief.`, pick];
 }
 
-async function take(n: number, deps: Deps): Promise<Result> {
+async function take(n: number, deps: Env): Promise<Result> {
   const { github } = deps;
   const before = await github.getIssue(n);
   if (!stepFor(before) || before.state === "closed") return refuse(await noStepRefusal(before, github));
 
   const user = await github.currentUser();
-  const claim = await acquire(github, n, { holder: user, session: deps.session, since: deps.now().toISOString() }, deps.now());
+  const claim = await acquire(github, n, { holder: user, session: deps.session, since: deps.now().toISOString() }, deps.now(), deps.config.staleAfterMs);
   if (!claim.ok) {
     const story = kindOf(before) === "slice" ? await github.parentOf(n) : null;
     return refuse([
@@ -147,7 +161,14 @@ async function take(n: number, deps: Deps): Promise<Result> {
     issue.labels = [...issue.labels.filter((l) => l !== state), step.enterAs];
   }
   await github.addLabels(n, ["in-progress"]);
-  return ok(await briefing(issue, step, github), {
+  let staleNote: string | null = null;
+  if (claim.tookOver) {
+    const removed = await removeWorktreeOf(deps, issue);
+    staleNote = `The previous holder's claim was stale (since ${hhmm(claim.tookOver.since)})${removed ? "; its worktree was removed." : "."}`;
+  }
+  const lines = await briefing(issue, step, deps);
+  if (staleNote) lines.splice(lines.indexOf(""), 0, "", staleNote);
+  return ok(lines, {
     issue: n,
     state: stateOf(issue),
     step: step.name,
@@ -158,7 +179,7 @@ async function take(n: number, deps: Deps): Promise<Result> {
 }
 
 /** Refuses unless this session holds the claim on n. */
-async function checkHeld(n: number, deps: Deps): Promise<Result | null> {
+async function checkHeld(n: number, deps: Env): Promise<Result | null> {
   const claim = await deps.github.readClaim(n);
   if (!claim) return refuse([`You do not hold #${n}. Claim it first with: psdd take ${n}`]);
   if (claim.session !== deps.session) {
@@ -167,7 +188,7 @@ async function checkHeld(n: number, deps: Deps): Promise<Result | null> {
   return null;
 }
 
-async function done(n: number, word: string | undefined, note: string | undefined, deps: Deps): Promise<Result> {
+async function done(n: number, word: string | undefined, note: string | undefined, deps: Env): Promise<Result> {
   const { github } = deps;
   const notHeld = await checkHeld(n, deps);
   if (notHeld) return notHeld;
@@ -199,7 +220,7 @@ async function done(n: number, word: string | undefined, note: string | undefine
   return ok([`#${n} is now ${where}. The claim is released.`, ...extra], { issue: n, from: stateOf(issue), to: outcome.to });
 }
 
-async function escalate(n: number, reason: string | undefined, deps: Deps): Promise<Result> {
+async function escalate(n: number, reason: string | undefined, deps: Env): Promise<Result> {
   if (!reason) return refuse(["Say why a human is needed. Run:", `  psdd escalate ${n} "reason"`]);
   const notHeld = await checkHeld(n, deps);
   if (notHeld) return notHeld;
@@ -214,7 +235,7 @@ async function escalate(n: number, reason: string | undefined, deps: Deps): Prom
   ]);
 }
 
-async function release(n: number, deps: Deps): Promise<Result> {
+async function release(n: number, deps: Env): Promise<Result> {
   const notHeld = await checkHeld(n, deps);
   if (notHeld) return notHeld;
   await deps.github.removeLabels(n, ["in-progress"]);
@@ -227,7 +248,7 @@ async function addSlice(
   title: string | undefined,
   blockedBy: string[],
   mode: string | undefined,
-  deps: Deps,
+  deps: Env,
 ): Promise<Result> {
   const { github } = deps;
   const usage = `  psdd add-slice ${story} "title" --mode afk|hil [--blocked-by <issue>]...`;

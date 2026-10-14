@@ -51,7 +51,6 @@ export interface GitHub {
   /** Create or update labels. */
   ensureLabels(labels: { name: string; color: string; description: string }[]): Promise<void>;
 
-  defaultBranch(): Promise<string>;
   branchExists(name: string): Promise<boolean>;
   /** Create branch `name` at the head of `from`. */
   createBranch(name: string, from: string): Promise<void>;

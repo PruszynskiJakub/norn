@@ -29,21 +29,26 @@ describe("psdd next", () => {
     expect(res.stdout).toBe(
       [
         'Story #123 "Rate limiting" is in implementation. 2 of 7 slices are merged',
-        "into story/123-rate-limiting.",
+        "into 123-rate-limiting.",
         "",
         "You can start 3 items now. They are independent, so run them in parallel,",
-        "each in its own subagent:",
+        "each in its own fresh subagent, told to work in the item's worktree:",
         "",
         '  - Slice #131 "Per-key limits" is ready-for-agent.',
+        "    Worktree: .agents/worktrees/123-rate-limiting-131",
         "    Start it with: psdd take 131",
         '  - Slice #128 "Limit headers" needs review.',
+        "    Worktree: .agents/worktrees/123-rate-limiting-128",
         "    Start it with: psdd take 128",
         '  - Slice #127 "Redis store" is in merge-queue.',
+        "    Worktree: .agents/worktrees/123-rate-limiting-127",
         "    Start it with: psdd take 127",
         "",
         "Waiting, nothing to do for you:",
         "  - #132 is blocked by #131.",
         "  - #129 needs a human: QA in mode:hil. Do not take it.",
+        "",
+        "Each phase gets a new agent. When an item is done, run psdd next 123 again.",
       ].join("\n"),
     );
   });
@@ -66,7 +71,7 @@ describe("psdd next", () => {
     const res = await w.psdd("next", "123");
 
     expect(res.stdout).toContain('Story #123 "Rate limiting" is in needs-refinement.');
-    expect(res.stdout).toContain("You can start 1 item now:");
+    expect(res.stdout).toContain("You can start 1 item now, in its own fresh subagent");
     expect(res.stdout).toContain("refinement (attended: the user takes part)");
     expect(res.stdout).toContain("Start it with: psdd take 123");
   });
@@ -134,5 +139,41 @@ describe("--json", () => {
     const res = await w.psdd("done", "7", "--json");
     expect(res.exitCode).toBe(1);
     expect(JSON.parse(res.stdout)).toMatchObject({ ok: false, refusal: expect.stringContaining("psdd take 7") });
+  });
+});
+
+describe("next names how to start fresh agents for the worktree tool", () => {
+  test("herdr: create the worktree if missing, then a new herdr agent in its pane", async () => {
+    const w = prdExample();
+    w.workspace.env = { HERDR_ENV: "1" };
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting-128");
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toContain("each as a new herdr agent in the item's worktree pane:");
+    expect(res.stdout).toContain(
+      "    Create the worktree: herdr worktree create --cwd /repo --branch 123-rate-limiting-131 --base 123-rate-limiting --path .agents/worktrees/123-rate-limiting-131 --no-focus",
+    );
+    expect(res.stdout).toContain("    Start an agent: herdr agent start psdd-131 --kind claude --pane <pane of .agents/worktrees/123-rate-limiting-131>");
+    const s128 = res.stdout.slice(res.stdout.indexOf("#128"), res.stdout.indexOf("#127"));
+    expect(s128).not.toContain("Create the worktree");
+  });
+
+  test("plain git: a new agent session started in the worktree", async () => {
+    const w = prdExample();
+    w.workspace.env = {};
+    const res = await w.psdd("next", "123");
+    expect(res.stdout).toContain("each in a new agent session started in the item's worktree:");
+  });
+
+  test("--json carries each item's branch and worktree", async () => {
+    const w = prdExample();
+    const report = JSON.parse((await w.psdd("next", "123", "--json")).stdout);
+    expect(report.start[0]).toMatchObject({
+      issue: 131,
+      branch: "123-rate-limiting-131",
+      worktree: ".agents/worktrees/123-rate-limiting-131",
+    });
+    expect(report.provider).toBe("claude-code");
   });
 });

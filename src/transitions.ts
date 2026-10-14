@@ -1,10 +1,15 @@
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
 import { kindOf, stateOf, type Outcome, type State } from "./machine.js";
+import { locate } from "./location.js";
 import { sliceBranch, specPath, storyBranch } from "./text.js";
+import type { Workspace } from "./workspace.js";
+import type { Config } from "./config.js";
 
 export interface Ctx {
   github: GitHub;
+  workspace: Workspace;
+  config: Config;
   now: () => Date;
   session: string;
   headSha: () => Promise<string>;
@@ -50,11 +55,13 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
   if (kindOf(issue) === "story" && outcome.to === "implementation") {
     const branch = storyBranch(n, issue.title);
     if (!(await github.branchExists(branch))) {
-      await github.createBranch(branch, await github.defaultBranch());
+      await github.createBranch(branch, ctx.config.baseBranch);
       report.push(`Created the story branch ${branch}.`);
     }
   }
   if (kindOf(issue) === "slice" && outcome.to === "closed") {
+    const removed = await removeWorktreeOf(ctx, issue);
+    if (removed) report.push(`Removed the worktree ${removed}.`);
     report.push(...(await afterSliceMerged(ctx, n)));
   }
   return report;
@@ -73,7 +80,7 @@ async function specLink(ctx: Ctx, issue: Issue): Promise<string | null> {
 /** Changes labels on an issue this session does not hold, by taking a short claim. */
 async function withShortClaim(ctx: Ctx, n: number, fn: () => Promise<void>): Promise<boolean> {
   const user = await ctx.github.currentUser();
-  const got = await acquire(ctx.github, n, { holder: user, session: ctx.session, since: ctx.now().toISOString() }, ctx.now());
+  const got = await acquire(ctx.github, n, { holder: user, session: ctx.session, since: ctx.now().toISOString() }, ctx.now(), ctx.config.staleAfterMs);
   if (!got.ok) return false;
   try {
     await fn();
@@ -121,7 +128,7 @@ async function afterSliceMerged(ctx: Ctx, slice: number): Promise<string[]> {
   const story = await github.getIssue(storyNumber);
   if (slices.every((s) => s.state === "closed") && stateOf(story) === "implementation") {
     const branch = storyBranch(story.number, story.title);
-    const base = await github.defaultBranch();
+    const base = ctx.config.baseBranch;
     const moved = await withShortClaim(ctx, storyNumber, async () => {
       const pr =
         (await github.findPullRequest(branch)) ??
@@ -140,7 +147,10 @@ async function afterSliceMerged(ctx: Ctx, slice: number): Promise<string[]> {
 
 /** Precondition for finishing a merge: the slice PR is merged. */
 export async function sliceMergeRefusal(github: GitHub, slice: Issue): Promise<string[] | null> {
-  const head = sliceBranch(slice.number, slice.title);
+  const storyNumber = await github.parentOf(slice.number);
+  if (!storyNumber) return [`#${slice.number} is not a sub-issue of a story.`];
+  const story = await github.getIssue(storyNumber);
+  const head = sliceBranch(story.number, story.title, slice.number);
   const pr = await github.findPullRequest(head);
   if (!pr) return [`No PR from ${head} was found. Open and merge it before running psdd done ${slice.number}.`];
   if (pr.state !== "merged") {
@@ -150,4 +160,12 @@ export async function sliceMergeRefusal(github: GitHub, slice: Issue): Promise<s
     ];
   }
   return null;
+}
+
+/** Removes the issue's local worktree, if there is one. Returns its path when removed. */
+export async function removeWorktreeOf(ctx: Ctx, issue: Issue): Promise<string | null> {
+  const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
+  if (!loc || !(await ctx.workspace.worktreeExists(loc.worktree))) return null;
+  await ctx.workspace.removeWorktree(loc.worktree, ctx.config.provider);
+  return loc.worktree;
 }

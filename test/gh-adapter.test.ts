@@ -131,12 +131,12 @@ describe("GhGitHub issues", () => {
 
   test("findPullRequest maps gh pr state", async () => {
     const { exec, calls } = scripted(() => ({
-      stdout: [{ number: 50, headRefName: "slice/127-x", baseRefName: "story/123-y", state: "MERGED", body: "b" }],
+      stdout: [{ number: 50, headRefName: "123-rate-limiting-127", baseRefName: "123-rate-limiting", state: "MERGED", body: "b" }],
     }));
-    expect(await new GhGitHub(exec).findPullRequest("slice/127-x")).toEqual({
+    expect(await new GhGitHub(exec).findPullRequest("123-rate-limiting-127")).toEqual({
       number: 50,
-      head: "slice/127-x",
-      base: "story/123-y",
+      head: "123-rate-limiting-127",
+      base: "123-rate-limiting",
       state: "merged",
       body: "b",
     });

@@ -38,10 +38,15 @@ export function hhmm(iso: string) {
   return iso.slice(11, 16);
 }
 
-export function storyBranch(n: number, title: string) {
-  return `story/${n}-${slugify(title)}`;
+export function storyBranch(story: number, storyTitle: string) {
+  return `${story}-${slugify(storyTitle)}`;
 }
 
-export function sliceBranch(n: number, title: string) {
-  return `slice/${n}-${slugify(title)}`;
+export function sliceBranch(story: number, storyTitle: string, slice: number) {
+  return `${storyBranch(story, storyTitle)}-${slice}`;
+}
+
+/** Every branch has its worktree at a fixed place. */
+export function worktreePath(branch: string) {
+  return `.agents/worktrees/${branch}`;
 }

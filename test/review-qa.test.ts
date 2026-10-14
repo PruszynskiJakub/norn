@@ -87,7 +87,7 @@ describe("story fixes", () => {
       w.github.issues.get(123)!.title = "Rate limiting";
       const take = await w.psdd("take", "123");
       expect(take.stdout).toContain("Invoke the skill: tdd");
-      expect(take.stdout).toContain("story/123-rate-limiting");
+      expect(take.stdout).toContain("123-rate-limiting");
       expect(w.github.labels(123)).toContain(state);
 
       await w.psdd("done", "123");

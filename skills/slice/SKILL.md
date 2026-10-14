@@ -16,4 +16,5 @@ Attended: agree the slices with the user before creating them.
    ```
 
 4. Add a body to each slice with `gh issue edit <slice> --body` that names its part of the plan and its acceptance examples.
-5. Done when every plan step is covered by a slice. Finish with `psdd done <story>`.
+5. Push the story branch from the story worktree, so slice PRs can target it.
+6. Done when every plan step is covered by a slice. Finish with `psdd done <story>`.

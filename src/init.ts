@@ -1,4 +1,5 @@
-import { existsSync, lstatSync, mkdirSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { DEFAULT_TEAM_CONFIG, LOCAL_CONFIG, TEAM_CONFIG } from "./config.js";
 import { join } from "node:path";
 import type { GitHub } from "./github.js";
 import { FLAGS, STATES } from "./machine.js";
@@ -61,6 +62,10 @@ export async function init({ github, cwd, installSkills }: InitDeps): Promise<{ 
   mkdirSync(specs, { recursive: true });
   if (readdirSync(specs).length === 0) writeFileSync(join(specs, ".gitkeep"), "");
 
+  const teamConfig = join(cwd, TEAM_CONFIG);
+  if (!existsSync(teamConfig)) writeFileSync(teamConfig, JSON.stringify(DEFAULT_TEAM_CONFIG, null, 2) + "\n");
+  ensureGitignored(cwd, [".agents/worktrees/", LOCAL_CONFIG]);
+
   await github.ensureLabels(labelDefinitions());
 
   return {
@@ -69,9 +74,11 @@ export async function init({ github, cwd, installSkills }: InitDeps): Promise<{ 
       "psdd is set up in this project:",
       `  - ${installed.length} skills in skills/, linked into .claude/skills/`,
       "  - .agents/specs/ for story specs",
+      `  - ${TEAM_CONFIG} with the team settings (each developer can override in ${LOCAL_CONFIG})`,
+      "  - .agents/worktrees/ and the local config in .gitignore",
       `  - ${labelDefinitions().length} labels on the repository`,
       "",
-      "Commit skills/, .claude/skills/ and .agents/specs/. Then start a story with: psdd next <story>",
+      "Commit skills/, .claude/skills/, .agents/ and .gitignore. Then start a story with: psdd next <story>",
     ],
   };
 }
@@ -83,4 +90,14 @@ function exists(p: string) {
   } catch {
     return false;
   }
+}
+
+function ensureGitignored(cwd: string, entries: string[]) {
+  const file = join(cwd, ".gitignore");
+  let text = existsSync(file) ? readFileSync(file, "utf8") : "";
+  const present = new Set(text.split("\n").map((l) => l.trim()));
+  const missing = entries.filter((e) => !present.has(e));
+  if (!missing.length) return;
+  if (text && !text.endsWith("\n")) text += "\n";
+  writeFileSync(file, text + missing.map((e) => e + "\n").join(""));
 }

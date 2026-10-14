@@ -5,7 +5,7 @@ description: psdd step for implementation, changes-requested and qa-failed; buil
 
 # TDD
 
-Your briefing names the branch. For a slice: the slice branch made from the story branch, and one PR into the story branch. For a story: commits go straight onto the story branch.
+Work in the worktree your briefing names; create it with the command the briefing gives when it is missing. For a slice: one PR from the slice branch into the story branch. For a story: commits go straight onto the story branch.
 
 1. Read the spec and the issue. For changes-requested or qa-failed, read the latest review or QA comment: each point in it is a test to make red.
 2. Work in red → green tracer bullets: one failing test at the issue's seam, the least code to pass it, repeat. Run the whole suite green before each commit.

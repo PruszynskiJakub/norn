@@ -15,12 +15,12 @@ interface Row {
 }
 
 /** Read-only overview. Makes no changes. */
-export async function status(github: GitHub, n: number, now: Date) {
+export async function status(github: GitHub, n: number, now: Date, staleAfterMs: number) {
   const story = await github.getIssue(n);
   const slices = await github.subIssues(n);
   const rows: Row[] = [];
-  for (const s of slices) rows.push(await row(github, s, now));
-  const head = await row(github, story, now);
+  for (const s of slices) rows.push(await row(github, s, now, staleAfterMs));
+  const head = await row(github, story, now, staleAfterMs);
   const data = {
     story: { ...head, owner: story.assignees[0] ?? null, branch: storyBranch(n, story.title) },
     slices: rows,
@@ -45,7 +45,7 @@ export async function status(github: GitHub, n: number, now: Date) {
   return { lines, data };
 }
 
-async function row(github: GitHub, issue: Issue, now: Date): Promise<Row> {
+async function row(github: GitHub, issue: Issue, now: Date, staleAfterMs: number): Promise<Row> {
   const closed = issue.state === "closed";
   const claim = closed ? null : await github.readClaim(issue.number);
   const blockers = closed ? [] : await github.blockedBy(issue.number);
@@ -57,6 +57,6 @@ async function row(github: GitHub, issue: Issue, now: Date): Promise<Row> {
     blockedBy: blockers.filter((b) => b.state === "open").map((b) => b.number),
     needsHuman: issue.labels.includes("needs-human"),
     heldSince: claim?.since ?? null,
-    stale: claim ? isStale(claim, now) : false,
+    stale: claim ? isStale(claim, now, staleAfterMs) : false,
   };
 }

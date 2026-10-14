@@ -13,7 +13,7 @@ function storyWithSlices() {
   for (const s of [127, 128, 131, 132]) gh.parents.set(s, 123);
   gh.blockers.set(131, [127]);
   gh.blockers.set(132, [131, 127]);
-  gh.branches.add("story/123-rate-limiting");
+  gh.branches.add("123-rate-limiting");
   return w;
 }
 
@@ -22,24 +22,24 @@ describe("merge-queue on a slice", () => {
     const w = storyWithSlices();
     const res = await w.psdd("take", "127");
     expect(res.stdout).toContain("Invoke the skill: merge");
-    expect(res.stdout).toContain("slice/127-redis-store into story/123-rate-limiting");
+    expect(res.stdout).toContain("123-rate-limiting-127 into 123-rate-limiting");
   });
 
   test("done is refused while the slice PR is not merged", async () => {
     const w = storyWithSlices();
-    w.github.prs.push({ number: 50, head: "slice/127-redis-store", base: "story/123-rate-limiting", state: "open" });
+    w.github.prs.push({ number: 50, head: "123-rate-limiting-127", base: "123-rate-limiting", state: "open" });
     await w.psdd("take", "127");
 
     const res = await w.psdd("done", "127");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("PR #50 from slice/127-redis-store is not merged yet");
+    expect(res.stdout).toContain("PR #50 from 123-rate-limiting-127 is not merged yet");
     expect(w.github.issues.get(127)!.state).toBe("open");
   });
 
   test("done closes the slice and unblocks dependents with no open blockers", async () => {
     const w = storyWithSlices();
-    w.github.prs.push({ number: 50, head: "slice/127-redis-store", base: "story/123-rate-limiting", state: "merged" });
+    w.github.prs.push({ number: 50, head: "123-rate-limiting-127", base: "123-rate-limiting", state: "merged" });
     await w.psdd("take", "127");
 
     const res = await w.psdd("done", "127");
@@ -59,13 +59,13 @@ describe("merge-queue on a slice", () => {
   test("when the last slice merges, the story goes to needs-review and gets its PR into main", async () => {
     const w = storyWithSlices();
     for (const s of [128, 131, 132]) w.github.issues.get(s)!.state = "closed";
-    w.github.prs.push({ number: 50, head: "slice/127-redis-store", base: "story/123-rate-limiting", state: "merged" });
+    w.github.prs.push({ number: 50, head: "123-rate-limiting-127", base: "123-rate-limiting", state: "merged" });
     await w.psdd("take", "127");
 
     await w.psdd("done", "127");
 
     expect(w.github.labels(123).sort()).toEqual(["needs-review", "type:story"]);
-    const pr = w.github.prs.find((p) => p.head === "story/123-rate-limiting")!;
+    const pr = w.github.prs.find((p) => p.head === "123-rate-limiting")!;
     expect(pr).toMatchObject({ base: "main", state: "open" });
     expect(pr.body).toContain("Closes #123");
     expect(w.github.comments(123).at(-1)).toContain("implementation → needs-review");
@@ -81,7 +81,7 @@ describe("story transitions around slices", () => {
 
     await w.psdd("done", "123");
 
-    expect(w.github.branches.has("story/123-rate-limiting")).toBe(true);
+    expect(w.github.branches.has("123-rate-limiting")).toBe(true);
   });
 
   test("a story in implementation cannot be taken; its label follows its slices", async () => {

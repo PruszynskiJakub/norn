@@ -99,9 +99,6 @@ export class FakeGitHub implements GitHub {
   async ensureLabels(labels: { name: string; color: string; description: string }[]) {
     for (const l of labels) this.labelDefs.set(l.name, { color: l.color, description: l.description });
   }
-  async defaultBranch() {
-    return "main";
-  }
   async branchExists(name: string) {
     return this.branches.has(name);
   }

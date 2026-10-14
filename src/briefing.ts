@@ -1,6 +1,8 @@
-import type { GitHub, Issue } from "./github.js";
+import type { Issue } from "./github.js";
+import { locate, workInLines, type Location } from "./location.js";
 import { kindOf, type Step } from "./machine.js";
-import { sliceBranch, specPath, storyBranch, wrap } from "./text.js";
+import { specPath, wrap } from "./text.js";
+import type { Ctx } from "./transitions.js";
 
 export function noun(issue: Issue) {
   const kind = kindOf(issue);
@@ -8,17 +10,20 @@ export function noun(issue: Issue) {
 }
 
 /** Briefing in fixed order: where you are, what to do, how to finish, what not to do. */
-export async function briefing(issue: Issue, step: Step, github: GitHub): Promise<string[]> {
+export async function briefing(issue: Issue, step: Step, ctx: Ctx): Promise<string[]> {
   const n = issue.number;
   let where = `You now hold ${noun(issue)} #${n} "${issue.title}". Its step is ${step.name}.`;
   if (step.attended) where += " This step is attended: the user takes part, and you do not decide on your own.";
   const many = Object.keys(step.outcomes).length > 1;
   const when = step.attended ? `When the user agrees ${step.name} is finished` : `When ${step.name} is finished`;
+  const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
+  const workIn = loc ? [...(await workInLines(loc, ctx.workspace, ctx.config.provider)), ""] : [];
   return [
     wrap(where),
     "",
+    ...workIn,
     `Invoke the skill: ${step.skill}`,
-    ...(await workContext(issue, step, github)),
+    ...(loc ? workContext(issue, step, loc) : []),
     "",
     `${when}, run${many ? " one of" : ""}:`,
     ...finishCommands(n, step),
@@ -41,31 +46,18 @@ export function finishCommands(n: number, step: Step): string[] {
   return cmds.map((c, i) => `  ${c.padEnd(width)}(${step.outcomes[words[i]].means})`);
 }
 
-/** Where the work happens: spec, branches, PRs. */
-async function workContext(issue: Issue, step: Step, github: GitHub): Promise<string[]> {
-  const n = issue.number;
+/** Spec and PR lines for the step. */
+function workContext(issue: Issue, step: Step, loc: Location): string[] {
+  const story = loc.story;
   if (kindOf(issue) === "story") {
-    const lines = [`Spec to work on: ${specPath(n, issue.title)}`];
-    const branch = storyBranch(n, issue.title);
-    if (step.skill === "tdd") lines.push(`Commit the fixes straight onto the story branch ${branch}.`);
-    if (step.skill === "review" || step.skill === "qa") lines.push(`Story PR: ${branch} into main.`);
+    const lines = [`Spec to work on: ${specPath(story.number, story.title)}`];
+    if (step.skill === "tdd") lines.push(`Commit the fixes straight onto the story branch ${loc.branch}.`);
+    if (step.skill === "review" || step.skill === "qa") lines.push(`Story PR: ${loc.branch} into ${loc.base}.`);
     return lines;
   }
-  if (kindOf(issue) === "slice") {
-    const parentNumber = await github.parentOf(n);
-    if (!parentNumber) return [];
-    const parent = await github.getIssue(parentNumber);
-    const story = storyBranch(parent.number, parent.title);
-    const slice = sliceBranch(n, issue.title);
-    const lines = [`Spec: ${specPath(parent.number, parent.title)} (story #${parent.number})`];
-    if (step.skill === "tdd") {
-      lines.push(`Work on branch ${slice}, made from ${story}.`, `Open one PR from ${slice} into ${story}.`);
-    } else if (step.skill === "merge") {
-      lines.push(`Merge the PR from ${slice} into ${story}, resolving conflicts if needed.`);
-    } else {
-      lines.push(`Slice PR: ${slice} into ${story}.`);
-    }
-    return lines;
-  }
-  return [];
+  const lines = [`Spec: ${specPath(story.number, story.title)} (story #${story.number})`];
+  if (step.skill === "tdd") lines.push(`Open one PR from ${loc.branch} into ${loc.base}.`);
+  else if (step.skill === "merge") lines.push(`Merge the PR from ${loc.branch} into ${loc.base}, resolving conflicts if needed.`);
+  else lines.push(`Slice PR: ${loc.branch} into ${loc.base}.`);
+  return lines;
 }
