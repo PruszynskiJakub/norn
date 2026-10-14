@@ -35,7 +35,7 @@ export function setup(opts: { now?: string; session?: string; user?: string } = 
     async psdd(...argv: string[]) {
       return run(argv, deps);
     },
-    withProject(cwd: string, installSkills: (cwd: string) => Promise<void>) {
+    withProject(cwd: string, installSkills: (cwd: string) => Promise<string[]>) {
       return (...argv: string[]) => run(argv, { ...deps, cwd, installSkills });
     },
     withNotify(notify: Deps["notify"]) {

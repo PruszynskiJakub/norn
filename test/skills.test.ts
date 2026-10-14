@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
@@ -15,6 +15,18 @@ describe("bundled skills", () => {
     const cwd = mkdtempSync(join(tmpdir(), "psdd-skills-"));
     await installSkills(cwd, {});
     for (const name of SKILLS) expect(existsSync(join(cwd, "skills", name, "SKILL.md"))).toBe(true);
+  });
+
+  test("installSkills replaces a skill that differs from the package and names it", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "psdd-skills-"));
+    await installSkills(cwd, {});
+    writeFileSync(join(cwd, "skills", "drive", "SKILL.md"), "an older drive");
+    writeFileSync(join(cwd, "skills", "deliver", "notes.md"), "a file the package does not have");
+
+    expect(await installSkills(cwd, {})).toEqual(["deliver", "drive"]);
+    expect(readFileSync(join(cwd, "skills", "drive", "SKILL.md"), "utf8")).toBe(readFileSync(join(BUNDLED_SKILLS, "drive", "SKILL.md"), "utf8"));
+    expect(existsSync(join(cwd, "skills", "deliver", "notes.md"))).toBe(false);
+    expect(await installSkills(cwd, {})).toEqual([]);
   });
 });
 
