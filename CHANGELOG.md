@@ -4,6 +4,11 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Fixed
+
+- `drive` no longer does an attended step in the main checkout after taking over a stopped session. It takes over and releases the item, then goes back to `psdd next`, so under herdr the story is still handed to an agent in its worktree. The hand-off reuses an agent already in the worktree's pane.
+- The `take` briefing says when the worktree has uncommitted changes, e.g. from an earlier session that stopped partway.
+
 ## [0.2.0] - 2026-10-14
 
 ### Added
