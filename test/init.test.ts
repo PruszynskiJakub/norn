@@ -15,6 +15,7 @@ function project() {
       mkdirSync(join(dir, "skills", name), { recursive: true });
       writeFileSync(join(dir, "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
     }
+    return [];
   });
   return { w, cwd, installs, psdd };
 }
@@ -48,10 +49,26 @@ describe("psdd init", () => {
     expect(res.exitCode).toBe(0);
   });
 
+  test("names the skills it updated", async () => {
+    const w = setup();
+    const cwd = mkdtempSync(join(tmpdir(), "psdd-init-"));
+    const psdd = w.withProject(cwd, async (dir) => {
+      for (const name of SKILLS) {
+        mkdirSync(join(dir, "skills", name), { recursive: true });
+        writeFileSync(join(dir, "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
+      }
+      return ["deliver", "drive"];
+    });
+
+    const res = await psdd("init");
+
+    expect(res.stdout).toContain("  - updated to this psdd version: deliver, drive (git diff skills/ shows the changes)");
+  });
+
   test("reports skills the installer did not provide", async () => {
     const w = setup();
     const cwd = mkdtempSync(join(tmpdir(), "psdd-init-"));
-    const psdd = w.withProject(cwd, async () => {});
+    const psdd = w.withProject(cwd, async () => []);
     const res = await psdd("init");
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain("Missing skills: triage");

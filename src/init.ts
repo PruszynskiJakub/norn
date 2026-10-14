@@ -35,11 +35,12 @@ export function labelDefinitions() {
 export interface InitDeps {
   github: GitHub;
   cwd: string;
-  installSkills: (cwd: string) => Promise<void>;
+  /** Returns the names of the skills it updated. */
+  installSkills: (cwd: string) => Promise<string[]>;
 }
 
 export async function init({ github, cwd, installSkills }: InitDeps): Promise<{ ok: boolean; lines: string[] }> {
-  await installSkills(cwd);
+  const updated = await installSkills(cwd);
   const skillsDir = join(cwd, "skills");
   const installed = existsSync(skillsDir) ? readdirSync(skillsDir).filter((d) => existsSync(join(skillsDir, d, "SKILL.md"))) : [];
   const missing = SKILLS.filter((s) => !installed.includes(s));
@@ -77,6 +78,7 @@ export async function init({ github, cwd, installSkills }: InitDeps): Promise<{ 
     lines: [
       "psdd is set up in this project:",
       `  - ${installed.length} skills in skills/, linked into .claude/skills/`,
+      ...(updated.length ? [`  - updated to this psdd version: ${updated.join(", ")} (git diff skills/ shows the changes)`] : []),
       "  - .agents/specs/ for story specs",
       `  - ${TEAM_CONFIG} with the team settings (each developer can override in ${LOCAL_CONFIG})`,
       "  - .agents/worktrees/ and the local config in .gitignore",

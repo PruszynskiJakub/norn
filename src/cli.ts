@@ -27,7 +27,7 @@ import {
 export type Deps = Omit<Ctx, "config" | "slugs"> & {
   cwd: string;
   /** Installs the psdd skills into <cwd>/skills/. */
-  installSkills: (cwd: string) => Promise<void>;
+  installSkills: (cwd: string) => Promise<string[]>;
 };
 
 /** Deps plus the loaded configuration, as every command after loading sees them. */

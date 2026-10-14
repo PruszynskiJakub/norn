@@ -4,6 +4,10 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Fixed
+
+- `psdd init` updates the project's skills to the installed psdd version. Before, it only copied skills that were missing, so after an upgrade projects kept running the old `drive` and `deliver`. It names the skills it replaced; `git diff skills/` shows the changes. With `PSDD_SKILLS_SOURCE` set, skills already in place are kept.
+
 ## [0.2.1] - 2026-10-14
 
 ### Fixed
