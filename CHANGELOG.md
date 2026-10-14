@@ -4,6 +4,8 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-10-14
+
 ### Fixed
 
 - Under herdr, `psdd next` lists the `herdr agent prompt` command for each item an agent runs unattended, with the prompt filled in, next to `herdr agent start`. `deliver` runs both as listed. Before, the orchestrator wrote the prompt command itself, and could pass `--timeout` without `--wait`, which herdr rejects: the agent started but never got its prompt.
@@ -83,7 +85,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.2...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.3...HEAD
+[0.2.3]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.3...v0.2.0
