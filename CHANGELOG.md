@@ -4,6 +4,8 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-10-14
+
 ### Fixed
 
 - `drive` no longer does an attended step in the main checkout after taking over a stopped session. It takes over and releases the item, then goes back to `psdd next`, so under herdr the story is still handed to an agent in its worktree. The hand-off reuses an agent already in the worktree's pane.
@@ -71,7 +73,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.1...HEAD
+[0.2.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.0...v0.2.1
 [0.2.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.1...v0.1.2
