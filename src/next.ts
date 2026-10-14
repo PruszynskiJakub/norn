@@ -291,7 +291,10 @@ export function renderNext(r: NextReport): string {
       if (s.checkedOutAt && s.branch) out.push(`    ${checkedOutElsewhere(s.branch, s.checkedOutAt)}`);
       if (r.provider === "herdr" && s.worktree) {
         const start = `herdr agent start psdd-${s.issue} --kind claude --pane <pane of ${s.worktree}>`;
-        if (!s.attended) out.push(`    Start an agent: ${start}`);
+        if (!s.attended) {
+          const prompt = `Work in ${s.worktree}. Run psdd take ${s.issue}, follow its briefing to the end, and finish with the psdd command it gives.`;
+          out.push(`    Start an agent: ${start}`, `    Then prompt it: herdr agent prompt psdd-${s.issue} "${prompt}"`);
+        }
         else if (s.here) out.push("    You are in its worktree: take it in this session.");
         else {
           // An attended step needs the user, so the new agent drives the story from its worktree and this session stops.

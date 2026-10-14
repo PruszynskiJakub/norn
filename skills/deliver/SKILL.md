@@ -11,7 +11,7 @@ You are the orchestrator. Every phase of the story's work happens in a fresh sub
 
 1. Run `psdd next <story>`. It lists the items you can start now, each with its worktree, how many to run at once, and how to start an agent for the tool in use.
 2. Start one fresh subagent per listed item, up to the limit `psdd next` gives:
-   - **herdr:** create the worktree with the listed command if needed, then `herdr agent start psdd-<issue> --kind claude --pane <pane>` in the worktree's pane, with the prompt below.
+   - **herdr:** create the worktree with the listed command if needed, then run the listed `herdr agent start` with the worktree's pane and the listed `herdr agent prompt` as they are. Add no flags: step 3 does the waiting, and `--timeout` without `--wait` fails.
    - **Claude Code:** a new subagent (not worktree isolation) with the prompt below.
    - **git:** create the worktree with the listed command if needed, then start a new agent session in the worktree with the `PSDD_SESSION=psdd-<issue>-<random>` that `psdd next` lists for it, with the prompt below. Use the value from the latest `psdd next`, never an earlier one: it makes each agent its own psdd session.
 
