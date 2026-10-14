@@ -70,15 +70,14 @@ export interface GitHub {
 
   /** Atomically create refs/psdd/claims/<issue>. False when it already exists. */
   createClaim(number: number, record: ClaimRecord): Promise<boolean>;
-  /** Points the existing claim ref at a new record, e.g. a later `since`. */
-  refreshClaim(number: number, record: ClaimRecord): Promise<void>;
   /**
-   * Replaces a stale claim, but only while its ref still points at `staleSha`:
-   * the new claim commit is a child of the stale one and the ref moves without
-   * force, so of two sessions taking over at once only one wins. False when
-   * the ref has moved or is gone.
+   * Points the claim ref at a new record, but only while it still points at
+   * `fromSha`: the new claim commit is a child of that one and the ref moves
+   * without force. Used both to refresh your own claim and to take over a
+   * stale one, so neither can overwrite a claim that changed in between.
+   * False when the ref has moved or is gone.
    */
-  takeOverClaim(number: number, staleSha: string, record: ClaimRecord): Promise<boolean>;
+  replaceClaim(number: number, fromSha: string, record: ClaimRecord): Promise<boolean>;
   readClaim(number: number): Promise<HeldClaim | null>;
   deleteClaim(number: number): Promise<void>;
 }

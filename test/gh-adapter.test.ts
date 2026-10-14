@@ -66,18 +66,13 @@ describe("GhGitHub claims", () => {
     await expect(new GhGitHub(exec).createClaim(131, { holder: "a", session: "s", since: "x" })).rejects.toThrow("HTTP 401");
   });
 
-  test("refreshClaim force-moves the ref to a new claim commit", async () => {
-    const { exec, calls } = scripted((c) => {
-      if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t2" } };
-      if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c2" } };
-      if (path(c).endsWith("/git/refs/psdd/claims/131")) return { stdout: { ref: "refs/psdd/claims/131" } };
+  test("replaceClaim loses when the ref is gone", async () => {
+    const { exec } = scripted((c) => {
+      if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t" } };
+      if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c" } };
+      if (path(c).endsWith("/git/refs/psdd/claims/131")) return { code: 1, stderr: "gh: Reference does not exist (HTTP 422)" };
     });
-
-    await new GhGitHub(exec).refreshClaim(131, { holder: "a", session: "s", since: "2026-10-13T15:00:00.000Z" });
-
-    const ref = calls.find((c) => path(c).endsWith("/git/refs/psdd/claims/131"))!;
-    expect(method(ref)).toBe("PATCH");
-    expect(ref.input).toEqual({ sha: "c2", force: true });
+    expect(await new GhGitHub(exec).replaceClaim(131, "mine1", { holder: "a", session: "s", since: "x" })).toBe(false);
   });
 
   test("readClaim follows the ref to its commit; a missing ref is no claim", async () => {
@@ -92,14 +87,14 @@ describe("GhGitHub claims", () => {
     expect(await gh.readClaim(132)).toBeNull();
   });
 
-  test("takeOverClaim makes a child of the stale commit and moves the ref without force", async () => {
+  test("replaceClaim makes a child of the commit read and moves the ref without force", async () => {
     const { exec, calls } = scripted((c) => {
       if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t3" } };
       if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c3" } };
       if (path(c).endsWith("/git/refs/psdd/claims/131")) return { stdout: { ref: "refs/psdd/claims/131" } };
     });
 
-    expect(await new GhGitHub(exec).takeOverClaim(131, "stale1", { holder: "b", session: "s2", since: "x" })).toBe(true);
+    expect(await new GhGitHub(exec).replaceClaim(131, "stale1", { holder: "b", session: "s2", since: "x" })).toBe(true);
 
     expect(calls.find((c) => path(c).endsWith("/git/commits"))!.input).toMatchObject({ parents: ["stale1"] });
     const ref = calls.find((c) => path(c).endsWith("/git/refs/psdd/claims/131"))!;
@@ -107,13 +102,13 @@ describe("GhGitHub claims", () => {
     expect(ref.input).toEqual({ sha: "c3", force: false });
   });
 
-  test("takeOverClaim loses when the ref has moved since it was read", async () => {
+  test("replaceClaim loses when the ref has moved since it was read", async () => {
     const { exec } = scripted((c) => {
       if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t" } };
       if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c" } };
       if (path(c).endsWith("/git/refs/psdd/claims/131")) return { code: 1, stderr: "gh: Update is not a fast forward (HTTP 422)" };
     });
-    expect(await new GhGitHub(exec).takeOverClaim(131, "stale1", { holder: "b", session: "s2", since: "x" })).toBe(false);
+    expect(await new GhGitHub(exec).replaceClaim(131, "stale1", { holder: "b", session: "s2", since: "x" })).toBe(false);
   });
 });
 

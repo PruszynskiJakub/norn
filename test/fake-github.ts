@@ -134,12 +134,11 @@ export class FakeGitHub implements GitHub {
     this.point(n, record);
     return true;
   }
-  async refreshClaim(n: number, record: ClaimRecord) {
-    if (!this.claims.has(n)) throw new Error(`fake: no claim on #${n}`);
-    this.point(n, record);
-  }
-  async takeOverClaim(n: number, staleSha: string, record: ClaimRecord) {
-    if (!this.claims.has(n) || (this.claimShas.get(n) ?? "seeded") !== staleSha) return false;
+  /** Runs before replaceClaim checks the ref, to stage a race: another session moving or deleting it. */
+  beforeReplace: ((n: number) => void) | null = null;
+  async replaceClaim(n: number, fromSha: string, record: ClaimRecord) {
+    this.beforeReplace?.(n);
+    if (!this.claims.has(n) || (this.claimShas.get(n) ?? "seeded") !== fromSha) return false;
     this.point(n, record);
     return true;
   }

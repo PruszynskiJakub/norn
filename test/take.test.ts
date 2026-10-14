@@ -108,3 +108,42 @@ describe("the PRD's refusal", () => {
     );
   });
 });
+
+describe("a claim that changes between reading and replacing it", () => {
+  test("a takeover that finds the stale claim already released creates a fresh one", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 7, title: "Rate limiting" });
+    w.setNow("2026-10-13T10:00:00Z");
+    await w.as("crashed-session")("take", "7");
+    w.setNow("2026-10-13T12:00:01Z");
+    // The old holder releases just after psdd read its stale claim.
+    w.github.beforeReplace = (n) => w.github.claims.delete(n);
+
+    const res = await w.psdd("take", "7");
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).not.toContain("already held");
+    expect(w.github.claim(7)).toMatchObject({ session: "session-1" });
+  });
+
+  test("a refresh that loses to another session's takeover is refused, not forced over it", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+    w.setNow("2026-10-13T10:00:00Z");
+    await w.psdd("take", "131");
+    w.setNow("2026-10-13T12:30:00Z");
+    // Another session takes over the (by now stale) claim just after this session read it as its own.
+    w.github.beforeReplace = (n) => {
+      w.github.beforeReplace = null;
+      w.github.claims.delete(n);
+      w.github.claimShas.delete(n);
+      void w.github.createClaim(n, { holder: "bob", session: "other-session", since: "2026-10-13T12:29:59.000Z" });
+    };
+
+    const res = await w.psdd("take", "131");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("#131 is already held by another session (since 12:29)");
+    expect(w.github.claim(131)).toMatchObject({ session: "other-session" });
+  });
+});
