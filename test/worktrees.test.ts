@@ -171,6 +171,20 @@ describe("worktree cleanup", () => {
     expect(res.stdout).toContain("Story #123 is merged and closed. Removed its worktree .agents/worktrees/123-rate-limiting.");
   });
 
+  test("a closed story loses the state label GitHub left on it, and next reports no state", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", state: "closed", labels: ["type:story", "merge-queue"] });
+    w.github.seedIssue({ number: 127, title: "Redis store", state: "closed", labels: ["type:slice", "mode:afk", "merge-queue"] });
+    w.github.parents.set(127, 123);
+
+    const res = await w.psdd("next", "123", "--json");
+
+    expect(w.github.labels(123)).toEqual(["type:story"]);
+    expect(w.github.labels(127)).toEqual(["type:slice", "mode:afk"]);
+    expect(JSON.parse(res.stdout)).toMatchObject({ state: null, closed: true });
+    expect(w.github.claims.size).toBe(0);
+  });
+
   test("taking over a stale claim keeps the worktree the previous holder left, and says so", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });

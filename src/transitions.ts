@@ -202,6 +202,16 @@ export function stateLabels(issue: Issue, keep?: string): State[] {
 }
 
 /**
+ * Removes the state labels a closed issue still carries, e.g. merge-queue on a
+ * story GitHub closed through its PR. Returns whether it changed anything.
+ */
+export async function clearClosedState(ctx: Ctx, issue: Issue): Promise<boolean> {
+  const left = stateLabels(issue);
+  if (issue.state !== "closed" || left.length === 0) return false;
+  return withShortClaim(ctx, issue.number, () => ctx.github.removeLabels(issue.number, left));
+}
+
+/**
  * Brings blocked / ready-for-agent in line with native blocked-by relations
  * for the open slices of a story. Returns lines describing changes.
  */

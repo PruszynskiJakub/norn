@@ -9,6 +9,7 @@ import { storySlug } from "./slug.js";
 import { hhmm, storyBranch, wrap } from "./text.js";
 import {
   bestEffort,
+  clearClosedState,
   ensureStoryBranch,
   needsHumanReason,
   promoteStory,
@@ -91,6 +92,10 @@ async function reconcile(ctx: Ctx, storyNumber: number): Promise<string[]> {
   const closed = (await github.subIssues(storyNumber)).filter((s) => s.state === "closed");
   if (story.state === "closed") closed.push(story);
   for (const issue of closed) {
+    notes.push(...(await bestEffort(`clear the labels of #${issue.number}`, storyNumber, async () => {
+      await clearClosedState(ctx, issue);
+      return [];
+    })));
     try {
       const removed = await removeWorktreeOf(ctx, issue);
       if (!removed) continue;
@@ -116,7 +121,8 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
     provider: ctx.config.provider,
     maxParallel: ctx.config.maxParallel,
     title: story.title,
-    state: stateOf(story),
+    // A closed story has no state, whatever labels GitHub left on it.
+    state: story.state === "closed" ? null : stateOf(story),
     branch: storyBranch(storyNumber, await storySlug(ctx, story)),
     slices: { total: slices.length, merged: slices.filter((s) => s.state === "closed").length },
     start: [],
