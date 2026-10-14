@@ -2,7 +2,7 @@ import { mkdtempSync, mkdirSync, readlinkSync, writeFileSync, existsSync, readFi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { SKILLS } from "../src/init.js";
+import { AGENT_INSTRUCTIONS, SKILLS } from "../src/init.js";
 import { setup } from "./harness.js";
 
 function project() {
@@ -95,5 +95,48 @@ describe("psdd init: configuration and worktrees", () => {
 
     expect(readFileSync(join(cwd, ".agents", "psdd.config.json"), "utf8")).toBe('{ "baseBranch": "develop" }\n');
     expect(readFileSync(join(cwd, ".gitignore"), "utf8")).toBe(".agents/worktrees/\n.agents/psdd.config.local.json\n");
+  });
+});
+
+describe("psdd init: agent instructions", () => {
+  test("with no AGENTS.md or CLAUDE.md, creates AGENTS.md with the psdd block and a CLAUDE.md that imports it", async () => {
+    const { cwd, psdd } = project();
+
+    const res = await psdd("init");
+
+    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe(AGENT_INSTRUCTIONS + "\n");
+    expect(readFileSync(join(cwd, "CLAUDE.md"), "utf8")).toBe("@AGENTS.md\n");
+    expect(res.stdout).toContain("drive <issue>");
+  });
+
+  test("appends the block to an existing CLAUDE.md and keeps what was there", async () => {
+    const { cwd, psdd } = project();
+    writeFileSync(join(cwd, "CLAUDE.md"), "# Project\n\nUse tabs.\n");
+
+    await psdd("init");
+
+    expect(readFileSync(join(cwd, "CLAUDE.md"), "utf8")).toBe("# Project\n\nUse tabs.\n\n" + AGENT_INSTRUCTIONS + "\n");
+    expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
+  });
+
+  test("replaces an earlier psdd block instead of adding a second one", async () => {
+    const { cwd, psdd } = project();
+    writeFileSync(join(cwd, "AGENTS.md"), "# Agents\n\n<!-- psdd:start -->\nold\n<!-- psdd:end -->\n\nMore.\n");
+
+    await psdd("init");
+    await psdd("init");
+
+    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe("# Agents\n\n" + AGENT_INSTRUCTIONS + "\n\nMore.\n");
+  });
+
+  test("leaves a CLAUDE.md that imports AGENTS.md alone", async () => {
+    const { cwd, psdd } = project();
+    writeFileSync(join(cwd, "AGENTS.md"), "# Agents\n");
+    writeFileSync(join(cwd, "CLAUDE.md"), "@AGENTS.md\n");
+
+    await psdd("init");
+
+    expect(readFileSync(join(cwd, "CLAUDE.md"), "utf8")).toBe("@AGENTS.md\n");
+    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe("# Agents\n\n" + AGENT_INSTRUCTIONS + "\n");
   });
 });
