@@ -26,6 +26,14 @@ describe("LocalWorkspace", () => {
     expect(await ws.worktreeExists(".agents/worktrees/124-y")).toBe(false);
   });
 
+  test("worktreeDirty asks git status in the worktree", async () => {
+    const { run, calls } = scripted((_, args) => ({ stdout: args[1].endsWith("dirty") ? "?? notes.txt\n" : "" }));
+    const ws = new LocalWorkspace("/repo", {}, run);
+    expect(await ws.worktreeDirty(".agents/worktrees/dirty")).toBe(true);
+    expect(await ws.worktreeDirty(".agents/worktrees/clean")).toBe(false);
+    expect(calls[0]).toBe("git -C /repo/.agents/worktrees/dirty status --porcelain");
+  });
+
   test("branchCheckedOutAt finds the worktree whose entry has the branch", async () => {
     const { run } = scripted(() => ({
       stdout: "worktree /repo\nHEAD abc\nbranch refs/heads/123-x\n\nworktree /repo/.agents/worktrees/124-y\nHEAD def\nbranch refs/heads/124-y\n\nworktree /tmp/d\nHEAD 012\ndetached\n",

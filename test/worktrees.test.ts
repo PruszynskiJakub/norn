@@ -171,6 +171,20 @@ describe("worktree cleanup", () => {
     expect(res.stdout).toContain("Story #123 is merged and closed. Removed its worktree .agents/worktrees/123-rate-limiting.");
   });
 
+  test("a worktree with uncommitted changes is kept, and next says so", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 127, title: "Redis store", state: "closed", stateReason: "not_planned", labels: ["type:slice", "mode:afk"] });
+    w.github.parents.set(127, 123);
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting-127");
+    w.workspace.dirty.add(".agents/worktrees/123-rate-limiting-127");
+
+    const res = await w.psdd("next", "123");
+
+    expect(w.workspace.removed).toEqual([]);
+    expect(res.stdout).toContain("Kept /repo/.agents/worktrees/123-rate-limiting-127: it has uncommitted changes. Remove it by hand when done.");
+  });
+
   test("a closed story loses the state label GitHub left on it, and next reports no state", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", state: "closed", labels: ["type:story", "merge-queue"] });

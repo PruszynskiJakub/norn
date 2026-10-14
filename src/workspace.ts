@@ -36,5 +36,7 @@ export interface Workspace {
   localBranchExists(branch: string): Promise<boolean>;
   /** Absolute path of the checkout or worktree that has the branch checked out; null when none. */
   branchCheckedOutAt(branch: string): Promise<string | null>;
+  /** Whether the worktree has uncommitted or untracked changes. */
+  worktreeDirty(rel: string): Promise<boolean>;
   removeWorktree(rel: string, provider: Provider): Promise<void>;
 }

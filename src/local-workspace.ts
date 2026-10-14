@@ -76,6 +76,10 @@ export class LocalWorkspace implements Workspace {
     return null;
   }
 
+  async worktreeDirty(rel: string) {
+    return (await this.must("git", ["-C", join(this.root, rel), "status", "--porcelain"])).trim() !== "";
+  }
+
   async localBranchExists(branch: string) {
     return (await this.run("git", ["-C", this.root, "show-ref", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;
   }

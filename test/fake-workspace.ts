@@ -23,6 +23,11 @@ export class FakeWorkspace implements Workspace {
   async localBranchExists(branch: string) {
     return this.localBranches.has(branch);
   }
+  /** Worktrees with uncommitted changes. */
+  dirty = new Set<string>();
+  async worktreeDirty(rel: string) {
+    return this.dirty.has(rel);
+  }
   async removeWorktree(rel: string, provider: Provider) {
     this.worktrees.delete(rel);
     this.removed.push({ path: rel, provider });

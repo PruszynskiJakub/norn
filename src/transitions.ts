@@ -292,16 +292,19 @@ export async function sliceMergeRefusal(ctx: Ctx, slice: Issue): Promise<string[
 }
 
 /**
- * Removes the issue's local worktree, if there is one. Returns its path when removed.
+ * Removes the issue's local worktree, if there is one. Returns its path when
+ * removed. A worktree with uncommitted changes is kept and returned as kept:
+ * removal forces, and someone may still be working there.
  * Throws rather than remove the worktree psdd is running in.
  */
-export async function removeWorktreeOf(ctx: Ctx, issue: Issue): Promise<string | null> {
+export async function removeWorktreeOf(ctx: Ctx, issue: Issue): Promise<{ removed: string } | { kept: string } | null> {
   const loc = await locate(issue, ctx);
   if (!loc || !(await ctx.workspace.worktreeExists(loc.worktree))) return null;
   const abs = join(ctx.workspace.root, loc.worktree);
   if (isWithin(ctx.workspace.cwd, abs)) {
     throw new Error(`psdd is running inside it; run psdd next from another directory to remove it`);
   }
+  if (await ctx.workspace.worktreeDirty(loc.worktree)) return { kept: abs };
   await ctx.workspace.removeWorktree(loc.worktree, ctx.config.provider);
-  return loc.worktree;
+  return { removed: loc.worktree };
 }

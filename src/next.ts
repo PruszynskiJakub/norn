@@ -97,11 +97,15 @@ async function reconcile(ctx: Ctx, storyNumber: number): Promise<string[]> {
       return [];
     })));
     try {
-      const removed = await removeWorktreeOf(ctx, issue);
-      if (!removed) continue;
+      const r = await removeWorktreeOf(ctx, issue);
+      if (!r) continue;
+      if ("kept" in r) {
+        notes.push(`Kept ${r.kept}: it has uncommitted changes. Remove it by hand when done.`);
+        continue;
+      }
       notes.push(issue.number === storyNumber
-        ? `Story #${storyNumber} is merged and closed. Removed its worktree ${removed}.`
-        : `Slice #${issue.number} is merged. Removed its worktree ${removed}.`);
+        ? `Story #${storyNumber} is merged and closed. Removed its worktree ${r.removed}.`
+        : `Slice #${issue.number} is merged. Removed its worktree ${r.removed}.`);
     } catch (e) {
       notes.push(`Could not remove the worktree of #${issue.number}: ${(e as Error).message}`);
     }
