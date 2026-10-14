@@ -1,3 +1,4 @@
+import { join, sep } from "node:path";
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
 import { kindOf, stateOf, type Outcome, type State } from "./machine.js";
@@ -212,10 +213,18 @@ export async function sliceMergeRefusal(github: GitHub, slice: Issue): Promise<s
   return null;
 }
 
-/** Removes the issue's local worktree, if there is one. Returns its path when removed. */
+/**
+ * Removes the issue's local worktree, if there is one. Returns its path when removed.
+ * Throws rather than remove the worktree psdd is running in.
+ */
 export async function removeWorktreeOf(ctx: Ctx, issue: Issue): Promise<string | null> {
   const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
   if (!loc || !(await ctx.workspace.worktreeExists(loc.worktree))) return null;
+  const abs = join(ctx.workspace.root, loc.worktree);
+  const cwd = ctx.workspace.cwd;
+  if (cwd === abs || cwd.startsWith(abs + sep)) {
+    throw new Error(`psdd is running inside it; run psdd next from another directory to remove it`);
+  }
   await ctx.workspace.removeWorktree(loc.worktree, ctx.config.provider);
   return loc.worktree;
 }

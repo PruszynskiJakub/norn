@@ -132,7 +132,7 @@ describe("worktree cleanup", () => {
     expect(res.stdout).toContain("Story #123 is merged and closed. Removed its worktree .agents/worktrees/123-rate-limiting.");
   });
 
-  test("taking over a stale claim cleans up the worktree the crashed session left behind", async () => {
+  test("taking over a stale claim keeps the worktree the previous holder left, and says so", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
     w.setNow("2026-10-13T08:00:00Z");
@@ -143,8 +143,22 @@ describe("worktree cleanup", () => {
 
     const res = await w.psdd("take", "123");
 
-    expect(w.workspace.removed.map((r) => r.path)).toEqual([".agents/worktrees/123-rate-limiting"]);
-    expect(res.stdout).toContain("The previous holder's claim was stale (since 08:00); its worktree was removed.");
-    expect(res.stdout).toContain("  git worktree add .agents/worktrees/123-rate-limiting 123-rate-limiting\n");
+    expect(w.workspace.removed).toEqual([]);
+    expect(res.stdout).toContain(
+      "The previous holder's claim was stale (since 08:00); its worktree is kept with what it left. Check git status there before you start.",
+    );
+    expect(res.stdout).not.toContain("does not exist");
+  });
+
+  test("next never removes the worktree it is running in", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", state: "closed", labels: ["type:story", "merge-queue"] });
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
+    w.workspace.cwd = "/repo/.agents/worktrees/123-rate-limiting/src";
+
+    const res = await w.psdd("next", "123");
+
+    expect(w.workspace.removed).toEqual([]);
+    expect(res.stdout).toContain("Could not remove the worktree of #123: psdd is running inside it");
   });
 });

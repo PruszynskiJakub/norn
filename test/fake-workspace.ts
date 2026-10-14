@@ -2,6 +2,7 @@ import type { Provider, Workspace } from "../src/workspace.js";
 
 export class FakeWorkspace implements Workspace {
   root = "/repo";
+  cwd = "/repo";
   env: Record<string, string | undefined> = { CLAUDECODE: "1" };
   files = new Map<string, string>();
   worktrees = new Set<string>();

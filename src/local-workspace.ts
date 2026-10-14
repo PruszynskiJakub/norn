@@ -22,6 +22,7 @@ export class LocalWorkspace implements Workspace {
     public root: string,
     public env: Record<string, string | undefined>,
     private run: Run = runCommand,
+    public cwd: string = root,
   ) {}
 
   /** The main checkout's root, also from inside a linked worktree. */

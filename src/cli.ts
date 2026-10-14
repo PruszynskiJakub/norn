@@ -5,6 +5,7 @@ import type { GitHub, Issue } from "./github.js";
 import { FIX_STATES, kindOf, stateOf, stepFor, type State } from "./machine.js";
 import { computeNext, notAStory, notifyWaiting, renderNext } from "./next.js";
 import { init } from "./init.js";
+import { locate } from "./location.js";
 import { notifyNeedsHuman } from "./notify.js";
 import { loadConfig, providerRefusal } from "./config.js";
 import { status } from "./status.js";
@@ -14,7 +15,6 @@ import {
   ensureStoryBranch,
   followUps,
   needsHumanLine,
-  removeWorktreeOf,
   sliceMergeRefusal,
   type Ctx,
 } from "./transitions.js";
@@ -173,8 +173,12 @@ async function take(n: number, deps: Env): Promise<Result> {
   await github.addLabels(n, ["in-progress"]);
   let staleNote: string | null = null;
   if (claim.tookOver) {
-    const removed = await removeWorktreeOf(deps, issue);
-    staleNote = `The previous holder's claim was stale (since ${hhmm(claim.tookOver.since)})${removed ? "; its worktree was removed." : "."}`;
+    // The holder may only be slow, and its worktree holds its commits: keep it, never remove it here.
+    const loc = await locate(issue, github, deps.config.baseBranch);
+    const kept = loc && (await deps.workspace.worktreeExists(loc.worktree));
+    staleNote = `The previous holder's claim was stale (since ${hhmm(claim.tookOver.since)})${
+      kept ? `; its worktree is kept with what it left. Check git status there before you start.` : "."
+    }`;
   }
   const lines = await briefing(issue, step, deps);
   if (staleNote) lines.splice(lines.indexOf(""), 0, "", staleNote);
