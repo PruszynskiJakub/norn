@@ -17,7 +17,7 @@ export async function briefing(issue: Issue, step: Step, ctx: Ctx): Promise<stri
   const many = Object.keys(step.outcomes).length > 1;
   const when = step.attended ? `When the user agrees ${step.name} is finished` : `When ${step.name} is finished`;
   const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
-  const workIn = loc ? [...(await workInLines(loc, ctx.workspace, ctx.config.provider)), ""] : [];
+  const workIn = loc ? [...(await workInLines(loc, ctx.workspace, ctx.github, ctx.config.provider)), ""] : [];
   return [
     wrap(where),
     "",

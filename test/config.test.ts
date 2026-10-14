@@ -17,7 +17,7 @@ describe("configuration", () => {
 
     const res = await w.psdd("take", "123");
 
-    expect(res.stdout).toContain("git worktree add .agents/worktrees/123-rate-limiting -b 123-rate-limiting develop");
+    expect(res.stdout).toContain("git -C /repo fetch origin develop && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting -b 123-rate-limiting origin/develop");
   });
 
   test("the local provider wins over the team file", async () => {
@@ -29,7 +29,7 @@ describe("configuration", () => {
     const res = await w.psdd("take", "123");
 
     expect(res.stdout).toContain(
-      "  herdr worktree create --cwd /repo --branch 123-rate-limiting --base main --path .agents/worktrees/123-rate-limiting --no-focus",
+      "  git -C /repo fetch origin main && herdr worktree create --cwd /repo --branch 123-rate-limiting --base origin/main --path /repo/.agents/worktrees/123-rate-limiting --no-focus",
     );
   });
 
@@ -42,7 +42,7 @@ describe("configuration", () => {
   test("auto falls back to plain git", async () => {
     const w = storyIn("needs-plan");
     w.workspace.env = {};
-    expect((await w.psdd("take", "123")).stdout).toContain("git worktree add");
+    expect((await w.psdd("take", "123")).stdout).toContain("worktree add");
   });
 
   test("provider herdr without HERDR_ENV is refused before anything is claimed", async () => {

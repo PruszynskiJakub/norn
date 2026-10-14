@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import type { GitHub, Issue } from "./github.js";
 import { kindOf } from "./machine.js";
 import { sliceBranch, storyBranch, worktreePath } from "./text.js";
@@ -27,14 +28,29 @@ export async function locate(issue: Issue, github: GitHub, baseBranch: string): 
   return null;
 }
 
-/** The command that creates the worktree with the given tool. */
-export function createWorktreeCommand(provider: Provider, loc: Location, root: string, branchExists: boolean): string {
+/** Where the item's branch exists already: in this clone, only on GitHub, or nowhere yet. */
+export type BranchAt = "local" | "remote" | "none";
+
+export async function branchAt(loc: Location, workspace: Workspace, github: GitHub): Promise<BranchAt> {
+  if (await workspace.localBranchExists(loc.branch)) return "local";
+  return (await github.branchExists(loc.branch)) ? "remote" : "none";
+}
+
+/**
+ * The command that creates the worktree with the given tool. Paths are absolute
+ * and git runs against the main checkout, so it works from any directory. A new
+ * branch starts from the base as it is on GitHub, fetched first.
+ */
+export function createWorktreeCommand(provider: Provider, loc: Location, root: string, at: BranchAt): string {
+  const path = join(root, loc.worktree);
+  const git = `git -C ${root}`;
   if (provider === "herdr") {
-    return `herdr worktree create --cwd ${root} --branch ${loc.branch} --base ${loc.base} --path ${loc.worktree} --no-focus`;
+    const fetch = at === "remote" ? `${git} fetch origin ${loc.base} ${loc.branch}` : `${git} fetch origin ${loc.base}`;
+    return `${fetch} && herdr worktree create --cwd ${root} --branch ${loc.branch} --base origin/${loc.base} --path ${path} --no-focus`;
   }
-  return branchExists
-    ? `git worktree add ${loc.worktree} ${loc.branch}`
-    : `git worktree add ${loc.worktree} -b ${loc.branch} ${loc.base}`;
+  if (at === "local") return `${git} worktree add ${path} ${loc.branch}`;
+  if (at === "remote") return `${git} fetch origin ${loc.branch} && ${git} worktree add ${path} ${loc.branch}`;
+  return `${git} fetch origin ${loc.base} && ${git} worktree add --no-track ${path} -b ${loc.branch} origin/${loc.base}`;
 }
 
 /** Auto-detection, in order: herdr, then Claude Code, then plain git. */
@@ -45,11 +61,11 @@ export function detectProvider(env: Record<string, string | undefined>): Provide
 }
 
 /** "Work in" lines of a briefing. */
-export async function workInLines(loc: Location, workspace: Workspace, provider: Provider): Promise<string[]> {
-  const lines = [`Work in: ${loc.worktree} (branch ${loc.branch})`];
+export async function workInLines(loc: Location, workspace: Workspace, github: GitHub, provider: Provider): Promise<string[]> {
+  const lines = [`Work in: ${join(workspace.root, loc.worktree)} (branch ${loc.branch})`];
   if (!(await workspace.worktreeExists(loc.worktree))) {
-    const exists = await workspace.localBranchExists(loc.branch);
-    lines.push("It does not exist yet. Create it first:", `  ${createWorktreeCommand(provider, loc, workspace.root, exists)}`);
+    const at = await branchAt(loc, workspace, github);
+    lines.push("It does not exist yet. Create it first:", `  ${createWorktreeCommand(provider, loc, workspace.root, at)}`);
   }
   return lines;
 }

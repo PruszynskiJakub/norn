@@ -37,13 +37,13 @@ describe("psdd next", () => {
         "worktree:",
         "",
         '  - Slice #131 "Per-key limits" is ready-for-agent.',
-        "    Worktree: .agents/worktrees/123-rate-limiting-131",
+        "    Worktree: /repo/.agents/worktrees/123-rate-limiting-131",
         "    Start it with: psdd take 131",
         '  - Slice #128 "Limit headers" needs review.',
-        "    Worktree: .agents/worktrees/123-rate-limiting-128",
+        "    Worktree: /repo/.agents/worktrees/123-rate-limiting-128",
         "    Start it with: psdd take 128",
         '  - Slice #127 "Redis store" is in merge-queue.',
-        "    Worktree: .agents/worktrees/123-rate-limiting-127",
+        "    Worktree: /repo/.agents/worktrees/123-rate-limiting-127",
         "    Start it with: psdd take 127",
         "",
         "Waiting, nothing to do for you:",
@@ -154,9 +154,9 @@ describe("next names how to start fresh agents for the worktree tool", () => {
 
     expect(res.stdout.replace(/\s+/g, " ")).toContain("each as a new herdr agent in the item's worktree pane:");
     expect(res.stdout).toContain(
-      "    Create the worktree: herdr worktree create --cwd /repo --branch 123-rate-limiting-131 --base 123-rate-limiting --path .agents/worktrees/123-rate-limiting-131 --no-focus",
+      "    Create the worktree: git -C /repo fetch origin 123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-131 --base origin/123-rate-limiting --path /repo/.agents/worktrees/123-rate-limiting-131 --no-focus",
     );
-    expect(res.stdout).toContain("    Start an agent: herdr agent start psdd-131 --kind claude --pane <pane of .agents/worktrees/123-rate-limiting-131>");
+    expect(res.stdout).toContain("    Start an agent: herdr agent start psdd-131 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-131>");
     const s128 = res.stdout.slice(res.stdout.indexOf("#128"), res.stdout.indexOf("#127"));
     expect(s128).not.toContain("Create the worktree");
   });
@@ -174,7 +174,7 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     expect(report.start[0]).toMatchObject({
       issue: 131,
       branch: "123-rate-limiting-131",
-      worktree: ".agents/worktrees/123-rate-limiting-131",
+      worktree: "/repo/.agents/worktrees/123-rate-limiting-131",
     });
     expect(report.provider).toBe("claude-code");
   });

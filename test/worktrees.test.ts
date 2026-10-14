@@ -13,9 +13,9 @@ describe("take names the worktree", () => {
         'You now hold story #123 "Rate limiting". Its step is refinement. This step',
         "is attended: the user takes part, and you do not decide on your own.",
         "",
-        "Work in: .agents/worktrees/123-rate-limiting (branch 123-rate-limiting)",
+        "Work in: /repo/.agents/worktrees/123-rate-limiting (branch 123-rate-limiting)",
         "It does not exist yet. Create it first:",
-        "  git worktree add .agents/worktrees/123-rate-limiting -b 123-rate-limiting main",
+        "  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting -b 123-rate-limiting origin/main",
         "",
         "Invoke the skill: refine",
         "Spec to work on: .agents/specs/123-rate-limiting/spec.md",
@@ -39,7 +39,7 @@ describe("take names the worktree", () => {
 
     const res = await w.psdd("take", "123");
 
-    expect(res.stdout).toContain("Work in: .agents/worktrees/123-rate-limiting (branch 123-rate-limiting)\n\nInvoke");
+    expect(res.stdout).toContain("Work in: /repo/.agents/worktrees/123-rate-limiting (branch 123-rate-limiting)\n\nInvoke");
     expect(res.stdout).not.toContain("does not exist");
   });
 
@@ -51,9 +51,9 @@ describe("take names the worktree", () => {
 
     const res = await w.psdd("take", "131");
 
-    expect(res.stdout).toContain("Work in: .agents/worktrees/123-rate-limiting-131 (branch 123-rate-limiting-131)");
+    expect(res.stdout).toContain("Work in: /repo/.agents/worktrees/123-rate-limiting-131 (branch 123-rate-limiting-131)");
     expect(res.stdout).toContain(
-      "  git worktree add .agents/worktrees/123-rate-limiting-131 -b 123-rate-limiting-131 123-rate-limiting",
+      "  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-131 -b 123-rate-limiting-131 origin/123-rate-limiting",
     );
     expect(res.stdout).toContain("Open one PR from 123-rate-limiting-131 into 123-rate-limiting.");
   });
@@ -65,7 +65,32 @@ describe("take names the worktree", () => {
 
     const res = await w.psdd("take", "123");
 
-    expect(res.stdout).toContain("  git worktree add .agents/worktrees/123-rate-limiting 123-rate-limiting\n");
+    expect(res.stdout).toContain("  git -C /repo worktree add /repo/.agents/worktrees/123-rate-limiting 123-rate-limiting\n");
+  });
+
+  test("a branch only on GitHub, like a story branch psdd made, is fetched and then checked out", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
+    w.github.branches.add("123-rate-limiting");
+
+    const res = await w.psdd("take", "123");
+
+    expect(res.stdout).toContain(
+      "  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add /repo/.agents/worktrees/123-rate-limiting 123-rate-limiting\n",
+    );
+  });
+
+  test("the commands work from inside another worktree: absolute paths, git run against the main checkout", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+    w.github.parents.set(131, 123);
+    w.workspace.cwd = "/repo/.agents/worktrees/123-rate-limiting";
+
+    const res = await w.psdd("take", "131");
+
+    expect(res.stdout).toContain("Work in: /repo/.agents/worktrees/123-rate-limiting-131 (branch 123-rate-limiting-131)");
+    expect(res.stdout).toContain("git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-131");
   });
 });
 

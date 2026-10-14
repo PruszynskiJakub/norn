@@ -1,6 +1,7 @@
 import { isStale } from "./claims.js";
 import { send } from "./notify.js";
-import { createWorktreeCommand, locate } from "./location.js";
+import { join } from "node:path";
+import { branchAt, createWorktreeCommand, locate } from "./location.js";
 import type { Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
 import { kindOf, stateOf, stepFor, type State } from "./machine.js";
@@ -157,12 +158,12 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
   let createWorktree: string | null = null;
   if (loc && ctx.config.provider === "herdr" && !(await ctx.workspace.worktreeExists(loc.worktree))) {
-    createWorktree = createWorktreeCommand("herdr", loc, ctx.workspace.root, await ctx.workspace.localBranchExists(loc.branch));
+    createWorktree = createWorktreeCommand("herdr", loc, ctx.workspace.root, await branchAt(loc, ctx.workspace, ctx.github));
   }
   report.start.push({
     issue: n,
     branch: loc?.branch ?? null,
-    worktree: loc?.worktree ?? null,
+    worktree: loc ? join(ctx.workspace.root, loc.worktree) : null,
     createWorktree,
     kind: kindOf(issue) === "slice" ? "slice" : "story",
     title: issue.title,
