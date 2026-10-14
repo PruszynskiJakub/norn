@@ -226,3 +226,32 @@ describe("a fix round's briefing", () => {
     expect(res.stdout).toContain("The problems are in the latest psdd comment on #123.");
   });
 });
+
+describe("an existing worktree", () => {
+  test("whose branch is on GitHub is brought up to date before work starts", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-review"] });
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
+    w.github.branches.add("123-rate-limiting");
+
+    const res = await w.psdd("take", "123");
+
+    expect(res.stdout).toContain(
+      [
+        "Work in: /repo/.agents/worktrees/123-rate-limiting (branch 123-rate-limiting)",
+        "Bring it up to date first:",
+        "  git -C /repo/.agents/worktrees/123-rate-limiting fetch origin 123-rate-limiting && git -C /repo/.agents/worktrees/123-rate-limiting merge --ff-only origin/123-rate-limiting",
+      ].join("\n"),
+    );
+  });
+
+  test("whose branch is only local is just named", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
+
+    const res = await w.psdd("take", "123");
+
+    expect(res.stdout).not.toContain("Bring it up to date");
+  });
+});

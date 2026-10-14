@@ -93,8 +93,17 @@ export async function workInLines(loc: Location, workspace: Workspace, github: G
     }
     const at = await branchAt(loc, workspace, github);
     lines.push("It does not exist yet. Create it first:", `  ${createWorktreeCommand(provider, loc, workspace.root, at)}`);
+  } else if (await github.branchExists(loc.branch)) {
+    // Others push here too, e.g. slices merged into the story branch; catch up before starting.
+    lines.push("Bring it up to date first:", `  ${updateWorktreeCommand(loc, workspace.root)}`);
   }
   return lines;
+}
+
+/** Fast-forwards an existing worktree to its branch on GitHub; a diverged branch fails and says so. */
+export function updateWorktreeCommand(loc: Location, absRoot: string): string {
+  const wt = `git -C ${sh(join(absRoot, loc.worktree))}`;
+  return `${wt} fetch origin ${sh(loc.branch)} && ${wt} merge --ff-only origin/${sh(loc.branch)}`;
 }
 
 /** git checks a branch out in one worktree only, so no create command can work. */
