@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
-import type { Provider, Workspace } from "./workspace.js";
+import { samePath, type Provider, type Workspace } from "./workspace.js";
 
 export type Run = (cmd: string, args: string[]) => Promise<{ code: number; stdout: string; stderr: string }>;
 
@@ -49,7 +49,8 @@ export class LocalWorkspace implements Workspace {
 
   async worktreeExists(rel: string) {
     const out = await this.must("git", ["-C", this.root, "worktree", "list", "--porcelain"]);
-    return out.split("\n").includes(`worktree ${join(this.root, rel)}`);
+    const path = join(this.root, rel);
+    return out.split("\n").some((l) => l.startsWith("worktree ") && samePath(l.slice("worktree ".length), path));
   }
 
   async branchCheckedOutAt(branch: string) {
@@ -74,7 +75,7 @@ export class LocalWorkspace implements Workspace {
       const list = JSON.parse(await this.must("herdr", ["worktree", "list", "--cwd", this.root])) as {
         result: { worktrees: { path: string; open_workspace_id?: string | null }[] };
       };
-      const id = list.result.worktrees.find((w) => w.path === path)?.open_workspace_id;
+      const id = list.result.worktrees.find((w) => samePath(w.path, path))?.open_workspace_id;
       if (id) {
         await this.must("herdr", ["worktree", "remove", "--workspace", id, "--force"]);
         return;

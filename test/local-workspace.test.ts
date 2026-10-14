@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { LocalWorkspace, type Run } from "../src/local-workspace.js";
+import { isWithin, samePath } from "../src/workspace.js";
 
 function scripted(handler: (cmd: string, args: string[]) => { code?: number; stdout?: string } | undefined) {
   const calls: string[] = [];
@@ -77,5 +78,18 @@ describe("LocalWorkspace", () => {
   test("the root is the main checkout, even when run from a worktree", async () => {
     const { run } = scripted(() => ({ stdout: "/repo/.git\n" }));
     expect(await LocalWorkspace.findRoot("/repo/.agents/worktrees/123-x", run)).toBe("/repo");
+  });
+});
+
+describe("comparing paths", () => {
+  test("git's C:/ form and Node's C:\\ form are the same path on Windows", () => {
+    expect(samePath("C:/Users/me/app/.agents/worktrees/7-x", "C:\\Users\\me\\app\\.agents\\worktrees\\7-x", "win32")).toBe(true);
+    expect(samePath("c:/Users/me/app/", "C:\\Users\\me\\app", "win32")).toBe(true);
+    expect(samePath("/repo/a", "/repo/b", "linux")).toBe(false);
+  });
+
+  test("isWithin knows a path inside a worktree, and not a sibling with the same prefix", () => {
+    expect(isWithin("C:\\r\\.agents\\worktrees\\7-x\\src", "C:/r/.agents/worktrees/7-x", "win32")).toBe(true);
+    expect(isWithin("/r/.agents/worktrees/7-x-12", "/r/.agents/worktrees/7-x", "linux")).toBe(false);
   });
 });

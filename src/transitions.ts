@@ -1,11 +1,11 @@
-import { join, sep } from "node:path";
+import { join } from "node:path";
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
 import { FIX_STATES, STATES, kindOf, stateOf, type Outcome, type State } from "./machine.js";
 import { locate } from "./location.js";
 import { slugLine, storySlug, type Slugs } from "./slug.js";
 import { sliceBranch, specPath, storyBranch } from "./text.js";
-import type { Workspace } from "./workspace.js";
+import { isWithin, type Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import { notifyNeedsHuman, type Notify } from "./notify.js";
 
@@ -285,8 +285,7 @@ export async function removeWorktreeOf(ctx: Ctx, issue: Issue): Promise<string |
   const loc = await locate(issue, ctx);
   if (!loc || !(await ctx.workspace.worktreeExists(loc.worktree))) return null;
   const abs = join(ctx.workspace.root, loc.worktree);
-  const cwd = ctx.workspace.cwd;
-  if (cwd === abs || cwd.startsWith(abs + sep)) {
+  if (isWithin(ctx.workspace.cwd, abs)) {
     throw new Error(`psdd is running inside it; run psdd next from another directory to remove it`);
   }
   await ctx.workspace.removeWorktree(loc.worktree, ctx.config.provider);
