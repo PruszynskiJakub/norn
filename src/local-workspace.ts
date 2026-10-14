@@ -3,11 +3,12 @@ import { readFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { samePath, type Provider, type Workspace } from "./workspace.js";
 
-export type Run = (cmd: string, args: string[]) => Promise<{ code: number; stdout: string; stderr: string }>;
+/** Runs a command; `env` is added to this process's environment. */
+export type Run = (cmd: string, args: string[], env?: Record<string, string>) => Promise<{ code: number; stdout: string; stderr: string }>;
 
-export const runCommand: Run = (cmd, args) =>
+export const runCommand: Run = (cmd, args, env) =>
   new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"], env: env ? { ...process.env, ...env } : process.env });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d) => (stdout += d));
