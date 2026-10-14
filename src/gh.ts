@@ -105,11 +105,18 @@ export class GhGitHub implements GitHub {
       }
     }
   }
+  async labelHistory(n: number) {
+    const events = await this.paginate<{ event: string; label?: { name: string } }>(`${REPO}/issues/${n}/events`);
+    return events.filter((e) => e.event === "labeled" && e.label).map((e) => e.label!.name);
+  }
   async assign(n: number, users: string[]) {
     await this.api("POST", `${REPO}/issues/${n}/assignees`, { assignees: users });
   }
   async comment(n: number, body: string) {
     await this.api("POST", `${REPO}/issues/${n}/comments`, { body });
+  }
+  async listComments(n: number) {
+    return (await this.paginate<{ body: string }>(`${REPO}/issues/${n}/comments`)).map((c) => c.body);
   }
   async closeIssue(n: number, reason: "completed" | "not_planned") {
     await this.api("PATCH", `${REPO}/issues/${n}`, { state: "closed", state_reason: reason });

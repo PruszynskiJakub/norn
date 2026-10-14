@@ -26,7 +26,7 @@ export interface Outcome {
   means: string;
   /** The outcome needs a note; this names it, e.g. "reason". */
   note?: string;
-  /** After the transition, set needs-human with this reason. */
+  /** After the transition, set needs-human; this is who must do what, e.g. "QA in mode:hil". */
   needsHuman?: string;
 }
 
@@ -40,6 +40,9 @@ export interface Step {
   /** Keyed by outcome word; the empty key is the single way to end. */
   outcomes: Record<string, Outcome>;
 }
+
+/** States that send an issue back for another round of tdd. */
+export const FIX_STATES: readonly State[] = ["changes-requested", "qa-failed"];
 
 export function stateOf(issue: Issue): State | null {
   return (STATES as readonly string[]).find((s) => issue.labels.includes(s)) as State | null ?? null;
@@ -73,7 +76,7 @@ export function stepFor(issue: Issue): Step | null {
         approve: {
           to: "needs-qa",
           means: "no requests, moves on to QA",
-          needsHuman: hil ? (kind === "story" ? "story QA is done by a human" : "QA in mode:hil") : undefined,
+          needsHuman: hil ? (kind === "story" ? "story QA" : "QA in mode:hil") : undefined,
         },
         "request-changes": { to: "changes-requested", means: "put the requests in the note", note: "requests" },
       },

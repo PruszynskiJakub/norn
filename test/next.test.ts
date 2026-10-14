@@ -31,8 +31,9 @@ describe("psdd next", () => {
         'Story #123 "Rate limiting" is in implementation. 2 of 7 slices are merged',
         "into 123-rate-limiting.",
         "",
-        "You can start 3 items now. They are independent, so run them in parallel,",
-        "each in its own fresh subagent, told to work in the item's worktree:",
+        "You can start 3 items now. They are independent, so run them in parallel, at",
+        "most 2 at a time, each in its own fresh subagent, told to work in the item's",
+        "worktree:",
         "",
         '  - Slice #131 "Per-key limits" is ready-for-agent.',
         "    Worktree: .agents/worktrees/123-rate-limiting-131",
@@ -82,7 +83,7 @@ describe("psdd next", () => {
 
     const res = await w.psdd("next", "123");
 
-    expect(res.stdout).toContain("Nothing can be started now.");
+    expect(res.stdout).toContain("nothing left that you can do.");
     expect(res.stdout).toContain("#123 waits for its owner (@bob) to merge the story PR into main.");
   });
 
@@ -150,7 +151,7 @@ describe("next names how to start fresh agents for the worktree tool", () => {
 
     const res = await w.psdd("next", "123");
 
-    expect(res.stdout).toContain("each as a new herdr agent in the item's worktree pane:");
+    expect(res.stdout.replace(/\s+/g, " ")).toContain("each as a new herdr agent in the item's worktree pane:");
     expect(res.stdout).toContain(
       "    Create the worktree: herdr worktree create --cwd /repo --branch 123-rate-limiting-131 --base 123-rate-limiting --path .agents/worktrees/123-rate-limiting-131 --no-focus",
     );
@@ -163,7 +164,7 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     const w = prdExample();
     w.workspace.env = {};
     const res = await w.psdd("next", "123");
-    expect(res.stdout).toContain("each in a new agent session started in the item's worktree:");
+    expect(res.stdout.replace(/\s+/g, " ")).toContain("each in a new agent session started in the item's worktree:");
   });
 
   test("--json carries each item's branch and worktree", async () => {
@@ -175,5 +176,22 @@ describe("next names how to start fresh agents for the worktree tool", () => {
       worktree: ".agents/worktrees/123-rate-limiting-131",
     });
     expect(report.provider).toBe("claude-code");
+  });
+});
+
+describe("parallel limit", () => {
+  const flat = (s: string) => s.replace(/\s+/g, " ");
+
+  test("next tells the orchestrator to run at most deliver.maxParallel items at once", async () => {
+    const w = prdExample();
+    expect(flat((await w.psdd("next", "123")).stdout)).toContain("run them in parallel, at most 2 at a time,");
+  });
+
+  test("the limit comes from the config", async () => {
+    const w = prdExample();
+    w.workspace.files.set(".agents/psdd.config.json", JSON.stringify({ deliver: { maxParallel: 3 } }));
+    const res = await w.psdd("next", "123");
+    expect(flat(res.stdout)).toContain("at most 3 at a time");
+    expect(JSON.parse((await w.psdd("next", "123", "--json")).stdout).maxParallel).toBe(3);
   });
 });

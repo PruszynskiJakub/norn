@@ -5,9 +5,28 @@ import { locate } from "./location.js";
 import { sliceBranch, specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
+import { notifyNeedsHuman, type Notify } from "./notify.js";
+
+/** The marker psdd writes when it sets needs-human; psdd next reads the reason back from it. */
+export const NEEDS_HUMAN_MARK = "psdd: needs-human — ";
+
+export function needsHumanLine(reason: string) {
+  return `${NEEDS_HUMAN_MARK}${reason}`;
+}
+
+/** The reason psdd last gave for needs-human on an issue, read back from its comments. */
+export async function needsHumanReason(github: GitHub, n: number): Promise<string | null> {
+  const comments = await github.listComments(n);
+  for (const body of comments.reverse()) {
+    const line = body.split("\n").find((l) => l.startsWith(NEEDS_HUMAN_MARK));
+    if (line) return line.slice(NEEDS_HUMAN_MARK.length);
+  }
+  return null;
+}
 
 export interface Ctx {
   github: GitHub;
+  notify: Notify;
   workspace: Workspace;
   config: Config;
   now: () => Date;
@@ -41,7 +60,7 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
     }
     if (outcome.needsHuman) {
       add.push("needs-human");
-      comment.push("", `This needs a human: ${outcome.needsHuman}.`);
+      comment.push("", needsHumanLine(outcome.needsHuman));
     }
     const state = stateOf(issue);
     const remove = ["in-progress", ...(outcome.needsHuman ? [] : ["needs-human"])];
@@ -49,6 +68,7 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
     await github.removeLabels(n, remove);
     await github.addLabels(n, add);
     await github.comment(n, comment.join("\n"));
+    if (outcome.needsHuman) await notifyNeedsHuman(ctx, n, outcome.needsHuman);
   }
 
   const report: string[] = [];

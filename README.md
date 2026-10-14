@@ -20,7 +20,9 @@ Run `psdd` with no arguments for every command. Add `--json` for scripts.
 - Uses your own `gh`; every change is made as you.
 - Claims are git refs `refs/psdd/claims/<issue>`; a stale claim (default 2h) is taken over and its left-behind worktree removed.
 - Each story and slice works in its own worktree under `.agents/worktrees/<branch>`; the briefing names it and gives the command to create it for herdr, Claude Code or plain git. psdd removes a slice's worktree when it merges, and the story's once the story is merged into main.
-- Team settings: `.agents/psdd.config.json` (`baseBranch`, `worktrees.provider`, `claims.staleAfter`). Each developer can override in the gitignored `.agents/psdd.config.local.json`.
+- Team settings: `.agents/psdd.config.json` (`baseBranch`, `worktrees.provider`, `claims.staleAfter`, `deliver.maxParallel`, `deliver.maxFixRounds`). Each developer can override in the gitignored `.agents/psdd.config.local.json`, which also picks `notifications` (`auto`, `herdr`, `os`, `none`).
+- Once slicing is done, the `deliver` skill runs the story unattended until it needs a human. After `deliver.maxFixRounds` rounds of changes-requested or qa-failed, an issue gets needs-human instead of another round.
+- psdd notifies you locally whenever it sets needs-human, and when `psdd next` finds nothing left to do.
 - The session holding a claim is `PSDD_SESSION`, else `CLAUDE_CODE_SESSION_ID`, else host and directory.
 - `psdd init` copies the skills bundled in `skills/`. Set `PSDD_SKILLS_SOURCE=<repo>` to install with `npx skills add <repo>` first.
 

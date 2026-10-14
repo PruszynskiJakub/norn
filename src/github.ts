@@ -34,8 +34,12 @@ export interface GitHub {
   getIssue(number: number): Promise<Issue>;
   addLabels(number: number, labels: string[]): Promise<void>;
   removeLabels(number: number, labels: string[]): Promise<void>;
+  /** Names of labels added to the issue, oldest first (from its timeline). */
+  labelHistory(number: number): Promise<string[]>;
   assign(number: number, users: string[]): Promise<void>;
   comment(number: number, body: string): Promise<void>;
+  /** Comment bodies, oldest first. */
+  listComments(number: number): Promise<string[]>;
   closeIssue(number: number, reason: "completed" | "not_planned"): Promise<void>;
   createIssue(input: { title: string; body: string; labels: string[]; assignees: string[] }): Promise<Issue>;
 

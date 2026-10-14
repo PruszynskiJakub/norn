@@ -6,6 +6,7 @@ import { sessionId } from "./env.js";
 import { GhError, GhGitHub } from "./gh.js";
 import { installSkills } from "./install-skills.js";
 import { LocalWorkspace } from "./local-workspace.js";
+import { makeNotifier } from "./notifier.js";
 
 try {
   const root = await LocalWorkspace.findRoot(process.cwd());
@@ -14,6 +15,7 @@ try {
     workspace: new LocalWorkspace(root, process.env),
     now: () => new Date(),
     session: sessionId(process.env, hostname(), process.cwd()),
+    notify: makeNotifier(),
     headSha: async () => execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
     cwd: root,
     installSkills,

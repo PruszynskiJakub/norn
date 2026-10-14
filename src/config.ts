@@ -1,4 +1,5 @@
 import { detectProvider } from "./location.js";
+import type { Channel } from "./notify.js";
 import type { Provider, Workspace } from "./workspace.js";
 
 export const TEAM_CONFIG = ".agents/psdd.config.json";
@@ -8,6 +9,7 @@ export const DEFAULT_TEAM_CONFIG = {
   baseBranch: "main",
   worktrees: { provider: "auto" },
   claims: { staleAfter: "2h" },
+  deliver: { maxParallel: 2, maxFixRounds: 3 },
 };
 
 export interface Config {
@@ -15,9 +17,14 @@ export interface Config {
   /** The provider after resolving auto. */
   provider: Provider;
   staleAfterMs: number;
+  maxParallel: number;
+  maxFixRounds: number;
+  /** Where notifications go; null when turned off. */
+  notifications: Channel | null;
 }
 
 const PROVIDERS = ["auto", "herdr", "claude-code", "git"] as const;
+const NOTIFICATIONS = ["auto", "herdr", "os", "none"];
 const ENV_FOR: Record<Provider, string | null> = { herdr: "HERDR_ENV", "claude-code": "CLAUDECODE", git: null };
 const UNITS: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
 
@@ -25,6 +32,8 @@ interface Raw {
   baseBranch?: string;
   worktrees?: { provider?: string };
   claims?: { staleAfter?: string };
+  deliver?: { maxParallel?: number; maxFixRounds?: number };
+  notifications?: string;
 }
 
 /** Checks one file's settings; returns problems prefixed with the file. */
@@ -33,7 +42,7 @@ function check(file: string, raw: unknown): string[] {
   const problems: string[] = [];
   const r = raw as Record<string, unknown>;
   for (const key of Object.keys(r)) {
-    if (!["baseBranch", "worktrees", "claims"].includes(key)) problems.push(`${file}: unknown setting "${key}"`);
+    if (!["baseBranch", "worktrees", "claims", "deliver", "notifications"].includes(key)) problems.push(`${file}: unknown setting "${key}"`);
   }
   if ("baseBranch" in r && (typeof r.baseBranch !== "string" || !r.baseBranch)) problems.push(`${file}: baseBranch must be a branch name`);
   const provider = (r.worktrees as Raw["worktrees"])?.provider;
@@ -43,6 +52,15 @@ function check(file: string, raw: unknown): string[] {
   const stale = (r.claims as Raw["claims"])?.staleAfter;
   if (stale !== undefined && !/^\d+[smhd]$/.test(String(stale))) {
     problems.push(`${file}: claims.staleAfter must be a duration like 90m or 2h`);
+  }
+  if ("notifications" in r) {
+    if (file === TEAM_CONFIG) problems.push(`${file}: notifications is set per developer in ${LOCAL_CONFIG}`);
+    else if (!NOTIFICATIONS.includes(r.notifications as string)) problems.push(`${file}: notifications must be one of ${NOTIFICATIONS.join(", ")}`);
+  }
+  const deliver = (r.deliver ?? {}) as Record<string, unknown>;
+  for (const key of ["maxParallel", "maxFixRounds"]) {
+    const v = deliver[key];
+    if (v !== undefined && !(Number.isInteger(v) && (v as number) > 0)) problems.push(`${file}: deliver.${key} must be a whole number above 0`);
   }
   return problems;
 }
@@ -74,6 +92,9 @@ export async function loadConfig(workspace: Workspace): Promise<Loaded> {
     provider: local.raw.worktrees?.provider ?? team.raw.worktrees?.provider ?? "auto",
     staleAfter: local.raw.claims?.staleAfter ?? team.raw.claims?.staleAfter ?? DEFAULT_TEAM_CONFIG.claims.staleAfter,
   };
+  const notifications = local.raw.notifications ?? "auto";
+  const channel: Channel | null =
+    notifications === "none" ? null : notifications === "auto" ? (workspace.env.HERDR_ENV === "1" ? "herdr" : "os") : (notifications as Channel);
   const provider = merged.provider === "auto" ? detectProvider(workspace.env) : (merged.provider as Provider);
   return {
     ok: true,
@@ -81,6 +102,9 @@ export async function loadConfig(workspace: Workspace): Promise<Loaded> {
       baseBranch: merged.baseBranch,
       provider,
       staleAfterMs: Number(merged.staleAfter.slice(0, -1)) * UNITS[merged.staleAfter.slice(-1)],
+      maxParallel: local.raw.deliver?.maxParallel ?? team.raw.deliver?.maxParallel ?? DEFAULT_TEAM_CONFIG.deliver.maxParallel,
+      notifications: channel,
+      maxFixRounds: local.raw.deliver?.maxFixRounds ?? team.raw.deliver?.maxFixRounds ?? DEFAULT_TEAM_CONFIG.deliver.maxFixRounds,
     },
   };
 }

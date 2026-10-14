@@ -31,7 +31,7 @@ describe("review", () => {
     await w.psdd("done", "131", "approve");
 
     expect(w.github.labels(131).sort()).toEqual(["mode:hil", "needs-human", "needs-qa", "type:slice"]);
-    expect(w.github.comments(131).at(-1)).toContain("needs a human: QA in mode:hil");
+    expect(w.github.comments(131).at(-1)).toContain("psdd: needs-human — QA in mode:hil");
   });
 
   test("approving a story hands QA to a human, since story QA is always human", async () => {

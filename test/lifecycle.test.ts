@@ -52,7 +52,7 @@ test("a story runs from new issue to its story PR, driven only through psdd", as
   // Story review and human QA, then the owner merges.
   await step("take", "123");
   await step("done", "123", "approve");
-  expect(await step("next", "123")).toContain("#123 needs a human: story QA is done by a human.");
+  expect(await step("next", "123")).toContain("Waiting for a human:\n  - #123 story QA.");
   await step("take", "123");
   await step("done", "123", "pass");
   expect(gh.labels(123).sort()).toEqual(["merge-queue", "type:story"]);

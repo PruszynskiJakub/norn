@@ -143,3 +143,20 @@ describe("GhGitHub issues", () => {
     expect(calls[0].args.slice(0, 2)).toEqual(["pr", "list"]);
   });
 });
+
+describe("GhGitHub label history", () => {
+  test("labelHistory lists labels added, oldest first, from the issue's events", async () => {
+    const { exec, calls } = scripted(() => ({
+      stdout: [
+        [
+          { event: "labeled", label: { name: "ready-for-agent" } },
+          { event: "assigned" },
+          { event: "unlabeled", label: { name: "ready-for-agent" } },
+        ],
+        [{ event: "labeled", label: { name: "changes-requested" } }],
+      ],
+    }));
+    expect(await new GhGitHub(exec).labelHistory(131)).toEqual(["ready-for-agent", "changes-requested"]);
+    expect(calls[0].args).toEqual(["api", "--paginate", "--slurp", "repos/{owner}/{repo}/issues/131/events"]);
+  });
+});

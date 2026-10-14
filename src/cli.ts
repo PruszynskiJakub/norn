@@ -2,13 +2,14 @@ import { parseArgs } from "./args.js";
 import { briefing, finishCommands } from "./briefing.js";
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
-import { kindOf, stateOf, stepFor } from "./machine.js";
-import { computeNext, notAStory, renderNext } from "./next.js";
+import { FIX_STATES, kindOf, stateOf, stepFor, type State } from "./machine.js";
+import { computeNext, notAStory, notifyWaiting, renderNext } from "./next.js";
 import { init } from "./init.js";
+import { notifyNeedsHuman } from "./notify.js";
 import { loadConfig, providerRefusal } from "./config.js";
 import { status } from "./status.js";
 import { hhmm, specPath } from "./text.js";
-import { applyOutcome, removeWorktreeOf, sliceMergeRefusal, type Ctx } from "./transitions.js";
+import { applyOutcome, needsHumanLine, removeWorktreeOf, sliceMergeRefusal, type Ctx } from "./transitions.js";
 
 export type Deps = Omit<Ctx, "config"> & {
   cwd: string;
@@ -101,6 +102,7 @@ async function dispatch(argv: string[], input: Deps): Promise<Result> {
       const r = await notAStory(deps.github, n);
       if (r) return refuse(r);
       const report = await computeNext(deps, n);
+      if (report.nothingLeft) await notifyWaiting(deps, report);
       return ok([renderNext(report)], { ...report });
     }
     case "add-slice":
@@ -214,8 +216,22 @@ async function done(n: number, word: string | undefined, note: string | undefine
     if (r) return refuse(r);
   }
 
-  const extra = await applyOutcome(deps, issue, outcome, word ?? "", note);
+  let applied = outcome;
+  const limitLines: string[] = [];
+  if (FIX_STATES.includes(outcome.to as State)) {
+    const history = await github.labelHistory(n);
+    const rounds = history.filter((l) => FIX_STATES.includes(l as State)).length + 1;
+    if (rounds > deps.config.maxFixRounds) {
+      const max = deps.config.maxFixRounds;
+      applied = { ...outcome, needsHuman: `escalated: "${note}" (${max} fix rounds reached)` };
+      limitLines.push(`#${n} has reached ${max} fix rounds, so it now needs a human instead of another round of tdd.`);
+    }
+  }
+  const extra = [...limitLines, ...(await applyOutcome(deps, issue, applied, word ?? "", note))];
   await github.deleteClaim(n);
+  if (kindOf(issue) === "story" && outcome.to === "implementation") {
+    extra.push(`To run the story unattended until it needs a human, the user can start the deliver skill: deliver ${n}`);
+  }
   const where = outcome.to === "closed" ? "closed" : outcome.to === "not-planned" ? "closed as not planned" : `in ${outcome.to}`;
   return ok([`#${n} is now ${where}. The claim is released.`, ...extra], { issue: n, from: stateOf(issue), to: outcome.to });
 }
@@ -227,7 +243,8 @@ async function escalate(n: number, reason: string | undefined, deps: Env): Promi
   const { github } = deps;
   await github.removeLabels(n, ["in-progress"]);
   await github.addLabels(n, ["needs-human"]);
-  await github.comment(n, `psdd: needs-human\n\n${reason}`);
+  await github.comment(n, needsHumanLine(`escalated: "${reason}"`));
+  await notifyNeedsHuman(deps, n, `escalated: "${reason}"`);
   await github.deleteClaim(n);
   return ok([
     `#${n} now needs a human. The claim is released.`,

@@ -81,3 +81,14 @@ describe("finishing slicing", () => {
     expect(w.github.labels(123)).toContain("needs-slicing");
   });
 });
+
+describe("after slicing", () => {
+  test("finishing slicing points the user to the deliver skill", async () => {
+    const w = await slicingStory();
+    await w.psdd("add-slice", "123", "Redis store", "--mode", "afk");
+
+    const res = await w.psdd("done", "123");
+
+    expect(res.stdout).toContain("To run the story unattended until it needs a human, the user can start the deliver skill: deliver 123");
+  });
+});

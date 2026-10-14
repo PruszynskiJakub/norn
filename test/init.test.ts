@@ -69,6 +69,7 @@ describe("psdd init: configuration and worktrees", () => {
       baseBranch: "main",
       worktrees: { provider: "auto" },
       claims: { staleAfter: "2h" },
+      deliver: { maxParallel: 2, maxFixRounds: 3 },
     });
     expect(readFileSync(join(cwd, ".gitignore"), "utf8")).toBe(
       "node_modules\n.agents/worktrees/\n.agents/psdd.config.local.json\n",

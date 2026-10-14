@@ -5,7 +5,7 @@ import type { GitHub } from "./github.js";
 import { FLAGS, STATES } from "./machine.js";
 
 /** Skills psdd briefings name. */
-export const SKILLS = ["triage", "refine", "clarify", "plan", "slice", "tdd", "review", "qa", "merge", "resolve"] as const;
+export const SKILLS = ["triage", "refine", "clarify", "plan", "slice", "tdd", "review", "qa", "merge", "resolve", "deliver"] as const;
 
 const DESCRIPTIONS: Record<string, [string, string]> = {
   "needs-refinement": ["c5def5", "Triaged; the spec is being refined"],
