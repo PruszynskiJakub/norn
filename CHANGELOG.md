@@ -4,6 +4,10 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Fixed
+
+- Under herdr, `psdd next` lists the `herdr agent prompt` command for each item an agent runs unattended, with the prompt filled in, next to `herdr agent start`. `deliver` runs both as listed. Before, the orchestrator wrote the prompt command itself, and could pass `--timeout` without `--wait`, which herdr rejects: the agent started but never got its prompt.
+
 ## [0.2.2] - 2026-10-14
 
 ### Fixed

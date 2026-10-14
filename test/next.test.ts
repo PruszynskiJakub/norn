@@ -179,6 +179,9 @@ describe("next names how to start fresh agents for the worktree tool", () => {
       "    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-131 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-131 --path /repo/.agents/worktrees/123-rate-limiting-131 --no-focus",
     );
     expect(res.stdout).toContain("    Start an agent: herdr agent start psdd-131 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-131>");
+    expect(res.stdout).toContain(
+      '    Then prompt it: herdr agent prompt psdd-131 "Work in /repo/.agents/worktrees/123-rate-limiting-131. Run psdd take 131, follow its briefing to the end, and finish with the psdd command it gives."',
+    );
     const s128 = res.stdout.slice(res.stdout.indexOf("#128"), res.stdout.indexOf("#127"));
     expect(s128).not.toContain("Create the worktree");
   });
