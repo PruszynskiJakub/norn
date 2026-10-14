@@ -119,7 +119,7 @@
   <li><strong>Base branch:</strong> a slice worktree starts from the story branch. The story worktree starts from <code>main</code>.</li>
 </ul>
 <div class="table-wrap"><table>
-  <thead><tr><th>Tool</th><th>Detected by</th><th>Create the worktree</th><th>New agent per phase</th></tr></thead>
+  <thead><tr><th>Tool</th><th>Detected by (auto)</th><th>Create the worktree</th><th>New agent per phase</th></tr></thead>
   <tbody>
     <tr><td>herdr</td><td><code>HERDR_ENV=1</code></td><td><code>herdr worktree create --cwd &lt;repo&gt; --branch &lt;branch&gt; --base &lt;base&gt; --path &lt;worktree&gt; --no-focus</code></td><td>A new herdr agent in the worktree's pane: <code>herdr agent start &lt;name&gt; --kind claude --pane &lt;pane&gt;</code></td></tr>
     <tr><td>Claude Code</td><td><code>CLAUDECODE=1</code></td><td><code>git worktree add &lt;worktree&gt; -b &lt;branch&gt; &lt;base&gt;</code></td><td>A new subagent told to work in the worktree path. Claude Code's built-in worktree isolation is not used</td></tr>
@@ -130,6 +130,25 @@
   <li><code>psdd init</code> adds <code>.agents/worktrees/</code> to <code>.gitignore</code>.</li>
   <li>When a slice merges into the story branch, psdd removes its worktree (<code>herdr worktree remove</code> or <code>git worktree remove</code>). The story worktree is removed after the story merges into <code>main</code>.</li>
   <li>Worktrees left behind by crashed sessions are cleaned up together with their stale claims.</li>
+</ul>
+
+<h2 id="configuration">Configuration</h2>
+<p>Team settings live in a committed <code>.agents/psdd.config.json</code>. Each developer picks their worktree tool in a gitignored <code>.agents/psdd.config.local.json</code>, which wins over the team file.</p>
+<pre><code>// .agents/psdd.config.json (committed)
+{
+  "baseBranch": "main",
+  "worktrees": { "provider": "auto" },
+  "claims": { "staleAfter": "2h" }
+}
+
+// .agents/psdd.config.local.json (gitignored, per developer)
+{ "worktrees": { "provider": "herdr" } }</code></pre>
+<ul>
+  <li><strong>Provider</strong> is <code>auto</code>, <code>herdr</code>, <code>claude-code</code> or <code>git</code>. <code>auto</code> uses the detection in the Worktrees table, in order: herdr first, then Claude Code, then plain git.</li>
+  <li><strong>Environment variables are a safety check.</strong> If the provider is <code>herdr</code> but <code>HERDR_ENV</code> is not set, psdd refuses and tells the agent to start from a herdr pane or switch the provider in the local file.</li>
+  <li><strong>Labels are fixed</strong> and not configurable, so every repo in the organisation works the same way.</li>
+  <li><code>psdd init</code> creates the team file with defaults and adds the local file to <code>.gitignore</code>.</li>
+  <li><strong>The worktree location is fixed</strong> at <code>.agents/worktrees/</code>, like the labels.</li>
 </ul>
 
 <h2 id="concurrency-git-ref-claims">Concurrency: git-ref claims</h2>
