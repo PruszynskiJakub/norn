@@ -142,9 +142,17 @@ export class GhGitHub implements GitHub {
     return (await this.paginate<RestIssue>(`${REPO}/issues/${n}/dependencies/blocked_by`)).map(toIssue);
   }
 
+  /**
+   * Every element of a paged list. `--jq '.[]'` prints one compact JSON value
+   * per line across all pages; unlike `--slurp` (gh 2.48+), it works on the
+   * older gh that distributions ship.
+   */
   private async paginate<T>(path: string): Promise<T[]> {
-    const out = await this.gh(["api", "--paginate", "--slurp", path]);
-    return (JSON.parse(out) as T[][]).flat();
+    const out = await this.gh(["api", "--paginate", "--jq", ".[]", path]);
+    return out
+      .split("\n")
+      .filter((line) => line.trim())
+      .map((line) => JSON.parse(line) as T);
   }
 
   async ensureLabels(labels: { name: string; color: string; description: string }[]) {

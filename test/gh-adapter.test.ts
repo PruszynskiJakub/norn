@@ -117,6 +117,25 @@ describe("GhGitHub claims", () => {
   });
 });
 
+describe("GhGitHub paged lists", () => {
+  test("lists are read with --paginate --jq '.[]', one JSON value per line across pages, without --slurp", async () => {
+    const { exec, calls } = scripted((c) => {
+      if (path(c) === "repos/{owner}/{repo}/issues/131/comments") {
+        return { stdout: [JSON.stringify({ body: "first\nline two" }), JSON.stringify({ body: "second" }), ""].join("\n") };
+      }
+    });
+
+    expect(await new GhGitHub(exec).listComments(131)).toEqual(["first\nline two", "second"]);
+    expect(calls[0].args).toEqual(["api", "--paginate", "--jq", ".[]", "repos/{owner}/{repo}/issues/131/comments"]);
+    expect(calls[0].args).not.toContain("--slurp");
+  });
+
+  test("an empty list prints nothing and reads as no items", async () => {
+    const { exec } = scripted(() => ({ stdout: "" }));
+    expect(await new GhGitHub(exec).subIssues(123)).toEqual([]);
+  });
+});
+
 describe("GhGitHub issues", () => {
   test("getIssue maps the REST issue", async () => {
     const { exec } = scripted(() => ({
