@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from "node:child_process";
+import { randomBytes } from "node:crypto";
 import { hostname } from "node:os";
 import { run } from "./cli.js";
 import { sessionId } from "./env.js";
@@ -15,6 +16,7 @@ try {
     workspace: new LocalWorkspace(root, process.env, runCommand, process.cwd()),
     now: () => new Date(),
     session: sessionId(process.env, hostname(), root),
+    nonce: () => randomBytes(2).toString("hex"),
     notify: makeNotifier(),
     headSha: async () => execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
     cwd: root,

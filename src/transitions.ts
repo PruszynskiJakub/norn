@@ -58,6 +58,8 @@ export interface Ctx {
   config: Config;
   now: () => Date;
   session: string;
+  /** A short random string, e.g. to make each agent's PSDD_SESSION unique. */
+  nonce: () => string;
   headSha: () => Promise<string>;
 }
 

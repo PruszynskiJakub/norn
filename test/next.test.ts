@@ -166,8 +166,33 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     w.workspace.env = {};
     const res = await w.psdd("next", "123");
     expect(res.stdout.replace(/\s+/g, " ")).toContain("each in a new agent session started in the item's worktree:");
-    expect(res.stdout).toContain("    Start an agent in /repo/.agents/worktrees/123-rate-limiting-131 with PSDD_SESSION=psdd-131 set.");
-    expect(JSON.parse((await w.psdd("next", "123", "--json")).stdout).start[0]).toMatchObject({ issue: 131, session: "psdd-131" });
+    expect(res.stdout).toContain("    Start an agent in /repo/.agents/worktrees/123-rate-limiting-131 with PSDD_SESSION=psdd-131-n1 set.");
+    expect(res.stdout).toContain("PSDD_SESSION=psdd-128-n2");
+    w.nonces.push("f00d");
+    expect(JSON.parse((await w.psdd("next", "123", "--json")).stdout).start[0]).toMatchObject({ issue: 131, session: "psdd-131-f00d" });
+  });
+
+  test("plain git: a new agent on an item whose claim went stale is a takeover, not the old holder", async () => {
+    const w = setup();
+    w.workspace.env = {};
+    w.github.seedIssue({ number: 10, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 12, title: "Per-key limits", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+    w.github.parents.set(12, 10);
+    w.github.branches.add("10-rate-limiting");
+    w.setNow("2026-10-13T08:00:00Z");
+    await w.as("psdd-12-aaaa")("take", "12");
+    w.workspace.worktrees.add(".agents/worktrees/10-rate-limiting-12");
+    w.setNow("2026-10-13T12:00:00Z");
+
+    w.nonces.push("bbbb");
+    const next = await w.psdd("next", "10");
+    expect(next.stdout).toContain("with PSDD_SESSION=psdd-12-bbbb set.");
+
+    const res = await w.as("psdd-12-bbbb")("take", "12");
+
+    expect(res.stdout).toContain("The previous holder's claim was stale (since 08:00); its worktree is kept");
+    expect(res.stdout).not.toContain("You already held");
+    expect(w.github.claim(12)).toMatchObject({ session: "psdd-12-bbbb" });
   });
 
   test("under Claude Code no PSDD_SESSION is given: the Claude Code session id names the session", async () => {

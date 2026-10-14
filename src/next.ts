@@ -29,7 +29,7 @@ export interface StartItem {
   worktree: string | null;
   /** Under herdr, the agent starts in the worktree's pane, so the worktree is made first. */
   createWorktree: string | null;
-  /** Under plain git, the PSDD_SESSION to start the item's agent with, so each agent is its own session. */
+  /** Under plain git, the PSDD_SESSION to start the item's agent with, unique per listing, so each agent is its own session. */
   session: string | null;
 }
 
@@ -175,7 +175,8 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     branch: loc?.branch ?? null,
     worktree: loc ? join(ctx.workspace.root, loc.worktree) : null,
     createWorktree,
-    session: ctx.config.provider === "git" ? `psdd-${n}` : null,
+    // Fresh for every agent: a new agent on an item whose claim went stale must not pass for the old holder.
+    session: ctx.config.provider === "git" ? `psdd-${n}-${ctx.nonce()}` : null,
     kind: kindOf(issue) === "slice" ? "slice" : "story",
     title: issue.title,
     state,
