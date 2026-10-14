@@ -4,6 +4,10 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Fixed
+
+- Under herdr, an attended story step no longer leaves an empty worktree workspace while the work goes on in the main checkout. `psdd next` tells `drive` to hand the story to a new agent in the worktree's pane (`herdr agent start`, then `prompt "drive <story>"` and `focus`), and inside that worktree it says to take the step in this session. Attended items are listed as started with the user, not by a fresh agent.
+
 ## [0.1.3] - 2026-10-14
 
 ### Added
