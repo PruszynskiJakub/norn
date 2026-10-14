@@ -2,7 +2,7 @@
 import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { hostname } from "node:os";
-import { run } from "./cli.js";
+import { ghFailureMessage, run } from "./cli.js";
 import { sessionId } from "./env.js";
 import { GhError, GhGitHub } from "./gh.js";
 import { installSkills } from "./install-skills.js";
@@ -26,7 +26,7 @@ try {
   process.exitCode = res.exitCode;
 } catch (e) {
   if (e instanceof GhError) {
-    process.stdout.write(`GitHub refused the call, so nothing more was done.\n${e.message}\nCheck gh auth status and that you are inside the repository, then retry.\n`);
+    process.stdout.write(ghFailureMessage(process.argv.slice(2), e.message) + "\n");
     process.exitCode = 1;
   } else throw e;
 }

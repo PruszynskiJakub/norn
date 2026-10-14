@@ -73,6 +73,25 @@ const NEEDS_NUMBER: Record<string, string> = {
   status: "psdd status <story>",
 };
 
+/**
+ * What to print when a gh call fails partway through a command. Earlier calls
+ * may already have changed GitHub, so it never claims nothing was done.
+ */
+export function ghFailureMessage(argv: string[], error: string): string {
+  const { positionals } = parseArgs(argv);
+  const [cmd, n] = positionals;
+  const lines = ["GitHub refused a call. Some changes from this command may already be applied.", error];
+  if (cmd && n && /^\d+$/.test(n)) {
+    lines.push(
+      `See where things stand with: psdd status ${n} (for a slice, psdd status <its story> shows the whole story)`,
+      `Check gh auth status and that you are inside the repository, then retry: psdd ${argv.map((a) => (/[\s"']/.test(a) ? JSON.stringify(a) : a)).join(" ")}`,
+    );
+  } else {
+    lines.push("Check gh auth status and that you are inside the repository, then retry the command.");
+  }
+  return lines.join("\n");
+}
+
 /** Commands that name or touch worktrees, and so need the provider to match the environment. */
 const USES_WORKTREES = new Set(["take", "next", "done"]);
 
