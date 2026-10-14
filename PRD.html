@@ -108,6 +108,9 @@
   <li>There is one PR per slice.</li>
   <li>The story owner is also the owner of all its slices.</li>
   <li>Fixes after story-level <code>changes-requested</code> or <code>qa-failed</code> are committed straight onto the story branch.</li>
+  <li><strong>The slug is recorded once.</strong> psdd writes <code>psdd: slug &lt;slug&gt;</code> in its first comment on a story and derives the branch, slice branches, worktrees and spec path from it, so renaming the story on GitHub changes none of them.</li>
+  <li>A story's slices are its sub-issues labelled <code>type:slice</code> in this repository. Other sub-issues a person attaches are ignored.</li>
+  <li>A slice merge is accepted only when its PR targets the story branch.</li>
 </ul>
 
 <h2 id="worktrees">Worktrees</h2>
@@ -130,12 +133,13 @@
 </table></div>
 <ul>
   <li><code>psdd init</code> adds <code>.agents/worktrees/</code> to <code>.gitignore</code>.</li>
-  <li><code>psdd next</code> removes the worktrees of closed items (<code>herdr worktree remove</code> or <code>git worktree remove</code>): a slice's once it has merged into the story branch, the story's once the story has merged into <code>main</code>. <code>psdd done</code> does not, because the merge agent runs inside the slice worktree. psdd never removes the worktree it runs in, and a removal that fails is reported, not fatal.</li>
+  <li><code>psdd next</code> removes the worktrees of closed items (<code>herdr worktree remove</code> or <code>git worktree remove</code>): a slice's once it has merged into the story branch, the story's once the story has merged into <code>main</code>. <code>psdd done</code> does not, because the merge agent runs inside the slice worktree. psdd never removes the worktree it runs in, keeps one with uncommitted changes and says so, and a removal that fails is reported, not fatal.</li>
+  <li>GitHub closes a story through its PR's <code>Closes #&lt;story&gt;</code> only for PRs into the default branch. When the story PR is merged and the story is still open, <code>psdd next</code> closes it. It also removes state labels left on closed issues.</li>
   <li>A worktree left behind by a session whose claim went stale is kept: the session may only be slow, and its commits are there. The next holder is told to check <code>git status</code> before starting.</li>
 </ul>
 
 <h2 id="configuration">Configuration</h2>
-<p>Team settings live in a committed <code>.agents/psdd.config.json</code>. Each developer picks their worktree tool in a gitignored <code>.agents/psdd.config.local.json</code>, which wins over the team file.</p>
+<p>Team settings live in a committed <code>.agents/psdd.config.json</code>. Each developer picks their worktree tool in a gitignored <code>.agents/psdd.config.local.json</code>, which wins over the team file. <code>claims.staleAfter</code> (at least <code>10m</code>) and <code>deliver.maxFixRounds</code> bind everyone's claims and rounds, so they can only be set in the team file.</p>
 <pre><code>// .agents/psdd.config.json (committed)
 {
   "baseBranch": "main",
@@ -165,7 +169,7 @@ release:  gh api -X DELETE repos/:owner/:repo/git/refs/psdd/claims/&lt;issue&gt;
   <li><strong>Only one agent can win.</strong> Two subagents can't take the same slice, because the second ref creation fails. Checking a label first cannot guarantee that.</li>
   <li><strong>The <code>in-progress</code> label mirrors the ref.</strong> It shows the claim in GitHub. The ref is the real lock.</li>
   <li><strong>Claims are held for the whole step,</strong> e.g. all of implement on a slice, and released when handing over to the next state.</li>
-  <li><strong>Stale claims.</strong> The ref points at a small commit recording holder, session ID and timestamp. psdd treats a claim older than 2 hours as abandoned and lets another session take it over.</li>
+  <li><strong>Stale claims.</strong> The ref points at a small commit recording holder, session ID and timestamp. psdd treats a claim older than 2 hours as abandoned and lets another session take it over. The takeover is conditional: the new claim commit is a child of the stale one and the ref moves only if it still points at the stale commit, so two sessions taking over at once cannot both win.</li>
   <li><strong>Refreshing a claim.</strong> <code>psdd take</code> on an issue the same session already holds briefs again and moves the claim's timestamp forward (the ref is force-updated to a new claim commit). Long steps re-run it, e.g. after each implement commit, so a slow session is not taken for crashed.</li>
   <li><strong>Transition first, then follow-ups.</strong> <code>psdd done</code> checks its preconditions (a story leaving slicing gets its branch first), changes the labels and releases the claim. The automatic transitions after it, such as unblocking slices and opening the story PR, are best effort: a failure is reported, and <code>psdd next</code> repeats them.</li>
 </ul>
