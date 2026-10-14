@@ -180,6 +180,10 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     expect(res.stdout.replace(/\s+/g, " ")).toContain("each in a new agent session started in the item's worktree:");
     expect(res.stdout).toContain("    Start an agent in /repo/.agents/worktrees/123-rate-limiting-131 with PSDD_SESSION=psdd-131-n1 set.");
     expect(res.stdout).toContain("PSDD_SESSION=psdd-128-n2");
+    // The session starts in the worktree, so it is made first, as under herdr.
+    expect(res.stdout).toContain(
+      "    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-131 -b 123-rate-limiting-131 origin/123-rate-limiting",
+    );
     w.nonces.push("f00d");
     expect(JSON.parse((await w.psdd("next", "123", "--json")).stdout).start[0]).toMatchObject({ issue: 131, session: "psdd-131-f00d" });
   });

@@ -97,3 +97,16 @@ describe("psdd next on a closed story", () => {
     expect(res.stdout).toBe('Story #123 "Rate limiting" is closed as not planned. Nothing left that you can do.');
   });
 });
+
+describe("psdd next with notifications turned off", () => {
+  test("does not claim the user was notified", async () => {
+    const w = stuckStory();
+    w.workspace.files.set(".agents/psdd.config.local.json", JSON.stringify({ notifications: "none" }));
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toContain("Stop here and report to the user.");
+    expect(res.stdout).not.toContain("notified");
+    expect(w.notifications).toEqual([]);
+  });
+});

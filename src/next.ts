@@ -57,6 +57,8 @@ export interface NextReport {
   /** The story is closed: merged, or closed as not planned. Nothing waits for anyone. */
   closed: boolean;
   notPlanned: boolean;
+  /** Notifications are on, so the user has been told what waits for them. */
+  notified: boolean;
   start: StartItem[];
   waiting: WaitItem[];
 }
@@ -123,6 +125,7 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
     nothingLeft: false,
     closed: story.state === "closed",
     notPlanned: story.stateReason === "not_planned",
+    notified: ctx.config.notifications !== null,
   };
   if (report.closed) {
     report.nothingLeft = true;
@@ -176,10 +179,11 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   const loc = await locate(issue, ctx);
   let createWorktree: string | null = null;
   let checkedOutAt: string | null = null;
-  if (loc && ctx.config.provider === "herdr" && !(await ctx.workspace.worktreeExists(loc.worktree))) {
+  // Under herdr and plain git the agent starts in the worktree, so it is made first; a Claude Code subagent makes it from its briefing.
+  if (loc && ctx.config.provider !== "claude-code" && !(await ctx.workspace.worktreeExists(loc.worktree))) {
     checkedOutAt = await ctx.workspace.branchCheckedOutAt(loc.branch);
     if (!checkedOutAt) {
-      createWorktree = createWorktreeCommand("herdr", loc, ctx.workspace.root, await branchAt(loc, ctx.workspace, ctx.github));
+      createWorktree = createWorktreeCommand(ctx.config.provider, loc, ctx.workspace.root, await branchAt(loc, ctx.workspace, ctx.github));
     }
   }
   report.start.push({
@@ -213,7 +217,7 @@ function renderNothingLeft(r: NextReport): string {
   const out = [...r.notes, `Story #${r.story} "${r.title}": nothing left that you can do.`];
   if (human.length) out.push("Waiting for a human:", ...human.map((w) => `  - #${w.issue} ${w.detail}.`));
   if (blocked.length) out.push("Blocked until then:", ...blocked.map(waitLine));
-  out.push("Stop here and report to the user. psdd has already notified them.");
+  out.push(`Stop here and report to the user.${r.notified ? " psdd has already notified them." : ""}`);
   return out.join("\n");
 }
 
