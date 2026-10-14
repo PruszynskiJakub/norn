@@ -207,7 +207,7 @@ async function take(n: number, deps: Env): Promise<Result> {
       kept ? `; its worktree is kept with what it left. Check git status there before you start.` : "."
     }`;
   }
-  const lines = await briefing(issue, step, deps);
+  const lines = await briefing(issue, step, deps, state);
   if (staleNote) lines.splice(lines.indexOf(""), 0, "", staleNote);
   if (claim.reacquired) lines.unshift(`You already held #${n}; the claim is refreshed. Here is its briefing again.`, "");
   return ok(lines, {

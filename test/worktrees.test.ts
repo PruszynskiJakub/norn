@@ -201,3 +201,28 @@ describe("worktree cleanup", () => {
     expect(res.stdout).toContain("Could not remove the worktree of #123: psdd is running inside it");
   });
 });
+
+describe("a fix round's briefing", () => {
+  test("a slice sent back by review pushes to its existing PR and is told where the requests are", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "changes-requested"] });
+    w.github.parents.set(131, 123);
+
+    const res = await w.psdd("take", "131");
+
+    expect(res.stdout).toContain("Push the fixes to the existing PR from 123-rate-limiting-131 into 123-rate-limiting.");
+    expect(res.stdout).toContain("The requests are in the latest psdd comment on #131.");
+    expect(res.stdout).not.toContain("Open one PR");
+  });
+
+  test("a story that failed QA names the problems", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "qa-failed"] });
+
+    const res = await w.psdd("take", "123");
+
+    expect(res.stdout).toContain("Commit the fixes straight onto the story branch 123-rate-limiting.");
+    expect(res.stdout).toContain("The problems are in the latest psdd comment on #123.");
+  });
+});

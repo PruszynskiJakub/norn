@@ -1,6 +1,6 @@
 import type { Issue } from "./github.js";
 import { locate, workInLines, type Location } from "./location.js";
-import { kindOf, type Step } from "./machine.js";
+import { FIX_STATES, kindOf, type State, type Step } from "./machine.js";
 import { specPath, wrap } from "./text.js";
 import type { Ctx } from "./transitions.js";
 
@@ -9,8 +9,11 @@ export function noun(issue: Issue) {
   return kind === "new" ? "issue" : kind;
 }
 
-/** Briefing in fixed order: where you are, what to do, how to finish, what not to do. */
-export async function briefing(issue: Issue, step: Step, ctx: Ctx): Promise<string[]> {
+/**
+ * Briefing in fixed order: where you are, what to do, how to finish, what not to do.
+ * `from` is the state the issue was in before take moved it, e.g. changes-requested.
+ */
+export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: State | null): Promise<string[]> {
   const n = issue.number;
   let where = `You now hold ${noun(issue)} #${n} "${issue.title}". Its step is ${step.name}.`;
   if (step.attended) where += " This step is attended: the user takes part, and you do not decide on your own.";
@@ -23,7 +26,7 @@ export async function briefing(issue: Issue, step: Step, ctx: Ctx): Promise<stri
     "",
     ...workIn,
     `Invoke the skill: ${step.skill}`,
-    ...(loc ? workContext(issue, step, loc) : []),
+    ...(loc ? workContext(issue, step, loc, from) : []),
     "",
     `${when}, run${many ? " one of" : ""}:`,
     ...finishCommands(n, step),
@@ -47,16 +50,21 @@ export function finishCommands(n: number, step: Step): string[] {
 }
 
 /** Spec and PR lines for the step. */
-function workContext(issue: Issue, step: Step, loc: Location): string[] {
+function workContext(issue: Issue, step: Step, loc: Location, from: State | null): string[] {
   const story = loc.story;
+  // A fix round works on what review or QA sent back; the PR is already open.
+  const fixing = step.skill === "tdd" && from !== null && FIX_STATES.includes(from);
+  const requests = `The ${from === "qa-failed" ? "problems" : "requests"} are in the latest psdd comment on #${issue.number}.`;
   if (kindOf(issue) === "story") {
     const lines = [`Spec to work on: ${specPath(story.number, loc.slug)}`];
     if (step.skill === "tdd") lines.push(`Commit the fixes straight onto the story branch ${loc.branch}.`);
+    if (fixing) lines.push(requests);
     if (step.skill === "review" || step.skill === "qa") lines.push(`Story PR: ${loc.branch} into ${loc.base}.`);
     return lines;
   }
   const lines = [`Spec: ${specPath(story.number, loc.slug)} (story #${story.number})`];
-  if (step.skill === "tdd") lines.push(`Open one PR from ${loc.branch} into ${loc.base}.`);
+  if (fixing) lines.push(`Push the fixes to the existing PR from ${loc.branch} into ${loc.base}.`, requests);
+  else if (step.skill === "tdd") lines.push(`Open one PR from ${loc.branch} into ${loc.base}.`);
   else if (step.skill === "merge") lines.push(`Merge the PR from ${loc.branch} into ${loc.base}, resolving conflicts if needed.`);
   else lines.push(`Slice PR: ${loc.branch} into ${loc.base}.`);
   return lines;
