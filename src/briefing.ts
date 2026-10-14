@@ -51,12 +51,12 @@ function workContext(issue: Issue, step: Step, loc: Location): string[] {
   const story = loc.story;
   if (kindOf(issue) === "story") {
     const lines = [`Spec to work on: ${specPath(story.number, story.title)}`];
-    if (step.skill === "tdd") lines.push(`Commit the fixes straight onto the story branch ${loc.branch}.`);
+    if (step.skill === "implement") lines.push(`Commit the fixes straight onto the story branch ${loc.branch}.`);
     if (step.skill === "review" || step.skill === "qa") lines.push(`Story PR: ${loc.branch} into ${loc.base}.`);
     return lines;
   }
   const lines = [`Spec: ${specPath(story.number, story.title)} (story #${story.number})`];
-  if (step.skill === "tdd") lines.push(`Open one PR from ${loc.branch} into ${loc.base}.`);
+  if (step.skill === "implement") lines.push(`Open one PR from ${loc.branch} into ${loc.base}.`);
   else if (step.skill === "merge") lines.push(`Merge the PR from ${loc.branch} into ${loc.base}, resolving conflicts if needed.`);
   else lines.push(`Slice PR: ${loc.branch} into ${loc.base}.`);
   return lines;

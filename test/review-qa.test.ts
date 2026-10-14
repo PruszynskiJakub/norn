@@ -81,12 +81,12 @@ describe("qa", () => {
 
 describe("story fixes", () => {
   test.each(["changes-requested", "qa-failed"])(
-    "a story in %s is fixed on the story branch with tdd, then goes back to needs-review",
+    "a story in %s is fixed on the story branch with implement, then goes back to needs-review",
     async (state) => {
       const w = issue(["type:story", state], 123);
       w.github.issues.get(123)!.title = "Rate limiting";
       const take = await w.psdd("take", "123");
-      expect(take.stdout).toContain("Invoke the skill: tdd");
+      expect(take.stdout).toContain("Invoke the skill: implement");
       expect(take.stdout).toContain("123-rate-limiting");
       expect(w.github.labels(123)).toContain(state);
 
