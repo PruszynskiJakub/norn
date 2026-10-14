@@ -4,6 +4,8 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-10-14
+
 ### Added
 
 - `psdd take <issue> --takeover` takes over a claim held by another session of yours before it goes stale, e.g. after closing an agent partway through refinement. Without the flag, take says the claim is yours and names the command; `psdd next` lists such items as "held by another session of yours". A teammate's claim is never taken. `drive` asks whether the other session is still running and then resumes or drops the step; `deliver` never uses the flag.
@@ -64,7 +66,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.3...v0.2.0
 [0.1.3]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.0...v0.1.1
