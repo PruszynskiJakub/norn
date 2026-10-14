@@ -110,7 +110,7 @@ async function dispatch(argv: string[], input: Deps): Promise<Result> {
       const r = await notAStory(deps.github, n);
       if (r) return refuse(r);
       const report = await computeNext(deps, n);
-      if (report.nothingLeft) await notifyWaiting(deps, report);
+      if (report.nothingLeft && !report.closed) await notifyWaiting(deps, report);
       return ok([renderNext(report)], { ...report });
     }
     case "add-slice":

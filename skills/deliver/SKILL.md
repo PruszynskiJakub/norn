@@ -18,7 +18,7 @@ You are the orchestrator. Every phase of the story's work happens in a fresh sub
    Prompt for each subagent: `Work in <worktree>. Run psdd take <issue>, follow its briefing to the end, and finish with the psdd command it gives.`
 3. Wait for the subagents to finish. Under herdr: `herdr agent wait psdd-<issue> --until done --until blocked`. Then go back to step 1.
 4. When all slices are merged, `psdd next` offers story review and any story fixes; run them the same way.
-5. Stop when `psdd next` says there is nothing left that you can do. That covers the story reaching story QA and only human-waiting items being left. psdd has already notified the user.
+5. Stop when `psdd next` says there is nothing left that you can do. That covers the story reaching story QA, only human-waiting items being left, and the story being closed. psdd has already notified the user of anything waiting for them.
 
 Done when you have given the user the report: what is merged, what is waiting and why, and who needs to act. The reasons come from `psdd status <story>` and the "Waiting for a human" list.
 

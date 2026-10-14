@@ -47,8 +47,11 @@ export interface NextReport {
   slices: { total: number; merged: number };
   /** Housekeeping psdd did, e.g. a removed worktree. */
   notes: string[];
-  /** Nothing can start and nothing is running: only people can move the story on. */
+  /** Nothing can start and nothing is running: only people can move the story on, or the story is closed. */
   nothingLeft: boolean;
+  /** The story is closed: merged, or closed as not planned. Nothing waits for anyone. */
+  closed: boolean;
+  notPlanned: boolean;
   start: StartItem[];
   waiting: WaitItem[];
 }
@@ -113,8 +116,13 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
     waiting: [],
     notes,
     nothingLeft: false,
+    closed: story.state === "closed",
+    notPlanned: story.stateReason === "not_planned",
   };
-  if (story.state === "closed") return report;
+  if (report.closed) {
+    report.nothingLeft = true;
+    return report;
+  }
   if (stateOf(story) === "merge-queue") {
     const owner = story.assignees[0] ? `@${story.assignees[0]}` : "the story owner";
     report.waiting.push({
@@ -190,6 +198,9 @@ function renderNothingLeft(r: NextReport): string {
 }
 
 export function renderNext(r: NextReport): string {
+  if (r.closed) {
+    return [...r.notes, `Story #${r.story} "${r.title}" is closed${r.notPlanned ? " as not planned" : ""}. Nothing left that you can do.`].join("\n");
+  }
   if (r.nothingLeft) return renderNothingLeft(r);
   const out: string[] = [];
   if (r.notes.length) out.push(...r.notes, "");
