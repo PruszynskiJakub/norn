@@ -1,7 +1,8 @@
 import { join } from "node:path";
 import type { GitHub, Issue } from "./github.js";
 import { kindOf } from "./machine.js";
-import { sliceBranch, storyBranch, worktreePath } from "./text.js";
+import { storySlug, type Slugs } from "./slug.js";
+import { sh, sliceBranch, storyBranch, worktreePath } from "./text.js";
 import type { Provider, Workspace } from "./workspace.js";
 
 /** Where an issue's work happens: its branch, the branch it starts from, and its worktree. */
@@ -11,19 +12,23 @@ export interface Location {
   worktree: string;
   /** The story, for a slice; the issue itself, for a story. */
   story: Issue;
+  /** The story's recorded slug. */
+  slug: string;
 }
 
-export async function locate(issue: Issue, github: GitHub, baseBranch: string): Promise<Location | null> {
+export async function locate(issue: Issue, ctx: { github: GitHub; slugs: Slugs; config: { baseBranch: string } }): Promise<Location | null> {
   if (kindOf(issue) === "story") {
-    const branch = storyBranch(issue.number, issue.title);
-    return { branch, base: baseBranch, worktree: worktreePath(branch), story: issue };
+    const slug = await storySlug(ctx, issue);
+    const branch = storyBranch(issue.number, slug);
+    return { branch, base: ctx.config.baseBranch, worktree: worktreePath(branch), story: issue, slug };
   }
   if (kindOf(issue) === "slice") {
-    const parent = await github.parentOf(issue.number);
+    const parent = await ctx.github.parentOf(issue.number);
     if (!parent) return null;
-    const story = await github.getIssue(parent);
-    const branch = sliceBranch(story.number, story.title, issue.number);
-    return { branch, base: storyBranch(story.number, story.title), worktree: worktreePath(branch), story };
+    const story = await ctx.github.getIssue(parent);
+    const slug = await storySlug(ctx, story);
+    const branch = sliceBranch(story.number, slug, issue.number);
+    return { branch, base: storyBranch(story.number, slug), worktree: worktreePath(branch), story, slug };
   }
   return null;
 }
@@ -50,10 +55,13 @@ export async function branchAt(loc: Location, workspace: Workspace, github: GitH
  * herdr ignores --base for an existing local branch and otherwise tracks the
  * base, so a new branch is made with git first and handed to herdr.
  */
-export function createWorktreeCommand(provider: Provider, loc: Location, root: string, at: BranchAt): string {
-  const path = join(root, loc.worktree);
+export function createWorktreeCommand(provider: Provider, loc: Location, absRoot: string, at: BranchAt): string {
+  // Every interpolated word is quoted, so a checkout under e.g. "/Users/Jane Doe" still works.
+  const root = sh(absRoot);
+  const path = sh(join(absRoot, loc.worktree));
   const git = `git -C ${root}`;
-  const { branch, base } = loc;
+  const branch = sh(loc.branch);
+  const base = sh(loc.base);
   const herdr = (extra: string) => `herdr worktree create --cwd ${root} --branch ${branch}${extra} --path ${path} --no-focus`;
   const add = provider === "herdr" ? herdr("") : `${git} worktree add ${path} ${branch}`;
   if (at.local) return at.remote ? `${git} fetch origin ${branch} && ${add} && git -C ${path} merge --ff-only origin/${branch}` : add;
@@ -85,8 +93,17 @@ export async function workInLines(loc: Location, workspace: Workspace, github: G
     }
     const at = await branchAt(loc, workspace, github);
     lines.push("It does not exist yet. Create it first:", `  ${createWorktreeCommand(provider, loc, workspace.root, at)}`);
+  } else if (await github.branchExists(loc.branch)) {
+    // Others push here too, e.g. slices merged into the story branch; catch up before starting.
+    lines.push("Bring it up to date first:", `  ${updateWorktreeCommand(loc, workspace.root)}`);
   }
   return lines;
+}
+
+/** Fast-forwards an existing worktree to its branch on GitHub; a diverged branch fails and says so. */
+export function updateWorktreeCommand(loc: Location, absRoot: string): string {
+  const wt = `git -C ${sh(join(absRoot, loc.worktree))}`;
+  return `${wt} fetch origin ${sh(loc.branch)} && ${wt} merge --ff-only origin/${sh(loc.branch)}`;
 }
 
 /** git checks a branch out in one worktree only, so no create command can work. */

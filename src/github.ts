@@ -23,6 +23,11 @@ export interface ClaimRecord {
   since: string;
 }
 
+/** A claim as read back: its record and the commit its ref points at. */
+export interface HeldClaim extends ClaimRecord {
+  sha: string;
+}
+
 /**
  * Everything psdd needs from GitHub. The real adapter shells out to the
  * user's own `gh`; tests use an in-memory fake.
@@ -45,6 +50,7 @@ export interface GitHub {
 
   /** Native sub-issues. */
   addSubIssue(parent: number, child: number): Promise<void>;
+  /** Native sub-issues in this repository, of any kind; see slicesOf for the story's slices. */
   subIssues(parent: number): Promise<Issue[]>;
   parentOf(child: number): Promise<number | null>;
 
@@ -64,8 +70,14 @@ export interface GitHub {
 
   /** Atomically create refs/psdd/claims/<issue>. False when it already exists. */
   createClaim(number: number, record: ClaimRecord): Promise<boolean>;
-  /** Points the existing claim ref at a new record, e.g. a later `since`. */
-  refreshClaim(number: number, record: ClaimRecord): Promise<void>;
-  readClaim(number: number): Promise<ClaimRecord | null>;
+  /**
+   * Points the claim ref at a new record, but only while it still points at
+   * `fromSha`: the new claim commit is a child of that one and the ref moves
+   * without force. Used both to refresh your own claim and to take over a
+   * stale one, so neither can overwrite a claim that changed in between.
+   * False when the ref has moved or is gone.
+   */
+  replaceClaim(number: number, fromSha: string, record: ClaimRecord): Promise<boolean>;
+  readClaim(number: number): Promise<HeldClaim | null>;
   deleteClaim(number: number): Promise<void>;
 }

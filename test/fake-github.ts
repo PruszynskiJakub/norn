@@ -122,19 +122,32 @@ export class FakeGitHub implements GitHub {
     this.prs.push(pr);
     return structuredClone(pr);
   }
+  /** The commit each claim ref points at. */
+  claimShas = new Map<number, string>();
+  private commits = 0;
+  private point(n: number, record: ClaimRecord) {
+    this.claims.set(n, { holder: record.holder, session: record.session, since: record.since });
+    this.claimShas.set(n, `claim${++this.commits}`);
+  }
   async createClaim(n: number, record: ClaimRecord) {
     if (this.claims.has(n)) return false;
-    this.claims.set(n, { ...record });
+    this.point(n, record);
     return true;
   }
-  async refreshClaim(n: number, record: ClaimRecord) {
-    if (!this.claims.has(n)) throw new Error(`fake: no claim on #${n}`);
-    this.claims.set(n, { ...record });
+  /** Runs before replaceClaim checks the ref, to stage a race: another session moving or deleting it. */
+  beforeReplace: ((n: number) => void) | null = null;
+  async replaceClaim(n: number, fromSha: string, record: ClaimRecord) {
+    this.beforeReplace?.(n);
+    if (!this.claims.has(n) || (this.claimShas.get(n) ?? "seeded") !== fromSha) return false;
+    this.point(n, record);
+    return true;
   }
   async readClaim(n: number) {
-    return this.claims.get(n) ?? null;
+    const claim = this.claims.get(n);
+    return claim ? { ...claim, sha: this.claimShas.get(n) ?? "seeded" } : null;
   }
   async deleteClaim(n: number) {
     this.claims.delete(n);
+    this.claimShas.delete(n);
   }
 }

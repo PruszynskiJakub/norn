@@ -80,6 +80,15 @@ describe("finishing slicing", () => {
     expect(res.stdout).toContain('psdd add-slice 123 "title" --mode afk|hil');
     expect(w.github.labels(123)).toContain("needs-slicing");
   });
+
+  test("a sub-issue a person attached by hand is not a slice", async () => {
+    const w = await slicingStory();
+    w.github.seedIssue({ number: 140, title: "Update docs", labels: [] });
+    w.github.parents.set(140, 123);
+    const res = await w.psdd("done", "123");
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("Story #123 has no slices yet");
+  });
 });
 
 describe("after slicing", () => {

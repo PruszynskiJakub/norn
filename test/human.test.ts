@@ -47,6 +47,7 @@ describe("resolving needs-human", () => {
 
     expect(w.github.labels(131).sort()).toEqual(["implementation", "mode:afk", "type:slice"]);
     expect(w.github.claim(131)).toBeNull();
+    expect(w.github.comments(131).at(-1)).toMatch(/^psdd: implementation → implementation \(needs-human resolved\)/);
   });
 });
 

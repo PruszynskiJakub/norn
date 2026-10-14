@@ -39,6 +39,8 @@ interface RestIssue {
   state_reason?: string | null;
   labels: { name: string }[];
   assignees: { login: string }[];
+  /** API URL of the issue's repository, e.g. https://api.github.com/repos/acme/app. */
+  repository_url?: string;
 }
 
 function toIssue(r: RestIssue): Issue {
@@ -128,7 +130,11 @@ export class GhGitHub implements GitHub {
     await this.api("POST", `${REPO}/issues/${parent}/sub_issues`, { sub_issue_id: id });
   }
   async subIssues(parent: number) {
-    return (await this.paginate<RestIssue>(`${REPO}/issues/${parent}/sub_issues`)).map(toIssue);
+    // Sub-issues may live in other repositories; their numbers mean nothing here.
+    const all = await this.paginate<RestIssue>(`${REPO}/issues/${parent}/sub_issues`);
+    if (all.length === 0) return [];
+    const { url } = await this.api<{ url: string }>("GET", REPO);
+    return all.filter((r) => !r.repository_url || r.repository_url === url).map(toIssue);
   }
   async parentOf(child: number) {
     const p = await this.find<RestIssue>(`${REPO}/issues/${child}/parent`);
@@ -142,9 +148,17 @@ export class GhGitHub implements GitHub {
     return (await this.paginate<RestIssue>(`${REPO}/issues/${n}/dependencies/blocked_by`)).map(toIssue);
   }
 
+  /**
+   * Every element of a paged list. `--jq '.[]'` prints one compact JSON value
+   * per line across all pages; unlike `--slurp` (gh 2.48+), it works on the
+   * older gh that distributions ship.
+   */
   private async paginate<T>(path: string): Promise<T[]> {
-    const out = await this.gh(["api", "--paginate", "--slurp", path]);
-    return (JSON.parse(out) as T[][]).flat();
+    const out = await this.gh(["api", "--paginate", "--jq", ".[]", path]);
+    return out
+      .split("\n")
+      .filter((line) => line.trim())
+      .map((line) => JSON.parse(line) as T);
   }
 
   async ensureLabels(labels: { name: string; color: string; description: string }[]) {
@@ -180,8 +194,8 @@ export class GhGitHub implements GitHub {
     return { number: pr.number, head: input.head, base: input.base, state: "open" as const, body: input.body };
   }
 
-  /** A parentless commit whose message and claim.json are the record. */
-  private async claimCommit(record: ClaimRecord) {
+  /** A commit whose message and claim.json are the record; parentless for a new claim. */
+  private async claimCommit(record: ClaimRecord, parents: string[] = []) {
     const content = JSON.stringify(record);
     const tree = await this.api<{ sha: string }>("POST", `${REPO}/git/trees`, {
       tree: [{ path: "claim.json", mode: "100644", type: "blob", content }],
@@ -189,9 +203,20 @@ export class GhGitHub implements GitHub {
     const commit = await this.api<{ sha: string }>("POST", `${REPO}/git/commits`, {
       message: content,
       tree: tree.sha,
-      parents: [],
+      parents,
     });
     return commit.sha;
+  }
+  async replaceClaim(n: number, fromSha: string, record: ClaimRecord) {
+    const sha = await this.claimCommit(record, [fromSha]);
+    try {
+      // Not forced: GitHub only moves the ref if the new commit descends from where it points now.
+      await this.api("PATCH", `${REPO}/git/refs/psdd/claims/${n}`, { sha, force: false });
+      return true;
+    } catch (e) {
+      if (e instanceof GhError && e.status === 422) return false;
+      throw e;
+    }
   }
   async createClaim(n: number, record: ClaimRecord) {
     const sha = await this.claimCommit(record);
@@ -203,15 +228,11 @@ export class GhGitHub implements GitHub {
       throw e;
     }
   }
-  async refreshClaim(n: number, record: ClaimRecord) {
-    const sha = await this.claimCommit(record);
-    await this.api("PATCH", `${REPO}/git/refs/psdd/claims/${n}`, { sha, force: true });
-  }
   async readClaim(n: number) {
     const ref = await this.find<{ object: { sha: string } }>(`${REPO}/git/ref/psdd/claims/${n}`);
     if (!ref) return null;
     const commit = await this.api<{ message: string }>("GET", `${REPO}/git/commits/${ref.object.sha}`);
-    return JSON.parse(commit.message) as ClaimRecord;
+    return { ...(JSON.parse(commit.message) as ClaimRecord), sha: ref.object.sha };
   }
   async deleteClaim(n: number) {
     try {

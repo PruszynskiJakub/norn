@@ -1,13 +1,14 @@
 import { spawn } from "node:child_process";
 import { readFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
-import type { Provider, Workspace } from "./workspace.js";
+import { basename, dirname, join, resolve } from "node:path";
+import { samePath, type Provider, type Workspace } from "./workspace.js";
 
-export type Run = (cmd: string, args: string[]) => Promise<{ code: number; stdout: string; stderr: string }>;
+/** Runs a command; `env` is added to this process's environment. */
+export type Run = (cmd: string, args: string[], env?: Record<string, string>) => Promise<{ code: number; stdout: string; stderr: string }>;
 
-export const runCommand: Run = (cmd, args) =>
+export const runCommand: Run = (cmd, args, env) =>
   new Promise((resolve, reject) => {
-    const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"] });
+    const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"], env: env ? { ...process.env, ...env } : process.env });
     let stdout = "";
     let stderr = "";
     child.stdout.on("data", (d) => (stdout += d));
@@ -15,6 +16,9 @@ export const runCommand: Run = (cmd, args) =>
     child.on("error", reject);
     child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
   });
+
+/** psdd cannot tell which checkout to work in. A refusal for the user, not a crash. */
+export class RootError extends Error {}
 
 /** The developer's machine, via git and herdr. */
 export class LocalWorkspace implements Workspace {
@@ -25,11 +29,22 @@ export class LocalWorkspace implements Workspace {
     public cwd: string = root,
   ) {}
 
-  /** The main checkout's root, also from inside a linked worktree. */
+  /**
+   * The main checkout's root, also from inside a linked worktree. The parent of
+   * the git directory is only right for an ordinary .git: a submodule's lives in
+   * the superproject's .git/modules and records its checkout as core.worktree.
+   * git worktree list names the git directory itself in those layouts, so it
+   * cannot be used either.
+   */
   static async findRoot(cwd: string, run: Run = runCommand): Promise<string> {
-    const r = await run("git", ["-C", cwd, "rev-parse", "--path-format=absolute", "--git-common-dir"]);
-    if (r.code !== 0) throw new Error(`Not inside a git repository: ${cwd}`);
-    return dirname(r.stdout.trim());
+    const r = await run("git", ["-C", cwd, "rev-parse", "--path-format=absolute", "--git-dir", "--git-common-dir", "--show-toplevel"]);
+    if (r.code !== 0) throw new RootError(`Not inside a git repository's checkout: ${cwd}`);
+    const [gitDir, commonDir, toplevel] = r.stdout.trim().split("\n");
+    if (gitDir === commonDir) return toplevel;
+    const configured = await run("git", ["--git-dir", commonDir, "config", "--get", "core.worktree"]);
+    if (configured.code === 0 && configured.stdout.trim()) return resolve(commonDir, configured.stdout.trim());
+    if (basename(commonDir) === ".git") return dirname(commonDir);
+    throw new RootError(`Cannot find the main checkout of ${commonDir} from this worktree. Run psdd from the main checkout.`);
   }
 
   private async must(cmd: string, args: string[]) {
@@ -49,7 +64,8 @@ export class LocalWorkspace implements Workspace {
 
   async worktreeExists(rel: string) {
     const out = await this.must("git", ["-C", this.root, "worktree", "list", "--porcelain"]);
-    return out.split("\n").includes(`worktree ${join(this.root, rel)}`);
+    const path = join(this.root, rel);
+    return out.split("\n").some((l) => l.startsWith("worktree ") && samePath(l.slice("worktree ".length), path));
   }
 
   async branchCheckedOutAt(branch: string) {
@@ -64,6 +80,10 @@ export class LocalWorkspace implements Workspace {
     return null;
   }
 
+  async worktreeDirty(rel: string) {
+    return (await this.must("git", ["-C", join(this.root, rel), "status", "--porcelain"])).trim() !== "";
+  }
+
   async localBranchExists(branch: string) {
     return (await this.run("git", ["-C", this.root, "show-ref", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;
   }
@@ -74,7 +94,7 @@ export class LocalWorkspace implements Workspace {
       const list = JSON.parse(await this.must("herdr", ["worktree", "list", "--cwd", this.root])) as {
         result: { worktrees: { path: string; open_workspace_id?: string | null }[] };
       };
-      const id = list.result.worktrees.find((w) => w.path === path)?.open_workspace_id;
+      const id = list.result.worktrees.find((w) => samePath(w.path, path))?.open_workspace_id;
       if (id) {
         await this.must("herdr", ["worktree", "remove", "--workspace", id, "--force"]);
         return;

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { describe, expect, test } from "vitest";
 import { setup } from "./harness.js";
 
@@ -59,7 +60,23 @@ describe("take names the worktree", () => {
       "  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-131 -b 123-rate-limiting-131 origin/123-rate-limiting",
     );
     expect(res.stdout).toContain("Open one PR from 123-rate-limiting-131 into 123-rate-limiting if there is none yet:");
-    expect(res.stdout).toContain('  gh pr create --base 123-rate-limiting --head 123-rate-limiting-131 --title "Per-key limits" --body "Part of #123. Slice #131."');
+    expect(res.stdout).toContain("  gh pr create --base 123-rate-limiting --head 123-rate-limiting-131 --title 'Per-key limits' --body 'Part of #123. Slice #131.'");
+  });
+
+  test("a slice title is quoted in the printed gh pr create, so the shell takes it literally", async () => {
+    const w = setup();
+    const title = 'Handle "quoted" $(touch pwned) `id` it\'s input';
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 131, title, labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+    w.github.parents.set(131, 123);
+
+    const res = await w.psdd("take", "131");
+
+    const line = res.stdout.split("\n").find((l) => l.trim().startsWith("gh pr create"))!.trim();
+    // Run it through a real shell with printf in place of gh: each argument must come back unchanged.
+    const args = execFileSync("/bin/sh", ["-c", line.replace(/^gh pr create/, "printf '%s\\n'")], { encoding: "utf8" }).split("\n");
+    expect(args).toContain(title);
+    expect(args).toContain("Part of #123. Slice #131.");
   });
 
   test("when the branch already exists locally, the worktree is added on it without -b", async () => {
@@ -175,6 +192,34 @@ describe("worktree cleanup", () => {
     expect(res.stdout).toContain("Story #123 is merged and closed. Removed its worktree .agents/worktrees/123-rate-limiting.");
   });
 
+  test("a worktree with uncommitted changes is kept, and next says so", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 127, title: "Redis store", state: "closed", stateReason: "not_planned", labels: ["type:slice", "mode:afk"] });
+    w.github.parents.set(127, 123);
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting-127");
+    w.workspace.dirty.add(".agents/worktrees/123-rate-limiting-127");
+
+    const res = await w.psdd("next", "123");
+
+    expect(w.workspace.removed).toEqual([]);
+    expect(res.stdout).toContain("Kept /repo/.agents/worktrees/123-rate-limiting-127: it has uncommitted changes. Remove it by hand when done.");
+  });
+
+  test("a closed story loses the state label GitHub left on it, and next reports no state", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", state: "closed", labels: ["type:story", "merge-queue"] });
+    w.github.seedIssue({ number: 127, title: "Redis store", state: "closed", labels: ["type:slice", "mode:afk", "merge-queue"] });
+    w.github.parents.set(127, 123);
+
+    const res = await w.psdd("next", "123", "--json");
+
+    expect(w.github.labels(123)).toEqual(["type:story"]);
+    expect(w.github.labels(127)).toEqual(["type:slice", "mode:afk"]);
+    expect(JSON.parse(res.stdout)).toMatchObject({ state: null, closed: true });
+    expect(w.github.claims.size).toBe(0);
+  });
+
   test("taking over a stale claim keeps the worktree the previous holder left, and says so", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
@@ -203,5 +248,59 @@ describe("worktree cleanup", () => {
 
     expect(w.workspace.removed).toEqual([]);
     expect(res.stdout).toContain("Could not remove the worktree of #123: psdd is running inside it");
+  });
+});
+
+describe("a fix round's briefing", () => {
+  test("a slice sent back by review is briefed as rework, even though take relabels it implementation", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "changes-requested"] });
+    w.github.parents.set(131, 123);
+
+    const res = await w.psdd("take", "131");
+
+    expect(w.github.labels(131)).toContain("implementation");
+    expect(res.stdout).toContain("This is rework: the latest review or QA comment on #131 lists what to fix.");
+    expect(res.stdout).toContain("Open one PR from 123-rate-limiting-131 into 123-rate-limiting if there is none yet:");
+  });
+
+  test("a story that failed QA is briefed as rework", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "qa-failed"] });
+
+    const res = await w.psdd("take", "123");
+
+    expect(res.stdout).toContain("This is rework: the latest review or QA comment on #123 lists what to fix.");
+    expect(res.stdout).toContain("Commit the fixes straight onto the story branch 123-rate-limiting and push them.");
+  });
+});
+
+describe("an existing worktree", () => {
+  test("whose branch is on GitHub is brought up to date before work starts", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-review"] });
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
+    w.github.branches.add("123-rate-limiting");
+
+    const res = await w.psdd("take", "123");
+
+    expect(res.stdout).toContain(
+      [
+        "Work in: /repo/.agents/worktrees/123-rate-limiting (branch 123-rate-limiting)",
+        "Bring it up to date first:",
+        "  git -C /repo/.agents/worktrees/123-rate-limiting fetch origin 123-rate-limiting && git -C /repo/.agents/worktrees/123-rate-limiting merge --ff-only origin/123-rate-limiting",
+      ].join("\n"),
+    );
+  });
+
+  test("whose branch is only local is just named", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
+
+    const res = await w.psdd("take", "123");
+
+    expect(res.stdout).not.toContain("Bring it up to date");
   });
 });

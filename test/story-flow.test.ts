@@ -41,7 +41,7 @@ describe("story phase 1", () => {
     await w.psdd("take", "123");
     await w.psdd("done", "123");
     expect(w.github.comments(123).at(-1)).toContain(
-      "https://github.com/acme/app/blob/abc123/.agents/specs/123-rate-limiting/spec.md",
+      "https://github.com/acme/app/blob/123-rate-limiting/.agents/specs/123-rate-limiting/spec.md",
     );
   });
 });

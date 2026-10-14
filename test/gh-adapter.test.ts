@@ -66,18 +66,13 @@ describe("GhGitHub claims", () => {
     await expect(new GhGitHub(exec).createClaim(131, { holder: "a", session: "s", since: "x" })).rejects.toThrow("HTTP 401");
   });
 
-  test("refreshClaim force-moves the ref to a new claim commit", async () => {
-    const { exec, calls } = scripted((c) => {
-      if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t2" } };
-      if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c2" } };
-      if (path(c).endsWith("/git/refs/psdd/claims/131")) return { stdout: { ref: "refs/psdd/claims/131" } };
+  test("replaceClaim loses when the ref is gone", async () => {
+    const { exec } = scripted((c) => {
+      if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t" } };
+      if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c" } };
+      if (path(c).endsWith("/git/refs/psdd/claims/131")) return { code: 1, stderr: "gh: Reference does not exist (HTTP 422)" };
     });
-
-    await new GhGitHub(exec).refreshClaim(131, { holder: "a", session: "s", since: "2026-10-13T15:00:00.000Z" });
-
-    const ref = calls.find((c) => path(c).endsWith("/git/refs/psdd/claims/131"))!;
-    expect(method(ref)).toBe("PATCH");
-    expect(ref.input).toEqual({ sha: "c2", force: true });
+    expect(await new GhGitHub(exec).replaceClaim(131, "mine1", { holder: "a", session: "s", since: "x" })).toBe(false);
   });
 
   test("readClaim follows the ref to its commit; a missing ref is no claim", async () => {
@@ -88,8 +83,60 @@ describe("GhGitHub claims", () => {
       if (path(c) === "repos/{owner}/{repo}/git/ref/psdd/claims/132") return { code: 1, stderr: "Not Found (HTTP 404)" };
     });
     const gh = new GhGitHub(exec);
-    expect(await gh.readClaim(131)).toEqual({ holder: "a", session: "s", since: "t" });
+    expect(await gh.readClaim(131)).toEqual({ holder: "a", session: "s", since: "t", sha: "c1" });
     expect(await gh.readClaim(132)).toBeNull();
+  });
+
+  test("replaceClaim makes a child of the commit read and moves the ref without force", async () => {
+    const { exec, calls } = scripted((c) => {
+      if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t3" } };
+      if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c3" } };
+      if (path(c).endsWith("/git/refs/psdd/claims/131")) return { stdout: { ref: "refs/psdd/claims/131" } };
+    });
+
+    expect(await new GhGitHub(exec).replaceClaim(131, "stale1", { holder: "b", session: "s2", since: "x" })).toBe(true);
+
+    expect(calls.find((c) => path(c).endsWith("/git/commits"))!.input).toMatchObject({ parents: ["stale1"] });
+    const ref = calls.find((c) => path(c).endsWith("/git/refs/psdd/claims/131"))!;
+    expect(method(ref)).toBe("PATCH");
+    expect(ref.input).toEqual({ sha: "c3", force: false });
+  });
+
+  test("replaceClaim loses when the ref has moved since it was read", async () => {
+    const { exec } = scripted((c) => {
+      if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t" } };
+      if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c" } };
+      if (path(c).endsWith("/git/refs/psdd/claims/131")) return { code: 1, stderr: "gh: Update is not a fast forward (HTTP 422)" };
+    });
+    expect(await new GhGitHub(exec).replaceClaim(131, "stale1", { holder: "b", session: "s2", since: "x" })).toBe(false);
+  });
+});
+
+describe("GhGitHub paged lists", () => {
+  test("lists are read with --paginate --jq '.[]', one JSON value per line across pages, without --slurp", async () => {
+    const { exec, calls } = scripted((c) => {
+      if (path(c) === "repos/{owner}/{repo}/issues/131/comments") {
+        return { stdout: [JSON.stringify({ body: "first\nline two" }), JSON.stringify({ body: "second" }), ""].join("\n") };
+      }
+    });
+
+    expect(await new GhGitHub(exec).listComments(131)).toEqual(["first\nline two", "second"]);
+    expect(calls[0].args).toEqual(["api", "--paginate", "--jq", ".[]", "repos/{owner}/{repo}/issues/131/comments"]);
+    expect(calls[0].args).not.toContain("--slurp");
+  });
+
+  test("an empty list prints nothing and reads as no items", async () => {
+    const { exec } = scripted(() => ({ stdout: "" }));
+    expect(await new GhGitHub(exec).subIssues(123)).toEqual([]);
+  });
+
+  test("sub-issues from another repository are left out", async () => {
+    const issue = (number: number, repo: string) => ({ id: number, number, title: "t", state: "open", labels: [], assignees: [], repository_url: `https://api.github.com/repos/${repo}` });
+    const { exec } = scripted((c) => {
+      if (c.args.includes("--paginate")) return { stdout: [issue(131, "acme/app"), issue(7, "acme/other")].map((i) => JSON.stringify(i)).join("\n") };
+      if (path(c) === "repos/{owner}/{repo}") return { stdout: { url: "https://api.github.com/repos/acme/app" } };
+    });
+    expect((await new GhGitHub(exec).subIssues(123)).map((i) => i.number)).toEqual([131]);
   });
 });
 

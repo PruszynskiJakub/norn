@@ -7,21 +7,40 @@ export type Acquire =
 /**
  * Claim an issue via its git ref. Ref creation is the atomic step: whoever
  * creates it wins. A claim this session already holds is refreshed to a new
- * `since`. A claim older than STALE_AFTER_MS is deleted and retried once.
+ * `since`, and a claim older than staleAfterMs is taken over; both only
+ * while the ref still points at the commit read, so neither can overwrite a
+ * claim another session took in between.
  */
 export async function acquire(github: GitHub, n: number, record: ClaimRecord, now: Date, staleAfterMs: number): Promise<Acquire> {
   if (await github.createClaim(n, record)) return { ok: true };
   const held = await github.readClaim(n);
-  if (held && held.session === record.session) {
-    await github.refreshClaim(n, record);
-    return { ok: true, reacquired: true };
+  if (!held) return lost(github, n, record);
+  if (held.session === record.session) {
+    if (await github.replaceClaim(n, held.sha, record)) return { ok: true, reacquired: true };
+    return lost(github, n, record);
   }
-  if (held && isStale(held, now, staleAfterMs)) {
-    await github.deleteClaim(n);
-    if (await github.createClaim(n, record)) return { ok: true, tookOver: held };
-    return { ok: false, held: await github.readClaim(n) };
+  if (isStale(held, now, staleAfterMs)) {
+    const { sha: _sha, ...was } = held;
+    if (await github.replaceClaim(n, held.sha, record)) return { ok: true, tookOver: was };
+    return lost(github, n, record);
   }
-  return { ok: false, held };
+  return { ok: false, held: strip(held) };
+}
+
+/**
+ * The ref changed under us. If someone holds it now, that is the answer;
+ * if it is gone (released in between), try once more to create it.
+ */
+async function lost(github: GitHub, n: number, record: ClaimRecord): Promise<Acquire> {
+  const now = await github.readClaim(n);
+  if (now) return { ok: false, held: strip(now) };
+  return (await github.createClaim(n, record)) ? { ok: true } : { ok: false, held: strip(await github.readClaim(n)) };
+}
+
+function strip(claim: (ClaimRecord & { sha?: string }) | null): ClaimRecord | null {
+  if (!claim) return null;
+  const { sha: _sha, ...record } = claim;
+  return record;
 }
 
 export function isStale(claim: ClaimRecord, now: Date, staleAfterMs: number) {

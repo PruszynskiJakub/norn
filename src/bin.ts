@@ -1,12 +1,11 @@
 #!/usr/bin/env node
-import { execFileSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
 import { hostname } from "node:os";
 import { ghFailureMessage, run } from "./cli.js";
 import { sessionId } from "./env.js";
 import { GhError, GhGitHub } from "./gh.js";
 import { installSkills } from "./install-skills.js";
-import { LocalWorkspace, runCommand } from "./local-workspace.js";
+import { LocalWorkspace, RootError, runCommand } from "./local-workspace.js";
 import { makeNotifier } from "./notifier.js";
 
 try {
@@ -18,7 +17,6 @@ try {
     session: sessionId(process.env, hostname(), root),
     nonce: () => randomBytes(2).toString("hex"),
     notify: makeNotifier(),
-    headSha: async () => execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim(),
     cwd: root,
     installSkills,
   });
@@ -27,6 +25,9 @@ try {
 } catch (e) {
   if (e instanceof GhError) {
     process.stdout.write(ghFailureMessage(process.argv.slice(2), e.message) + "\n");
+    process.exitCode = 1;
+  } else if (e instanceof RootError) {
+    process.stdout.write(e.message + "\n");
     process.exitCode = 1;
   } else throw e;
 }

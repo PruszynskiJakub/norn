@@ -38,6 +38,30 @@ describe("merge-queue on a slice", () => {
     expect(w.github.issues.get(127)!.state).toBe("open");
   });
 
+  test("done is refused when the slice PR targets another branch than the story branch", async () => {
+    const w = storyWithSlices();
+    w.github.prs.push({ number: 50, head: "123-rate-limiting-127", base: "main", state: "open" });
+    await w.psdd("take", "127");
+
+    const res = await w.psdd("done", "127");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("PR #50 from 123-rate-limiting-127 targets main, not the story branch 123-rate-limiting.");
+    expect(res.stdout).toContain("gh pr edit 50 --base 123-rate-limiting");
+  });
+
+  test("a slice PR already merged into main is refused, not counted as merged into the story", async () => {
+    const w = storyWithSlices();
+    w.github.prs.push({ number: 50, head: "123-rate-limiting-127", base: "main", state: "merged" });
+    await w.psdd("take", "127");
+
+    const res = await w.psdd("done", "127");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("psdd escalate 127 'slice PR #50 was merged into main, not 123-rate-limiting'");
+    expect(w.github.issues.get(127)!.state).toBe("open");
+  });
+
   test("done closes the slice and unblocks dependents with no open blockers", async () => {
     const w = storyWithSlices();
     w.github.prs.push({ number: 50, head: "123-rate-limiting-127", base: "123-rate-limiting", state: "merged" });
@@ -99,7 +123,8 @@ describe("story transitions around slices", () => {
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "merge-queue"], assignees: ["bob"] });
     const res = await w.psdd("take", "123");
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("Only the story owner (@bob) merges the story PR into main");
+    expect(res.stdout).toContain("Only the story owner (@bob) merges the story PR;");
+    expect(res.stdout).toContain("psdd next 123 closes the story if GitHub has not");
     expect(w.github.claim(123)).toBeNull();
   });
 

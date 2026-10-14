@@ -1,7 +1,7 @@
 import type { Issue } from "./github.js";
 import { locate, workInLines, type Location } from "./location.js";
-import { FIX_STATES, kindOf, stateOf, type Step } from "./machine.js";
-import { specPath, wrap } from "./text.js";
+import { FIX_STATES, kindOf, type State, type Step } from "./machine.js";
+import { sh, specPath, wrap } from "./text.js";
 import { fixRounds, type Ctx } from "./transitions.js";
 
 export function noun(issue: Issue) {
@@ -9,19 +9,22 @@ export function noun(issue: Issue) {
   return kind === "new" ? "issue" : kind;
 }
 
-/** Briefing in fixed order: where you are, what to do, how to finish, what not to do. */
-export async function briefing(issue: Issue, step: Step, ctx: Ctx): Promise<string[]> {
+/**
+ * Briefing in fixed order: where you are, what to do, how to finish, what not to do.
+ * `from` is the state the issue was in before take moved it, e.g. changes-requested.
+ */
+export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: State | null): Promise<string[]> {
   const n = issue.number;
   let where = `You now hold ${noun(issue)} #${n} "${issue.title}". Its step is ${step.name}.`;
   if (step.attended) where += " This step is attended: the user takes part, and you do not decide on your own.";
   const many = Object.keys(step.outcomes).length > 1;
   const when = step.attended ? `When the user agrees ${step.name} is finished` : `When ${step.name} is finished`;
-  const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
+  const loc = await locate(issue, ctx);
   const workIn = loc ? [...(await workInLines(loc, ctx.workspace, ctx.github, ctx.config.provider)), ""] : [];
-  // take relabels a slice in rework to implementation, so the history says whether this is rework.
+  // take relabels a slice in rework to implementation; `from` and the history say whether this is rework.
   const rework =
     step.skill === "implement" &&
-    (FIX_STATES.includes(stateOf(issue)!) || fixRounds(await ctx.github.listComments(n)) > 0);
+    ((from !== null && FIX_STATES.includes(from)) || fixRounds(await ctx.github.listComments(n)) > 0);
   return [
     wrap(where),
     "",
@@ -63,7 +66,7 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
   }
   if (!loc) return [];
   const story = loc.story;
-  const spec = specPath(story.number, story.title);
+  const spec = specPath(story.number, loc.slug);
   const pushSpec = `Commit the spec on ${loc.branch} and push it, so the link psdd posts resolves.`;
   const rework = isRework
     ? [`This is rework: the latest review or QA comment on #${n} lists what to fix. ${readIssue}`]
@@ -87,7 +90,7 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
       );
     }
     if (step.skill === "implement") lines.push(...rework, `Commit the fixes straight onto the story branch ${loc.branch} and push them.`);
-    if (step.skill === "review" || step.skill === "qa") lines.push(`Story PR: ${loc.branch} into ${loc.base}. Diff: git diff origin/${loc.base}...HEAD`);
+    if (step.skill === "review" || step.skill === "qa") lines.push(`Story PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`);
     return lines;
   }
   const lines = [`Spec: ${spec} (story #${story.number})`, readIssue];
@@ -95,15 +98,16 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
     lines.push(
       ...rework,
       `Commit on ${loc.branch} and push. Open one PR from ${loc.branch} into ${loc.base} if there is none yet:`,
-      `  gh pr create --base ${loc.base} --head ${loc.branch} --title "${issue.title}" --body "Part of #${story.number}. Slice #${n}."`,
+      // The title is free text from GitHub: quoted, so a " or $(...) in it can neither break nor run anything.
+      `  gh pr create --base ${sh(loc.base)} --head ${sh(loc.branch)} --title ${sh(issue.title)} --body ${sh(`Part of #${story.number}. Slice #${n}.`)}`,
     );
   } else if (step.skill === "merge") {
     lines.push(
       `Merge origin/${loc.base} into ${loc.branch}, resolving conflicts if needed, and push.`,
-      `Then merge the PR: gh pr merge ${loc.branch} --merge`,
+      `Then merge the PR: gh pr merge ${sh(loc.branch)} --merge`,
     );
   } else {
-    lines.push(`Slice PR: ${loc.branch} into ${loc.base}. Diff: git diff origin/${loc.base}...HEAD`);
+    lines.push(`Slice PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`);
   }
   return lines;
 }

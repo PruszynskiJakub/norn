@@ -6,6 +6,7 @@ const slice: Location = {
   base: "123-rate-limiting",
   worktree: ".agents/worktrees/123-rate-limiting-131",
   story: { number: 123, title: "Rate limiting", state: "open", labels: [], assignees: [] },
+  slug: "rate-limiting",
 };
 const path = "/repo/.agents/worktrees/123-rate-limiting-131";
 
@@ -45,6 +46,19 @@ describe("git worktree commands for a local branch", () => {
   test("only local: no fetch, which would fail without the branch on GitHub", () => {
     expect(createWorktreeCommand("claude-code", slice, "/repo", { local: true, remote: false })).toBe(
       `git -C /repo worktree add ${path} 123-rate-limiting-131`,
+    );
+  });
+});
+
+describe("printed commands are shell-quoted", () => {
+  test("a checkout under a path with a space or a quote is single-quoted, plain words are not", () => {
+    const root = "/Users/Jane O'Doe/app";
+    const wt = `'/Users/Jane O'\\''Doe/app/.agents/worktrees/123-rate-limiting-131'`;
+    expect(createWorktreeCommand("git", slice, root, { local: false, remote: false })).toBe(
+      `git -C '/Users/Jane O'\\''Doe/app' fetch origin 123-rate-limiting && git -C '/Users/Jane O'\\''Doe/app' worktree add --no-track ${wt} -b 123-rate-limiting-131 origin/123-rate-limiting`,
+    );
+    expect(createWorktreeCommand("herdr", slice, root, { local: true, remote: false })).toBe(
+      `herdr worktree create --cwd '/Users/Jane O'\\''Doe/app' --branch 123-rate-limiting-131 --path ${wt} --no-focus`,
     );
   });
 });

@@ -1,6 +1,7 @@
 import { isStale } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
-import { stateOf } from "./machine.js";
+import { slicesOf, stateOf, statesOf } from "./machine.js";
+import { storySlug, type Slugs } from "./slug.js";
 import { hhmm, storyBranch } from "./text.js";
 
 interface Row {
@@ -15,14 +16,15 @@ interface Row {
 }
 
 /** Read-only overview. Makes no changes. */
-export async function status(github: GitHub, n: number, now: Date, staleAfterMs: number) {
+export async function status(ctx: { github: GitHub; slugs: Slugs }, n: number, now: Date, staleAfterMs: number) {
+  const { github } = ctx;
   const story = await github.getIssue(n);
-  const slices = await github.subIssues(n);
+  const slices = await slicesOf(github, n);
   const rows: Row[] = [];
   for (const s of slices) rows.push(await row(github, s, now, staleAfterMs));
   const head = await row(github, story, now, staleAfterMs);
   const data = {
-    story: { ...head, owner: story.assignees[0] ?? null, branch: storyBranch(n, story.title) },
+    story: { ...head, owner: story.assignees[0] ?? null, branch: storyBranch(n, await storySlug(ctx, story)) },
     slices: rows,
   };
 
@@ -52,11 +54,18 @@ async function row(github: GitHub, issue: Issue, now: Date, staleAfterMs: number
   return {
     number: issue.number,
     title: issue.title,
-    state: closed ? (issue.stateReason === "not_planned" ? "closed" : "merged") : (stateOf(issue) ?? "untriaged"),
+    state: closed ? (issue.stateReason === "not_planned" ? "closed" : "merged") : openState(issue),
     mode: issue.labels.includes("mode:hil") ? "hil" : issue.labels.includes("mode:afk") ? "afk" : null,
     blockedBy: blockers.filter((b) => b.state === "open").map((b) => b.number),
     needsHuman: issue.labels.includes("needs-human"),
     heldSince: claim?.since ?? null,
     stale: claim ? isStale(claim, now, staleAfterMs) : false,
   };
+}
+
+/** The state of an open issue as status shows it; two state labels are shown as both, since psdd cannot tell which is real. */
+function openState(issue: Issue): string {
+  const states = statesOf(issue);
+  if (states.length > 1) return `${states.join(" + ")} (more than one state label)`;
+  return stateOf(issue) ?? "untriaged";
 }

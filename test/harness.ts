@@ -16,7 +16,6 @@ export function setup(opts: { now?: string; session?: string; user?: string } = 
     now: () => now,
     session: opts.session ?? "session-1",
     nonce: () => nonces.shift() ?? `n${++made}`,
-    headSha: async () => "abc123",
     notify: async (channel, message) => {
       notifications.push({ channel, ...message });
     },

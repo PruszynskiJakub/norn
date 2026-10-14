@@ -4,10 +4,13 @@ import { join } from "node:path";
 import { branchAt, checkedOutElsewhere, createWorktreeCommand, locate } from "./location.js";
 import type { Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
-import { kindOf, stateOf, stepFor, type State } from "./machine.js";
+import { STATES, ambiguousStates, kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
+import { storySlug } from "./slug.js";
 import { hhmm, storyBranch, wrap } from "./text.js";
 import {
   bestEffort,
+  clearClosedState,
+  closeMergedStory,
   ensureStoryBranch,
   needsHumanReason,
   promoteStory,
@@ -37,7 +40,7 @@ export interface StartItem {
 
 export interface WaitItem {
   issue: number;
-  reason: "blocked" | "needs-human" | "held" | "owner-merge";
+  reason: "blocked" | "needs-human" | "held" | "owner-merge" | "no-state" | "ambiguous-state";
   detail: string;
 }
 
@@ -56,6 +59,8 @@ export interface NextReport {
   /** The story is closed: merged, or closed as not planned. Nothing waits for anyone. */
   closed: boolean;
   notPlanned: boolean;
+  /** Notifications are on, so the user has been told what waits for them. */
+  notified: boolean;
   start: StartItem[];
   waiting: WaitItem[];
 }
@@ -82,18 +87,32 @@ async function reconcile(ctx: Ctx, storyNumber: number): Promise<string[]> {
   if (story.state === "open" && stateOf(story) === "implementation") {
     const branch = await ensureStoryBranch(ctx, story).catch((e: Error) => ({ ok: false as const, lines: [`Could not create the story branch: ${e.message}`] }));
     if (!branch.ok) notes.push(...branch.lines);
-    else if (branch.created) notes.push(`Created the story branch ${storyBranch(storyNumber, story.title)}.`);
+    else if (branch.created) notes.push(`Created the story branch ${branch.branch}.`);
   }
   notes.push(...(await bestEffort("move the story on", storyNumber, () => promoteStory(ctx, storyNumber))));
-  const closed = (await github.subIssues(storyNumber)).filter((s) => s.state === "closed");
+  notes.push(...(await bestEffort("close the merged story", storyNumber, async () => {
+    if (!(await closeMergedStory(ctx, story))) return [];
+    story.state = "closed";
+    story.labels = story.labels.filter((l) => !(STATES as readonly string[]).includes(l));
+    return [`The story PR is merged. Closed story #${storyNumber}.`];
+  })));
+  const closed = (await slicesOf(github, storyNumber)).filter((s) => s.state === "closed");
   if (story.state === "closed") closed.push(story);
   for (const issue of closed) {
+    notes.push(...(await bestEffort(`clear the labels of #${issue.number}`, storyNumber, async () => {
+      await clearClosedState(ctx, issue);
+      return [];
+    })));
     try {
-      const removed = await removeWorktreeOf(ctx, issue);
-      if (!removed) continue;
+      const r = await removeWorktreeOf(ctx, issue);
+      if (!r) continue;
+      if ("kept" in r) {
+        notes.push(`Kept ${r.kept}: it has uncommitted changes. Remove it by hand when done.`);
+        continue;
+      }
       notes.push(issue.number === storyNumber
-        ? `Story #${storyNumber} is merged and closed. Removed its worktree ${removed}.`
-        : `Slice #${issue.number} is merged. Removed its worktree ${removed}.`);
+        ? `Story #${storyNumber} is merged and closed. Removed its worktree ${r.removed}.`
+        : `Slice #${issue.number} is merged. Removed its worktree ${r.removed}.`);
     } catch (e) {
       notes.push(`Could not remove the worktree of #${issue.number}: ${(e as Error).message}`);
     }
@@ -107,14 +126,15 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
   await syncBlocked(ctx, storyNumber);
   const notes = await reconcile(ctx, storyNumber);
   const story = await github.getIssue(storyNumber);
-  const slices = await github.subIssues(storyNumber);
+  const slices = await slicesOf(github, storyNumber);
   const report: NextReport = {
     story: storyNumber,
     provider: ctx.config.provider,
     maxParallel: ctx.config.maxParallel,
     title: story.title,
-    state: stateOf(story),
-    branch: storyBranch(storyNumber, story.title),
+    // A closed story has no state, whatever labels GitHub left on it.
+    state: story.state === "closed" ? null : stateOf(story),
+    branch: storyBranch(storyNumber, await storySlug(ctx, story)),
     slices: { total: slices.length, merged: slices.filter((s) => s.state === "closed").length },
     start: [],
     waiting: [],
@@ -122,6 +142,7 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
     nothingLeft: false,
     closed: story.state === "closed",
     notPlanned: story.stateReason === "not_planned",
+    notified: ctx.config.notifications !== null,
   };
   if (report.closed) {
     report.nothingLeft = true;
@@ -148,10 +169,20 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
 async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   const n = issue.number;
   const state = stateOf(issue);
+  const ambiguous = ambiguousStates(issue);
+  if (ambiguous) {
+    report.waiting.push({ issue: n, reason: "ambiguous-state", detail: ambiguous });
+    return;
+  }
   if (issue.labels.includes("needs-human")) {
     const fallback = state === "needs-qa" ? (kindOf(issue) === "story" ? "story QA" : "QA in mode:hil") : "see its latest comment";
     const why = (await needsHumanReason(ctx.github, n)) ?? fallback;
     report.waiting.push({ issue: n, reason: "needs-human", detail: why });
+    return;
+  }
+  if (!state) {
+    // Not skipped silently: with no state psdd cannot brief it, and delivery must not report nothing left.
+    report.waiting.push({ issue: n, reason: "no-state", detail: "has no state label; a person must set one" });
     return;
   }
   if (state === "blocked") {
@@ -160,20 +191,21 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     return;
   }
   const step = stepFor(issue);
-  if (!step || !state) return;
+  if (!step) return;
   const claim = await ctx.github.readClaim(n);
   if (claim && !isStale(claim, ctx.now(), ctx.config.staleAfterMs)) {
     const who = claim.session === ctx.session ? "this session" : "another session";
     report.waiting.push({ issue: n, reason: "held", detail: `is held by ${who} (since ${hhmm(claim.since)})` });
     return;
   }
-  const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
+  const loc = await locate(issue, ctx);
   let createWorktree: string | null = null;
   let checkedOutAt: string | null = null;
-  if (loc && ctx.config.provider === "herdr" && !(await ctx.workspace.worktreeExists(loc.worktree))) {
+  // Under herdr and plain git the agent starts in the worktree, so it is made first; a Claude Code subagent makes it from its briefing.
+  if (loc && ctx.config.provider !== "claude-code" && !(await ctx.workspace.worktreeExists(loc.worktree))) {
     checkedOutAt = await ctx.workspace.branchCheckedOutAt(loc.branch);
     if (!checkedOutAt) {
-      createWorktree = createWorktreeCommand("herdr", loc, ctx.workspace.root, await branchAt(loc, ctx.workspace, ctx.github));
+      createWorktree = createWorktreeCommand(ctx.config.provider, loc, ctx.workspace.root, await branchAt(loc, ctx.workspace, ctx.github));
     }
   }
   report.start.push({
@@ -198,13 +230,16 @@ function waitLine(w: WaitItem) {
   return w.reason === "needs-human" ? `  - #${w.issue} needs a human: ${w.detail}. Do not take it.` : `  - #${w.issue} ${w.detail}.`;
 }
 
+/** Waiting items only a person can move on. */
+const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "owner-merge", "no-state", "ambiguous-state"];
+
 function renderNothingLeft(r: NextReport): string {
-  const human = r.waiting.filter((w) => w.reason === "needs-human" || w.reason === "owner-merge");
+  const human = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));
   const blocked = r.waiting.filter((w) => w.reason === "blocked");
   const out = [...r.notes, `Story #${r.story} "${r.title}": nothing left that you can do.`];
   if (human.length) out.push("Waiting for a human:", ...human.map((w) => `  - #${w.issue} ${w.detail}.`));
   if (blocked.length) out.push("Blocked until then:", ...blocked.map(waitLine));
-  out.push("Stop here and report to the user. psdd has already notified them.");
+  out.push(`Stop here and report to the user.${r.notified ? " psdd has already notified them." : ""}`);
   return out.join("\n");
 }
 
@@ -273,7 +308,7 @@ export async function notAStory(github: GitHub, n: number): Promise<string[] | n
 
 /** Delivery stops: tell the user what waits for them. */
 export async function notifyWaiting(ctx: Ctx, r: NextReport) {
-  const waiting = r.waiting.filter((w) => w.reason === "needs-human" || w.reason === "owner-merge");
+  const waiting = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));
   await send(ctx, {
     title: `psdd: story #${r.story} is waiting for you`,
     body: waiting.map((w) => `#${w.issue} ${w.detail}`).join("\n") || "Nothing left to do on the story.",
