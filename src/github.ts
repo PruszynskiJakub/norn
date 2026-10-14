@@ -23,6 +23,11 @@ export interface ClaimRecord {
   since: string;
 }
 
+/** A claim as read back: its record and the commit its ref points at. */
+export interface HeldClaim extends ClaimRecord {
+  sha: string;
+}
+
 /**
  * Everything psdd needs from GitHub. The real adapter shells out to the
  * user's own `gh`; tests use an in-memory fake.
@@ -66,6 +71,13 @@ export interface GitHub {
   createClaim(number: number, record: ClaimRecord): Promise<boolean>;
   /** Points the existing claim ref at a new record, e.g. a later `since`. */
   refreshClaim(number: number, record: ClaimRecord): Promise<void>;
-  readClaim(number: number): Promise<ClaimRecord | null>;
+  /**
+   * Replaces a stale claim, but only while its ref still points at `staleSha`:
+   * the new claim commit is a child of the stale one and the ref moves without
+   * force, so of two sessions taking over at once only one wins. False when
+   * the ref has moved or is gone.
+   */
+  takeOverClaim(number: number, staleSha: string, record: ClaimRecord): Promise<boolean>;
+  readClaim(number: number): Promise<HeldClaim | null>;
   deleteClaim(number: number): Promise<void>;
 }

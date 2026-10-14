@@ -181,7 +181,7 @@ export class GhGitHub implements GitHub {
   }
 
   /** A parentless commit whose message and claim.json are the record. */
-  private async claimCommit(record: ClaimRecord) {
+  private async claimCommit(record: ClaimRecord, parents: string[] = []) {
     const content = JSON.stringify(record);
     const tree = await this.api<{ sha: string }>("POST", `${REPO}/git/trees`, {
       tree: [{ path: "claim.json", mode: "100644", type: "blob", content }],
@@ -189,9 +189,20 @@ export class GhGitHub implements GitHub {
     const commit = await this.api<{ sha: string }>("POST", `${REPO}/git/commits`, {
       message: content,
       tree: tree.sha,
-      parents: [],
+      parents,
     });
     return commit.sha;
+  }
+  async takeOverClaim(n: number, staleSha: string, record: ClaimRecord) {
+    const sha = await this.claimCommit(record, [staleSha]);
+    try {
+      // Not forced: GitHub only moves the ref if the new commit descends from where it points now.
+      await this.api("PATCH", `${REPO}/git/refs/psdd/claims/${n}`, { sha, force: false });
+      return true;
+    } catch (e) {
+      if (e instanceof GhError && e.status === 422) return false;
+      throw e;
+    }
   }
   async createClaim(n: number, record: ClaimRecord) {
     const sha = await this.claimCommit(record);
@@ -211,7 +222,7 @@ export class GhGitHub implements GitHub {
     const ref = await this.find<{ object: { sha: string } }>(`${REPO}/git/ref/psdd/claims/${n}`);
     if (!ref) return null;
     const commit = await this.api<{ message: string }>("GET", `${REPO}/git/commits/${ref.object.sha}`);
-    return JSON.parse(commit.message) as ClaimRecord;
+    return { ...(JSON.parse(commit.message) as ClaimRecord), sha: ref.object.sha };
   }
   async deleteClaim(n: number) {
     try {
