@@ -13,14 +13,16 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 ### Fixed
 
 - A multi-line review or QA note no longer stops the fix budget from resetting after a person resolves the escalation.
-- A failed label change no longer leaves an issue without a state; `psdd next` lists an issue with no state label as waiting for a person.
-- Two sessions taking over the same stale claim can no longer both hold it.
+- A failed label change no longer leaves an issue without a state; `psdd next` lists an issue with no state label as waiting for a person. An issue left with two state labels is refused by `take` and listed by `psdd next` and `psdd status` for a person to fix, instead of being briefed as its old step.
+- Two sessions taking over the same stale claim can no longer both hold it, and refreshing your own claim can no longer overwrite another session's takeover. A takeover that finds the claim already released takes it instead of reporting it held.
 - `psdd done` on a merge refuses a slice PR that does not target the story branch.
 - Lists are read without `gh api --slurp`, so gh older than 2.48 works.
 - Printed commands are shell-quoted, including the slice title in the briefing's `gh pr create`; worktree paths compare correctly on Windows; the main checkout is found from anywhere in a submodule. In a `--separate-git-dir` clone or a bare repository with worktrees, psdd runs from the main checkout only, and elsewhere says so instead of crashing.
 - An existing worktree is brought up to date in the briefing; a slice relabelled by `take` is still briefed as rework.
 - `psdd next` no longer says the user was notified when notifications are off, gives the create command under plain git, clears state labels from closed issues, keeps worktrees with uncommitted changes, ignores sub-issues that are not slices, and closes a story whose PR merged into a non-default base.
 - The resolve step's comment says `needs-human resolved`.
+- A story whose title has no ASCII letters or digits records its slug once, not on every comment.
+- The deliver skill no longer says the user was notified when notifications are off.
 - Windows notifications pass their text through the environment, so quotes in it cannot break out of the script.
 
 ## [0.1.0] - 2026-10-14
