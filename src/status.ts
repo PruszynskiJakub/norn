@@ -1,6 +1,7 @@
 import { isStale } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
 import { stateOf } from "./machine.js";
+import { storySlug, type Slugs } from "./slug.js";
 import { hhmm, storyBranch } from "./text.js";
 
 interface Row {
@@ -15,14 +16,15 @@ interface Row {
 }
 
 /** Read-only overview. Makes no changes. */
-export async function status(github: GitHub, n: number, now: Date, staleAfterMs: number) {
+export async function status(ctx: { github: GitHub; slugs: Slugs }, n: number, now: Date, staleAfterMs: number) {
+  const { github } = ctx;
   const story = await github.getIssue(n);
   const slices = await github.subIssues(n);
   const rows: Row[] = [];
   for (const s of slices) rows.push(await row(github, s, now, staleAfterMs));
   const head = await row(github, story, now, staleAfterMs);
   const data = {
-    story: { ...head, owner: story.assignees[0] ?? null, branch: storyBranch(n, story.title) },
+    story: { ...head, owner: story.assignees[0] ?? null, branch: storyBranch(n, await storySlug(ctx, story)) },
     slices: rows,
   };
 

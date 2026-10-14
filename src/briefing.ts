@@ -16,7 +16,7 @@ export async function briefing(issue: Issue, step: Step, ctx: Ctx): Promise<stri
   if (step.attended) where += " This step is attended: the user takes part, and you do not decide on your own.";
   const many = Object.keys(step.outcomes).length > 1;
   const when = step.attended ? `When the user agrees ${step.name} is finished` : `When ${step.name} is finished`;
-  const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
+  const loc = await locate(issue, ctx);
   const workIn = loc ? [...(await workInLines(loc, ctx.workspace, ctx.github, ctx.config.provider)), ""] : [];
   return [
     wrap(where),
@@ -50,12 +50,12 @@ export function finishCommands(n: number, step: Step): string[] {
 function workContext(issue: Issue, step: Step, loc: Location): string[] {
   const story = loc.story;
   if (kindOf(issue) === "story") {
-    const lines = [`Spec to work on: ${specPath(story.number, story.title)}`];
+    const lines = [`Spec to work on: ${specPath(story.number, loc.slug)}`];
     if (step.skill === "tdd") lines.push(`Commit the fixes straight onto the story branch ${loc.branch}.`);
     if (step.skill === "review" || step.skill === "qa") lines.push(`Story PR: ${loc.branch} into ${loc.base}.`);
     return lines;
   }
-  const lines = [`Spec: ${specPath(story.number, story.title)} (story #${story.number})`];
+  const lines = [`Spec: ${specPath(story.number, loc.slug)} (story #${story.number})`];
   if (step.skill === "tdd") lines.push(`Open one PR from ${loc.branch} into ${loc.base}.`);
   else if (step.skill === "merge") lines.push(`Merge the PR from ${loc.branch} into ${loc.base}, resolving conflicts if needed.`);
   else lines.push(`Slice PR: ${loc.branch} into ${loc.base}.`);

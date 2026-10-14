@@ -5,6 +5,7 @@ import { branchAt, checkedOutElsewhere, createWorktreeCommand, locate } from "./
 import type { Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
 import { kindOf, stateOf, stepFor, type State } from "./machine.js";
+import { storySlug } from "./slug.js";
 import { hhmm, storyBranch, wrap } from "./text.js";
 import {
   bestEffort,
@@ -82,7 +83,7 @@ async function reconcile(ctx: Ctx, storyNumber: number): Promise<string[]> {
   if (story.state === "open" && stateOf(story) === "implementation") {
     const branch = await ensureStoryBranch(ctx, story).catch((e: Error) => ({ ok: false as const, lines: [`Could not create the story branch: ${e.message}`] }));
     if (!branch.ok) notes.push(...branch.lines);
-    else if (branch.created) notes.push(`Created the story branch ${storyBranch(storyNumber, story.title)}.`);
+    else if (branch.created) notes.push(`Created the story branch ${branch.branch}.`);
   }
   notes.push(...(await bestEffort("move the story on", storyNumber, () => promoteStory(ctx, storyNumber))));
   const closed = (await github.subIssues(storyNumber)).filter((s) => s.state === "closed");
@@ -114,7 +115,7 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
     maxParallel: ctx.config.maxParallel,
     title: story.title,
     state: stateOf(story),
-    branch: storyBranch(storyNumber, story.title),
+    branch: storyBranch(storyNumber, await storySlug(ctx, story)),
     slices: { total: slices.length, merged: slices.filter((s) => s.state === "closed").length },
     start: [],
     waiting: [],
@@ -172,7 +173,7 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     report.waiting.push({ issue: n, reason: "held", detail: `is held by ${who} (since ${hhmm(claim.since)})` });
     return;
   }
-  const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
+  const loc = await locate(issue, ctx);
   let createWorktree: string | null = null;
   let checkedOutAt: string | null = null;
   if (loc && ctx.config.provider === "herdr" && !(await ctx.workspace.worktreeExists(loc.worktree))) {

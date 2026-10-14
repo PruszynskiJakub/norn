@@ -1,6 +1,7 @@
 import { join } from "node:path";
 import type { GitHub, Issue } from "./github.js";
 import { kindOf } from "./machine.js";
+import { storySlug, type Slugs } from "./slug.js";
 import { sliceBranch, storyBranch, worktreePath } from "./text.js";
 import type { Provider, Workspace } from "./workspace.js";
 
@@ -11,19 +12,23 @@ export interface Location {
   worktree: string;
   /** The story, for a slice; the issue itself, for a story. */
   story: Issue;
+  /** The story's recorded slug. */
+  slug: string;
 }
 
-export async function locate(issue: Issue, github: GitHub, baseBranch: string): Promise<Location | null> {
+export async function locate(issue: Issue, ctx: { github: GitHub; slugs: Slugs; config: { baseBranch: string } }): Promise<Location | null> {
   if (kindOf(issue) === "story") {
-    const branch = storyBranch(issue.number, issue.title);
-    return { branch, base: baseBranch, worktree: worktreePath(branch), story: issue };
+    const slug = await storySlug(ctx, issue);
+    const branch = storyBranch(issue.number, slug);
+    return { branch, base: ctx.config.baseBranch, worktree: worktreePath(branch), story: issue, slug };
   }
   if (kindOf(issue) === "slice") {
-    const parent = await github.parentOf(issue.number);
+    const parent = await ctx.github.parentOf(issue.number);
     if (!parent) return null;
-    const story = await github.getIssue(parent);
-    const branch = sliceBranch(story.number, story.title, issue.number);
-    return { branch, base: storyBranch(story.number, story.title), worktree: worktreePath(branch), story };
+    const story = await ctx.github.getIssue(parent);
+    const slug = await storySlug(ctx, story);
+    const branch = sliceBranch(story.number, slug, issue.number);
+    return { branch, base: storyBranch(story.number, slug), worktree: worktreePath(branch), story, slug };
   }
   return null;
 }

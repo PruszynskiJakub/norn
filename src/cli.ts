@@ -9,7 +9,8 @@ import { locate } from "./location.js";
 import { notifyNeedsHuman } from "./notify.js";
 import { loadConfig, providerRefusal } from "./config.js";
 import { status } from "./status.js";
-import { hhmm, specPath, storyBranch } from "./text.js";
+import { storySlug, type Slugs } from "./slug.js";
+import { hhmm, specPath } from "./text.js";
 import {
   applyOutcome,
   ensureStoryBranch,
@@ -23,7 +24,7 @@ import {
   type Ctx,
 } from "./transitions.js";
 
-export type Deps = Omit<Ctx, "config"> & {
+export type Deps = Omit<Ctx, "config" | "slugs"> & {
   cwd: string;
   /** Installs the psdd skills into <cwd>/skills/. */
   installSkills: (cwd: string) => Promise<void>;
@@ -110,14 +111,14 @@ async function dispatch(argv: string[], input: Deps): Promise<Result> {
   }
   const loaded = await loadConfig(input.workspace);
   if (!loaded.ok) return refuse(loaded.lines);
-  const deps = { ...input, config: loaded.config };
+  const deps = { ...input, config: loaded.config, slugs: new Map() as Slugs };
   if (USES_WORKTREES.has(cmd)) {
     const r = providerRefusal(deps.config, deps.workspace.env);
     if (r) return refuse(r);
   }
   switch (cmd) {
     case "status": {
-      const { lines, data } = await status(deps.github, Number(rest[0]), deps.now(), deps.config.staleAfterMs);
+      const { lines, data } = await status(deps, Number(rest[0]), deps.now(), deps.config.staleAfterMs);
       return ok(lines, data);
     }
     case "take":
@@ -200,7 +201,7 @@ async function take(n: number, deps: Env): Promise<Result> {
   let staleNote: string | null = null;
   if (claim.tookOver) {
     // The holder may only be slow, and its worktree holds its commits: keep it, never remove it here.
-    const loc = await locate(issue, github, deps.config.baseBranch);
+    const loc = await locate(issue, deps);
     const kept = loc && (await deps.workspace.worktreeExists(loc.worktree));
     staleNote = `The previous holder's claim was stale (since ${hhmm(claim.tookOver.since)})${
       kept ? `; its worktree is kept with what it left. Check git status there before you start.` : "."
@@ -251,14 +252,14 @@ async function done(n: number, word: string | undefined, note: string | undefine
     ]);
   }
   if (step.skill === "merge") {
-    const r = await sliceMergeRefusal(github, issue);
+    const r = await sliceMergeRefusal(deps, issue);
     if (r) return refuse(r);
   }
   const preLines: string[] = [];
   if (kindOf(issue) === "story" && outcome.to === "implementation") {
     const branch = await ensureStoryBranch(deps, issue);
     if (!branch.ok) return refuse(branch.lines);
-    if (branch.created) preLines.push(`Created the story branch ${storyBranch(n, issue.title)}.`);
+    if (branch.created) preLines.push(`Created the story branch ${branch.branch}.`);
   }
 
   let applied = outcome;
@@ -333,7 +334,7 @@ async function addSlice(
   const open = blockers.filter((b) => b.state === "open");
   const slice = await github.createIssue({
     title,
-    body: `Slice of #${story}. Spec: ${specPath(story, parent.title)}`,
+    body: `Slice of #${story}. Spec: ${specPath(story, await storySlug(deps, parent))}`,
     labels: ["type:slice", `mode:${mode}`, open.length ? "blocked" : "ready-for-agent"],
     assignees: parent.assignees,
   });

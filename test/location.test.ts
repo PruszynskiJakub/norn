@@ -6,6 +6,7 @@ const slice: Location = {
   base: "123-rate-limiting",
   worktree: ".agents/worktrees/123-rate-limiting-131",
   story: { number: 123, title: "Rate limiting", state: "open", labels: [], assignees: [] },
+  slug: "rate-limiting",
 };
 const path = "/repo/.agents/worktrees/123-rate-limiting-131";
 

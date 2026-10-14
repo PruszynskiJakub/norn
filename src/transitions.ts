@@ -3,6 +3,7 @@ import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
 import { FIX_STATES, STATES, kindOf, stateOf, type Outcome, type State } from "./machine.js";
 import { locate } from "./location.js";
+import { slugLine, storySlug, type Slugs } from "./slug.js";
 import { sliceBranch, specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
@@ -66,6 +67,8 @@ export interface Ctx {
   /** A short random string, e.g. to make each agent's PSDD_SESSION unique. */
   nonce: () => string;
   headSha: () => Promise<string>;
+  /** Story slugs read during this command; see slug.ts. */
+  slugs: Slugs;
 }
 
 /**
@@ -79,6 +82,10 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
   const comment = [`psdd: ${from} → ${outcome.to === "not-planned" ? "closed as not planned" : outcome.to}${word ? ` (${word})` : ""}`];
   const spec = await specLink(ctx, issue);
   if (spec) comment.push("", `Spec: ${spec}`);
+  // A story records its slug the first time psdd writes on it, triage included.
+  const becomesStory = kindOf(issue) === "story" || (kindOf(issue) === "new" && outcome.to !== "not-planned");
+  const slug = becomesStory ? await slugLine(ctx, issue) : null;
+  if (slug) comment.push("", slug);
   if (note) comment.push("", note);
 
   // The new state is written before the old labels go, so a failure in between
@@ -114,7 +121,7 @@ export async function followUps(ctx: Ctx, issue: Issue, outcome: Outcome): Promi
   const story = await ctx.github.parentOf(issue.number);
   if (!story) return [];
   const lines: string[] = [];
-  const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
+  const loc = await locate(issue, ctx);
   if (loc && (await ctx.workspace.worktreeExists(loc.worktree))) {
     lines.push(`Its worktree ${loc.worktree} is removed by the next psdd next ${story}.`);
   }
@@ -132,12 +139,12 @@ export async function bestEffort(what: string, story: number, fn: () => Promise<
   }
 }
 
-export type Ensured = { ok: true; created: boolean } | { ok: false; lines: string[] };
+export type Ensured = { ok: true; created: boolean; branch: string } | { ok: false; lines: string[] };
 
 /** Creates the story branch from the base branch unless it is already on GitHub. */
 export async function ensureStoryBranch(ctx: Ctx, story: Issue): Promise<Ensured> {
-  const branch = storyBranch(story.number, story.title);
-  if (await ctx.github.branchExists(branch)) return { ok: true, created: false };
+  const branch = storyBranch(story.number, await storySlug(ctx, story));
+  if (await ctx.github.branchExists(branch)) return { ok: true, created: false, branch };
   const base = ctx.config.baseBranch;
   if (!(await ctx.github.branchExists(base))) {
     return {
@@ -149,7 +156,7 @@ export async function ensureStoryBranch(ctx: Ctx, story: Issue): Promise<Ensured
     };
   }
   await ctx.github.createBranch(branch, base);
-  return { ok: true, created: true };
+  return { ok: true, created: true, branch };
 }
 
 async function specLink(ctx: Ctx, issue: Issue): Promise<string | null> {
@@ -159,7 +166,7 @@ async function specLink(ctx: Ctx, issue: Issue): Promise<string | null> {
     if (p) story = await ctx.github.getIssue(p);
   }
   if (!story) return null;
-  return `${await ctx.github.repoUrl()}/blob/${await ctx.headSha()}/${specPath(story.number, story.title)}`;
+  return `${await ctx.github.repoUrl()}/blob/${await ctx.headSha()}/${specPath(story.number, await storySlug(ctx, story))}`;
 }
 
 /** Changes labels on an issue this session does not hold, by taking a short claim. */
@@ -178,8 +185,10 @@ async function withShortClaim(ctx: Ctx, n: number, fn: () => Promise<void>): Pro
 
 async function setState(ctx: Ctx, issue: Issue, to: State, why: string) {
   const from = stateOf(issue);
+  // A story from before the slug marker records it here, under the short claim.
+  const slug = kindOf(issue) === "story" ? await slugLine(ctx, issue) : null;
   await ctx.github.addLabels(issue.number, [to]);
-  await ctx.github.comment(issue.number, `psdd: ${from} → ${to} (automatic)\n\n${why}`);
+  await ctx.github.comment(issue.number, `psdd: ${from} → ${to} (automatic)\n\n${why}${slug ? `\n\n${slug}` : ""}`);
   await ctx.github.removeLabels(issue.number, stateLabels(issue, to));
 }
 
@@ -220,7 +229,8 @@ export async function promoteStory(ctx: Ctx, storyNumber: number): Promise<strin
   const slices = await github.subIssues(storyNumber);
   const story = await github.getIssue(storyNumber);
   if (story.state === "open" && slices.length && slices.every((s) => s.state === "closed") && stateOf(story) === "implementation") {
-    const branch = storyBranch(story.number, story.title);
+    const slug = await storySlug(ctx, story);
+    const branch = storyBranch(story.number, slug);
     const base = ctx.config.baseBranch;
     const moved = await withShortClaim(ctx, storyNumber, async () => {
       const pr =
@@ -229,7 +239,7 @@ export async function promoteStory(ctx: Ctx, storyNumber: number): Promise<strin
           head: branch,
           base,
           title: story.title,
-          body: `Closes #${story.number}\n\nSpec: ${specPath(story.number, story.title)}`,
+          body: `Closes #${story.number}\n\nSpec: ${specPath(story.number, slug)}`,
         }));
       await setState(ctx, story, "needs-review", `Every slice is merged into ${branch}. Story PR: #${pr.number}.`);
     });
@@ -239,11 +249,12 @@ export async function promoteStory(ctx: Ctx, storyNumber: number): Promise<strin
 }
 
 /** Precondition for finishing a merge: the slice PR is merged. */
-export async function sliceMergeRefusal(github: GitHub, slice: Issue): Promise<string[] | null> {
+export async function sliceMergeRefusal(ctx: Ctx, slice: Issue): Promise<string[] | null> {
+  const { github } = ctx;
   const storyNumber = await github.parentOf(slice.number);
   if (!storyNumber) return [`#${slice.number} is not a sub-issue of a story.`];
   const story = await github.getIssue(storyNumber);
-  const head = sliceBranch(story.number, story.title, slice.number);
+  const head = sliceBranch(story.number, await storySlug(ctx, story), slice.number);
   const pr = await github.findPullRequest(head);
   if (!pr) return [`No PR from ${head} was found. Open and merge it before running psdd done ${slice.number}.`];
   if (pr.state !== "merged") {
@@ -260,7 +271,7 @@ export async function sliceMergeRefusal(github: GitHub, slice: Issue): Promise<s
  * Throws rather than remove the worktree psdd is running in.
  */
 export async function removeWorktreeOf(ctx: Ctx, issue: Issue): Promise<string | null> {
-  const loc = await locate(issue, ctx.github, ctx.config.baseBranch);
+  const loc = await locate(issue, ctx);
   if (!loc || !(await ctx.workspace.worktreeExists(loc.worktree))) return null;
   const abs = join(ctx.workspace.root, loc.worktree);
   const cwd = ctx.workspace.cwd;
