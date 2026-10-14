@@ -41,6 +41,28 @@ Run `psdd` with no arguments for every command. Add `--json` for scripts.
 - Skills carry the craft and know nothing of psdd; the `take` briefing carries the process around them (what to read, where to commit and push, how to create slices and PRs, and which finish command each result maps to). `deliver` is the exception: it drives psdd.
 - `psdd init` copies the skills bundled in `skills/`: one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver) and the reference skills they use (`interview`, `codebase-design`, `tdd`). `codebase-design`, `tdd` and the step skills' approach are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). Set `PSDD_SKILLS_SOURCE=<repo>` to install with `npx skills add <repo>` first.
 
+### Try it in a sandbox
+
+You need Node 20+, git, Claude Code, `gh` logged in (`gh auth status`) and read access to this repository.
+
+1. Create a throwaway repository with a first commit on `main`:
+   ```sh
+   gh repo create psdd-sandbox --private --clone --add-readme && cd psdd-sandbox
+   npm init -y && echo node_modules >> .gitignore
+   ```
+2. Install psdd and set it up. `init` installs the skills into `skills/` (linked into `.claude/skills/`), creates `.agents/specs/` and `.agents/psdd.config.json`, gitignores `.agents/worktrees/` and the local config, and creates the labels on the repository.
+   ```sh
+   npm install -D github:PruszynskiJakub/ai-engine#v0.1.2
+   npx psdd init
+   git add -A && git commit -m "Set up psdd" && git push
+   ```
+3. Open an issue for something small, for example `gh issue create --title "Add a greet command" --body "Print Hello, <name>"`.
+4. Start Claude Code in the sandbox and ask: `Run psdd take <issue> and follow the briefing.` Triage, refine, clarify, plan and slice are attended: the agent prepares each call and you decide. Each step ends with the `psdd done <issue> <outcome>` the briefing gives (triage `accept`, refine `clear` or `questions`), and `psdd next <issue>` says what comes next. Slicing creates the slices as sub-issues and moves the story to implementation.
+5. Ask Claude Code: `deliver <story>`. It implements, reviews, QAs and merges the slices into the story branch in fresh subagents, then reviews the story. It stops at story QA, which is always yours, or when only items waiting for a person are left; `psdd status <story>` shows them. For a `needs-human` issue or a `mode:hil` QA, run `psdd take <issue>` with your agent and finish with the command it gives.
+6. After story QA passes, merge the story PR into `main` yourself (`gh pr merge`). The next `psdd next <story>` removes the worktrees.
+
+To start over, delete the repository: `gh repo delete psdd-sandbox --yes` (needs `gh auth refresh -s delete_repo` once).
+
 ### Develop
 
 ```sh
