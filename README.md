@@ -4,6 +4,10 @@
 
 1. **The owner of an issue is responsible for it end to end.** The owner is the issue's GitHub assignee, and an issue has exactly one assignee. Responsibility covers all related issues and PRs, including slices.
 
+## Supported agents
+
+psdd is tested on Claude Code. Other agents are supported but not tested.
+
 ## psdd
 
 CLI for the SDD process. The developer's LLM calls it to run work through the process; GitHub labels, native relations, comments and branches are the only state. See `PRD.html`.

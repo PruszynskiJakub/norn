@@ -354,6 +354,13 @@ Do not work on it. Run psdd next 123 and pick a different item.</code></pre>
   <li>An issue reaches its fix-round limit: it gets <code>needs-human</code> instead of going back to implement.</li>
 </ul>
 
+<h2 id="recommendations">Recommendations</h2>
+<p>psdd does not require these tools, but they make working with it faster.</p>
+<ul>
+  <li><strong><a href="https://herdr.dev/agent-guide.md">herdr</a>:</strong> the preferred worktree provider. Each phase runs as its own herdr agent in the worktree's pane, <code>deliver</code> waits on agents with <code>herdr agent wait</code>, and notifications show inside herdr. psdd detects it with <code>HERDR_ENV=1</code> and picks it first in <code>auto</code> mode.</li>
+  <li><strong><a href="https://ghostty.org">Ghostty</a>:</strong> the recommended terminal to run herdr and the agents in.</li>
+</ul>
+
 </main>
 </body>
 </html>
