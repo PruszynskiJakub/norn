@@ -78,7 +78,10 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
   const { github } = ctx;
   const n = issue.number;
   const from = stateOf(issue) ?? "triage";
-  const comment = [`psdd: ${from} → ${outcome.to === "not-planned" ? "closed as not planned" : outcome.to}${word ? ` (${word})` : ""}`];
+  // The resolve step has no outcome word and keeps the state; say what it did.
+  const resolved = !word && issue.labels.includes("needs-human") && !outcome.needsHuman;
+  const why = word || (resolved ? "needs-human resolved" : "");
+  const comment = [`psdd: ${from} → ${outcome.to === "not-planned" ? "closed as not planned" : outcome.to}${why ? ` (${why})` : ""}`];
   const spec = await specLink(ctx, issue);
   if (spec) comment.push("", `Spec: ${spec}`);
   // A story records its slug the first time psdd writes on it, triage included.
