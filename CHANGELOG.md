@@ -6,7 +6,7 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ### Changed
 
-- `claims.staleAfter` and `deliver.maxFixRounds` can only be set in the team config; `staleAfter` must be at least `10m`.
+- `claims.staleAfter` and `deliver.maxFixRounds` are read from the team config only. In the local config they are ignored with a warning (in `--json`, a `warnings` field), and a team `staleAfter` below `10m` is raised to `10m` with a warning. Commands still run.
 - Branch, worktree and spec names come from a slug recorded once on the story, not from its current title.
 - Spec links point at the story branch, not the local HEAD.
 

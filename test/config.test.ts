@@ -80,26 +80,54 @@ describe("configuration", () => {
   test.each([
     [{ claims: { staleAfter: "10m" } }, "claims.staleAfter"],
     [{ deliver: { maxFixRounds: 5 } }, "deliver.maxFixRounds"],
-  ])("%j in the local file is refused: it binds the whole team", async (local, key) => {
+  ])("%j in the local file is ignored with a warning: it binds the whole team", async (local, key) => {
     const w = storyIn("needs-plan");
     w.workspace.files.set(LOCAL, JSON.stringify(local));
     const res = await w.psdd("take", "123");
-    expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain(`${LOCAL}: ${key} is shared by the team; set it in ${TEAM}`);
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain(`psdd warning:\n  ${LOCAL}: ${key} is shared by the team, so psdd ignores it here; set it in ${TEAM}`);
+    expect(res.stdout).toContain("You now hold story #123");
+  });
+
+  test("a local claims.staleAfter does not change when a teammate's claim is stale", async () => {
+    const w = storyIn("needs-plan");
+    w.workspace.files.set(LOCAL, JSON.stringify({ claims: { staleAfter: "15m" } }));
+    w.setNow("2026-10-13T10:00:00Z");
+    await w.as("teammate")("take", "123");
+    w.setNow("2026-10-13T10:20:00Z");
+
+    expect((await w.psdd("take", "123")).exitCode).toBe(1);
+  });
+
+  test("with --json the warning is a field, not part of the message", async () => {
+    const w = storyIn("needs-plan");
+    w.workspace.files.set(LOCAL, JSON.stringify({ deliver: { maxFixRounds: 5 } }));
+    const body = JSON.parse((await w.psdd("status", "123", "--json")).stdout);
+    expect(body.ok).toBe(true);
+    expect(body.warnings).toEqual([`${LOCAL}: deliver.maxFixRounds is shared by the team, so psdd ignores it here; set it in ${TEAM}`]);
+    expect(body.message).not.toContain("warning");
   });
 
   test("deliver.maxParallel stays a per-developer setting", async () => {
     const w = storyIn("needs-plan");
     w.workspace.files.set(LOCAL, JSON.stringify({ deliver: { maxParallel: 4 } }));
-    expect((await w.psdd("take", "123")).exitCode).toBe(0);
+    const res = await w.psdd("take", "123");
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).not.toContain("warning");
   });
 
-  test("claims.staleAfter below 10m is refused", async () => {
+  test("claims.staleAfter below 10m is raised to 10m with a warning", async () => {
     const w = storyIn("needs-plan");
     w.workspace.files.set(TEAM, JSON.stringify({ claims: { staleAfter: "0s" } }));
-    const res = await w.psdd("take", "123");
-    expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain(`${TEAM}: claims.staleAfter must be at least 10m`);
+    w.setNow("2026-10-13T10:00:00Z");
+    const first = await w.as("teammate")("take", "123");
+    expect(first.exitCode).toBe(0);
+    expect(first.stdout).toContain(`${TEAM}: claims.staleAfter 0s is below the 10m minimum, so psdd uses 10m`);
+
+    w.setNow("2026-10-13T10:09:00Z");
+    expect((await w.psdd("take", "123")).exitCode).toBe(1);
+    w.setNow("2026-10-13T10:11:00Z");
+    expect((await w.psdd("take", "123")).exitCode).toBe(0);
   });
 
   test("a config the CLI cannot read is refused with the file and the problem", async () => {

@@ -139,7 +139,7 @@
 </ul>
 
 <h2 id="configuration">Configuration</h2>
-<p>Team settings live in a committed <code>.agents/psdd.config.json</code>. Each developer picks their worktree tool in a gitignored <code>.agents/psdd.config.local.json</code>, which wins over the team file. <code>claims.staleAfter</code> (at least <code>10m</code>) and <code>deliver.maxFixRounds</code> bind everyone's claims and rounds, so they can only be set in the team file.</p>
+<p>Team settings live in a committed <code>.agents/psdd.config.json</code>. Each developer picks their worktree tool in a gitignored <code>.agents/psdd.config.local.json</code>, which wins over the team file. <code>claims.staleAfter</code> and <code>deliver.maxFixRounds</code> bind everyone's claims and rounds, so psdd reads them from the team file only. Set in the local file, they are ignored with a warning; a team <code>staleAfter</code> below <code>10m</code> is raised to <code>10m</code> with a warning. Commands still run in both cases.</p>
 <pre><code>// .agents/psdd.config.json (committed)
 {
   "baseBranch": "main",

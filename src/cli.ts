@@ -7,7 +7,7 @@ import { computeNext, notAStory, notifyWaiting, renderNext } from "./next.js";
 import { init } from "./init.js";
 import { locate } from "./location.js";
 import { notifyNeedsHuman } from "./notify.js";
-import { loadConfig, providerRefusal } from "./config.js";
+import { loadConfig, providerRefusal, type Config } from "./config.js";
 import { status } from "./status.js";
 import { storySlug, type Slugs } from "./slug.js";
 import { hhmm, sh, specPath } from "./text.js";
@@ -38,6 +38,8 @@ export interface Result {
   exitCode: number;
   /** Facts behind the prose, printed instead of it with --json. */
   data?: Record<string, unknown>;
+  /** Configuration problems psdd worked around; printed once, before the answer. */
+  warnings?: string[];
 }
 
 const ok = (lines: string[], data?: Record<string, unknown>): Result => ({ exitCode: 0, stdout: lines.join("\n"), data });
@@ -46,9 +48,13 @@ const refuse = (lines: string[]): Result => ({ exitCode: 1, stdout: lines.join("
 export async function run(argv: string[], deps: Deps): Promise<Result> {
   const { bools } = parseArgs(argv);
   const res = await dispatch(argv, deps);
-  if (!bools.has("json")) return { exitCode: res.exitCode, stdout: res.stdout };
+  const warnings = res.warnings ?? [];
+  if (!bools.has("json")) {
+    const head = warnings.length ? ["psdd warning:", ...warnings.map((w) => `  ${w}`), ""] : [];
+    return { exitCode: res.exitCode, stdout: [...head, res.stdout].join("\n") };
+  }
   const body = res.exitCode === 0 ? { ok: true, ...res.data, message: res.stdout } : { ok: false, refusal: res.stdout };
-  return { exitCode: res.exitCode, stdout: JSON.stringify(body, null, 2) };
+  return { exitCode: res.exitCode, stdout: JSON.stringify(warnings.length ? { ...body, warnings } : body, null, 2) };
 }
 
 export const USAGE = [
@@ -111,6 +117,11 @@ async function dispatch(argv: string[], input: Deps): Promise<Result> {
   }
   const loaded = await loadConfig(input.workspace);
   if (!loaded.ok) return refuse(loaded.lines);
+  return { ...(await withConfig(cmd, rest, flags, input, loaded.config)), warnings: loaded.warnings };
+}
+
+async function withConfig(cmd: string, rest: string[], flags: Record<string, string[]>, input: Deps, config: Config): Promise<Result> {
+  const loaded = { config };
   const deps = { ...input, config: loaded.config, slugs: new Map() as Slugs };
   if (USES_WORKTREES.has(cmd)) {
     const r = providerRefusal(deps.config, deps.workspace.env);
