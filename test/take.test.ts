@@ -24,7 +24,7 @@ describe("psdd take refusals", () => {
     const w = setup();
     w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "ready-for-agent"] });
     w.setNow("2026-10-13T14:02:00Z");
-    await w.as("other-session")("take", "131");
+    await w.asTeammate("bob", "other-session")("take", "131");
     w.setNow("2026-10-13T14:30:00Z");
 
     const res = await w.psdd("take", "131");
@@ -33,6 +33,71 @@ describe("psdd take refusals", () => {
     expect(res.stdout).toContain("#131 is already held by another session (since 14:02)");
     expect(res.stdout).toContain("Do not work on it.");
     expect(w.github.claim(131)).toMatchObject({ session: "other-session" });
+  });
+});
+
+describe("taking over a stopped session of your own", () => {
+  function heldByMyOtherSession() {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-refinement"] });
+    w.setNow("2026-10-13T14:02:00Z");
+    return w;
+  }
+
+  test("a fresh claim of another session of yours is refused, with the takeover command", async () => {
+    const w = heldByMyOtherSession();
+    await w.as("stopped-session")("take", "123");
+    w.setNow("2026-10-13T14:30:00Z");
+
+    const res = await w.psdd("take", "123");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toBe(
+      [
+        "#123 is held by another session of yours (since 14:02).",
+        "If that session has stopped, take it over here: psdd take 123 --takeover",
+        "If it is still running, do not work on it.",
+      ].join("\n"),
+    );
+    expect(w.github.claim(123)).toMatchObject({ session: "stopped-session" });
+  });
+
+  test("--takeover takes it over before it goes stale, keeping its worktree", async () => {
+    const w = heldByMyOtherSession();
+    await w.as("stopped-session")("take", "123");
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
+    w.setNow("2026-10-13T14:30:00Z");
+
+    const res = await w.psdd("take", "123", "--takeover");
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain(
+      "You took #123 over from another session of yours (since 14:02); its worktree is kept with what it left. Check git status there before you start.",
+    );
+    expect(res.stdout).toContain("Invoke the skill: refine");
+    expect(w.github.claim(123)).toMatchObject({ holder: "alice", session: "session-1", since: "2026-10-13T14:30:00.000Z" });
+  });
+
+  test("--takeover does not take a teammate's claim", async () => {
+    const w = heldByMyOtherSession();
+    await w.asTeammate("bob", "bobs-session")("take", "123");
+
+    const res = await w.psdd("take", "123", "--takeover");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toBe(
+      ["#123 is held by @bob (since 14:02). --takeover only takes over your own sessions.", "Ask them to release it, or wait until the claim goes stale."].join("\n"),
+    );
+    expect(w.github.claim(123)).toMatchObject({ holder: "bob", session: "bobs-session" });
+  });
+
+  test("--takeover on an unheld issue is an ordinary take", async () => {
+    const w = heldByMyOtherSession();
+
+    const res = await w.psdd("take", "123", "--takeover");
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).not.toContain("took #123 over");
   });
 });
 
@@ -99,7 +164,7 @@ describe("the PRD's refusal", () => {
     w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
     w.github.parents.set(131, 123);
     w.setNow("2026-10-13T14:02:00Z");
-    await w.as("other")("take", "131");
+    await w.asTeammate("bob", "other")("take", "131");
 
     const res = await w.psdd("take", "131");
 

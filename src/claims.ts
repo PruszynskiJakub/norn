@@ -1,7 +1,7 @@
 import type { ClaimRecord, GitHub } from "./github.js";
 
 export type Acquire =
-  | { ok: true; tookOver?: ClaimRecord; reacquired?: boolean }
+  | { ok: true; tookOver?: ClaimRecord; ownTakeover?: boolean; reacquired?: boolean }
   | { ok: false; held: ClaimRecord | null };
 
 /**
@@ -9,9 +9,18 @@ export type Acquire =
  * creates it wins. A claim this session already holds is refreshed to a new
  * `since`, and a claim older than staleAfterMs is taken over; both only
  * while the ref still points at the commit read, so neither can overwrite a
- * claim another session took in between.
+ * claim another session took in between. With `takeover`, a fresh claim of
+ * another session of the same holder is taken over too: the person says that
+ * session has stopped.
  */
-export async function acquire(github: GitHub, n: number, record: ClaimRecord, now: Date, staleAfterMs: number): Promise<Acquire> {
+export async function acquire(
+  github: GitHub,
+  n: number,
+  record: ClaimRecord,
+  now: Date,
+  staleAfterMs: number,
+  opts: { takeover?: boolean } = {},
+): Promise<Acquire> {
   if (await github.createClaim(n, record)) return { ok: true };
   const held = await github.readClaim(n);
   if (!held) return lost(github, n, record);
@@ -19,9 +28,10 @@ export async function acquire(github: GitHub, n: number, record: ClaimRecord, no
     if (await github.replaceClaim(n, held.sha, record)) return { ok: true, reacquired: true };
     return lost(github, n, record);
   }
-  if (isStale(held, now, staleAfterMs)) {
+  const stale = isStale(held, now, staleAfterMs);
+  if (stale || (opts.takeover && held.holder === record.holder)) {
     const { sha: _sha, ...was } = held;
-    if (await github.replaceClaim(n, held.sha, record)) return { ok: true, tookOver: was };
+    if (await github.replaceClaim(n, held.sha, record)) return stale ? { ok: true, tookOver: was } : { ok: true, tookOver: was, ownTakeover: true };
     return lost(github, n, record);
   }
   return { ok: false, held: strip(held) };
