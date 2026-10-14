@@ -98,16 +98,57 @@
 <h2 id="branches-prs-and-ownership">Branches, PRs and ownership</h2>
 <p>Slices merge into the story branch, and only the story's owner merges the story into <code>main</code>.</p>
 <div class="table-wrap"><table>
-  <thead><tr><th>Level</th><th>Branch</th><th>PR targets</th><th>Who merges</th></tr></thead>
+  <thead><tr><th>Level</th><th>Branch</th><th>Worktree</th><th>PR targets</th><th>Who merges</th></tr></thead>
   <tbody>
-    <tr><td>Story</td><td>story branch</td><td><code>main</code></td><td>The story owner</td></tr>
-    <tr><td>Slice</td><td>slice branch</td><td>story branch</td><td>An agent, resolving conflicts if needed</td></tr>
+    <tr><td>Story</td><td><code>&lt;id&gt;-&lt;slug&gt;</code></td><td><code>.agents/worktrees/&lt;id&gt;-&lt;slug&gt;</code></td><td><code>main</code></td><td>The story owner</td></tr>
+    <tr><td>Slice</td><td><code>&lt;id&gt;-&lt;slug&gt;-&lt;sliceid&gt;</code></td><td><code>.agents/worktrees/&lt;id&gt;-&lt;slug&gt;-&lt;sliceid&gt;</code></td><td>story branch</td><td>An agent, resolving conflicts if needed</td></tr>
   </tbody>
 </table></div>
 <ul>
   <li>There is one PR per slice.</li>
   <li>The story owner is also the owner of all its slices.</li>
   <li>Fixes after story-level <code>changes-requested</code> or <code>qa-failed</code> are committed straight onto the story branch.</li>
+</ul>
+
+<h2 id="worktrees">Worktrees</h2>
+<p>The story and each slice have their own worktree for the life of their branch. Every phase runs in a fresh subagent with empty context, working in that worktree.</p>
+<ul>
+  <li><strong>Story worktree:</strong> refine, clarify, plan, slice, story review, story QA and story fixes run here.</li>
+  <li><strong>Slice worktree:</strong> tdd, review, QA and merge run here, each as a new subagent.</li>
+  <li><strong>psdd says where to work.</strong> The <code>take</code> briefing names the worktree path and branch. If the worktree is missing, it gives the command to create it for the tool in use.</li>
+  <li><strong>Base branch:</strong> a slice worktree starts from the story branch. The story worktree starts from <code>main</code>.</li>
+</ul>
+<div class="table-wrap"><table>
+  <thead><tr><th>Tool</th><th>Detected by (auto)</th><th>Create the worktree</th><th>New agent per phase</th></tr></thead>
+  <tbody>
+    <tr><td>herdr</td><td><code>HERDR_ENV=1</code></td><td><code>herdr worktree create --cwd &lt;repo&gt; --branch &lt;branch&gt; --base &lt;base&gt; --path &lt;worktree&gt; --no-focus</code></td><td>A new herdr agent in the worktree's pane: <code>herdr agent start &lt;name&gt; --kind claude --pane &lt;pane&gt;</code></td></tr>
+    <tr><td>Claude Code</td><td><code>CLAUDECODE=1</code></td><td><code>git worktree add &lt;worktree&gt; -b &lt;branch&gt; &lt;base&gt;</code></td><td>A new subagent told to work in the worktree path. Claude Code's built-in worktree isolation is not used</td></tr>
+    <tr><td>git</td><td>fallback</td><td><code>git worktree add &lt;worktree&gt; -b &lt;branch&gt; &lt;base&gt;</code></td><td>A new agent session started in the worktree</td></tr>
+  </tbody>
+</table></div>
+<ul>
+  <li><code>psdd init</code> adds <code>.agents/worktrees/</code> to <code>.gitignore</code>.</li>
+  <li>When a slice merges into the story branch, psdd removes its worktree (<code>herdr worktree remove</code> or <code>git worktree remove</code>). The story worktree is removed after the story merges into <code>main</code>.</li>
+  <li>Worktrees left behind by crashed sessions are cleaned up together with their stale claims.</li>
+</ul>
+
+<h2 id="configuration">Configuration</h2>
+<p>Team settings live in a committed <code>.agents/psdd.config.json</code>. Each developer picks their worktree tool in a gitignored <code>.agents/psdd.config.local.json</code>, which wins over the team file.</p>
+<pre><code>// .agents/psdd.config.json (committed)
+{
+  "baseBranch": "main",
+  "worktrees": { "provider": "auto" },
+  "claims": { "staleAfter": "2h" }
+}
+
+// .agents/psdd.config.local.json (gitignored, per developer)
+{ "worktrees": { "provider": "herdr" } }</code></pre>
+<ul>
+  <li><strong>Provider</strong> is <code>auto</code>, <code>herdr</code>, <code>claude-code</code> or <code>git</code>. <code>auto</code> uses the detection in the Worktrees table, in order: herdr first, then Claude Code, then plain git.</li>
+  <li><strong>Environment variables are a safety check.</strong> If the provider is <code>herdr</code> but <code>HERDR_ENV</code> is not set, psdd refuses and tells the agent to start from a herdr pane or switch the provider in the local file.</li>
+  <li><strong>Labels are fixed</strong> and not configurable, so every repo in the organisation works the same way.</li>
+  <li><code>psdd init</code> creates the team file with defaults and adds the local file to <code>.gitignore</code>.</li>
+  <li><strong>The worktree location is fixed</strong> at <code>.agents/worktrees/</code>, like the labels.</li>
 </ul>
 
 <h2 id="concurrency-git-ref-claims">Concurrency: git-ref claims</h2>
@@ -157,9 +198,9 @@ release:  gh api -X DELETE repos/:owner/:repo/git/refs/psdd/claims/&lt;issue&gt;
 <h2 id="sessions">Sessions</h2>
 <p>A session always works on one declared story. An unattended session is, for example, a Claude Code session whose main agent hands out next actions to subagents.</p>
 <ol>
-  <li>The main agent asks psdd for every actionable item on the story, each with its skill.</li>
-  <li>It starts a subagent per item. Unblocked slices run in parallel.</li>
-  <li>Each subagent claims its issue, follows the skill, and asks psdd to make the transition.</li>
+  <li>The main agent asks psdd for every actionable item on the story, each with its skill and worktree.</li>
+  <li>It starts a fresh subagent per item, in that item's worktree (under herdr, a new herdr agent in the worktree's pane). Unblocked slices run in parallel.</li>
+  <li>Each subagent claims its issue, follows the skill, and asks psdd to make the transition. The next phase gets a new subagent.</li>
   <li>When a <code>mode:hil</code> slice reaches <code>needs-qa</code>, the session sets <code>needs-human</code> and carries on with other slices that aren't blocked by it.</li>
   <li>A human records the QA result through their agent, which calls psdd.</li>
 </ol>
@@ -226,6 +267,10 @@ Waiting, nothing to do for you:
 <p><strong><code>psdd take 123</code></strong> (story in needs-refinement)</p>
 <pre><code>You now hold story #123 "Rate limiting". Its step is refinement. This step
 is attended: the user takes part, and you do not decide on your own.
+
+Work in: .agents/worktrees/123-rate-limiting (branch 123-rate-limiting)
+It does not exist yet. Create it first:
+  git worktree add .agents/worktrees/123-rate-limiting -b 123-rate-limiting main
 
 Invoke the skill: refine
 Spec to work on: .agents/specs/123-rate-limiting/spec.md
