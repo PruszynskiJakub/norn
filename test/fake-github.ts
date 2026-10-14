@@ -4,7 +4,6 @@ export class FakeGitHub implements GitHub {
   issues = new Map<number, Issue>();
   claims = new Map<number, ClaimRecord>();
   commentsByIssue = new Map<number, string[]>();
-  labelEvents = new Map<number, string[]>();
   parents = new Map<number, number>();
   blockers = new Map<number, number[]>();
   branches = new Set<string>(["main"]);
@@ -57,10 +56,6 @@ export class FakeGitHub implements GitHub {
   async addLabels(n: number, labels: string[]) {
     const i = this.mustGet(n);
     for (const l of labels) if (!i.labels.includes(l)) i.labels.push(l);
-    this.labelEvents.set(n, [...(this.labelEvents.get(n) ?? []), ...labels]);
-  }
-  async labelHistory(n: number) {
-    return [...(this.labelEvents.get(n) ?? [])];
   }
   async removeLabels(n: number, labels: string[]) {
     const i = this.mustGet(n);

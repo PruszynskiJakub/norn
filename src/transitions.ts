@@ -1,7 +1,7 @@
 import { join, sep } from "node:path";
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
-import { kindOf, stateOf, type Outcome, type State } from "./machine.js";
+import { FIX_STATES, kindOf, stateOf, type Outcome, type State } from "./machine.js";
 import { locate } from "./location.js";
 import { sliceBranch, specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
@@ -23,6 +23,32 @@ export async function needsHumanReason(github: GitHub, n: number): Promise<strin
     if (line) return line.slice(NEEDS_HUMAN_MARK.length);
   }
   return null;
+}
+
+export function fixLimitReason(max: number) {
+  return `(${max} fix rounds reached)`;
+}
+
+const FIX_LIMIT = new RegExp(`^${NEEDS_HUMAN_MARK}.*\\(\\d+ fix rounds reached\\)$`, "m");
+const TRANSITION = /^psdd: (\S+) → (\S+)/;
+
+/**
+ * Fix rounds that count toward the limit, read from psdd's transition comments:
+ * entries into a fix state from another state, since the last time the limit
+ * escalated. A person resolving that escalation so starts a fresh budget; the
+ * needs-human of QA in mode:hil does not reset it.
+ */
+export function fixRounds(comments: string[]): number {
+  let rounds = 0;
+  for (const body of comments) {
+    if (FIX_LIMIT.test(body)) {
+      rounds = 0;
+      continue;
+    }
+    const m = TRANSITION.exec(body);
+    if (m && m[1] !== m[2] && FIX_STATES.includes(m[2] as State)) rounds++;
+  }
+  return rounds;
 }
 
 export interface Ctx {

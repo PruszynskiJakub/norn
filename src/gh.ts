@@ -108,10 +108,6 @@ export class GhGitHub implements GitHub {
       }
     }
   }
-  async labelHistory(n: number) {
-    const events = await this.paginate<{ event: string; label?: { name: string } }>(`${REPO}/issues/${n}/events`);
-    return events.filter((e) => e.event === "labeled" && e.label).map((e) => e.label!.name);
-  }
   async assign(n: number, users: string[]) {
     await this.api("POST", `${REPO}/issues/${n}/assignees`, { assignees: users });
   }
