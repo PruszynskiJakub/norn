@@ -73,7 +73,7 @@ describe("psdd next", () => {
     const res = await w.psdd("next", "123");
 
     expect(res.stdout).toContain('Story #123 "Rate limiting" is in needs-refinement.');
-    expect(res.stdout).toContain("You can start 1 item now, in its own fresh subagent");
+    expect(res.stdout).toContain("You can start 1 item now, with the user:");
     expect(res.stdout).toContain("refinement (attended: the user takes part)");
     expect(res.stdout).toContain("Start it with: psdd take 123");
   });
@@ -171,6 +171,39 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     expect(res.stdout).toContain("    Start an agent: herdr agent start psdd-131 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-131>");
     const s128 = res.stdout.slice(res.stdout.indexOf("#128"), res.stdout.indexOf("#127"));
     expect(s128).not.toContain("Create the worktree");
+  });
+
+  test("herdr: an attended step is handed to an agent in the worktree, which drives the story", async () => {
+    const w = setup();
+    w.workspace.env = { HERDR_ENV: "1" };
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-refinement"] });
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toContain("    Create the worktree: ");
+    expect(res.stdout).toContain(
+      [
+        "    Hand the story to an agent in its worktree, which drives it on with the user:",
+        "      herdr agent start psdd-123 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting>",
+        '      herdr agent prompt psdd-123 "drive 123"',
+        "      herdr agent focus psdd-123",
+      ].join("\n"),
+    );
+    expect(res.stdout).not.toContain("Start an agent:");
+  });
+
+  test("herdr: inside the worktree, an attended step is taken in this session", async () => {
+    const w = setup();
+    w.workspace.env = { HERDR_ENV: "1" };
+    w.workspace.cwd = "/repo/.agents/worktrees/123-rate-limiting";
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toContain("    You are in its worktree: take it in this session.");
+    expect(res.stdout).not.toContain("herdr agent");
+    expect(JSON.parse((await w.psdd("next", "123", "--json")).stdout).start[0]).toMatchObject({ issue: 123, here: true });
   });
 
   test("plain git: a new agent session started in the worktree", async () => {

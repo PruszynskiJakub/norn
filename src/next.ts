@@ -2,7 +2,7 @@ import { isStale } from "./claims.js";
 import { send } from "./notify.js";
 import { join } from "node:path";
 import { branchAt, checkedOutElsewhere, createWorktreeCommand, locate } from "./location.js";
-import type { Provider } from "./workspace.js";
+import { isWithin, type Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
 import { STATES, ambiguousStates, kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
 import { storySlug } from "./slug.js";
@@ -34,6 +34,8 @@ export interface StartItem {
   createWorktree: string | null;
   /** Under herdr, where the item's branch is checked out instead, so no worktree can be made for it. */
   checkedOutAt: string | null;
+  /** psdd runs inside the item's worktree, so this session can take it here. */
+  here: boolean;
   /** Under plain git, the PSDD_SESSION to start the item's agent with, unique per listing, so each agent is its own session. */
   session: string | null;
 }
@@ -199,6 +201,7 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     return;
   }
   const loc = await locate(issue, ctx);
+  const here = loc !== null && isWithin(ctx.workspace.cwd, join(ctx.workspace.root, loc.worktree));
   let createWorktree: string | null = null;
   let checkedOutAt: string | null = null;
   // Under herdr and plain git the agent starts in the worktree, so it is made first; a Claude Code subagent makes it from its briefing.
@@ -214,6 +217,7 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     worktree: loc ? join(ctx.workspace.root, loc.worktree) : null,
     createWorktree,
     checkedOutAt,
+    here,
     // Fresh for every agent: a new agent on an item whose claim went stale must not pass for the old holder.
     session: ctx.config.provider === "git" ? `psdd-${n}-${ctx.nonce()}` : null,
     kind: kindOf(issue) === "slice" ? "slice" : "story",
@@ -258,6 +262,8 @@ export function renderNext(r: NextReport): string {
     out.push(`Nothing can be started now. Wait for the running items to finish, then run psdd next ${r.story} again.`);
   }
   else {
+    // Attended steps are done with the user, not by a fresh agent of their own.
+    const attendedOnly = r.start.every((s) => s.attended);
     const count = `You can start ${r.start.length} item${r.start.length === 1 ? "" : "s"} now`;
     const agent = {
       herdr: "each as a new herdr agent in the item's worktree pane:",
@@ -265,7 +271,9 @@ export function renderNext(r: NextReport): string {
       git: "each in a new agent session started in the item's worktree:",
     }[r.provider];
     out.push(
-      r.start.length === 1
+      attendedOnly
+        ? `${count}, with the user:`
+        : r.start.length === 1
         ? `${count}, ${agent.replace(/^each /, "")}`
         : wrap(`${count}. They are independent, so run them in parallel, at most ${r.maxParallel} at a time, ${agent}`),
       "",
@@ -281,7 +289,18 @@ export function renderNext(r: NextReport): string {
       if (s.createWorktree) out.push(`    Create the worktree: ${s.createWorktree}`);
       if (s.checkedOutAt && s.branch) out.push(`    ${checkedOutElsewhere(s.branch, s.checkedOutAt)}`);
       if (r.provider === "herdr" && s.worktree) {
-        out.push(`    Start an agent: herdr agent start psdd-${s.issue} --kind claude --pane <pane of ${s.worktree}>`);
+        const start = `herdr agent start psdd-${s.issue} --kind claude --pane <pane of ${s.worktree}>`;
+        if (!s.attended) out.push(`    Start an agent: ${start}`);
+        else if (s.here) out.push("    You are in its worktree: take it in this session.");
+        else {
+          // An attended step needs the user, so the new agent drives the story from its worktree and this session stops.
+          out.push(
+            "    Hand the story to an agent in its worktree, which drives it on with the user:",
+            `      ${start}`,
+            `      herdr agent prompt psdd-${s.issue} "drive ${r.story}"`,
+            `      herdr agent focus psdd-${s.issue}`,
+          );
+        }
       }
       if (s.session && s.worktree) out.push(`    Start an agent in ${s.worktree} with PSDD_SESSION=${s.session} set.`);
       out.push(`    Start it with: ${s.command}`);
@@ -291,7 +310,7 @@ export function renderNext(r: NextReport): string {
     out.push("", "Waiting, nothing to do for you:");
     for (const w of r.waiting) out.push(waitLine(w));
   }
-  if (r.start.length) out.push("", `Each phase gets a new agent. When an item is done, run psdd next ${r.story} again.`);
+  if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. When an item is done, run psdd next ${r.story} again.`);
   return out.join("\n");
 }
 
