@@ -1,18 +1,17 @@
 ---
 name: refine
-description: psdd step for a story in needs-refinement; interviews the user to a shared understanding and writes the story's spec.md. Invoke when a psdd briefing names refine.
+description: Interview the user to a shared understanding of a story and write its spec: problem, solution, numbered behaviour, out of scope, open questions. Use when refining an accepted issue into a spec.
 ---
 
 # Refine
 
-Attended: the user makes every decision. Finding facts in the code is yours.
+The user makes every decision. Finding facts in the code is yours.
 
-1. **Gather context.** Read the issue with `gh issue view <issue> --comments`, triage's notes included, and explore the code it touches.
+1. **Gather context.** Read the issue and its comments, triage's findings included, and explore the code it touches.
 2. **Interview.** Invoke the `interview` skill on the story: the problem, the solution as the user sees it, the behaviour in concrete examples, and what is out of scope. A decision that needs someone not present becomes an open question naming who can answer it, and its branch closes.
-3. **Write the spec** at the path in your briefing, in the layout below. It records the decisions from the confirmed summary; no decision appears in it that the user did not make.
-4. Commit spec.md on the story branch in the story worktree and push it, so the link psdd posts resolves.
+3. **Write the spec** in the layout below. It records the decisions from the confirmed summary; no decision appears in it that the user did not make.
 
-Done when the user has confirmed the interview summary (every branch settled, or parked as an open question) and agrees the spec says what they meant. Finish with `clear` when Open questions is empty, otherwise `questions`.
+Done when the user has confirmed the interview summary (every branch settled, or parked as an open question) and agrees the spec says what they meant. The result is the spec, with Open questions empty or not.
 
 ## Spec layout
 

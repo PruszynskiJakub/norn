@@ -22,7 +22,8 @@ describe("merge-queue on a slice", () => {
     const w = storyWithSlices();
     const res = await w.psdd("take", "127");
     expect(res.stdout).toContain("Invoke the skill: merge");
-    expect(res.stdout).toContain("123-rate-limiting-127 into 123-rate-limiting");
+    expect(res.stdout).toContain("Merge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.");
+    expect(res.stdout).toContain("Then merge the PR: gh pr merge 123-rate-limiting-127 --merge");
   });
 
   test("done is refused while the slice PR is not merged", async () => {

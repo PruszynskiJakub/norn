@@ -115,6 +115,7 @@
 <ul>
   <li><strong>Story worktree:</strong> refine, clarify, plan, slice, story review, story QA and story fixes run here.</li>
   <li><strong>Slice worktree:</strong> implement, review, QA and merge run here, each as a new subagent.</li>
+  <li><strong>The briefing carries the process; skills carry the craft.</strong> Skills know nothing of psdd, labels, branches or worktrees: each ends on a result (a spec, a verdict, a breakdown). The briefing says what to read, where the work is committed and pushed, which commands create slices and PRs, and which finish command each result maps to.</li>
   <li><strong>psdd says where to work.</strong> The <code>take</code> briefing names the worktree path and branch. If the worktree is missing, it gives the command to create it for the tool in use.</li>
   <li><strong>Base branch:</strong> a slice worktree starts from the story branch. The story worktree starts from <code>main</code>. psdd makes the story branch on GitHub and slices merge there, so a new branch starts from <code>origin/&lt;base&gt;</code>, fetched first, without tracking it; a branch that exists only on GitHub is fetched and checked out with its commits; and a local branch that is also on GitHub is fast-forwarded inside the new worktree (<code>git merge --ff-only origin/&lt;branch&gt;</code>: local commits ahead of GitHub are kept, and a diverged branch gets its worktree with the failing merge as the signal). A branch already checked out in another checkout gets no create command; psdd names that checkout instead.</li>
   <li><strong>Paths are absolute</strong> and git runs as <code>git -C &lt;main checkout&gt;</code>, so the commands work from any directory, including another worktree.</li>
@@ -331,11 +332,14 @@ It does not exist yet. Create it first:
 
 Invoke the skill: refine
 Spec to work on: .agents/specs/123-rate-limiting/spec.md
+Read the issue: gh issue view 123 --comments
+Commit the spec on 123-rate-limiting and push it, so the link psdd posts resolves.
 
 When the user agrees refinement is finished, run one of:
   psdd done 123 clear       (no open questions, moves on to planning)
   psdd done 123 questions   (open questions, moves to clarification)
 
+On a long step, run psdd take 123 again now and then: it keeps your claim fresh.
 If you have to stop, run: psdd release 123</code></pre>
 
 <p><strong>A refusal</strong></p>
