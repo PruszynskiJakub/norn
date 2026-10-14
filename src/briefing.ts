@@ -1,7 +1,7 @@
 import type { Issue } from "./github.js";
 import { locate, workInLines, type Location } from "./location.js";
 import { FIX_STATES, kindOf, type State, type Step } from "./machine.js";
-import { specPath, wrap } from "./text.js";
+import { sh, specPath, wrap } from "./text.js";
 import { fixRounds, type Ctx } from "./transitions.js";
 
 export function noun(issue: Issue) {
@@ -90,7 +90,7 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
       );
     }
     if (step.skill === "implement") lines.push(...rework, `Commit the fixes straight onto the story branch ${loc.branch} and push them.`);
-    if (step.skill === "review" || step.skill === "qa") lines.push(`Story PR: ${loc.branch} into ${loc.base}. Diff: git diff origin/${loc.base}...HEAD`);
+    if (step.skill === "review" || step.skill === "qa") lines.push(`Story PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`);
     return lines;
   }
   const lines = [`Spec: ${spec} (story #${story.number})`, readIssue];
@@ -98,15 +98,16 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
     lines.push(
       ...rework,
       `Commit on ${loc.branch} and push. Open one PR from ${loc.branch} into ${loc.base} if there is none yet:`,
-      `  gh pr create --base ${loc.base} --head ${loc.branch} --title "${issue.title}" --body "Part of #${story.number}. Slice #${n}."`,
+      // The title is free text from GitHub: quoted, so a " or $(...) in it can neither break nor run anything.
+      `  gh pr create --base ${sh(loc.base)} --head ${sh(loc.branch)} --title ${sh(issue.title)} --body ${sh(`Part of #${story.number}. Slice #${n}.`)}`,
     );
   } else if (step.skill === "merge") {
     lines.push(
       `Merge origin/${loc.base} into ${loc.branch}, resolving conflicts if needed, and push.`,
-      `Then merge the PR: gh pr merge ${loc.branch} --merge`,
+      `Then merge the PR: gh pr merge ${sh(loc.branch)} --merge`,
     );
   } else {
-    lines.push(`Slice PR: ${loc.branch} into ${loc.base}. Diff: git diff origin/${loc.base}...HEAD`);
+    lines.push(`Slice PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`);
   }
   return lines;
 }

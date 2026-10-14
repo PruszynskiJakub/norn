@@ -58,7 +58,7 @@ describe("merge-queue on a slice", () => {
     const res = await w.psdd("done", "127");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain('psdd escalate 127 "slice PR #50 was merged into main, not 123-rate-limiting"');
+    expect(res.stdout).toContain("psdd escalate 127 'slice PR #50 was merged into main, not 123-rate-limiting'");
     expect(w.github.issues.get(127)!.state).toBe("open");
   });
 

@@ -1,3 +1,4 @@
+import { execFileSync } from "node:child_process";
 import { describe, expect, test } from "vitest";
 import { setup } from "./harness.js";
 
@@ -59,7 +60,23 @@ describe("take names the worktree", () => {
       "  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-131 -b 123-rate-limiting-131 origin/123-rate-limiting",
     );
     expect(res.stdout).toContain("Open one PR from 123-rate-limiting-131 into 123-rate-limiting if there is none yet:");
-    expect(res.stdout).toContain('  gh pr create --base 123-rate-limiting --head 123-rate-limiting-131 --title "Per-key limits" --body "Part of #123. Slice #131."');
+    expect(res.stdout).toContain("  gh pr create --base 123-rate-limiting --head 123-rate-limiting-131 --title 'Per-key limits' --body 'Part of #123. Slice #131.'");
+  });
+
+  test("a slice title is quoted in the printed gh pr create, so the shell takes it literally", async () => {
+    const w = setup();
+    const title = 'Handle "quoted" $(touch pwned) `id` it\'s input';
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 131, title, labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+    w.github.parents.set(131, 123);
+
+    const res = await w.psdd("take", "131");
+
+    const line = res.stdout.split("\n").find((l) => l.trim().startsWith("gh pr create"))!.trim();
+    // Run it through a real shell with printf in place of gh: each argument must come back unchanged.
+    const args = execFileSync("/bin/sh", ["-c", line.replace(/^gh pr create/, "printf '%s\\n'")], { encoding: "utf8" }).split("\n");
+    expect(args).toContain(title);
+    expect(args).toContain("Part of #123. Slice #131.");
   });
 
   test("when the branch already exists locally, the worktree is added on it without -b", async () => {

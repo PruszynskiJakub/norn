@@ -4,7 +4,7 @@ import type { GitHub, Issue } from "./github.js";
 import { FIX_STATES, STATES, kindOf, slicesOf, stateOf, type Outcome, type State } from "./machine.js";
 import { locate } from "./location.js";
 import { slugLine, storySlug, type Slugs } from "./slug.js";
-import { sliceBranch, specPath, storyBranch } from "./text.js";
+import { sh, sliceBranch, specPath, storyBranch } from "./text.js";
 import { isWithin, type Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import { notifyNeedsHuman, type Notify } from "./notify.js";
@@ -295,8 +295,8 @@ export async function sliceMergeRefusal(ctx: Ctx, slice: Issue): Promise<string[
     return [
       `PR #${pr.number} from ${head} targets ${pr.base}, not the story branch ${base}.`,
       pr.state === "merged"
-        ? `Its changes are not on ${base}, and a person must sort that out. Run: psdd escalate ${slice.number} "slice PR #${pr.number} was merged into ${pr.base}, not ${base}"`
-        : `Retarget it with: gh pr edit ${pr.number} --base ${base}, then merge it and run psdd done ${slice.number}.`,
+        ? `Its changes are not on ${base}, and a person must sort that out. Run: psdd escalate ${slice.number} ${sh(`slice PR #${pr.number} was merged into ${pr.base}, not ${base}`)}`
+        : `Retarget it with: gh pr edit ${pr.number} --base ${sh(base)}, then merge it and run psdd done ${slice.number}.`,
     ];
   }
   if (pr.state !== "merged") {
