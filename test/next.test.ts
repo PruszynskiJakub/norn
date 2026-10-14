@@ -113,7 +113,7 @@ describe("--json", () => {
     const report = JSON.parse(res.stdout);
     expect(report.slices).toEqual({ total: 7, merged: 2 });
     expect(report.start.map((s: { issue: number; skill: string }) => [s.issue, s.skill])).toEqual([
-      [131, "tdd"],
+      [131, "implement"],
       [128, "review"],
       [127, "merge"],
     ]);

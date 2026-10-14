@@ -19,11 +19,14 @@ describe("take names the worktree", () => {
         "",
         "Invoke the skill: refine",
         "Spec to work on: .agents/specs/123-rate-limiting/spec.md",
+        "Read the issue: gh issue view 123 --comments",
+        "Commit the spec on 123-rate-limiting and push it, so the link psdd posts resolves.",
         "",
         "When the user agrees refinement is finished, run one of:",
         "  psdd done 123 clear       (no open questions, moves on to planning)",
         "  psdd done 123 questions   (open questions, moves to clarification)",
         "",
+        "On a long step, run psdd take 123 again now and then: it keeps your claim fresh.",
         "If you have to stop, run: psdd release 123",
         'If something is wrong and a person is needed, run: psdd escalate 123 "reason"',
         "",
@@ -55,7 +58,8 @@ describe("take names the worktree", () => {
     expect(res.stdout).toContain(
       "  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-131 -b 123-rate-limiting-131 origin/123-rate-limiting",
     );
-    expect(res.stdout).toContain("Open one PR from 123-rate-limiting-131 into 123-rate-limiting.");
+    expect(res.stdout).toContain("Open one PR from 123-rate-limiting-131 into 123-rate-limiting if there is none yet:");
+    expect(res.stdout).toContain('  gh pr create --base 123-rate-limiting --head 123-rate-limiting-131 --title "Per-key limits" --body "Part of #123. Slice #131."');
   });
 
   test("when the branch already exists locally, the worktree is added on it without -b", async () => {
@@ -231,7 +235,7 @@ describe("worktree cleanup", () => {
 });
 
 describe("a fix round's briefing", () => {
-  test("a slice sent back by review pushes to its existing PR and is told where the requests are", async () => {
+  test("a slice sent back by review is briefed as rework, even though take relabels it implementation", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
     w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "changes-requested"] });
@@ -239,19 +243,19 @@ describe("a fix round's briefing", () => {
 
     const res = await w.psdd("take", "131");
 
-    expect(res.stdout).toContain("Push the fixes to the existing PR from 123-rate-limiting-131 into 123-rate-limiting.");
-    expect(res.stdout).toContain("The requests are in the latest psdd comment on #131.");
-    expect(res.stdout).not.toContain("Open one PR");
+    expect(w.github.labels(131)).toContain("implementation");
+    expect(res.stdout).toContain("This is rework: the latest review or QA comment on #131 lists what to fix.");
+    expect(res.stdout).toContain("Open one PR from 123-rate-limiting-131 into 123-rate-limiting if there is none yet:");
   });
 
-  test("a story that failed QA names the problems", async () => {
+  test("a story that failed QA is briefed as rework", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "qa-failed"] });
 
     const res = await w.psdd("take", "123");
 
-    expect(res.stdout).toContain("Commit the fixes straight onto the story branch 123-rate-limiting.");
-    expect(res.stdout).toContain("The problems are in the latest psdd comment on #123.");
+    expect(res.stdout).toContain("This is rework: the latest review or QA comment on #123 lists what to fix.");
+    expect(res.stdout).toContain("Commit the fixes straight onto the story branch 123-rate-limiting and push them.");
   });
 });
 

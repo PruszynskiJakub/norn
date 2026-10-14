@@ -4,6 +4,10 @@
 
 1. **The owner of an issue is responsible for it end to end.** The owner is the issue's GitHub assignee, and an issue has exactly one assignee. Responsibility covers all related issues and PRs, including slices.
 
+## Supported agents
+
+psdd is tested on Claude Code. Other agents are supported but not tested.
+
 ## psdd
 
 CLI for the SDD process. The developer's LLM calls it to run work through the process; GitHub labels, native relations, comments and branches are the only state. See `PRD.html`.
@@ -25,7 +29,8 @@ Run `psdd` with no arguments for every command. Add `--json` for scripts.
 - Once slicing is done, the `deliver` skill runs the story unattended until it needs a human. After `deliver.maxFixRounds` rounds of changes-requested or qa-failed, an issue gets needs-human instead of another round; once a person resolves it, it gets a fresh budget.
 - psdd notifies you locally whenever it sets needs-human, and when `psdd next` finds nothing left to do.
 - The session holding a claim is `PSDD_SESSION`, else `CLAUDE_CODE_SESSION_ID`, else the herdr pane (`HERDR_PANE_ID`), else host and repository root. Under the git provider, `psdd next` gives each agent its own `PSDD_SESSION` to start with. Known limit: Claude Code subagents share their parent's session id, so under the claude-code provider the deliver orchestrator and its subagents are one session; use herdr for per-agent isolation.
-- `psdd init` copies the skills bundled in `skills/`. Set `PSDD_SKILLS_SOURCE=<repo>` to install with `npx skills add <repo>` first.
+- Skills carry the craft and know nothing of psdd; the `take` briefing carries the process around them (what to read, where to commit and push, how to create slices and PRs, and which finish command each result maps to). `deliver` is the exception: it drives psdd.
+- `psdd init` copies the skills bundled in `skills/`: one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver) and the reference skills they use (`interview`, `codebase-design`, `tdd`). `codebase-design`, `tdd` and the step skills' approach are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). Set `PSDD_SKILLS_SOURCE=<repo>` to install with `npx skills add <repo>` first.
 
 ### Develop
 

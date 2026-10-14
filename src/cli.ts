@@ -270,7 +270,7 @@ async function done(n: number, word: string | undefined, note: string | undefine
     if (rounds > deps.config.maxFixRounds) {
       const max = deps.config.maxFixRounds;
       applied = { ...outcome, needsHuman: `${note ? `escalated: "${oneLine(note)}" ` : ""}${fixLimitReason(max)}` };
-      limitLines.push(`#${n} has reached ${max} fix rounds, so it now needs a human instead of another round of tdd.`);
+      limitLines.push(`#${n} has reached ${max} fix rounds, so it now needs a human instead of another round of implement.`);
     }
   }
   try {
