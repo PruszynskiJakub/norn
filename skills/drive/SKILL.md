@@ -16,14 +16,18 @@ You take the issue through psdd one step at a time, with the user. psdd says wha
    - If it lists only items that are not attended, go to step 4.
    - If it says there is nothing left that you can do, go to step 5.
    - If the item says to hand the story to an agent in its worktree, go to step 6.
-2. Run `psdd take <item>` and follow its briefing to the end: invoke the skill it names, do the step with the user, and finish with the `psdd done` command the user's decision maps to. Do not finish a step the user has not agreed is finished.
+   - If it lists an item as held by another session of yours, go to step 7 with that item.
+2. Run `psdd take <item>` and follow its briefing to the end. If take says the item is held by another session of yours, go to step 7. Otherwise: invoke the skill it names, do the step with the user, and finish with the `psdd done` command the user's decision maps to. Do not finish a step the user has not agreed is finished.
 3. Go back to step 1 with the story.
 4. The rest runs without the user. Tell them what `psdd next` lists and offer to start the deliver skill: `deliver <story>`. Start it only when they agree.
 5. Report: where the story is, what is waiting and why, and who needs to act. The reasons come from `psdd status <story>` and the "Waiting for a human" list.
-
 6. Hand over (herdr only). Create the worktree with the listed command if needed. Find its pane: `herdr worktree list --cwd <repo root>` gives the worktree's `open_workspace_id`, and `herdr pane list --workspace <id>` its pane. Run the listed `herdr agent start`, `herdr agent prompt` and `herdr agent focus` commands with that pane. Tell the user the story goes on with the agent in that workspace, and stop. The new agent runs this skill from the worktree.
+7. Pick up a stopped session. An earlier session of the user's holds the item, e.g. one they closed partway through a step. Ask the user whether that session is still running.
+   - Still running: tell them to carry on there, and stop.
+   - Stopped, and they want to go on: run `psdd take <item> --takeover` and continue as in step 2. Check `git status` in the worktree first if the briefing says to: the earlier session's work is there.
+   - Stopped, and they want to drop the step: run `psdd take <item> --takeover`, then `psdd release <item>`. The item keeps its state for whoever takes it next.
 
-Done when the user has the report, has started deliver, or the story has been handed over.
+Done when the user has the report, has started deliver, or the story has been handed over or left to a running session.
 
 ## Rules
 
@@ -31,4 +35,5 @@ Done when the user has the report, has started deliver, or the story has been ha
 - Attended steps happen in your own context with the user, not in subagents.
 - An item that needs a human is for the person it names. If that is the user and they want to resolve it now, run `psdd take <item>`; it briefs the resolve step. Otherwise leave it.
 - If the user stops partway, run `psdd release <item>` so the claim does not go stale.
+- Use `--takeover` only when the user says the other session has stopped.
 - Change state only through psdd. Labels, claims and branches belong to psdd.

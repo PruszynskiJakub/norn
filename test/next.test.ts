@@ -58,12 +58,22 @@ describe("psdd next", () => {
   test("a slice held by another session is waiting, not startable", async () => {
     const w = prdExample();
     w.setNow("2026-10-13T14:02:00Z");
-    await w.as("other")("take", "131");
+    await w.asTeammate("bob", "other")("take", "131");
 
     const res = await w.psdd("next", "123");
 
     expect(res.stdout).toContain("You can start 2 items now.");
     expect(res.stdout).toContain("  - #131 is held by another session (since 14:02).");
+  });
+
+  test("a slice held by another session of yours says so", async () => {
+    const w = prdExample();
+    w.setNow("2026-10-13T14:02:00Z");
+    await w.as("other")("take", "131");
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toContain("  - #131 is held by another session of yours (since 14:02).");
   });
 
   test("a story in phase 1 offers the story itself, marked as attended", async () => {

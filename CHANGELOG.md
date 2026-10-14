@@ -4,6 +4,10 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- `psdd take <issue> --takeover` takes over a claim held by another session of yours before it goes stale, e.g. after closing an agent partway through refinement. Without the flag, take says the claim is yours and names the command; `psdd next` lists such items as "held by another session of yours". A teammate's claim is never taken. `drive` asks whether the other session is still running and then resumes or drops the step; `deliver` never uses the flag.
+
 ### Fixed
 
 - Under herdr, an attended story step no longer leaves an empty worktree workspace while the work goes on in the main checkout. `psdd next` tells `drive` to hand the story to a new agent in the worktree's pane (`herdr agent start`, then `prompt "drive <story>"` and `focus`), and inside that worktree it says to take the step in this session. Attended items are listed as started with the user, not by a fresh agent.

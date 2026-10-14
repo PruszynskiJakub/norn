@@ -44,5 +44,17 @@ export function setup(opts: { now?: string; session?: string; user?: string } = 
     as(session: string) {
       return (...argv: string[]) => run(argv, { ...deps, session });
     },
+    /** A teammate: another GitHub user, in a session of their own. */
+    asTeammate(user: string, session: string) {
+      return async (...argv: string[]) => {
+        const me = github.user;
+        github.user = user;
+        try {
+          return await run(argv, { ...deps, session });
+        } finally {
+          github.user = me;
+        }
+      };
+    },
   };
 }

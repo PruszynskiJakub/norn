@@ -62,7 +62,8 @@ export const USAGE = [
   "",
   "  psdd init                          Set up this project: skills, .agents/specs/, labels",
   "  psdd next <story>                  What can be done on the story now",
-  "  psdd take <issue>                  Claim the issue and get the briefing for its step",
+  "  psdd take <issue> [--takeover]     Claim the issue and get the briefing for its step;",
+  "                                     --takeover takes it from a stopped session of yours",
   '  psdd done <issue> [outcome] ["note"]  Finish the step; psdd makes the transition',
   '  psdd add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
   '  psdd escalate <issue> "reason"     Set needs-human and release the claim',
@@ -105,7 +106,7 @@ export function ghFailureMessage(argv: string[], error: string): string {
 const USES_WORKTREES = new Set(["take", "next", "done"]);
 
 async function dispatch(argv: string[], input: Deps): Promise<Result> {
-  const { positionals, flags } = parseArgs(argv);
+  const { positionals, flags, bools } = parseArgs(argv);
   const [cmd, ...rest] = positionals;
   if (!cmd || !(cmd in NEEDS_NUMBER || cmd === "init")) return { exitCode: 2, stdout: USAGE };
   if (cmd in NEEDS_NUMBER && !/^\d+$/.test(rest[0] ?? "")) {
@@ -117,10 +118,10 @@ async function dispatch(argv: string[], input: Deps): Promise<Result> {
   }
   const loaded = await loadConfig(input.workspace);
   if (!loaded.ok) return refuse(loaded.lines);
-  return { ...(await withConfig(cmd, rest, flags, input, loaded.config)), warnings: loaded.warnings };
+  return { ...(await withConfig(cmd, rest, flags, bools, input, loaded.config)), warnings: loaded.warnings };
 }
 
-async function withConfig(cmd: string, rest: string[], flags: Record<string, string[]>, input: Deps, config: Config): Promise<Result> {
+async function withConfig(cmd: string, rest: string[], flags: Record<string, string[]>, bools: Set<string>, input: Deps, config: Config): Promise<Result> {
   const loaded = { config };
   const deps = { ...input, config: loaded.config, slugs: new Map() as Slugs };
   if (USES_WORKTREES.has(cmd)) {
@@ -133,7 +134,7 @@ async function withConfig(cmd: string, rest: string[], flags: Record<string, str
       return ok(lines, data);
     }
     case "take":
-      return take(Number(rest[0]), deps);
+      return take(Number(rest[0]), bools.has("takeover"), deps);
     case "done":
       return done(Number(rest[0]), rest[1], rest[2], deps);
     case "escalate":
@@ -180,17 +181,33 @@ async function noStepRefusal(issue: Issue, github: GitHub): Promise<string[]> {
   return [`#${n} (${state ?? "no state"}) has no step psdd can brief.`, pick];
 }
 
-async function take(n: number, deps: Env): Promise<Result> {
+async function take(n: number, takeover: boolean, deps: Env): Promise<Result> {
   const { github } = deps;
   const before = await github.getIssue(n);
   if (!stepFor(before) || before.state === "closed") return refuse(await noStepRefusal(before, github));
 
   const user = await github.currentUser();
-  const claim = await acquire(github, n, { holder: user, session: deps.session, since: deps.now().toISOString() }, deps.now(), deps.config.staleAfterMs);
+  const record = { holder: user, session: deps.session, since: deps.now().toISOString() };
+  const claim = await acquire(github, n, record, deps.now(), deps.config.staleAfterMs, { takeover });
   if (!claim.ok) {
+    const what = `${kindOf(before) === "slice" ? "Slice " : ""}#${n}`;
+    const since = claim.held ? hhmm(claim.held.since) : "unknown";
+    if (claim.held?.holder === user) {
+      return refuse([
+        `${what} is held by another session of yours (since ${since}).`,
+        `If that session has stopped, take it over here: psdd take ${n} --takeover`,
+        "If it is still running, do not work on it.",
+      ]);
+    }
+    if (takeover && claim.held) {
+      return refuse([
+        `${what} is held by @${claim.held.holder} (since ${since}). --takeover only takes over your own sessions.`,
+        `Ask them to release it, or wait until the claim goes stale.`,
+      ]);
+    }
     const story = kindOf(before) === "slice" ? await github.parentOf(n) : null;
     return refuse([
-      `${kindOf(before) === "slice" ? "Slice " : ""}#${n} is already held by another session (since ${claim.held ? hhmm(claim.held.since) : "unknown"}).`,
+      `${what} is already held by another session (since ${since}).`,
       `Do not work on it.${story ? ` Run psdd next ${story} and pick a different item.` : ""}`,
     ]);
   }
@@ -216,7 +233,10 @@ async function take(n: number, deps: Env): Promise<Result> {
     // The holder may only be slow, and its worktree holds its commits: keep it, never remove it here.
     const loc = await locate(issue, deps);
     const kept = loc && (await deps.workspace.worktreeExists(loc.worktree));
-    staleNote = `The previous holder's claim was stale (since ${hhmm(claim.tookOver.since)})${
+    const was = claim.ownTakeover
+      ? `You took #${n} over from another session of yours (since ${hhmm(claim.tookOver.since)})`
+      : `The previous holder's claim was stale (since ${hhmm(claim.tookOver.since)})`;
+    staleNote = `${was}${
       kept ? `; its worktree is kept with what it left. Check git status there before you start.` : "."
     }`;
   }

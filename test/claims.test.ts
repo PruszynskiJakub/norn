@@ -28,6 +28,17 @@ describe("stale-claim takeover", () => {
     expect(gh.claim(131)?.session).toBe("a");
   });
 
+  test("takeover takes a fresh claim of the same holder only", async () => {
+    const gh = new FakeGitHub("alice");
+    await gh.createClaim(131, { holder: "alice", session: "stopped", since: now.toISOString() });
+    await gh.createClaim(132, { holder: "bob", session: "running", since: now.toISOString() });
+
+    expect(await acquire(gh, 131, record("a"), now, twoHours)).toMatchObject({ ok: false });
+    expect(await acquire(gh, 131, record("a"), now, twoHours, { takeover: true })).toMatchObject({ ok: true, ownTakeover: true, tookOver: { session: "stopped" } });
+    expect(await acquire(gh, 132, record("a"), now, twoHours, { takeover: true })).toMatchObject({ ok: false, held: { holder: "bob" } });
+    expect(gh.claim(132)?.session).toBe("running");
+  });
+
   test("a stale claim is taken over and reported without its commit sha", async () => {
     const gh = new FakeGitHub("alice");
     await gh.createClaim(131, { holder: "bob", session: "crashed", since: "2026-10-13T10:00:00Z" });

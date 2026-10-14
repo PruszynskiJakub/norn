@@ -196,7 +196,8 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   if (!step) return;
   const claim = await ctx.github.readClaim(n);
   if (claim && !isStale(claim, ctx.now(), ctx.config.staleAfterMs)) {
-    const who = claim.session === ctx.session ? "this session" : "another session";
+    const who =
+      claim.session === ctx.session ? "this session" : claim.holder === (await ctx.github.currentUser()) ? "another session of yours" : "another session";
     report.waiting.push({ issue: n, reason: "held", detail: `is held by ${who} (since ${hhmm(claim.since)})` });
     return;
   }
