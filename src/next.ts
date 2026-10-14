@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { branchAt, checkedOutElsewhere, createWorktreeCommand, locate } from "./location.js";
 import type { Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
-import { kindOf, stateOf, stepFor, type State } from "./machine.js";
+import { kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
 import { storySlug } from "./slug.js";
 import { hhmm, storyBranch, wrap } from "./text.js";
 import {
@@ -89,7 +89,7 @@ async function reconcile(ctx: Ctx, storyNumber: number): Promise<string[]> {
     else if (branch.created) notes.push(`Created the story branch ${branch.branch}.`);
   }
   notes.push(...(await bestEffort("move the story on", storyNumber, () => promoteStory(ctx, storyNumber))));
-  const closed = (await github.subIssues(storyNumber)).filter((s) => s.state === "closed");
+  const closed = (await slicesOf(github, storyNumber)).filter((s) => s.state === "closed");
   if (story.state === "closed") closed.push(story);
   for (const issue of closed) {
     notes.push(...(await bestEffort(`clear the labels of #${issue.number}`, storyNumber, async () => {
@@ -119,7 +119,7 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
   await syncBlocked(ctx, storyNumber);
   const notes = await reconcile(ctx, storyNumber);
   const story = await github.getIssue(storyNumber);
-  const slices = await github.subIssues(storyNumber);
+  const slices = await slicesOf(github, storyNumber);
   const report: NextReport = {
     story: storyNumber,
     provider: ctx.config.provider,

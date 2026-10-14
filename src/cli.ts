@@ -2,7 +2,7 @@ import { parseArgs } from "./args.js";
 import { briefing, finishCommands } from "./briefing.js";
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
-import { FIX_STATES, kindOf, stateOf, stepFor, type State } from "./machine.js";
+import { FIX_STATES, kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
 import { computeNext, notAStory, notifyWaiting, renderNext } from "./next.js";
 import { init } from "./init.js";
 import { locate } from "./location.js";
@@ -245,7 +245,7 @@ async function done(n: number, word: string | undefined, note: string | undefine
   if (outcome.note && !note) {
     return refuse([`This outcome needs a ${outcome.note}. Run:`, `  psdd done ${n} ${word} "${outcome.note}"`]);
   }
-  if (kindOf(issue) === "story" && stateOf(issue) === "needs-slicing" && (await github.subIssues(n)).length === 0) {
+  if (kindOf(issue) === "story" && stateOf(issue) === "needs-slicing" && (await slicesOf(github, n)).length === 0) {
     return refuse([
       `Story #${n} has no slices yet. Create them first, one per slice, with:`,
       `  psdd add-slice ${n} "title" --mode afk|hil [--blocked-by <issue>]`,

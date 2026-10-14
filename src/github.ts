@@ -50,6 +50,7 @@ export interface GitHub {
 
   /** Native sub-issues. */
   addSubIssue(parent: number, child: number): Promise<void>;
+  /** Native sub-issues in this repository, of any kind; see slicesOf for the story's slices. */
   subIssues(parent: number): Promise<Issue[]>;
   parentOf(child: number): Promise<number | null>;
 

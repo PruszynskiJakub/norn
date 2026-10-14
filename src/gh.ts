@@ -39,6 +39,8 @@ interface RestIssue {
   state_reason?: string | null;
   labels: { name: string }[];
   assignees: { login: string }[];
+  /** API URL of the issue's repository, e.g. https://api.github.com/repos/acme/app. */
+  repository_url?: string;
 }
 
 function toIssue(r: RestIssue): Issue {
@@ -128,7 +130,11 @@ export class GhGitHub implements GitHub {
     await this.api("POST", `${REPO}/issues/${parent}/sub_issues`, { sub_issue_id: id });
   }
   async subIssues(parent: number) {
-    return (await this.paginate<RestIssue>(`${REPO}/issues/${parent}/sub_issues`)).map(toIssue);
+    // Sub-issues may live in other repositories; their numbers mean nothing here.
+    const all = await this.paginate<RestIssue>(`${REPO}/issues/${parent}/sub_issues`);
+    if (all.length === 0) return [];
+    const { url } = await this.api<{ url: string }>("GET", REPO);
+    return all.filter((r) => !r.repository_url || r.repository_url === url).map(toIssue);
   }
   async parentOf(child: number) {
     const p = await this.find<RestIssue>(`${REPO}/issues/${child}/parent`);

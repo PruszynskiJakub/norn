@@ -91,4 +91,16 @@ describe("the story branch is made before slicing ends", () => {
 
     expect(w.github.labels(123)).toContain("needs-review");
   });
+
+  test("an open sub-issue that is not a slice does not hold the story back", async () => {
+    const w = lastSliceMerged();
+    w.github.issues.get(127)!.state = "closed";
+    w.github.seedIssue({ number: 140, title: "Update docs", labels: [] });
+    w.github.parents.set(140, 123);
+
+    const res = await w.psdd("next", "123", "--json");
+
+    expect(w.github.labels(123)).toContain("needs-review");
+    expect(JSON.parse(res.stdout).slices).toEqual({ total: 2, merged: 2 });
+  });
 });

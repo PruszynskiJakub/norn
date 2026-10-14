@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
-import { FIX_STATES, STATES, kindOf, stateOf, type Outcome, type State } from "./machine.js";
+import { FIX_STATES, STATES, kindOf, slicesOf, stateOf, type Outcome, type State } from "./machine.js";
 import { locate } from "./location.js";
 import { slugLine, storySlug, type Slugs } from "./slug.js";
 import { sliceBranch, specPath, storyBranch } from "./text.js";
@@ -220,7 +220,7 @@ export async function clearClosedState(ctx: Ctx, issue: Issue): Promise<boolean>
  */
 export async function syncBlocked(ctx: Ctx, story: number): Promise<string[]> {
   const lines: string[] = [];
-  for (const slice of await ctx.github.subIssues(story)) {
+  for (const slice of await slicesOf(ctx.github, story)) {
     const state = stateOf(slice);
     if (slice.state !== "open" || (state !== "blocked" && state !== "ready-for-agent")) continue;
     const open = (await ctx.github.blockedBy(slice.number)).filter((b) => b.state === "open");
@@ -240,7 +240,7 @@ export async function syncBlocked(ctx: Ctx, story: number): Promise<string[]> {
 export async function promoteStory(ctx: Ctx, storyNumber: number): Promise<string[]> {
   const { github } = ctx;
   const lines: string[] = [];
-  const slices = await github.subIssues(storyNumber);
+  const slices = await slicesOf(github, storyNumber);
   const story = await github.getIssue(storyNumber);
   if (story.state === "open" && slices.length && slices.every((s) => s.state === "closed") && stateOf(story) === "implementation") {
     const slug = await storySlug(ctx, story);

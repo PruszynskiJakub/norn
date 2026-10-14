@@ -134,6 +134,15 @@ describe("GhGitHub paged lists", () => {
     const { exec } = scripted(() => ({ stdout: "" }));
     expect(await new GhGitHub(exec).subIssues(123)).toEqual([]);
   });
+
+  test("sub-issues from another repository are left out", async () => {
+    const issue = (number: number, repo: string) => ({ id: number, number, title: "t", state: "open", labels: [], assignees: [], repository_url: `https://api.github.com/repos/${repo}` });
+    const { exec } = scripted((c) => {
+      if (c.args.includes("--paginate")) return { stdout: [issue(131, "acme/app"), issue(7, "acme/other")].map((i) => JSON.stringify(i)).join("\n") };
+      if (path(c) === "repos/{owner}/{repo}") return { stdout: { url: "https://api.github.com/repos/acme/app" } };
+    });
+    expect((await new GhGitHub(exec).subIssues(123)).map((i) => i.number)).toEqual([131]);
+  });
 });
 
 describe("GhGitHub issues", () => {

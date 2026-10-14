@@ -1,6 +1,6 @@
 import { isStale } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
-import { stateOf } from "./machine.js";
+import { slicesOf, stateOf } from "./machine.js";
 import { storySlug, type Slugs } from "./slug.js";
 import { hhmm, storyBranch } from "./text.js";
 
@@ -19,7 +19,7 @@ interface Row {
 export async function status(ctx: { github: GitHub; slugs: Slugs }, n: number, now: Date, staleAfterMs: number) {
   const { github } = ctx;
   const story = await github.getIssue(n);
-  const slices = await github.subIssues(n);
+  const slices = await slicesOf(github, n);
   const rows: Row[] = [];
   for (const s of slices) rows.push(await row(github, s, now, staleAfterMs));
   const head = await row(github, story, now, staleAfterMs);

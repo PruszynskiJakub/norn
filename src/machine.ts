@@ -54,6 +54,11 @@ export function kindOf(issue: Issue): "story" | "slice" | "new" {
   return "new";
 }
 
+/** The story's slices: its sub-issues labelled type:slice. Anything else a person attached is not psdd's. */
+export async function slicesOf(github: { subIssues(parent: number): Promise<Issue[]> }, story: number): Promise<Issue[]> {
+  return (await github.subIssues(story)).filter((i) => kindOf(i) === "slice");
+}
+
 export function stepFor(issue: Issue): Step | null {
   const kind = kindOf(issue);
   const state = stateOf(issue);
