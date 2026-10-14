@@ -154,7 +154,7 @@ describe("next names how to start fresh agents for the worktree tool", () => {
 
     expect(res.stdout.replace(/\s+/g, " ")).toContain("each as a new herdr agent in the item's worktree pane:");
     expect(res.stdout).toContain(
-      "    Create the worktree: git -C /repo fetch origin 123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-131 --base origin/123-rate-limiting --path /repo/.agents/worktrees/123-rate-limiting-131 --no-focus",
+      "    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-131 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-131 --path /repo/.agents/worktrees/123-rate-limiting-131 --no-focus",
     );
     expect(res.stdout).toContain("    Start an agent: herdr agent start psdd-131 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-131>");
     const s128 = res.stdout.slice(res.stdout.indexOf("#128"), res.stdout.indexOf("#127"));

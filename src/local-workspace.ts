@@ -60,7 +60,7 @@ export class LocalWorkspace implements Workspace {
     const path = join(this.root, rel);
     if (provider === "herdr") {
       const list = JSON.parse(await this.must("herdr", ["worktree", "list", "--cwd", this.root])) as {
-        result: { worktrees: { path: string; open_workspace_id: string | null }[] };
+        result: { worktrees: { path: string; open_workspace_id?: string | null }[] };
       };
       const id = list.result.worktrees.find((w) => w.path === path)?.open_workspace_id;
       if (id) {

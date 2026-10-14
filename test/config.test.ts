@@ -29,7 +29,7 @@ describe("configuration", () => {
     const res = await w.psdd("take", "123");
 
     expect(res.stdout).toContain(
-      "  git -C /repo fetch origin main && herdr worktree create --cwd /repo --branch 123-rate-limiting --base origin/main --path /repo/.agents/worktrees/123-rate-limiting --no-focus",
+      "  git -C /repo fetch origin main && git -C /repo branch --no-track 123-rate-limiting origin/main && herdr worktree create --cwd /repo --branch 123-rate-limiting --path /repo/.agents/worktrees/123-rate-limiting --no-focus",
     );
   });
 
