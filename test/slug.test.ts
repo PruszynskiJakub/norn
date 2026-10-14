@@ -78,4 +78,26 @@ describe("a story's names come from the slug psdd recorded, not its live title",
 
     expect(reads).toBe(1);
   });
+
+  test("a title with no ASCII letters or digits records its empty slug once, not on every comment", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "日本語 — ✨" });
+    await w.psdd("take", "123");
+    await w.psdd("done", "123", "accept");
+    await w.psdd("take", "123");
+    await w.psdd("done", "123", "clear");
+
+    const marked = w.github.comments(123).filter((c) => c.split("\n").some((l) => l.trimEnd() === "psdd: slug"));
+    expect(marked).toHaveLength(1);
+  });
+
+  test("a slug marker whose trailing space GitHub dropped still counts as recorded", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "✨", labels: ["type:story", "needs-refinement"] });
+    w.github.commentsByIssue.set(123, ["psdd: triage → needs-refinement (accept)\n\npsdd: slug"]);
+    await w.psdd("take", "123");
+    await w.psdd("done", "123", "clear");
+
+    expect(w.github.comments(123).at(-1)).not.toContain("psdd: slug");
+  });
 });

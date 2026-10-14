@@ -21,8 +21,9 @@ async function recorded(ctx: SlugCtx, n: number): Promise<string | null> {
   if (ctx.slugs.has(n)) return ctx.slugs.get(n)!;
   let slug: string | null = null;
   for (const body of await ctx.github.listComments(n)) {
-    const line = body.split("\n").find((l) => l.startsWith(SLUG_MARK));
-    if (line) slug = line.slice(SLUG_MARK.length).trim();
+    // An empty slug leaves "psdd: slug" with nothing after it, and GitHub may drop the trailing space.
+    const line = body.split("\n").find((l) => l.startsWith(SLUG_MARK) || l === SLUG_MARK.trimEnd());
+    if (line !== undefined) slug = line.slice(SLUG_MARK.length).trim();
   }
   ctx.slugs.set(n, slug);
   return slug;
@@ -38,7 +39,8 @@ export async function storySlug(ctx: SlugCtx, story: Issue): Promise<string> {
  * its claim, or null when the slug is already recorded.
  */
 export async function slugLine(ctx: SlugCtx, story: Issue): Promise<string | null> {
-  if (await recorded(ctx, story.number)) return null;
+  // An empty slug is still a recorded one: a title with no letters or digits slugifies to "".
+  if ((await recorded(ctx, story.number)) !== null) return null;
   const slug = slugify(story.title);
   ctx.slugs.set(story.number, slug);
   return `${SLUG_MARK}${slug}`;
