@@ -4,6 +4,8 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-10-15
+
 ### Changed
 
 - Under herdr, an item waiting for a person (`needs-human-qa` or `needs-human`) is done in its own worktree's pane, like every other step. `psdd next` lists, with the item, how to hand it to an agent there if the user does it now (`herdr agent start`, `prompt "drive <item>"`, `focus`), or, inside that worktree, to take it in this session; `--json` carries the item's `worktree` and `here`. `drive` follows it instead of taking the item in the pane it was started from. Delivery still stops on these items, and other worktree providers are unchanged.
@@ -110,7 +112,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.1...v0.2.2
