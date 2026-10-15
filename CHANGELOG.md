@@ -7,6 +7,9 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 ### Changed
 
 - Under herdr, an item waiting for a person (`needs-human-qa` or `needs-human`) is done in its own worktree's pane, like every other step. `psdd next` lists, with the item, how to hand it to an agent there if the user does it now (`herdr agent start`, `prompt "drive <item>"`, `focus`), or, inside that worktree, to take it in this session; `--json` carries the item's `worktree` and `here`. `drive` follows it instead of taking the item in the pane it was started from. Delivery still stops on these items, and other worktree providers are unchanged.
+- An item for a person that a session holds is listed by `psdd next` as held by it (`heldBy` in `--json`), with no hand-off, so no second agent is sent to it. When only such work is left, delivery stops without notifying the user about it; items no one holds are still notified.
+- `psdd next` counts your agents already running on the story against `deliver.maxParallel` and offers only the free slots (`running` and `slots` in `--json`). At the limit it lists the ready items and says to wait. A teammate's agents and a person's work do not count.
+- `deliver` goes on with its loop after the user runs `drive` in the same session, and `drive` does not offer `deliver` again from a session already running it.
 
 ## [0.3.0] - 2026-10-15
 

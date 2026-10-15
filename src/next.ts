@@ -49,6 +49,10 @@ export interface WaitItem {
   createWorktree?: string | null;
   checkedOutAt?: string | null;
   here?: boolean;
+  /** An item for a person that a session holds: who, and since when. No hand-off is offered for it. */
+  heldBy?: string;
+  /** Held by one of the user's own sessions: an agent of theirs at work, using a parallel slot. */
+  mine?: boolean;
 }
 
 export interface NextReport {
@@ -66,8 +70,11 @@ export interface NextReport {
   /** The story is closed: merged, or closed as not planned. Nothing waits for anyone. */
   closed: boolean;
   notPlanned: boolean;
-  /** Notifications are on, so the user has been told what waits for them. */
+  /** Notifications are on and something no one holds waits for a person, so the user has been told. */
   notified: boolean;
+  /** The user's agents at work on the story, and how many more may start under deliver.maxParallel. */
+  running: number;
+  slots: number;
   start: StartItem[];
   waiting: WaitItem[];
 }
@@ -138,6 +145,8 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
     closed: story.state === "closed",
     notPlanned: story.stateReason === "not_planned",
     notified: ctx.config.notifications !== null,
+    running: 0,
+    slots: ctx.config.maxParallel,
   };
   if (report.closed) {
     report.nothingLeft = true;
@@ -158,6 +167,10 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
     await classify(ctx, issue, report);
   }
   report.nothingLeft = report.start.length === 0 && !report.waiting.some((w) => w.reason === "held");
+  report.running = report.waiting.filter((w) => w.mine).length;
+  report.slots = Math.max(0, ctx.config.maxParallel - report.running);
+  // A person already at work on everything waiting for one needs no notice.
+  report.notified &&= toNotify(report).length > 0 || !report.waiting.some((w) => w.heldBy);
   return report;
 }
 
@@ -171,12 +184,12 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   }
   if (issue.labels.includes("needs-human")) {
     const why = (await needsHumanReason(ctx.github, n)) ?? "see its latest comment";
-    report.waiting.push({ issue: n, reason: "needs-human", detail: why, ...(await humanPlace(ctx, issue)) });
+    report.waiting.push({ issue: n, reason: "needs-human", detail: why, ...(await humanWork(ctx, issue)) });
     return;
   }
   // The state itself says a person is needed; their agent takes it with them.
   if (state === "needs-human-qa") {
-    report.waiting.push({ issue: n, reason: "human-qa", detail: humanQaReason(issue), ...(await humanPlace(ctx, issue)) });
+    report.waiting.push({ issue: n, reason: "human-qa", detail: humanQaReason(issue), ...(await humanWork(ctx, issue)) });
     return;
   }
   if (!state) {
@@ -191,11 +204,9 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   }
   const step = stepFor(issue);
   if (!step) return;
-  const claim = await ctx.github.readClaim(n);
-  if (claim && !isStale(claim, ctx.now(), ctx.config.staleAfterMs)) {
-    const who =
-      claim.session === ctx.session ? "this session" : claim.holder === (await ctx.github.currentUser()) ? "another session of yours" : "another session";
-    report.waiting.push({ issue: n, reason: "held", detail: `is held by ${who} (since ${hhmm(claim.since)})` });
+  const held = await heldBy(ctx, n);
+  if (held) {
+    report.waiting.push({ issue: n, reason: "held", detail: `is held by ${held.who}`, mine: held.mine });
     return;
   }
   const { loc, worktree, createWorktree, checkedOutAt, here } = await place(ctx, issue);
@@ -235,8 +246,22 @@ async function place(ctx: Ctx, issue: Issue) {
   return { loc, worktree, createWorktree, checkedOutAt, here };
 }
 
-/** Under herdr, a person does their item in its worktree's pane, like every other step; elsewhere it is done where they are. */
-async function humanPlace(ctx: Ctx, issue: Issue): Promise<Partial<WaitItem>> {
+/** The live claim on an item: which session holds it, and whether it is one of the user's. */
+async function heldBy(ctx: Ctx, n: number) {
+  const claim = await ctx.github.readClaim(n);
+  if (!claim || isStale(claim, ctx.now(), ctx.config.staleAfterMs)) return null;
+  const mine = claim.holder === (await ctx.github.currentUser());
+  const who = claim.session === ctx.session ? "this session" : mine ? "another session of yours" : "another session";
+  return { who: `${who} (since ${hhmm(claim.since)})`, mine };
+}
+
+/**
+ * Where a person does their item: held by a session, it is being done there.
+ * Otherwise, under herdr, in its worktree's pane, like every other step; elsewhere where they are.
+ */
+async function humanWork(ctx: Ctx, issue: Issue): Promise<Partial<WaitItem>> {
+  const held = await heldBy(ctx, issue.number);
+  if (held) return { heldBy: held.who };
   if (ctx.config.provider !== "herdr") return {};
   const { loc, worktree, createWorktree, checkedOutAt, here } = await place(ctx, issue);
   return { branch: loc?.branch ?? null, worktree, createWorktree, checkedOutAt, here };
@@ -244,7 +269,7 @@ async function humanPlace(ctx: Ctx, issue: Issue): Promise<Partial<WaitItem>> {
 
 /** How the user does an item for a person now: here, or with an agent in its worktree's pane. */
 function humanHandOff(w: WaitItem): string[] {
-  if (!w.worktree) return [];
+  if (!w.worktree || w.heldBy) return [];
   if (w.here) return ["    You are in its worktree: if the user does it now, take it in this session."];
   if (w.checkedOutAt && w.branch) return [`    ${checkedOutElsewhere(w.branch, w.checkedOutAt)}`];
   return [
@@ -256,11 +281,16 @@ function humanHandOff(w: WaitItem): string[] {
   ];
 }
 
+/** What waits for a person, and who holds it if a session does. */
+function humanDetail(w: WaitItem) {
+  return `${w.detail}${w.heldBy ? `, held by ${w.heldBy}` : ""}`;
+}
+
 function waitLine(w: WaitItem) {
   // Inside its worktree this session is where the user does it, so it is not told off.
   const dont = w.here ? "" : " Do not take it.";
-  if (w.reason === "needs-human") return `  - #${w.issue} needs a human: ${w.detail}.${dont}`;
-  if (w.reason === "human-qa") return `  - #${w.issue} ${w.detail}.${dont}`;
+  if (w.reason === "needs-human") return `  - #${w.issue} needs a human: ${humanDetail(w)}.${dont}`;
+  if (w.reason === "human-qa") return `  - #${w.issue} ${humanDetail(w)}.${dont}`;
   return `  - #${w.issue} ${w.detail}.`;
 }
 
@@ -271,10 +301,15 @@ function renderNothingLeft(r: NextReport): string {
   const human = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));
   const blocked = r.waiting.filter((w) => w.reason === "blocked");
   const out = [...r.notes, `Story #${r.story} "${r.title}": nothing left that you can do.`];
-  if (human.length) out.push("Waiting for a human:", ...human.flatMap((w) => [`  - #${w.issue} ${w.detail}.`, ...humanHandOff(w)]));
+  if (human.length) out.push("Waiting for a human:", ...human.flatMap((w) => [`  - #${w.issue} ${humanDetail(w)}.`, ...humanHandOff(w)]));
   if (blocked.length) out.push("Blocked until then:", ...blocked.map(waitLine));
   out.push(`Stop here and report to the user.${r.notified ? " psdd has already notified them." : ""}`);
   return out.join("\n");
+}
+
+function runningNote(r: NextReport) {
+  if (!r.running) return "";
+  return ` (${r.running} of your agents ${r.running === 1 ? "is" : "are"} running, the limit is ${r.maxParallel})`;
 }
 
 export function renderNext(r: NextReport): string {
@@ -291,6 +326,14 @@ export function renderNext(r: NextReport): string {
   if (r.start.length === 0) {
     out.push(`Nothing can be started now. Wait for the running items to finish, then run psdd next ${r.story} again.`);
   }
+  else if (r.slots === 0 && r.start.every((s) => !s.attended)) {
+    const ready = `${r.start.length} item${r.start.length === 1 ? " is" : "s are"} ready`;
+    out.push(
+      wrap(`${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run psdd next ${r.story} again.`),
+      "",
+      ...r.start.map((s) => `  - ${s.kind === "slice" ? "Slice" : "Story"} #${s.issue} "${s.title}" ${DESCRIBE[s.state] ?? `is in ${s.state}`}.`),
+    );
+  }
   else {
     // Attended steps are done with the user, not by a fresh agent of their own.
     const attendedOnly = r.start.every((s) => s.attended);
@@ -305,7 +348,7 @@ export function renderNext(r: NextReport): string {
         ? `${count}, with the user:`
         : r.start.length === 1
         ? `${count}, ${agent.replace(/^each /, "")}`
-        : wrap(`${count}. They are independent, so run them in parallel, at most ${r.maxParallel} at a time, ${agent}`),
+        : wrap(`${count}. They are independent, so run them in parallel, at most ${r.slots} at a time${runningNote(r)}, ${agent}`),
       "",
     );
     for (const s of r.start) {
@@ -359,8 +402,14 @@ export async function notAStory(github: GitHub, n: number): Promise<string[] | n
 }
 
 /** Delivery stops: tell the user what waits for them. */
+/** What waits for a person that no session holds. */
+function toNotify(r: NextReport) {
+  return r.waiting.filter((w) => FOR_HUMAN.includes(w.reason) && !w.heldBy);
+}
+
 export async function notifyWaiting(ctx: Ctx, r: NextReport) {
-  const waiting = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));
+  if (!r.notified) return;
+  const waiting = toNotify(r);
   await send(ctx, {
     title: `psdd: story #${r.story} is waiting for you`,
     body: waiting.map((w) => `#${w.issue} ${w.detail}`).join("\n") || "Nothing left to do on the story.",

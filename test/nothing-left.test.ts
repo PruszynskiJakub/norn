@@ -117,3 +117,34 @@ describe("psdd next with notifications turned off", () => {
     expect(w.notifications).toEqual([]);
   });
 });
+
+describe("psdd next when only a person's work is left", () => {
+  test("says a person is on it, and does not notify them about it", async () => {
+    const w = stuckStory();
+    w.github.issues.get(131)!.state = "closed";
+    w.setNow("2026-10-13T14:02:00Z");
+    await w.as("drive")("take", "129");
+
+    const res = await w.as("orchestrator")("next", "123");
+
+    expect(res.stdout).toBe(
+      [
+        'Story #123 "Rate limiting": nothing left that you can do.',
+        "Waiting for a human:",
+        "  - #129 needs human QA (mode:hil), held by another session of yours (since 14:02).",
+        "Stop here and report to the user.",
+      ].join("\n"),
+    );
+    expect(w.notifications).toEqual([]);
+    expect(JSON.parse((await w.as("orchestrator")("next", "123", "--json")).stdout)).toMatchObject({ nothingLeft: true, notified: false });
+  });
+
+  test("still notifies about the items no one holds", async () => {
+    const w = stuckStory();
+    await w.as("drive")("take", "129");
+
+    await w.as("orchestrator")("next", "123");
+
+    expect(w.notifications.map((n) => n.body)).toEqual(['#131 escalated: "Redis client times out in tests" (3 fix rounds reached)']);
+  });
+});

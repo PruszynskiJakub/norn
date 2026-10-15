@@ -207,7 +207,7 @@ release:  gh api -X DELETE repos/:owner/:repo/git/refs/psdd/claims/&lt;issue&gt;
 <ul>
   <li><strong>Only one agent can win.</strong> Two subagents can't take the same slice, because the second ref creation fails. Checking a label first cannot guarantee that.</li>
   <li><strong>The <code>in-progress</code> label mirrors the ref.</strong> It shows the claim in GitHub. The ref is the real lock.</li>
-  <li><strong>Claims are held for the whole step,</strong> e.g. all of implement on a slice, and released when handing over to the next state.</li>
+  <li><strong>Claims are held for the whole step,</strong> e.g. all of implement on a slice, and released when handing over to the next state. A person's step is claimed too: <code>psdd next</code> lists an item waiting for a person that a session holds as "held by &lt;session&gt; (since hh:mm)", and offers no hand-off for it.</li>
   <li><strong>Stale claims.</strong> The ref points at a small commit recording holder, session ID and timestamp. psdd treats a claim older than 2 hours as abandoned and lets another session take it over. The takeover is conditional: the new claim commit is a child of the stale one and the ref moves only if it still points at the stale commit, so two sessions taking over at once cannot both win.</li>
   <li><strong>Taking over your own stopped session.</strong> <code>psdd take &lt;issue&gt; --takeover</code> takes over a claim of the same GitHub user at any age, e.g. a session closed partway through refinement, with the same conditional move and the same note to check <code>git status</code>. Without the flag, take refuses and names the command. It never takes another user's claim. Agents in <code>deliver</code> share their user, so the flag is for people, who know the other session has stopped.</li>
   <li><strong>Refreshing a claim.</strong> <code>psdd take</code> on an issue the same session already holds briefs again and moves the claim's timestamp forward (the ref is force-updated to a new claim commit). Long steps re-run it, e.g. after each implement commit, so a slow session is not taken for crashed.</li>
@@ -264,21 +264,22 @@ release:  gh api -X DELETE repos/:owner/:repo/git/refs/psdd/claims/&lt;issue&gt;
 <p><code>deliver &lt;story id&gt;</code> runs a story unattended from <code>implementation</code> until it needs a human. The user starts it once slicing is done.</p>
 <ol>
   <li>Run <code>psdd tidy</code> once at the start, then ask psdd for work: <code>psdd next &lt;story&gt;</code>.</li>
-  <li>Start a fresh subagent per actionable item in its worktree (a herdr agent under herdr), at most 2 at a time.</li>
+  <li>Start a fresh subagent per actionable item in its worktree (a herdr agent under herdr), up to the free slots <code>psdd next</code> gives (see Limits).</li>
   <li>Wait for subagents to finish (under herdr, with <code>herdr agent wait --until done|blocked</code>), then go back to step 1.</li>
   <li>When an item gets <code>needs-human</code>, psdd notifies the user (see <a href="#notifications">Notifications</a>) and the orchestrator carries on with everything not blocked by it.</li>
   <li>Once all slices are merged into the story branch, run story review and story <code>auto-qa</code> the same way, plus implement fixes if either asks for changes.</li>
-  <li>Stop when the story reaches <code>needs-human-qa</code> (always a person) or when only items waiting for a person remain. Run <code>psdd tidy</code>, then end with a report: what is done, what is waiting, and who needs to act.</li>
+  <li>Stop when the story reaches <code>needs-human-qa</code> (always a person) or when only items waiting for a person remain, also when a person is already doing them. Run <code>psdd tidy</code>, then end with a report: what is done, what is waiting, and who needs to act. Delivery does not wait on a person's work: the person's <code>drive</code> session offers <code>deliver</code> again when they finish.</li>
 </ol>
 <p><strong>Rules for the orchestrator</strong></p>
 <ul>
   <li>Never do a phase's work itself. Every phase gets a new subagent.</li>
   <li>Never touch labels, branches or PRs. Only call psdd.</li>
   <li>Never take an item flagged <code>needs-human</code> or in <code>needs-human-qa</code>.</li>
+  <li>If the user runs <code>drive</code> in the orchestrator's session, do that step with them, then go back to the loop: the <code>deliver</code> they asked for still stands. <code>drive</code> does not offer <code>deliver</code> again from a session already running it.</li>
 </ul>
 <p><strong>Limits</strong></p>
 <ul>
-  <li><strong>Parallelism:</strong> at most 2 subagents at once (<code>deliver.maxParallel</code>).</li>
+  <li><strong>Parallelism:</strong> at most 2 subagents at once (<code>deliver.maxParallel</code>). <code>psdd next</code> counts the user's agents already running on the story (items held by their sessions) and offers only the free slots: "at most 1 at a time (1 of your agents is running, the limit is 2)". At the limit it lists the ready items without start commands and says to wait for one to finish. A teammate's agents and a person's work do not count. psdd does not know which orchestrator started an agent, so two orchestrators of the same user share the limit; marking the running orchestrator is <a href="https://github.com/PruszynskiJakub/ai-engine/issues/26">issue #26</a>.</li>
   <li><strong>Fix rounds:</strong> after 3 rounds of <code>changes-requested</code> or <code>qa-failed</code> on the same issue, psdd sets <code>needs-human</code> instead of sending it back to implement (<code>deliver.maxFixRounds</code>). psdd counts rounds from the issue's label history, so it keeps no state of its own.</li>
 </ul>
 <p><strong>When nothing is left to do,</strong> <code>psdd next</code> says so explicitly:</p>
@@ -295,7 +296,7 @@ Stop here and report to the user. psdd has already notified them.</code></pre>
 <p><strong>Events (more may be added later)</strong></p>
 <ul>
   <li><strong>A person is needed:</strong> <code>needs-human</code> is set (an escalation or an issue hitting the fix-round limit), or a <code>mode:hil</code> slice or the story reaches <code>needs-human-qa</code>.</li>
-  <li><strong><code>deliver</code> stops:</strong> <code>psdd next</code> reports nothing left to do, with a summary of what is waiting.</li>
+  <li><strong><code>deliver</code> stops:</strong> <code>psdd next</code> reports nothing left to do, with a summary of what is waiting. Items a session already holds are left out; if a person is already doing everything that waits, nothing is sent.</li>
 </ul>
 <p>The title says who must act on what ("psdd: #131 needs you"). The body gives the reason and the issue link.</p>
 <p><strong>Delivery</strong> is chosen per developer in <code>.agents/psdd.config.local.json</code> with <code>"notifications"</code>:</p>
