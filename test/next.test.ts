@@ -219,6 +219,82 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     expect(JSON.parse((await w.psdd("next", "123", "--json")).stdout).start[0]).toMatchObject({ issue: 123, here: true });
   });
 
+  test("herdr: an item for a person is handed to an agent in its worktree if the user does it now", async () => {
+    const w = prdExample();
+    w.workspace.env = { HERDR_ENV: "1" };
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toContain(
+      [
+        "  - #129 needs human QA (mode:hil). Do not take it.",
+        "    If the user does it now, hand it to an agent in its worktree:",
+        "      Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-129 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-129 --path /repo/.agents/worktrees/123-rate-limiting-129 --no-focus",
+        "      herdr agent start psdd-129 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-129>",
+        '      herdr agent prompt psdd-129 "drive 129"',
+        "      herdr agent focus psdd-129",
+      ].join("\n"),
+    );
+    expect(JSON.parse((await w.psdd("next", "123", "--json")).stdout).waiting[1]).toMatchObject({
+      issue: 129,
+      reason: "human-qa",
+      worktree: "/repo/.agents/worktrees/123-rate-limiting-129",
+      here: false,
+    });
+  });
+
+  test("herdr: inside its worktree, an item for a person is taken in this session if the user does it now", async () => {
+    const w = prdExample();
+    w.workspace.env = { HERDR_ENV: "1" };
+    w.workspace.cwd = "/repo/.agents/worktrees/123-rate-limiting-129";
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting-129");
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toContain(
+      [
+        "  - #129 needs human QA (mode:hil).",
+        "    You are in its worktree: if the user does it now, take it in this session.",
+      ].join("\n"),
+    );
+    expect(res.stdout).not.toContain("herdr agent start psdd-129");
+  });
+
+  test("herdr: when nothing is left, the hand-off is listed with the item that waits for a human", async () => {
+    const w = setup();
+    w.workspace.env = { HERDR_ENV: "1" };
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "changes-requested", "needs-human"] });
+    w.github.parents.set(131, 123);
+    w.github.branches.add("123-rate-limiting");
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting-131");
+    w.github.commentsByIssue.set(131, ['psdd: needs-human — escalated: "Redis client times out in tests" (3 fix rounds reached)']);
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toContain(
+      [
+        "Waiting for a human:",
+        '  - #131 escalated: "Redis client times out in tests" (3 fix rounds reached).',
+        "    If the user does it now, hand it to an agent in its worktree:",
+        "      herdr agent start psdd-131 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-131>",
+        '      herdr agent prompt psdd-131 "drive 131"',
+        "      herdr agent focus psdd-131",
+        "Stop here and report to the user.",
+      ].join("\n"),
+    );
+  });
+
+  test("herdr: a story waiting for its owner to merge gets no hand-off", async () => {
+    const w = setup();
+    w.workspace.env = { HERDR_ENV: "1" };
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "merge-queue"], assignees: ["bob"] });
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).not.toContain("herdr agent");
+  });
+
   test("plain git: a new agent session started in the worktree", async () => {
     const w = prdExample();
     w.workspace.env = {};
