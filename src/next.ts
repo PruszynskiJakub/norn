@@ -43,6 +43,12 @@ export interface WaitItem {
   issue: number;
   reason: "blocked" | "needs-human" | "human-qa" | "held" | "owner-merge" | "no-state" | "ambiguous-state";
   detail: string;
+  /** Under herdr, an item for a person is done in its worktree's pane: these say where, as for a StartItem. */
+  branch?: string | null;
+  worktree?: string | null;
+  createWorktree?: string | null;
+  checkedOutAt?: string | null;
+  here?: boolean;
 }
 
 export interface NextReport {
@@ -165,12 +171,12 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   }
   if (issue.labels.includes("needs-human")) {
     const why = (await needsHumanReason(ctx.github, n)) ?? "see its latest comment";
-    report.waiting.push({ issue: n, reason: "needs-human", detail: why });
+    report.waiting.push({ issue: n, reason: "needs-human", detail: why, ...(await humanPlace(ctx, issue)) });
     return;
   }
   // The state itself says a person is needed; their agent takes it with them.
   if (state === "needs-human-qa") {
-    report.waiting.push({ issue: n, reason: "human-qa", detail: humanQaReason(issue) });
+    report.waiting.push({ issue: n, reason: "human-qa", detail: humanQaReason(issue), ...(await humanPlace(ctx, issue)) });
     return;
   }
   if (!state) {
@@ -192,21 +198,11 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     report.waiting.push({ issue: n, reason: "held", detail: `is held by ${who} (since ${hhmm(claim.since)})` });
     return;
   }
-  const loc = await locate(issue, ctx);
-  const here = loc !== null && isWithin(ctx.workspace.cwd, join(ctx.workspace.root, loc.worktree));
-  let createWorktree: string | null = null;
-  let checkedOutAt: string | null = null;
-  // Under herdr and plain git the agent starts in the worktree, so it is made first; a Claude Code subagent makes it from its briefing.
-  if (loc && ctx.config.provider !== "claude-code" && !(await ctx.workspace.worktreeExists(loc.worktree))) {
-    checkedOutAt = await ctx.workspace.branchCheckedOutAt(loc.branch);
-    if (!checkedOutAt) {
-      createWorktree = createWorktreeCommand(ctx.config.provider, loc, ctx.workspace.root, await branchAt(loc, ctx.workspace, ctx.github));
-    }
-  }
+  const { loc, worktree, createWorktree, checkedOutAt, here } = await place(ctx, issue);
   report.start.push({
     issue: n,
     branch: loc?.branch ?? null,
-    worktree: loc ? join(ctx.workspace.root, loc.worktree) : null,
+    worktree,
     createWorktree,
     checkedOutAt,
     here,
@@ -222,9 +218,49 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   });
 }
 
+/** Where an item is worked on: its worktree, and whether it must be made first or is checked out elsewhere. */
+async function place(ctx: Ctx, issue: Issue) {
+  const loc = await locate(issue, ctx);
+  const worktree = loc ? join(ctx.workspace.root, loc.worktree) : null;
+  const here = worktree !== null && isWithin(ctx.workspace.cwd, worktree);
+  let createWorktree: string | null = null;
+  let checkedOutAt: string | null = null;
+  // Under herdr and plain git the agent starts in the worktree, so it is made first; a Claude Code subagent makes it from its briefing.
+  if (loc && ctx.config.provider !== "claude-code" && !(await ctx.workspace.worktreeExists(loc.worktree))) {
+    checkedOutAt = await ctx.workspace.branchCheckedOutAt(loc.branch);
+    if (!checkedOutAt) {
+      createWorktree = createWorktreeCommand(ctx.config.provider, loc, ctx.workspace.root, await branchAt(loc, ctx.workspace, ctx.github));
+    }
+  }
+  return { loc, worktree, createWorktree, checkedOutAt, here };
+}
+
+/** Under herdr, a person does their item in its worktree's pane, like every other step; elsewhere it is done where they are. */
+async function humanPlace(ctx: Ctx, issue: Issue): Promise<Partial<WaitItem>> {
+  if (ctx.config.provider !== "herdr") return {};
+  const { loc, worktree, createWorktree, checkedOutAt, here } = await place(ctx, issue);
+  return { branch: loc?.branch ?? null, worktree, createWorktree, checkedOutAt, here };
+}
+
+/** How the user does an item for a person now: here, or with an agent in its worktree's pane. */
+function humanHandOff(w: WaitItem): string[] {
+  if (!w.worktree) return [];
+  if (w.here) return ["    You are in its worktree: if the user does it now, take it in this session."];
+  if (w.checkedOutAt && w.branch) return [`    ${checkedOutElsewhere(w.branch, w.checkedOutAt)}`];
+  return [
+    "    If the user does it now, hand it to an agent in its worktree:",
+    ...(w.createWorktree ? [`      Create the worktree: ${w.createWorktree}`] : []),
+    `      herdr agent start psdd-${w.issue} --kind claude --pane <pane of ${w.worktree}>`,
+    `      herdr agent prompt psdd-${w.issue} "drive ${w.issue}"`,
+    `      herdr agent focus psdd-${w.issue}`,
+  ];
+}
+
 function waitLine(w: WaitItem) {
-  if (w.reason === "needs-human") return `  - #${w.issue} needs a human: ${w.detail}. Do not take it.`;
-  if (w.reason === "human-qa") return `  - #${w.issue} ${w.detail}. Do not take it.`;
+  // Inside its worktree this session is where the user does it, so it is not told off.
+  const dont = w.here ? "" : " Do not take it.";
+  if (w.reason === "needs-human") return `  - #${w.issue} needs a human: ${w.detail}.${dont}`;
+  if (w.reason === "human-qa") return `  - #${w.issue} ${w.detail}.${dont}`;
   return `  - #${w.issue} ${w.detail}.`;
 }
 
@@ -235,7 +271,7 @@ function renderNothingLeft(r: NextReport): string {
   const human = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));
   const blocked = r.waiting.filter((w) => w.reason === "blocked");
   const out = [...r.notes, `Story #${r.story} "${r.title}": nothing left that you can do.`];
-  if (human.length) out.push("Waiting for a human:", ...human.map((w) => `  - #${w.issue} ${w.detail}.`));
+  if (human.length) out.push("Waiting for a human:", ...human.flatMap((w) => [`  - #${w.issue} ${w.detail}.`, ...humanHandOff(w)]));
   if (blocked.length) out.push("Blocked until then:", ...blocked.map(waitLine));
   out.push(`Stop here and report to the user.${r.notified ? " psdd has already notified them." : ""}`);
   return out.join("\n");
@@ -305,7 +341,7 @@ export function renderNext(r: NextReport): string {
   }
   if (r.waiting.length) {
     out.push("", "Waiting, nothing to do for you:");
-    for (const w of r.waiting) out.push(waitLine(w));
+    for (const w of r.waiting) out.push(waitLine(w), ...humanHandOff(w));
   }
   if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. When an item is done, run psdd next ${r.story} again.`);
   return out.join("\n");
