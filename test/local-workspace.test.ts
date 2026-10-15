@@ -17,6 +17,40 @@ function scripted(handler: (cmd: string, args: string[]) => { code?: number; std
 }
 
 describe("LocalWorkspace", () => {
+  test("listWorktrees gives each worktree's path and branch, detached ones without", async () => {
+    const { run } = scripted(() => ({
+      stdout: "worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo/.agents/worktrees/123-x\nHEAD def\nbranch refs/heads/123-x\n\nworktree /tmp/d\nHEAD 012\ndetached\n\n",
+    }));
+    expect(await new LocalWorkspace("/repo", {}, run).listWorktrees()).toEqual([
+      { path: "/repo", branch: "main" },
+      { path: "/repo/.agents/worktrees/123-x", branch: "123-x" },
+      { path: "/tmp/d", branch: null },
+    ]);
+  });
+
+  test("hasUnpushedCommits counts the branch's commits on no remote-tracking branch", async () => {
+    const { run, calls } = scripted((_, args) => ({ stdout: args.includes("refs/heads/ahead") ? "2\n" : "0\n" }));
+    const ws = new LocalWorkspace("/repo", {}, run);
+    expect(await ws.hasUnpushedCommits("ahead")).toBe(true);
+    expect(await ws.hasUnpushedCommits("pushed")).toBe(false);
+    expect(calls[0]).toBe("git -C /repo rev-list --count refs/heads/ahead --not --remotes");
+  });
+
+  test("readEvidence reads every file under the directory, relative to where psdd runs", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "psdd-evidence-"));
+    mkdirSync(join(cwd, "qa", "logs"), { recursive: true });
+    writeFileSync(join(cwd, "qa", "shot.png"), "png");
+    writeFileSync(join(cwd, "qa", "logs", "run.txt"), "ok");
+    const ws = new LocalWorkspace("/repo", {}, scripted(() => ({})).run, cwd);
+    const files = await ws.readEvidence("qa");
+    expect(files?.map((f) => [f.path, f.content.toString()])).toEqual([
+      ["logs/run.txt", "ok"],
+      ["shot.png", "png"],
+    ]);
+    expect(await ws.readEvidence("missing")).toBeNull();
+    expect(await ws.readEvidence("qa/shot.png")).toBeNull();
+  });
+
   test("worktreeExists looks the path up in git's worktree list", async () => {
     const { run } = scripted(() => ({
       stdout: "worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo/.agents/worktrees/123-x\nHEAD def\n",

@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { ClaimRecord, GitHub, Issue, PullRequest } from "./github.js";
+import type { ClaimRecord, FileToPush, GitHub, Issue, PullRequest } from "./github.js";
 
 export type Exec = (args: string[], input?: string) => Promise<{ code: number; stdout: string; stderr: string }>;
 
@@ -170,6 +170,35 @@ export class GhGitHub implements GitHub {
   async branchExists(name: string) {
     return (await this.find(`${REPO}/git/ref/heads/${name}`)) !== null;
   }
+  async listBranches(prefix: string) {
+    // matching-refs matches by prefix; a trailing slash is left off and checked here.
+    const refs = await this.paginate<{ ref: string }>(`${REPO}/git/matching-refs/${`heads/${prefix}`.replace(/\/+$/, "")}`);
+    return refs.map((r) => r.ref.slice("refs/heads/".length)).filter((b) => b.startsWith(prefix));
+  }
+  async deleteBranch(name: string) {
+    try {
+      await this.api("DELETE", `${REPO}/git/refs/heads/${name}`);
+    } catch (e) {
+      if (!(e instanceof GhError && (e.status === 404 || e.status === 422))) throw e;
+    }
+  }
+  async pushFiles(branch: string, files: FileToPush[], message: string) {
+    const tree: { path: string; mode: string; type: string; sha: string }[] = [];
+    for (const f of files) {
+      const blob = await this.api<{ sha: string }>("POST", `${REPO}/git/blobs`, { content: f.content.toString("base64"), encoding: "base64" });
+      tree.push({ path: f.path, mode: "100644", type: "blob", sha: blob.sha });
+    }
+    const t = await this.api<{ sha: string }>("POST", `${REPO}/git/trees`, { tree });
+    const head = await this.find<{ object: { sha: string } }>(`${REPO}/git/ref/heads/${branch}`);
+    const commit = await this.api<{ sha: string }>("POST", `${REPO}/git/commits`, {
+      message,
+      tree: t.sha,
+      parents: head ? [head.object.sha] : [],
+    });
+    if (head) await this.api("PATCH", `${REPO}/git/refs/heads/${branch}`, { sha: commit.sha, force: false });
+    else await this.api("POST", `${REPO}/git/refs`, { ref: `refs/heads/${branch}`, sha: commit.sha });
+    return commit.sha;
+  }
   async createBranch(name: string, from: string) {
     const head = await this.api<{ object: { sha: string } }>("GET", `${REPO}/git/ref/heads/${from}`);
     await this.api("POST", `${REPO}/git/refs`, { ref: `refs/heads/${name}`, sha: head.object.sha });
@@ -177,9 +206,9 @@ export class GhGitHub implements GitHub {
   async findPullRequest(head: string): Promise<PullRequest | null> {
     const out = await this.gh([
       "pr", "list", "--head", head, "--state", "all", "--limit", "1",
-      "--json", "number,headRefName,baseRefName,state,body",
+      "--json", "number,headRefName,baseRefName,state,body,headRefOid",
     ]);
-    const [pr] = JSON.parse(out) as { number: number; headRefName: string; baseRefName: string; state: string; body: string }[];
+    const [pr] = JSON.parse(out) as { number: number; headRefName: string; baseRefName: string; state: string; body: string; headRefOid?: string }[];
     if (!pr) return null;
     return {
       number: pr.number,
@@ -187,6 +216,7 @@ export class GhGitHub implements GitHub {
       base: pr.baseRefName,
       state: pr.state.toLowerCase() as PullRequest["state"],
       body: pr.body,
+      ...(pr.headRefOid ? { headSha: pr.headRefOid } : {}),
     };
   }
   async createPullRequest(input: { head: string; base: string; title: string; body: string }) {
@@ -233,6 +263,10 @@ export class GhGitHub implements GitHub {
     if (!ref) return null;
     const commit = await this.api<{ message: string }>("GET", `${REPO}/git/commits/${ref.object.sha}`);
     return { ...(JSON.parse(commit.message) as ClaimRecord), sha: ref.object.sha };
+  }
+  async listClaims() {
+    const refs = await this.paginate<{ ref: string }>(`${REPO}/git/matching-refs/psdd/claims`);
+    return refs.map((r) => /^refs\/psdd\/claims\/(\d+)$/.exec(r.ref)).filter((m) => m !== null).map((m) => Number(m[1]));
   }
   async deleteClaim(n: number) {
     try {

@@ -1,4 +1,4 @@
-import type { ClaimRecord, GitHub, Issue, PullRequest } from "../src/github.js";
+import type { ClaimRecord, FileToPush, GitHub, Issue, PullRequest } from "../src/github.js";
 
 export class FakeGitHub implements GitHub {
   issues = new Map<number, Issue>();
@@ -109,6 +109,21 @@ export class FakeGitHub implements GitHub {
   async branchExists(name: string) {
     return this.branches.has(name);
   }
+  async listBranches(prefix: string) {
+    return [...this.branches].filter((b) => b.startsWith(prefix));
+  }
+  async deleteBranch(name: string) {
+    this.branches.delete(name);
+  }
+  /** Commits pushed with pushFiles, oldest first. */
+  pushed: { branch: string; sha: string; parent: string | null; files: FileToPush[]; message: string }[] = [];
+  async pushFiles(branch: string, files: FileToPush[], message: string) {
+    const parent = this.pushed.filter((p) => p.branch === branch).at(-1)?.sha ?? null;
+    const sha = `evidence${this.pushed.length + 1}`.padEnd(40, "0");
+    this.pushed.push({ branch, sha, parent, files, message });
+    this.branches.add(branch);
+    return sha;
+  }
   async createBranch(name: string, from: string) {
     if (!this.branches.has(from)) throw new Error(`fake: no branch ${from}`);
     if (this.branches.has(name)) throw new Error(`fake: branch ${name} exists`);
@@ -145,6 +160,9 @@ export class FakeGitHub implements GitHub {
   async readClaim(n: number) {
     const claim = this.claims.get(n);
     return claim ? { ...claim, sha: this.claimShas.get(n) ?? "seeded" } : null;
+  }
+  async listClaims() {
+    return [...this.claims.keys()];
   }
   async deleteClaim(n: number) {
     this.claims.delete(n);

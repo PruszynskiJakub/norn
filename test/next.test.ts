@@ -10,7 +10,7 @@ function prdExample() {
   gh.seedIssue({ number: 126, title: "Errors", state: "closed", labels: ["type:slice", "mode:afk"] });
   gh.seedIssue({ number: 127, title: "Redis store", labels: ["type:slice", "mode:afk", "merge-queue"] });
   gh.seedIssue({ number: 128, title: "Limit headers", labels: ["type:slice", "mode:afk", "needs-review"] });
-  gh.seedIssue({ number: 129, title: "Dashboard", labels: ["type:slice", "mode:hil", "needs-qa", "needs-human"] });
+  gh.seedIssue({ number: 129, title: "Dashboard", labels: ["type:slice", "mode:hil", "needs-human-qa"] });
   gh.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
   gh.seedIssue({ number: 132, title: "Docs", labels: ["type:slice", "mode:afk", "blocked"] });
   for (const s of [125, 126, 131, 128, 127, 132, 129]) gh.parents.set(s, 123);
@@ -48,7 +48,7 @@ describe("psdd next", () => {
         "",
         "Waiting, nothing to do for you:",
         "  - #132 is blocked by #131.",
-        "  - #129 needs a human: QA in mode:hil. Do not take it.",
+        "  - #129 needs human QA (mode:hil). Do not take it.",
         "",
         "Each phase gets a new agent. When an item is done, run psdd next 123 again.",
       ].join("\n"),
@@ -129,7 +129,7 @@ describe("--json", () => {
     ]);
     expect(report.waiting.map((x: { issue: number; reason: string }) => [x.issue, x.reason])).toEqual([
       [132, "blocked"],
-      [129, "needs-human"],
+      [129, "human-qa"],
     ]);
   });
 

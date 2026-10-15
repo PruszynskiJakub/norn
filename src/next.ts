@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { branchAt, checkedOutElsewhere, createWorktreeCommand, locate } from "./location.js";
 import { isWithin, type Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
-import { STATES, ambiguousStates, kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
+import { STATES, ambiguousStates, humanQaReason, kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
 import { storySlug } from "./slug.js";
 import { hhmm, storyBranch, wrap } from "./text.js";
 import {
@@ -14,7 +14,6 @@ import {
   ensureStoryBranch,
   needsHumanReason,
   promoteStory,
-  removeWorktreeOf,
   syncBlocked,
   type Ctx,
 } from "./transitions.js";
@@ -42,7 +41,7 @@ export interface StartItem {
 
 export interface WaitItem {
   issue: number;
-  reason: "blocked" | "needs-human" | "held" | "owner-merge" | "no-state" | "ambiguous-state";
+  reason: "blocked" | "needs-human" | "human-qa" | "held" | "owner-merge" | "no-state" | "ambiguous-state";
   detail: string;
 }
 
@@ -54,7 +53,7 @@ export interface NextReport {
   state: State | null;
   branch: string;
   slices: { total: number; merged: number };
-  /** Housekeeping psdd did, e.g. a removed worktree. */
+  /** Housekeeping psdd did, e.g. closing a merged story. */
   notes: string[];
   /** Nothing can start and nothing is running: only people can move the story on, or the story is closed. */
   nothingLeft: boolean;
@@ -72,15 +71,16 @@ const DESCRIBE: Partial<Record<State, string>> = {
   implementation: "is in implementation with no one holding it",
   "needs-review": "needs review",
   "changes-requested": "has changes requested",
-  "needs-qa": "needs QA",
+  "needs-qa": "needs QA by an agent",
   "qa-failed": "failed QA",
   "merge-queue": "is in merge-queue",
 };
 
 /**
  * Catches the story up with what earlier commands left undone or could not do:
- * the story branch, moving on once every slice is merged, and removing the
- * worktrees of closed items. Returns notes on what changed or failed.
+ * the story branch, moving on once every slice is merged, closing a merged
+ * story and clearing state labels left on closed issues. Removing what closed
+ * issues leave behind is psdd tidy's. Returns notes on what changed or failed.
  */
 async function reconcile(ctx: Ctx, storyNumber: number): Promise<string[]> {
   const { github } = ctx;
@@ -105,19 +105,6 @@ async function reconcile(ctx: Ctx, storyNumber: number): Promise<string[]> {
       await clearClosedState(ctx, issue);
       return [];
     })));
-    try {
-      const r = await removeWorktreeOf(ctx, issue);
-      if (!r) continue;
-      if ("kept" in r) {
-        notes.push(`Kept ${r.kept}: it has uncommitted changes. Remove it by hand when done.`);
-        continue;
-      }
-      notes.push(issue.number === storyNumber
-        ? `Story #${storyNumber} is merged and closed. Removed its worktree ${r.removed}.`
-        : `Slice #${issue.number} is merged. Removed its worktree ${r.removed}.`);
-    } catch (e) {
-      notes.push(`Could not remove the worktree of #${issue.number}: ${(e as Error).message}`);
-    }
   }
   return notes;
 }
@@ -177,9 +164,13 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     return;
   }
   if (issue.labels.includes("needs-human")) {
-    const fallback = state === "needs-qa" ? (kindOf(issue) === "story" ? "story QA" : "QA in mode:hil") : "see its latest comment";
-    const why = (await needsHumanReason(ctx.github, n)) ?? fallback;
+    const why = (await needsHumanReason(ctx.github, n)) ?? "see its latest comment";
     report.waiting.push({ issue: n, reason: "needs-human", detail: why });
+    return;
+  }
+  // The state itself says a person is needed; their agent takes it with them.
+  if (state === "needs-human-qa") {
+    report.waiting.push({ issue: n, reason: "human-qa", detail: humanQaReason(issue) });
     return;
   }
   if (!state) {
@@ -232,11 +223,13 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
 }
 
 function waitLine(w: WaitItem) {
-  return w.reason === "needs-human" ? `  - #${w.issue} needs a human: ${w.detail}. Do not take it.` : `  - #${w.issue} ${w.detail}.`;
+  if (w.reason === "needs-human") return `  - #${w.issue} needs a human: ${w.detail}. Do not take it.`;
+  if (w.reason === "human-qa") return `  - #${w.issue} ${w.detail}. Do not take it.`;
+  return `  - #${w.issue} ${w.detail}.`;
 }
 
 /** Waiting items only a person can move on. */
-const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "owner-merge", "no-state", "ambiguous-state"];
+const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owner-merge", "no-state", "ambiguous-state"];
 
 function renderNothingLeft(r: NextReport): string {
   const human = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));

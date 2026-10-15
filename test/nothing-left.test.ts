@@ -6,11 +6,11 @@ function stuckStory() {
   const gh = w.github;
   gh.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"], assignees: ["alice"] });
   gh.seedIssue({ number: 127, title: "Redis store", state: "closed", labels: ["type:slice", "mode:afk"] });
-  gh.seedIssue({ number: 129, title: "Dashboard", labels: ["type:slice", "mode:hil", "needs-qa", "needs-human"] });
+  gh.seedIssue({ number: 129, title: "Dashboard", labels: ["type:slice", "mode:hil", "needs-human-qa"] });
   gh.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "changes-requested", "needs-human"] });
   for (const s of [127, 129, 131]) gh.parents.set(s, 123);
   gh.branches.add("123-rate-limiting");
-  gh.commentsByIssue.set(129, ["psdd: needs-review → needs-qa (approve)\n\npsdd: needs-human — QA in mode:hil"]);
+  gh.commentsByIssue.set(129, ["psdd: needs-qa → needs-human-qa (pass)"]);
   gh.commentsByIssue.set(131, [
     'psdd: needs-review → changes-requested (request-changes)\n\npsdd: needs-human — escalated: "Redis client times out in tests" (3 fix rounds reached)',
   ]);
@@ -27,7 +27,7 @@ describe("psdd next when nothing is left", () => {
       [
         'Story #123 "Rate limiting": nothing left that you can do.',
         "Waiting for a human:",
-        "  - #129 QA in mode:hil.",
+        "  - #129 needs human QA (mode:hil).",
         '  - #131 escalated: "Redis client times out in tests" (3 fix rounds reached).',
         "Stop here and report to the user. psdd has already notified them.",
       ].join("\n"),
@@ -58,13 +58,20 @@ describe("psdd next when nothing is left", () => {
     expect(res.stdout).toContain("  - #131 needs a human: escalated");
   });
 
-  test("the story reaching story QA ends delivery", async () => {
+  test("the story reaching QA by a person ends delivery", async () => {
     const w = setup();
-    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-qa", "needs-human"] });
-    w.github.commentsByIssue.set(123, ["psdd: needs-human — story QA"]);
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-human-qa"] });
     const res = await w.psdd("next", "123");
     expect(res.stdout).toContain("nothing left that you can do");
-    expect(res.stdout).toContain("  - #123 story QA.");
+    expect(res.stdout).toContain("  - #123 needs human QA (story).");
+  });
+
+  test("the story in agent QA is started like any unattended step", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-qa"] });
+    const res = await w.psdd("next", "123");
+    expect(res.stdout).toContain('  - Story #123 "Rate limiting" needs QA by an agent.');
+    expect(res.stdout).not.toContain("attended");
   });
 
   test("--json flags the end", async () => {

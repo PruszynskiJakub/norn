@@ -9,6 +9,7 @@ import { locate } from "./location.js";
 import { notifyNeedsHuman } from "./notify.js";
 import { loadConfig, providerRefusal, type Config } from "./config.js";
 import { status } from "./status.js";
+import { qaBranch, renderTidy, tidy } from "./tidy.js";
 import { storySlug, type Slugs } from "./slug.js";
 import { hhmm, sh, specPath } from "./text.js";
 import {
@@ -22,6 +23,7 @@ import {
   sliceMergeRefusal,
   stateLabels,
   type Ctx,
+  type Evidence,
 } from "./transitions.js";
 
 export type Deps = Omit<Ctx, "config" | "slugs"> & {
@@ -58,17 +60,20 @@ export async function run(argv: string[], deps: Deps): Promise<Result> {
 }
 
 export const USAGE = [
-  "psdd runs work through the SDD process. Every command takes the issue number explicitly.",
+  "psdd runs work through the SDD process. Commands on an issue take its number explicitly.",
   "",
   "  psdd init                          Set up this project: skills, .agents/specs/, labels",
   "  psdd next <story>                  What can be done on the story now",
   "  psdd take <issue> [--takeover]     Claim the issue and get the briefing for its step;",
   "                                     --takeover takes it from a stopped session of yours",
-  '  psdd done <issue> [outcome] ["note"]  Finish the step; psdd makes the transition',
+  '  psdd done <issue> [outcome] ["note"] [--evidence <dir>]',
+  "                                     Finish the step; psdd makes the transition.",
+  "                                     --evidence attaches the QA files in <dir>",
   '  psdd add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
   '  psdd escalate <issue> "reason"     Set needs-human and release the claim',
   "  psdd release <issue>               Give up the claim without a transition",
   "  psdd status <story>                Read-only overview of the story and its slices",
+  "  psdd tidy [--dry-run]              Remove what belongs to closed issues",
   "",
   "Add --json for machine-readable output.",
 ].join("\n");
@@ -76,7 +81,7 @@ export const USAGE = [
 const NEEDS_NUMBER: Record<string, string> = {
   next: "psdd next <story>",
   take: "psdd take <issue>",
-  done: 'psdd done <issue> [outcome] ["note"]',
+  done: 'psdd done <issue> [outcome] ["note"] [--evidence <dir>]',
   "add-slice": 'psdd add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
   escalate: 'psdd escalate <issue> "reason"',
   release: "psdd release <issue>",
@@ -103,12 +108,15 @@ export function ghFailureMessage(argv: string[], error: string): string {
 }
 
 /** Commands that name or touch worktrees, and so need the provider to match the environment. */
-const USES_WORKTREES = new Set(["take", "next", "done"]);
+const USES_WORKTREES = new Set(["take", "next", "done", "tidy"]);
+
+/** Commands that take no issue number. */
+const NO_NUMBER = new Set(["init", "tidy"]);
 
 async function dispatch(argv: string[], input: Deps): Promise<Result> {
   const { positionals, flags, bools } = parseArgs(argv);
   const [cmd, ...rest] = positionals;
-  if (!cmd || !(cmd in NEEDS_NUMBER || cmd === "init")) return { exitCode: 2, stdout: USAGE };
+  if (!cmd || !(cmd in NEEDS_NUMBER || NO_NUMBER.has(cmd))) return { exitCode: 2, stdout: USAGE };
   if (cmd in NEEDS_NUMBER && !/^\d+$/.test(rest[0] ?? "")) {
     return { exitCode: 2, stdout: `Give the issue number explicitly:\n  ${NEEDS_NUMBER[cmd]}` };
   }
@@ -136,7 +144,11 @@ async function withConfig(cmd: string, rest: string[], flags: Record<string, str
     case "take":
       return take(Number(rest[0]), bools.has("takeover"), deps);
     case "done":
-      return done(Number(rest[0]), rest[1], rest[2], deps);
+      return done(Number(rest[0]), rest[1], rest[2], flags["evidence"]?.[0], deps);
+    case "tidy": {
+      const report = await tidy(deps, bools.has("dry-run"));
+      return ok([renderTidy(report)], { ...report });
+    }
     case "escalate":
       return escalate(Number(rest[0]), rest[1], deps);
     case "release":
@@ -263,7 +275,7 @@ async function checkHeld(n: number, deps: Env): Promise<Result | null> {
   return null;
 }
 
-async function done(n: number, word: string | undefined, note: string | undefined, deps: Env): Promise<Result> {
+async function done(n: number, word: string | undefined, note: string | undefined, evidenceDir: string | undefined, deps: Env): Promise<Result> {
   const { github } = deps;
   const notHeld = await checkHeld(n, deps);
   if (notHeld) return notHeld;
@@ -276,7 +288,10 @@ async function done(n: number, word: string | undefined, note: string | undefine
     return refuse([head, "Finish with one of:", ...finishCommands(n, step)]);
   }
   if (outcome.note && !note) {
-    return refuse([`This outcome needs a ${outcome.note}. Run:`, `  psdd done ${n} ${word} "${outcome.note}"`]);
+    return refuse([`This outcome needs a ${outcome.note}. Run:`, `  psdd done ${n} ${word} "${outcome.note}"${step.evidence ? " [--evidence <dir>]" : ""}`]);
+  }
+  if (evidenceDir !== undefined && !step.evidence) {
+    return refuse([`--evidence is for QA steps; ${step.name} takes none. Finish without it:`, ...finishCommands(n, step)]);
   }
   if (kindOf(issue) === "story" && stateOf(issue) === "needs-slicing" && (await slicesOf(github, n)).length === 0) {
     return refuse([
@@ -295,6 +310,24 @@ async function done(n: number, word: string | undefined, note: string | undefine
     if (branch.created) preLines.push(`Created the story branch ${branch.branch}.`);
   }
 
+  let evidence: Evidence | undefined;
+  if (evidenceDir !== undefined) {
+    const files = await deps.workspace.readEvidence(evidenceDir);
+    if (!files) return refuse([`${evidenceDir} is not a directory. Put the evidence files in a directory and pass its path to --evidence.`]);
+    if (!files.length) return refuse([`${evidenceDir} is empty. Put the evidence files in it, or finish without --evidence.`]);
+    const big = files.filter((f) => f.content.length > MAX_EVIDENCE_BYTES);
+    if (big.length) {
+      return refuse([
+        `These files are over ${MAX_EVIDENCE_BYTES / 1024 / 1024} MB, too big to push as evidence: ${big.map((f) => f.path).join(", ")}.`,
+        "Trim them, e.g. cut a log to the part that shows the result, and run the command again.",
+      ]);
+    }
+    // Pushed before the transition, so the comment can embed the files at their commit.
+    const branch = qaBranch(n);
+    const sha = await github.pushFiles(branch, files, `QA evidence for #${n} (${step.name}, ${word})`);
+    evidence = { branch, sha, files: files.map((f) => f.path) };
+  }
+
   let applied = outcome;
   const limitLines: string[] = [];
   // A round starts when review or QA sends the issue back; resolving needs-human stays put and is no round.
@@ -307,7 +340,7 @@ async function done(n: number, word: string | undefined, note: string | undefine
     }
   }
   try {
-    await applyOutcome(deps, issue, applied, word ?? "", note);
+    await applyOutcome(deps, issue, applied, word ?? "", note, evidence);
   } finally {
     await github.deleteClaim(n);
   }
@@ -316,8 +349,13 @@ async function done(n: number, word: string | undefined, note: string | undefine
     extra.push(`To run the story unattended until it needs a human, the user can start the deliver skill: deliver ${n}`);
   }
   const where = outcome.to === "closed" ? "closed" : outcome.to === "not-planned" ? "closed as not planned" : `in ${outcome.to}`;
-  return ok([`#${n} is now ${where}. The claim is released.`, ...extra], { issue: n, from: stateOf(issue), to: outcome.to });
+  if (evidence) extra.unshift(`Pushed ${evidence.files.length} evidence file${evidence.files.length === 1 ? "" : "s"} to ${evidence.branch} and embedded them in the comment.`);
+  if (outcome.notify && !applied.needsHuman) extra.push(`A person does the next step, so do not take #${n} again. psdd has notified the user.`);
+  return ok([`#${n} is now ${where}. The claim is released.`, ...extra], { issue: n, from: stateOf(issue), to: outcome.to, ...(evidence ? { evidence } : {}) });
 }
+
+/** GitHub's API takes blobs up to 100 MB; evidence is screenshots, logs and output, far smaller. */
+const MAX_EVIDENCE_BYTES = 25 * 1024 * 1024;
 
 async function escalate(n: number, reason: string | undefined, deps: Env): Promise<Result> {
   if (!reason) return refuse(["Say why a human is needed. Run:", `  psdd escalate ${n} "reason"`]);

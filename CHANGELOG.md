@@ -4,6 +4,22 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- QA has two steps. In `needs-qa` an agent runs the new `auto-qa` skill on every slice and story: it checks each criterion it can from the user's side and collects the evidence. A failure goes straight to `qa-failed` and counts as a fix round. A `mode:afk` slice that passes goes to `merge-queue`; a `mode:hil` slice and every story go to the new state `needs-human-qa`, where a person runs `qa` with their agent, starting from the agent's evidence and from any remarks of their own. Remarks outside the criteria become follow-up issues unless the person pulls them in or drops them. psdd notifies the user when an item reaches `needs-human-qa`, and `psdd next` lists it as "needs human QA". `psdd init` adds the label and the skill.
+- `psdd done <issue> <outcome> "note" --evidence <dir>` on a QA step pushes the files in `<dir>` to the branch `psdd/qa/<issue>` and embeds them in the QA comment at that commit, so each round's comment keeps its own evidence. The agent's QA note is its evidence pack and is required.
+- `psdd tidy [--dry-run]` removes what belongs to closed issues: QA evidence branches, worktrees, merged slice and story branches (locally and on GitHub), and claim refs. A worktree or branch with uncommitted or unpushed work, and the worktree psdd runs in, are named instead. `deliver` runs it when it starts and stops, `drive` when a story is closed.
+
+### Changed
+
+- Review approval no longer sets needs-human for a `mode:hil` slice or a story: they go to QA by an agent first. needs-human now always means an escalation, cleared with `resolve`, in every state.
+- `psdd next` no longer removes worktrees; `psdd tidy` does.
+- The slice body has a Verifier section: an agent, or an agent then a person, with what only the person can check and why.
+
+### Upgrading
+
+- An item waiting in `needs-qa` with needs-human for a person's QA from an earlier version is briefed as `resolve`. To give it the new person's QA step instead, run `gh issue edit <issue> --add-label needs-human-qa --remove-label needs-qa,needs-human`. Run `npx psdd init` to get the new label and skills.
+
 ## [0.2.3] - 2026-10-14
 
 ### Fixed

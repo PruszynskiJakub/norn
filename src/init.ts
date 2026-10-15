@@ -5,7 +5,7 @@ import type { GitHub } from "./github.js";
 import { FLAGS, STATES } from "./machine.js";
 
 /** Skills psdd briefings name. */
-export const SKILLS = ["triage", "refine", "clarify", "plan", "slice", "implement", "review", "qa", "merge", "resolve", "drive", "deliver", "tdd", "interview", "codebase-design"] as const;
+export const SKILLS = ["triage", "refine", "clarify", "plan", "slice", "implement", "review", "auto-qa", "qa", "merge", "resolve", "drive", "deliver", "tdd", "interview", "codebase-design"] as const;
 
 const DESCRIPTIONS: Record<string, [string, string]> = {
   "needs-refinement": ["c5def5", "Triaged; the spec is being refined"],
@@ -17,15 +17,16 @@ const DESCRIPTIONS: Record<string, [string, string]> = {
   implementation: ["1d76db", "Story: slices in progress. Slice: implement"],
   "needs-review": ["5319e7", "Code review of the slice PR or the story PR"],
   "changes-requested": ["d93f0b", "Review asked for changes"],
-  "needs-qa": ["5319e7", "QA by agent (mode:afk) or human (mode:hil)"],
+  "needs-qa": ["5319e7", "QA by an agent, with evidence"],
+  "needs-human-qa": ["e99695", "QA by a person, after the agent's"],
   "qa-failed": ["d93f0b", "QA found problems"],
-  "merge-queue": ["0e8a16", "Implementation done, review has no requests, QA approved"],
+  "merge-queue": ["0e8a16", "Implementation done, review has no requests, QA passed"],
   "type:story": ["ededed", "psdd story state machine"],
   "type:slice": ["ededed", "psdd slice state machine"],
   "in-progress": ["fef2c0", "Someone holds the claim (mirror of the git-ref claim)"],
   "needs-human": ["e11d21", "A person is needed; cleared with the resolve skill"],
-  "mode:afk": ["bfdadc", "QA by an agent running tests"],
-  "mode:hil": ["bfdadc", "QA by a human"],
+  "mode:afk": ["bfdadc", "QA by an agent only"],
+  "mode:hil": ["bfdadc", "QA by an agent, then by a person"],
 };
 
 export function labelDefinitions() {

@@ -1,17 +1,21 @@
 ---
 name: qa
-description: Verify a change works from the user's side, criterion by criterion, with a repro for every failure. Use when QA-ing a slice or a story.
+description: Walk a person through QA of a change, starting from an agent's evidence and from the person's own remarks, and record their verdict with a repro for every failure. Use when a person QAs a slice or a story.
 ---
 
 # QA
 
-You run QA yourself, or, when a person does it, you walk them through and record what they report.
+The person decides; you run things and record. An agent has QA'd before you, and its evidence pack is on the issue.
 
-1. Pull the branch and run the full test suite.
-2. Walk every acceptance criterion of the slice (for a story: every Behaviour item in the spec) as a user would: run the app, the command, the request, never the tests. Record for each what you ran and what you observed.
-3. With a person doing QA: walk them through the same criteria and record what they report.
-4. For each failure, capture a **repro**: the one command or the shortest user steps that show it, with expected and observed results. Make it as tight as you can: implementation turns it into a red test.
+1. Read the agent's evidence pack: what it checked, what it saw, and what it left for a person.
+2. Pull the branch, run the full test suite, and run the app on this machine.
+3. Walk the person through what is left for them, one criterion at a time, with what the agent prepared. Then through anything in the pack they want to question; they may fail a criterion the agent passed.
+4. **Remarks of their own.** If the person tried the app on their own, take their list of remarks. Tie each to a criterion (for a story: a Behaviour item); a remark on a criterion fails it. For a remark outside the criteria, the person chooses:
+   - **follow up** (the default, so QA does not grow the item): it becomes a new issue;
+   - **pull it in**: it fails this item, like a criterion;
+   - **drop it**: noted only.
+5. For each failure, capture a **repro**: the one command or the shortest user steps that show it, with expected and observed results. Make it as tight as you can: implementation turns it into a red test. Save what the person shows you (screenshots, logs) as evidence files.
 
-Redact every secret in what you record: write `<REDACTED>` in its place.
+Redact every secret in what you record and in every evidence file: write `<REDACTED>` in its place.
 
-Done when every criterion has a recorded result and every failure has a repro. The result is pass, or fail with each failing criterion's repro, expected and observed results.
+Done when every criterion has the person's result, every failure has a repro, and every remark is tied to a criterion, a follow-up, or dropped. The result is the person's verdict: pass, or fail with each failing criterion's repro, expected and observed results, plus the follow-ups to open.

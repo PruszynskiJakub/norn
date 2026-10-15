@@ -27,19 +27,29 @@ describe("notifications", () => {
     ]);
   });
 
-  test("a mode:hil slice reaching QA notifies", async () => {
+  test("a mode:hil slice reaching QA by a person notifies", async () => {
     const w = slice(["mode:hil", "needs-review"]);
     await w.psdd("take", "131");
     await w.psdd("done", "131", "approve");
-    expect(w.notifications.map((n) => [n.title, n.body.split("\n")[0]])).toEqual([["psdd: #131 needs you", "QA in mode:hil"]]);
+    expect(w.notifications).toEqual([]);
+    await w.psdd("take", "131");
+    await w.psdd("done", "131", "pass", "Behaviour 1: passed");
+    expect(w.notifications.map((n) => [n.title, n.body.split("\n")[0]])).toEqual([["psdd: #131 needs you", "needs human QA (mode:hil)"]]);
   });
 
-  test("a story reaching story QA notifies", async () => {
+  test("a mode:afk slice passing agent QA notifies no one", async () => {
+    const w = slice(["mode:afk", "needs-qa"]);
+    await w.psdd("take", "131");
+    await w.psdd("done", "131", "pass", "Behaviour 1: passed");
+    expect(w.notifications).toEqual([]);
+  });
+
+  test("a story reaching QA by a person notifies", async () => {
     const w = setup();
-    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-review"] });
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-qa"] });
     await w.psdd("take", "123");
-    await w.psdd("done", "123", "approve");
-    expect(w.notifications.map((n) => n.title)).toEqual(["psdd: #123 needs you"]);
+    await w.psdd("done", "123", "pass", "Behaviour 1: passed");
+    expect(w.notifications.map((n) => [n.title, n.body.split("\n")[0]])).toEqual([["psdd: #123 needs you", "needs human QA (story)"]]);
   });
 
   test("an ordinary transition does not notify", async () => {
@@ -50,13 +60,12 @@ describe("notifications", () => {
   });
 
   test("when next finds nothing left, it notifies with what is waiting", async () => {
-    const w = slice(["mode:hil", "needs-qa", "needs-human"]);
-    w.github.commentsByIssue.set(131, ["psdd: needs-human — QA in mode:hil"]);
+    const w = slice(["mode:hil", "needs-human-qa"]);
 
     await w.psdd("next", "123");
 
     expect(w.notifications).toEqual([
-      { channel: "os", title: "psdd: story #123 is waiting for you", body: "#131 QA in mode:hil" },
+      { channel: "os", title: "psdd: story #123 is waiting for you", body: "#131 needs human QA (mode:hil)" },
     ]);
   });
 

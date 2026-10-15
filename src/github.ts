@@ -13,6 +13,14 @@ export interface PullRequest {
   base: string;
   state: "open" | "closed" | "merged";
   body?: string;
+  /** The commit the PR's head pointed at last, e.g. when it merged. */
+  headSha?: string;
+}
+
+/** A file to push, by its path inside the commit. */
+export interface FileToPush {
+  path: string;
+  content: Buffer;
 }
 
 /** What a claim ref's commit records. */
@@ -62,6 +70,16 @@ export interface GitHub {
   ensureLabels(labels: { name: string; color: string; description: string }[]): Promise<void>;
 
   branchExists(name: string): Promise<boolean>;
+  /** Branches on GitHub whose name starts with `prefix`. */
+  listBranches(prefix: string): Promise<string[]>;
+  /** Deletes a branch on GitHub; one that is already gone is no error. */
+  deleteBranch(name: string): Promise<void>;
+  /**
+   * Commits exactly these files onto `branch`, creating it when missing; the
+   * commit's parent is the branch's head, so earlier commits stay reachable.
+   * Returns the new commit's sha.
+   */
+  pushFiles(branch: string, files: FileToPush[], message: string): Promise<string>;
   /** Create branch `name` at the head of `from`. */
   createBranch(name: string, from: string): Promise<void>;
   /** The most recent PR from `head`, if any. */
@@ -79,5 +97,7 @@ export interface GitHub {
    */
   replaceClaim(number: number, fromSha: string, record: ClaimRecord): Promise<boolean>;
   readClaim(number: number): Promise<HeldClaim | null>;
+  /** Issue numbers that have a claim ref. */
+  listClaims(): Promise<number[]>;
   deleteClaim(number: number): Promise<void>;
 }
