@@ -4,6 +4,8 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-15
+
 ### Added
 
 - QA has two steps. In `needs-qa` an agent runs the new `auto-qa` skill on every slice and story: it checks each criterion it can from the user's side and collects the evidence. A failure goes straight to `qa-failed` and counts as a fix round. A `mode:afk` slice that passes goes to `merge-queue`; a `mode:hil` slice and every story go to the new state `needs-human-qa`, where a person runs `qa` with their agent, starting from the agent's evidence and from any remarks of their own. Remarks outside the criteria become follow-up issues unless the person pulls them in or drops them. psdd notifies the user when an item reaches `needs-human-qa`, and `psdd next` lists it as "needs human QA". `psdd init` adds the label and the skill.
@@ -101,7 +103,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.3...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.2...v0.2.3
 [0.2.2]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.1...v0.2.2
 [0.2.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.0...v0.2.1
