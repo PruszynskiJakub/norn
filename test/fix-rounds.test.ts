@@ -95,9 +95,9 @@ describe("a fresh fix budget after a person resolves the limit", () => {
     expect(w.github.labels(131)).toContain("needs-human");
   });
 
-  test("the needs-human of QA in mode:hil does not reset the budget", async () => {
+  test("an escalation other than the fix-round limit does not reset the budget", async () => {
     const w = sliceWithRounds(3);
-    w.github.commentsByIssue.get(131)!.push("psdd: needs-review → needs-qa (approve)\n\npsdd: needs-human — QA in mode:hil");
+    w.github.commentsByIssue.get(131)!.push('psdd: needs-human — escalated: "Redis is not available in CI"');
     await w.psdd("take", "131");
 
     await w.psdd("done", "131", "request-changes", "Still flaky");

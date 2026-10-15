@@ -1,11 +1,10 @@
-import { join } from "node:path";
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
 import { FIX_STATES, STATES, kindOf, slicesOf, stateOf, type Outcome, type State } from "./machine.js";
 import { locate } from "./location.js";
 import { slugLine, storySlug, type Slugs } from "./slug.js";
 import { sh, sliceBranch, specPath, storyBranch } from "./text.js";
-import { isWithin, type Workspace } from "./workspace.js";
+import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import { notifyNeedsHuman, type Notify } from "./notify.js";
 
@@ -41,8 +40,7 @@ const TRANSITION = /^psdd: (\S+) → (\S+)/;
 /**
  * Fix rounds that count toward the limit, read from psdd's transition comments:
  * entries into a fix state from another state, since the last time the limit
- * escalated. A person resolving that escalation so starts a fresh budget; the
- * needs-human of QA in mode:hil does not reset it.
+ * escalated. A person resolving that escalation so starts a fresh budget.
  */
 export function fixRounds(comments: string[]): number {
   let rounds = 0;
@@ -70,11 +68,31 @@ export interface Ctx {
   slugs: Slugs;
 }
 
+/** QA evidence files pushed to their branch, to embed in the transition comment. */
+export interface Evidence {
+  branch: string;
+  sha: string;
+  /** Paths inside the commit. */
+  files: string[];
+}
+
+const IMAGE = /\.(png|jpe?g|gif|webp|svg)$/i;
+
+/** Markdown that embeds the evidence at its commit: images inline, other files as links. */
+export function evidenceLines(repoUrl: string, e: Evidence): string[] {
+  const lines = [`Evidence (${e.branch} at ${e.sha.slice(0, 7)}):`, ""];
+  for (const f of e.files) {
+    const url = `${repoUrl}/blob/${e.sha}/${f.split("/").map(encodeURIComponent).join("/")}`;
+    lines.push(IMAGE.test(f) ? `![${f}](${url}?raw=true)` : `- [${f}](${url})`);
+  }
+  return lines;
+}
+
 /**
  * Applies an outcome to an issue whose claim this session holds: labels,
  * comment and closing. The automatic transitions that follow are in followUps.
  */
-export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, word: string, note?: string): Promise<void> {
+export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, word: string, note?: string, evidence?: Evidence): Promise<void> {
   const { github } = ctx;
   const n = issue.number;
   const from = stateOf(issue) ?? "triage";
@@ -89,6 +107,7 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
   const slug = becomesStory ? await slugLine(ctx, issue) : null;
   if (slug) comment.push("", slug);
   if (note) comment.push("", note);
+  if (evidence) comment.push("", ...evidenceLines(await github.repoUrl(), evidence));
 
   // The new state is written before the old labels go, so a failure in between
   // leaves an issue psdd can still act on, never one with no state.
@@ -111,6 +130,7 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
     await github.comment(n, comment.join("\n"));
     await github.removeLabels(n, remove);
     if (outcome.needsHuman) await notifyNeedsHuman(ctx, n, outcome.needsHuman);
+    else if (outcome.notify) await notifyNeedsHuman(ctx, n, outcome.notify);
   }
 }
 
@@ -125,7 +145,7 @@ export async function followUps(ctx: Ctx, issue: Issue, outcome: Outcome): Promi
   const lines: string[] = [];
   const loc = await locate(issue, ctx);
   if (loc && (await ctx.workspace.worktreeExists(loc.worktree))) {
-    lines.push(`Its worktree ${loc.worktree} is removed by the next psdd next ${story}.`);
+    lines.push(`Its worktree ${loc.worktree} is removed by the next psdd tidy.`);
   }
   lines.push(...(await bestEffort("unblock the slices waiting on it", story, () => syncBlocked(ctx, story))));
   lines.push(...(await bestEffort("move the story on", story, () => promoteStory(ctx, story))));
@@ -306,22 +326,4 @@ export async function sliceMergeRefusal(ctx: Ctx, slice: Issue): Promise<string[
     ];
   }
   return null;
-}
-
-/**
- * Removes the issue's local worktree, if there is one. Returns its path when
- * removed. A worktree with uncommitted changes is kept and returned as kept:
- * removal forces, and someone may still be working there.
- * Throws rather than remove the worktree psdd is running in.
- */
-export async function removeWorktreeOf(ctx: Ctx, issue: Issue): Promise<{ removed: string } | { kept: string } | null> {
-  const loc = await locate(issue, ctx);
-  if (!loc || !(await ctx.workspace.worktreeExists(loc.worktree))) return null;
-  const abs = join(ctx.workspace.root, loc.worktree);
-  if (isWithin(ctx.workspace.cwd, abs)) {
-    throw new Error(`psdd is running inside it; run psdd next from another directory to remove it`);
-  }
-  if (await ctx.workspace.worktreeDirty(loc.worktree)) return { kept: abs };
-  await ctx.workspace.removeWorktree(loc.worktree, ctx.config.provider);
-  return { removed: loc.worktree };
 }

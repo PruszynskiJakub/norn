@@ -11,6 +11,7 @@ export const STATES = [
   "needs-review",
   "changes-requested",
   "needs-qa",
+  "needs-human-qa",
   "qa-failed",
   "merge-queue",
 ] as const;
@@ -26,8 +27,10 @@ export interface Outcome {
   means: string;
   /** The outcome needs a note; this names it, e.g. "reason". */
   note?: string;
-  /** After the transition, set needs-human; this is who must do what, e.g. "QA in mode:hil". */
+  /** After the transition, set needs-human; this is who must do what, e.g. an escalation's reason. */
   needsHuman?: string;
+  /** After the transition, a person is needed without the needs-human flag; this is what for, e.g. "needs human QA (mode:hil)". */
+  notify?: string;
 }
 
 export interface Step {
@@ -39,6 +42,8 @@ export interface Step {
   enterAs?: State;
   /** Keyed by outcome word; the empty key is the single way to end. */
   outcomes: Record<string, Outcome>;
+  /** The step can attach evidence files with psdd done --evidence <dir>. */
+  evidence?: boolean;
 }
 
 /** States that send an issue back for another round of implement. */
@@ -75,9 +80,9 @@ export function stepFor(issue: Issue): Step | null {
   if (ambiguousStates(issue)) return null;
   const kind = kindOf(issue);
   const state = stateOf(issue);
+  // A story always gets a person's QA after the agent's; a slice only in mode:hil.
   const hil = kind === "story" || issue.labels.includes("mode:hil");
-  // A human doing QA records the result through the qa step itself.
-  if (issue.labels.includes("needs-human") && state && state !== "needs-qa") {
+  if (issue.labels.includes("needs-human") && state) {
     return {
       name: "resolving needs-human",
       skill: "resolve",
@@ -91,23 +96,39 @@ export function stepFor(issue: Issue): Step | null {
       skill: "review",
       attended: false,
       outcomes: {
-        approve: {
-          to: "needs-qa",
-          means: "no requests, moves on to QA",
-          needsHuman: hil ? (kind === "story" ? "story QA" : "QA in mode:hil") : undefined,
-        },
+        approve: { to: "needs-qa", means: "no requests, moves on to QA by an agent" },
         "request-changes": { to: "changes-requested", means: "put the requests in the note", note: "requests" },
       },
     };
   }
   if (kind !== "new" && state === "needs-qa") {
     return {
-      name: "QA",
-      skill: "qa",
-      attended: hil,
+      name: "agent QA",
+      skill: "auto-qa",
+      attended: false,
+      evidence: true,
       outcomes: {
-        pass: { to: "merge-queue", means: "QA approved, moves to the merge queue" },
-        fail: { to: "qa-failed", means: "put the problems in the note", note: "problems" },
+        pass: hil
+          ? {
+              to: "needs-human-qa",
+              means: "every criterion you could check passed; moves on to QA by a person",
+              note: "evidence",
+              notify: humanQaReason(issue),
+            }
+          : { to: "merge-queue", means: "every criterion passed, moves to the merge queue", note: "evidence" },
+        fail: { to: "qa-failed", means: "put the failures with their repros in the note", note: "evidence" },
+      },
+    };
+  }
+  if (kind !== "new" && state === "needs-human-qa") {
+    return {
+      name: "human QA",
+      skill: "qa",
+      attended: true,
+      evidence: true,
+      outcomes: {
+        pass: { to: "merge-queue", means: "the person passes QA, moves to the merge queue" },
+        fail: { to: "qa-failed", means: "put the failures with their repros in the note", note: "problems" },
       },
     };
   }
@@ -183,4 +204,9 @@ export function stepFor(issue: Issue): Step | null {
     };
   }
   return null;
+}
+
+/** Why an issue in needs-human-qa waits for a person. */
+export function humanQaReason(issue: Issue) {
+  return kindOf(issue) === "story" ? "needs human QA (story)" : "needs human QA (mode:hil)";
 }

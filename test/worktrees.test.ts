@@ -129,7 +129,7 @@ describe("take names the worktree", () => {
   });
 });
 
-describe("worktree cleanup", () => {
+describe("worktrees of merged items", () => {
   function mergingSlice() {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
@@ -142,68 +142,23 @@ describe("worktree cleanup", () => {
     return w;
   }
 
-  test("done on a merged slice leaves its worktree; the next psdd next removes it with the configured tool", async () => {
+  test("done on a merged slice leaves its worktree, and so does next: removing it is psdd tidy's", async () => {
     const w = mergingSlice();
     await w.psdd("take", "127");
 
     const res = await w.psdd("done", "127");
+    await w.psdd("next", "123");
 
     expect(w.workspace.removed).toEqual([]);
-    expect(res.stdout).toContain("Its worktree .agents/worktrees/123-rate-limiting-127 is removed by the next psdd next 123.");
-
-    const next = await w.psdd("next", "123");
-
-    expect(w.workspace.removed).toEqual([{ path: ".agents/worktrees/123-rate-limiting-127", provider: "claude-code" }]);
-    expect(next.stdout).toContain("Slice #127 is merged. Removed its worktree .agents/worktrees/123-rate-limiting-127.");
+    expect(res.stdout).toContain("Its worktree .agents/worktrees/123-rate-limiting-127 is removed by the next psdd tidy.");
   });
 
-  test("a slice with no local worktree merges without removing anything", async () => {
+  test("a slice with no local worktree merges without mentioning one", async () => {
     const w = mergingSlice();
     w.workspace.worktrees.clear();
     await w.psdd("take", "127");
     const res = await w.psdd("done", "127");
-    await w.psdd("next", "123");
-    expect(w.workspace.removed).toEqual([]);
     expect(res.stdout).not.toContain("worktree");
-  });
-
-  test("a worktree that cannot be removed is reported by next, and the rest of next still runs", async () => {
-    const w = mergingSlice();
-    w.github.issues.get(127)!.state = "closed";
-    w.workspace.removeWorktree = async () => {
-      throw new Error("git worktree remove failed: locked");
-    };
-
-    const res = await w.psdd("next", "123");
-
-    expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain("Could not remove the worktree of #127: git worktree remove failed: locked");
-    expect(res.stdout).toContain("Slice #128");
-  });
-
-  test("the story worktree is removed once the story has merged into main", async () => {
-    const w = setup();
-    w.github.seedIssue({ number: 123, title: "Rate limiting", state: "closed", labels: ["type:story", "merge-queue"] });
-    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
-
-    const res = await w.psdd("next", "123");
-
-    expect(w.workspace.removed.map((r) => r.path)).toEqual([".agents/worktrees/123-rate-limiting"]);
-    expect(res.stdout).toContain("Story #123 is merged and closed. Removed its worktree .agents/worktrees/123-rate-limiting.");
-  });
-
-  test("a worktree with uncommitted changes is kept, and next says so", async () => {
-    const w = setup();
-    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
-    w.github.seedIssue({ number: 127, title: "Redis store", state: "closed", stateReason: "not_planned", labels: ["type:slice", "mode:afk"] });
-    w.github.parents.set(127, 123);
-    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting-127");
-    w.workspace.dirty.add(".agents/worktrees/123-rate-limiting-127");
-
-    const res = await w.psdd("next", "123");
-
-    expect(w.workspace.removed).toEqual([]);
-    expect(res.stdout).toContain("Kept /repo/.agents/worktrees/123-rate-limiting-127: it has uncommitted changes. Remove it by hand when done.");
   });
 
   test("a closed story loses the state label GitHub left on it, and next reports no state", async () => {
@@ -236,18 +191,6 @@ describe("worktree cleanup", () => {
       "The previous holder's claim was stale (since 08:00); its worktree is kept with what it left. Check git status there before you start.",
     );
     expect(res.stdout).not.toContain("does not exist");
-  });
-
-  test("next never removes the worktree it is running in", async () => {
-    const w = setup();
-    w.github.seedIssue({ number: 123, title: "Rate limiting", state: "closed", labels: ["type:story", "merge-queue"] });
-    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
-    w.workspace.cwd = "/repo/.agents/worktrees/123-rate-limiting/src";
-
-    const res = await w.psdd("next", "123");
-
-    expect(w.workspace.removed).toEqual([]);
-    expect(res.stdout).toContain("Could not remove the worktree of #123: psdd is running inside it");
   });
 });
 

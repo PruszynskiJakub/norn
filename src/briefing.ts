@@ -48,7 +48,7 @@ export function finishCommands(n: number, step: Step): string[] {
   if (words.length === 1 && words[0] === "") return [`  psdd done ${n}`];
   const cmds = words.map((w) => {
     const o = step.outcomes[w];
-    return `psdd done ${n} ${w}${o.note ? ` "${o.note}"` : ""}`;
+    return `psdd done ${n} ${w}${o.note ? ` "${o.note}"` : ""}${step.evidence ? " [--evidence <dir>]" : ""}`;
   });
   const width = Math.max(...cmds.map((c) => c.length)) + 3;
   return cmds.map((c, i) => `  ${c.padEnd(width)}(${step.outcomes[words[i]].means})`);
@@ -84,13 +84,16 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
       lines.push(
         "Create the slices in dependency order, blockers first, one command per slice:",
         `  psdd add-slice ${n} "title" --mode afk|hil [--blocked-by <slice>]...`,
-        "  --mode afk when tests verify the slice, hil when a person must look at it.",
+        "  --mode afk when an agent can verify every criterion, hil when a person must also look at it.",
         "Then give each slice its body: gh issue edit <slice> --body-file <file>",
         `Push ${loc.branch} once the slices exist, so slice PRs can target it.`,
       );
     }
     if (step.skill === "implement") lines.push(...rework, `Commit the fixes straight onto the story branch ${loc.branch} and push them.`);
-    if (step.skill === "review" || step.skill === "qa") lines.push(`Story PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`);
+    if (step.skill === "review" || step.skill === "auto-qa" || step.skill === "qa") {
+      lines.push(`Story PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`);
+    }
+    lines.push(...qaLines(issue, step, loc, readIssue));
     return lines;
   }
   const lines = [`Spec: ${spec} (story #${story.number})`, readIssue];
@@ -107,7 +110,40 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
       `Then merge the PR: gh pr merge ${sh(loc.branch)} --merge`,
     );
   } else {
-    lines.push(`Slice PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`);
+    lines.push(`Slice PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`, ...qaLines(issue, step, loc, readIssue));
   }
   return lines;
+}
+
+/** How QA's results reach the issue: the note, evidence files, and for a person, remarks. */
+function qaLines(issue: Issue, step: Step, loc: Location, readIssue: string): string[] {
+  const n = issue.number;
+  const files = "Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: psdd pushes the files and embeds them in the comment. Do not commit them.";
+  if (step.skill === "auto-qa") {
+    const lines = [
+      "Your note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.",
+      files,
+    ];
+    if (kindOf(issue) === "slice" && issue.labels.includes("mode:afk")) {
+      lines.push(`No person checks this slice after you. A criterion you cannot check is never passed: run psdd escalate ${n} "reason".`);
+    } else {
+      lines.push(
+        "A person QAs this after you. For what only a person can check (the slice's verifier reason), list it in the note",
+        "with what you could prepare: how to run it, a URL, screenshots up to where you had to stop. Then pass.",
+      );
+    }
+    return lines;
+  }
+  if (step.skill === "qa") {
+    return [
+      `Start from the agent's QA comment on #${n}: its evidence, and what it left for a person. ${readIssue}`,
+      `Run the app from ${loc.branch} on this machine and walk the user through what is left, plus anything in the evidence they question.`,
+      "Tie each remark the user brings to a criterion; a remark on a criterion fails it. For a remark outside the criteria, the user decides:",
+      `  follow up (the default): gh issue create --title "<remark>" --body "From QA of #${n}: <remark>" (it goes through triage)`,
+      "  pull it in: it fails this item, like a criterion",
+      "  drop it: say so in the note",
+      `Every failure needs a repro. ${files}`,
+    ];
+  }
+  return [];
 }

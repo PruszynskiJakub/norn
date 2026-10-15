@@ -39,4 +39,20 @@ export interface Workspace {
   /** Whether the worktree has uncommitted or untracked changes. */
   worktreeDirty(rel: string): Promise<boolean>;
   removeWorktree(rel: string, provider: Provider): Promise<void>;
+  /** Every worktree of the repository, main checkout included: absolute path and checked-out branch. */
+  listWorktrees(): Promise<{ path: string; branch: string | null }[]>;
+  listLocalBranches(): Promise<string[]>;
+  /** The commit a local branch points at; null when there is no such branch. */
+  branchHead(branch: string): Promise<string | null>;
+  /** Whether the local branch has commits that no remote-tracking branch has. */
+  hasUnpushedCommits(branch: string): Promise<boolean>;
+  /** Deletes a local branch; the caller has made sure nothing on it would be lost. */
+  deleteLocalBranch(branch: string): Promise<void>;
+  /** Updates the remote-tracking branches from GitHub, dropping those deleted there. */
+  fetchRemote(): Promise<void>;
+  /**
+   * The files under `dir` (relative to cwd, or absolute), with paths relative
+   * to it; null when it is not a directory.
+   */
+  readEvidence(dir: string): Promise<{ path: string; content: Buffer }[] | null>;
 }

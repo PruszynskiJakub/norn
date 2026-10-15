@@ -204,3 +204,61 @@ describe("GhGitHub issues", () => {
     expect(calls[0].args.slice(0, 2)).toEqual(["pr", "list"]);
   });
 });
+
+describe("GhGitHub branches and evidence", () => {
+  test("pushFiles commits exactly the files on top of the branch's head and moves it without force", async () => {
+    let blobs = 0;
+    const { exec, calls } = scripted((c) => {
+      if (path(c).endsWith("/git/blobs")) return { stdout: { sha: `blob${++blobs}` } };
+      if (path(c).endsWith("/git/trees")) return { stdout: { sha: "tree1" } };
+      if (path(c).endsWith("/git/ref/heads/psdd/qa/131")) return { stdout: { object: { sha: "prev" } } };
+      if (path(c).endsWith("/git/commits")) return { stdout: { sha: "commit2" } };
+      if (path(c).endsWith("/git/refs/heads/psdd/qa/131")) return { stdout: {} };
+    });
+
+    const sha = await new GhGitHub(exec).pushFiles("psdd/qa/131", [{ path: "a.png", content: Buffer.from("png") }], "QA evidence");
+
+    expect(sha).toBe("commit2");
+    expect(calls.find((c) => path(c).endsWith("/git/blobs"))!.input).toEqual({ content: Buffer.from("png").toString("base64"), encoding: "base64" });
+    expect(calls.find((c) => path(c).endsWith("/git/trees"))!.input).toEqual({ tree: [{ path: "a.png", mode: "100644", type: "blob", sha: "blob1" }] });
+    expect(calls.find((c) => path(c).endsWith("/git/commits"))!.input).toEqual({ message: "QA evidence", tree: "tree1", parents: ["prev"] });
+    const move = calls.at(-1)!;
+    expect(method(move)).toBe("PATCH");
+    expect(move.input).toEqual({ sha: "commit2", force: false });
+  });
+
+  test("pushFiles creates the branch with a parentless commit the first time", async () => {
+    const { exec, calls } = scripted((c) => {
+      if (path(c).endsWith("/git/blobs")) return { stdout: { sha: "b" } };
+      if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t" } };
+      if (path(c).endsWith("/git/ref/heads/psdd/qa/131")) return { code: 1, stderr: "Not Found (HTTP 404)" };
+      if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c1" } };
+      if (path(c).endsWith("/git/refs")) return { stdout: {} };
+    });
+    await new GhGitHub(exec).pushFiles("psdd/qa/131", [{ path: "a.txt", content: Buffer.from("x") }], "m");
+    expect(calls.find((c) => path(c).endsWith("/git/commits"))!.input).toMatchObject({ parents: [] });
+    expect(calls.at(-1)!.input).toEqual({ ref: "refs/heads/psdd/qa/131", sha: "c1" });
+  });
+
+  test("listBranches and listClaims read matching refs by prefix", async () => {
+    const { exec, calls } = scripted((c) => {
+      if (c.args.includes("repos/{owner}/{repo}/git/matching-refs/heads/psdd/qa")) {
+        return { stdout: '{"ref":"refs/heads/psdd/qa/131"}\n{"ref":"refs/heads/psdd/qaother"}\n' };
+      }
+      if (c.args.includes("repos/{owner}/{repo}/git/matching-refs/psdd/claims")) {
+        return { stdout: '{"ref":"refs/psdd/claims/131"}\n{"ref":"refs/psdd/claims/7"}\n' };
+      }
+    });
+    const gh = new GhGitHub(exec);
+    expect(await gh.listBranches("psdd/qa/")).toEqual(["psdd/qa/131"]);
+    expect(await gh.listClaims()).toEqual([131, 7]);
+    expect(calls[0].args.slice(0, 4)).toEqual(["api", "--paginate", "--jq", ".[]"]);
+  });
+
+  test("deleteBranch treats a branch that is already gone as deleted", async () => {
+    const { exec, calls } = scripted(() => ({ code: 1, stderr: "Reference does not exist (HTTP 422)" }));
+    await new GhGitHub(exec).deleteBranch("123-x-127");
+    expect(method(calls[0])).toBe("DELETE");
+    expect(path(calls[0])).toBe("repos/{owner}/{repo}/git/refs/heads/123-x-127");
+  });
+});

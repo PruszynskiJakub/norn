@@ -32,7 +32,7 @@ describe("briefing carries the process", () => {
   test("slice: how to create slices and their bodies, then push the story branch", async () => {
     const res = await storyAt("needs-slicing").psdd("take", "123");
     expect(res.stdout).toContain('  psdd add-slice 123 "title" --mode afk|hil [--blocked-by <slice>]...');
-    expect(res.stdout).toContain("  --mode afk when tests verify the slice, hil when a person must look at it.");
+    expect(res.stdout).toContain("  --mode afk when an agent can verify every criterion, hil when a person must also look at it.");
     expect(res.stdout).toContain("Then give each slice its body: gh issue edit <slice> --body-file <file>");
     expect(res.stdout).toContain("Push 123-rate-limiting once the slices exist, so slice PRs can target it.");
   });

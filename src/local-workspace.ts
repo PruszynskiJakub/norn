@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
-import { readFile } from "node:fs/promises";
-import { basename, dirname, join, resolve } from "node:path";
+import { readFile, readdir, stat } from "node:fs/promises";
+import { basename, dirname, join, relative, resolve, sep } from "node:path";
 import { samePath, type Provider, type Workspace } from "./workspace.js";
 
 /** Runs a command; `env` is added to this process's environment. */
@@ -86,6 +86,61 @@ export class LocalWorkspace implements Workspace {
 
   async localBranchExists(branch: string) {
     return (await this.run("git", ["-C", this.root, "show-ref", "--verify", "--quiet", `refs/heads/${branch}`])).code === 0;
+  }
+
+  async listWorktrees() {
+    const out = await this.must("git", ["-C", this.root, "worktree", "list", "--porcelain"]);
+    return out
+      .split("\n\n")
+      .map((entry) => entry.split("\n"))
+      .filter((lines) => lines[0]?.startsWith("worktree "))
+      .map((lines) => ({
+        path: lines[0].slice("worktree ".length),
+        branch: lines.find((l) => l.startsWith("branch refs/heads/"))?.slice("branch refs/heads/".length) ?? null,
+      }));
+  }
+
+  async listLocalBranches() {
+    const out = await this.must("git", ["-C", this.root, "for-each-ref", "--format=%(refname:short)", "refs/heads/"]);
+    return out.split("\n").filter(Boolean);
+  }
+
+  async branchHead(branch: string) {
+    const r = await this.run("git", ["-C", this.root, "rev-parse", "--verify", "--quiet", `refs/heads/${branch}`]);
+    return r.code === 0 ? r.stdout.trim() : null;
+  }
+
+  async hasUnpushedCommits(branch: string) {
+    const out = await this.must("git", ["-C", this.root, "rev-list", "--count", `refs/heads/${branch}`, "--not", "--remotes"]);
+    return Number(out.trim()) > 0;
+  }
+
+  async deleteLocalBranch(branch: string) {
+    await this.must("git", ["-C", this.root, "branch", "-D", branch]);
+  }
+
+  async fetchRemote() {
+    await this.must("git", ["-C", this.root, "fetch", "--prune", "origin"]);
+  }
+
+  async readEvidence(dir: string) {
+    const abs = resolve(this.cwd, dir);
+    try {
+      if (!(await stat(abs)).isDirectory()) return null;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw e;
+    }
+    const files: { path: string; content: Buffer }[] = [];
+    const walk = async (d: string) => {
+      for (const e of await readdir(d, { withFileTypes: true })) {
+        const full = join(d, e.name);
+        if (e.isDirectory()) await walk(full);
+        else if (e.isFile()) files.push({ path: relative(abs, full).split(sep).join("/"), content: await readFile(full) });
+      }
+    };
+    await walk(abs);
+    return files.sort((a, b) => a.path.localeCompare(b.path));
   }
 
   async removeWorktree(rel: string, provider: Provider) {
