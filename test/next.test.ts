@@ -367,3 +367,101 @@ describe("parallel limit", () => {
     expect(JSON.parse((await w.psdd("next", "123", "--json")).stdout).maxParallel).toBe(3);
   });
 });
+
+describe("work a person holds", () => {
+  test("an item for a person that a session holds is listed as held, with no hand-off", async () => {
+    const w = prdExample();
+    w.workspace.env = { HERDR_ENV: "1" };
+    w.setNow("2026-10-13T14:02:00Z");
+    await w.as("drive-main-pane")("take", "129");
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toContain("  - #129 needs human QA (mode:hil), held by another session of yours (since 14:02). Do not take it.");
+    expect(res.stdout).not.toContain("psdd-129");
+    expect(JSON.parse((await w.psdd("next", "123", "--json")).stdout).waiting[1]).toMatchObject({
+      issue: 129,
+      reason: "human-qa",
+      heldBy: "another session of yours (since 14:02)",
+    });
+  });
+
+  test("an escalation a session holds is listed as held too", async () => {
+    const w = prdExample();
+    w.github.issues.get(131)!.labels.push("needs-human");
+    w.setNow("2026-10-13T14:02:00Z");
+    await w.asTeammate("bob", "bobs")("take", "131");
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toContain("  - #131 needs a human: see its latest comment, held by another session (since 14:02). Do not take it.");
+  });
+});
+
+describe("running agents count against the parallel limit", () => {
+  function fourReady() {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    for (const n of [131, 132, 133, 134]) {
+      w.github.seedIssue({ number: n, title: `Slice ${n}`, labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+      w.github.parents.set(n, 123);
+    }
+    w.github.branches.add("123-rate-limiting");
+    w.setNow("2026-10-13T14:02:00Z");
+    return w;
+  }
+
+  test("with the limit reached by your running agents, nothing more is started", async () => {
+    const w = fourReady();
+    await w.as("agent-131")("take", "131");
+    await w.as("agent-132")("take", "132");
+
+    const res = await w.as("orchestrator-b")("next", "123");
+
+    expect(res.stdout).toContain(
+      [
+        "2 items are ready, but 2 of your agents are running, the limit of",
+        "deliver.maxParallel. Wait for one to finish, then run psdd next 123 again.",
+        "",
+        '  - Slice #133 "Slice 133" is ready-for-agent.',
+        '  - Slice #134 "Slice 134" is ready-for-agent.',
+      ].join("\n"),
+    );
+    expect(res.stdout).not.toContain("Start it with");
+    expect(JSON.parse((await w.psdd("next", "123", "--json")).stdout)).toMatchObject({ running: 2, slots: 0 });
+  });
+
+  test("with one of your agents running, only the free slots are offered", async () => {
+    const w = fourReady();
+    await w.as("agent-131")("take", "131");
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout.replace(/\s+/g, " ")).toContain(
+      "You can start 3 items now. They are independent, so run them in parallel, at most 1 at a time (1 of your agents is running, the limit is 2),",
+    );
+  });
+
+  test("a teammate's agents and a person's work do not use your slots", async () => {
+    const w = fourReady();
+    await w.asTeammate("bob", "bobs")("take", "131");
+    w.github.seedIssue({ number: 129, title: "Dashboard", labels: ["type:slice", "mode:hil", "needs-human-qa"] });
+    w.github.parents.set(129, 123);
+    await w.as("drive")("take", "129");
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout.replace(/\s+/g, " ")).toContain("You can start 3 items now. They are independent, so run them in parallel, at most 2 at a time,");
+  });
+
+  test("attended steps are not limited", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-refinement"] });
+    w.workspace.files.set(".agents/psdd.config.json", JSON.stringify({ deliver: { maxParallel: 1 } }));
+    w.github.seedIssue({ number: 7, title: "Other", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+
+    const res = await w.psdd("next", "123");
+
+    expect(res.stdout).toContain("You can start 1 item now, with the user:");
+  });
+});
