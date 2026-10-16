@@ -103,7 +103,8 @@ export async function loadConfig(workspace: Workspace): Promise<Loaded> {
   const team = await read(workspace, TEAM_CONFIG);
   const local = await read(workspace, LOCAL_CONFIG);
   const problems = [...team.problems, ...local.problems];
-  if (problems.length) return { ok: false, lines: ["psdd cannot read its configuration:", ...problems.map((p) => `  ${p}`), "Fix the file and run the command again."] };
+  if (problems.length)
+    return { ok: false, lines: ["psdd cannot read its configuration:", ...problems.map((p) => `  ${p}`), "Fix the file and run the command again."] };
 
   const merged = {
     baseBranch: local.raw.baseBranch ?? team.raw.baseBranch ?? DEFAULT_TEAM_CONFIG.baseBranch,
@@ -133,8 +134,5 @@ export function providerRefusal(config: Config, env: Record<string, string | und
   const variable = ENV_FOR[config.provider];
   if (!variable || env[variable] === "1") return null;
   const start = config.provider === "herdr" ? "Start from a herdr pane" : "Start from a Claude Code session";
-  return [
-    `The worktree provider is ${config.provider}, but ${variable} is not set.`,
-    `${start}, or switch the provider in ${LOCAL_CONFIG}.`,
-  ];
+  return [`The worktree provider is ${config.provider}, but ${variable} is not set.`, `${start}, or switch the provider in ${LOCAL_CONFIG}.`];
 }

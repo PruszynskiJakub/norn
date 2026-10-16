@@ -1,8 +1,6 @@
 import type { ClaimRecord, GitHub } from "./github.js";
 
-export type Acquire =
-  | { ok: true; tookOver?: ClaimRecord; ownTakeover?: boolean; reacquired?: boolean }
-  | { ok: false; held: ClaimRecord | null };
+export type Acquire = { ok: true; tookOver?: ClaimRecord; ownTakeover?: boolean; reacquired?: boolean } | { ok: false; held: ClaimRecord | null };
 
 /**
  * Claim an issue via its git ref. Ref creation is the atomic step: whoever

@@ -144,7 +144,7 @@ async function withConfig(cmd: string, rest: string[], flags: Record<string, str
     case "take":
       return take(Number(rest[0]), bools.has("takeover"), deps);
     case "done":
-      return done(Number(rest[0]), rest[1], rest[2], flags["evidence"]?.[0], deps);
+      return done(Number(rest[0]), rest[1], rest[2], flags.evidence?.[0], deps);
     case "tidy": {
       const report = await tidy(deps, bools.has("dry-run"));
       return ok([renderTidy(report)], { ...report });
@@ -162,7 +162,7 @@ async function withConfig(cmd: string, rest: string[], flags: Record<string, str
       return ok([renderNext(report)], { ...report });
     }
     case "add-slice":
-      return addSlice(Number(rest[0]), rest[1], flags["blocked-by"] ?? [], flags["mode"]?.[0], deps);
+      return addSlice(Number(rest[0]), rest[1], flags["blocked-by"] ?? [], flags.mode?.[0], deps);
   }
   return { exitCode: 2, stdout: USAGE };
 }
@@ -177,7 +177,10 @@ async function noStepRefusal(issue: Issue, github: GitHub): Promise<string[]> {
   const ambiguous = ambiguousStates(issue);
   if (ambiguous) return [`#${n} ${ambiguous}.`, pick];
   if (kindOf(issue) === "story" && state === "implementation") {
-    return [`Story #${n} is in implementation. Its label follows its slices; there is no step to take on the story itself.`, `Run psdd next ${n} to see its slices.`];
+    return [
+      `Story #${n} is in implementation. Its label follows its slices; there is no step to take on the story itself.`,
+      `Run psdd next ${n} to see its slices.`,
+    ];
   }
   if (kindOf(issue) === "story" && state === "merge-queue") {
     const owner = issue.assignees[0] ? `@${issue.assignees[0]}` : "unassigned";
@@ -248,9 +251,7 @@ async function take(n: number, takeover: boolean, deps: Env): Promise<Result> {
     const was = claim.ownTakeover
       ? `You took #${n} over from another session of yours (since ${hhmm(claim.tookOver.since)})`
       : `The previous holder's claim was stale (since ${hhmm(claim.tookOver.since)})`;
-    staleNote = `${was}${
-      kept ? `; its worktree is kept with what it left. Check git status there before you start.` : "."
-    }`;
+    staleNote = `${was}${kept ? `; its worktree is kept with what it left. Check git status there before you start.` : "."}`;
   }
   const lines = await briefing(issue, step, deps, state);
   if (staleNote) lines.splice(lines.indexOf(""), 0, "", staleNote);
@@ -349,7 +350,10 @@ async function done(n: number, word: string | undefined, note: string | undefine
     extra.push(`To run the story unattended until it needs a human, the user can start the deliver skill: deliver ${n}`);
   }
   const where = outcome.to === "closed" ? "closed" : outcome.to === "not-planned" ? "closed as not planned" : `in ${outcome.to}`;
-  if (evidence) extra.unshift(`Pushed ${evidence.files.length} evidence file${evidence.files.length === 1 ? "" : "s"} to ${evidence.branch} and embedded them in the comment.`);
+  if (evidence)
+    extra.unshift(
+      `Pushed ${evidence.files.length} evidence file${evidence.files.length === 1 ? "" : "s"} to ${evidence.branch} and embedded them in the comment.`,
+    );
   if (outcome.notify && !applied.needsHuman) extra.push(`A person does the next step, so do not take #${n} again. psdd has notified the user.`);
   return ok([`#${n} is now ${where}. The claim is released.`, ...extra], { issue: n, from: stateOf(issue), to: outcome.to, ...(evidence ? { evidence } : {}) });
 }
@@ -369,10 +373,7 @@ async function escalate(n: number, reason: string | undefined, deps: Env): Promi
   await github.comment(n, [needsHumanLine(why), ...(reason.includes("\n") ? ["", reason] : [])].join("\n"));
   await notifyNeedsHuman(deps, n, why);
   await github.deleteClaim(n);
-  return ok([
-    `#${n} now needs a human. The claim is released.`,
-    "Do not work on it further. A person picks it up with the resolve skill.",
-  ]);
+  return ok([`#${n} now needs a human. The claim is released.`, "Do not work on it further. A person picks it up with the resolve skill."]);
 }
 
 async function release(n: number, deps: Env): Promise<Result> {
@@ -383,13 +384,7 @@ async function release(n: number, deps: Env): Promise<Result> {
   return ok([`Released #${n}. Its state is unchanged. Do not work on it further.`]);
 }
 
-async function addSlice(
-  story: number,
-  title: string | undefined,
-  blockedBy: string[],
-  mode: string | undefined,
-  deps: Env,
-): Promise<Result> {
+async function addSlice(story: number, title: string | undefined, blockedBy: string[], mode: string | undefined, deps: Env): Promise<Result> {
   const { github } = deps;
   const usage = `  psdd add-slice ${story} "title" --mode afk|hil [--blocked-by <issue>]...`;
   if (!title || (mode !== "afk" && mode !== "hil")) {

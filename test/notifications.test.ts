@@ -64,9 +64,7 @@ describe("notifications", () => {
 
     await w.psdd("next", "123");
 
-    expect(w.notifications).toEqual([
-      { channel: "os", title: "psdd: story #123 is waiting for you", body: "#131 needs human QA (mode:hil)" },
-    ]);
+    expect(w.notifications).toEqual([{ channel: "os", title: "psdd: story #123 is waiting for you", body: "#131 needs human QA (mode:hil)" }]);
   });
 
   test("auto uses herdr inside herdr", async () => {

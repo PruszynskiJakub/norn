@@ -88,9 +88,7 @@ describe("psdd init: configuration and worktrees", () => {
       claims: { staleAfter: "2h" },
       deliver: { maxParallel: 2, maxFixRounds: 3 },
     });
-    expect(readFileSync(join(cwd, ".gitignore"), "utf8")).toBe(
-      "node_modules\n.agents/worktrees/\n.agents/psdd.config.local.json\n",
-    );
+    expect(readFileSync(join(cwd, ".gitignore"), "utf8")).toBe("node_modules\n.agents/worktrees/\n.agents/psdd.config.local.json\n");
   });
 
   test("the base branch is the repository's default branch", async () => {
@@ -121,7 +119,7 @@ describe("psdd init: agent instructions", () => {
 
     const res = await psdd("init");
 
-    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe(AGENT_INSTRUCTIONS + "\n");
+    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe(`${AGENT_INSTRUCTIONS}\n`);
     expect(readFileSync(join(cwd, "CLAUDE.md"), "utf8")).toBe("@AGENTS.md\n");
     expect(res.stdout).toContain("drive <issue>");
   });
@@ -132,7 +130,7 @@ describe("psdd init: agent instructions", () => {
 
     await psdd("init");
 
-    expect(readFileSync(join(cwd, "CLAUDE.md"), "utf8")).toBe("# Project\n\nUse tabs.\n\n" + AGENT_INSTRUCTIONS + "\n");
+    expect(readFileSync(join(cwd, "CLAUDE.md"), "utf8")).toBe(`# Project\n\nUse tabs.\n\n${AGENT_INSTRUCTIONS}\n`);
     expect(existsSync(join(cwd, "AGENTS.md"))).toBe(false);
   });
 
@@ -143,7 +141,7 @@ describe("psdd init: agent instructions", () => {
     await psdd("init");
     await psdd("init");
 
-    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe("# Agents\n\n" + AGENT_INSTRUCTIONS + "\n\nMore.\n");
+    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe(`# Agents\n\n${AGENT_INSTRUCTIONS}\n\nMore.\n`);
   });
 
   test("leaves a CLAUDE.md that imports AGENTS.md alone", async () => {
@@ -154,6 +152,6 @@ describe("psdd init: agent instructions", () => {
     await psdd("init");
 
     expect(readFileSync(join(cwd, "CLAUDE.md"), "utf8")).toBe("@AGENTS.md\n");
-    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe("# Agents\n\n" + AGENT_INSTRUCTIONS + "\n");
+    expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe(`# Agents\n\n${AGENT_INSTRUCTIONS}\n`);
   });
 });

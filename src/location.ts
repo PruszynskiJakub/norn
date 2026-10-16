@@ -66,9 +66,7 @@ export function createWorktreeCommand(provider: Provider, loc: Location, absRoot
   const add = provider === "herdr" ? herdr("") : `${git} worktree add ${path} ${branch}`;
   if (at.local) return at.remote ? `${git} fetch origin ${branch} && ${add} && git -C ${path} merge --ff-only origin/${branch}` : add;
   if (at.remote) {
-    return provider === "herdr"
-      ? `${git} fetch origin ${base} ${branch} && ${herdr(` --base origin/${branch}`)}`
-      : `${git} fetch origin ${branch} && ${add}`;
+    return provider === "herdr" ? `${git} fetch origin ${base} ${branch} && ${herdr(` --base origin/${branch}`)}` : `${git} fetch origin ${branch} && ${add}`;
   }
   return provider === "herdr"
     ? `${git} fetch origin ${base} && ${git} branch --no-track ${branch} origin/${base} && ${herdr("")}`
@@ -96,7 +94,8 @@ export async function workInLines(loc: Location, workspace: Workspace, github: G
     return lines;
   }
   // An earlier session may have stopped partway and left its work here.
-  if (await workspace.worktreeDirty(loc.worktree)) lines.push("It has uncommitted changes, e.g. from an earlier session. Check git status there before you start.");
+  if (await workspace.worktreeDirty(loc.worktree))
+    lines.push("It has uncommitted changes, e.g. from an earlier session. Check git status there before you start.");
   if (await github.branchExists(loc.branch)) {
     // Others push here too, e.g. slices merged into the story branch; catch up before starting.
     lines.push("Bring it up to date first:", `  ${updateWorktreeCommand(loc, workspace.root)}`);

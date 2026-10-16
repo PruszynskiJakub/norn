@@ -50,7 +50,7 @@ export interface Step {
 export const FIX_STATES: readonly State[] = ["changes-requested", "qa-failed"];
 
 export function stateOf(issue: Issue): State | null {
-  return (STATES as readonly string[]).find((s) => issue.labels.includes(s)) as State | null ?? null;
+  return ((STATES as readonly string[]).find((s) => issue.labels.includes(s)) as State | null) ?? null;
 }
 
 /** Every state label on the issue. More than one means a label change failed halfway. */

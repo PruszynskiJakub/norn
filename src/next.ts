@@ -7,16 +7,7 @@ import type { GitHub, Issue } from "./github.js";
 import { STATES, ambiguousStates, humanQaReason, kindOf, slicesOf, stateOf, stepFor, type State } from "./machine.js";
 import { storySlug } from "./slug.js";
 import { hhmm, storyBranch, wrap } from "./text.js";
-import {
-  bestEffort,
-  clearClosedState,
-  closeMergedStory,
-  ensureStoryBranch,
-  needsHumanReason,
-  promoteStory,
-  syncBlocked,
-  type Ctx,
-} from "./transitions.js";
+import { bestEffort, clearClosedState, closeMergedStory, ensureStoryBranch, needsHumanReason, promoteStory, syncBlocked, type Ctx } from "./transitions.js";
 
 export interface StartItem {
   issue: number;
@@ -100,24 +91,31 @@ async function reconcile(ctx: Ctx, storyNumber: number): Promise<string[]> {
   const notes: string[] = [];
   const story = await github.getIssue(storyNumber);
   if (story.state === "open" && stateOf(story) === "implementation") {
-    const branch = await ensureStoryBranch(ctx, story).catch((e: Error) => ({ ok: false as const, lines: [`Could not create the story branch: ${e.message}`] }));
+    const branch = await ensureStoryBranch(ctx, story).catch((e: Error) => ({
+      ok: false as const,
+      lines: [`Could not create the story branch: ${e.message}`],
+    }));
     if (!branch.ok) notes.push(...branch.lines);
     else if (branch.created) notes.push(`Created the story branch ${branch.branch}.`);
   }
   notes.push(...(await bestEffort("move the story on", storyNumber, () => promoteStory(ctx, storyNumber))));
-  notes.push(...(await bestEffort("close the merged story", storyNumber, async () => {
-    if (!(await closeMergedStory(ctx, story))) return [];
-    story.state = "closed";
-    story.labels = story.labels.filter((l) => !(STATES as readonly string[]).includes(l));
-    return [`The story PR is merged. Closed story #${storyNumber}.`];
-  })));
+  notes.push(
+    ...(await bestEffort("close the merged story", storyNumber, async () => {
+      if (!(await closeMergedStory(ctx, story))) return [];
+      story.state = "closed";
+      story.labels = story.labels.filter((l) => !(STATES as readonly string[]).includes(l));
+      return [`The story PR is merged. Closed story #${storyNumber}.`];
+    })),
+  );
   const closed = (await slicesOf(github, storyNumber)).filter((s) => s.state === "closed");
   if (story.state === "closed") closed.push(story);
   for (const issue of closed) {
-    notes.push(...(await bestEffort(`clear the labels of #${issue.number}`, storyNumber, async () => {
-      await clearClosedState(ctx, issue);
-      return [];
-    })));
+    notes.push(
+      ...(await bestEffort(`clear the labels of #${issue.number}`, storyNumber, async () => {
+        await clearClosedState(ctx, issue);
+        return [];
+      })),
+    );
   }
   return notes;
 }
@@ -325,16 +323,16 @@ export function renderNext(r: NextReport): string {
 
   if (r.start.length === 0) {
     out.push(`Nothing can be started now. Wait for the running items to finish, then run psdd next ${r.story} again.`);
-  }
-  else if (r.slots === 0 && r.start.every((s) => !s.attended)) {
+  } else if (r.slots === 0 && r.start.every((s) => !s.attended)) {
     const ready = `${r.start.length} item${r.start.length === 1 ? " is" : "s are"} ready`;
     out.push(
-      wrap(`${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run psdd next ${r.story} again.`),
+      wrap(
+        `${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run psdd next ${r.story} again.`,
+      ),
       "",
       ...r.start.map((s) => `  - ${s.kind === "slice" ? "Slice" : "Story"} #${s.issue} "${s.title}" ${DESCRIBE[s.state] ?? `is in ${s.state}`}.`),
     );
-  }
-  else {
+  } else {
     // Attended steps are done with the user, not by a fresh agent of their own.
     const attendedOnly = r.start.every((s) => s.attended);
     const count = `You can start ${r.start.length} item${r.start.length === 1 ? "" : "s"} now`;
@@ -347,8 +345,8 @@ export function renderNext(r: NextReport): string {
       attendedOnly
         ? `${count}, with the user:`
         : r.start.length === 1
-        ? `${count}, ${agent.replace(/^each /, "")}`
-        : wrap(`${count}. They are independent, so run them in parallel, at most ${r.slots} at a time${runningNote(r)}, ${agent}`),
+          ? `${count}, ${agent.replace(/^each /, "")}`
+          : wrap(`${count}. They are independent, so run them in parallel, at most ${r.slots} at a time${runningNote(r)}, ${agent}`),
       "",
     );
     for (const s of r.start) {
@@ -366,8 +364,7 @@ export function renderNext(r: NextReport): string {
         if (!s.attended) {
           const prompt = `Work in ${s.worktree}. Run psdd take ${s.issue}, follow its briefing to the end, and finish with the psdd command it gives.`;
           out.push(`    Start an agent: ${start}`, `    Then prompt it: herdr agent prompt psdd-${s.issue} "${prompt}"`);
-        }
-        else if (s.here) out.push("    You are in its worktree: take it in this session.");
+        } else if (s.here) out.push("    You are in its worktree: take it in this session.");
         else {
           // An attended step needs the user, so the new agent drives the story from its worktree and this session stops.
           out.push(

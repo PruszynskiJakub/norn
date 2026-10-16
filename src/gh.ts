@@ -205,8 +205,16 @@ export class GhGitHub implements GitHub {
   }
   async findPullRequest(head: string): Promise<PullRequest | null> {
     const out = await this.gh([
-      "pr", "list", "--head", head, "--state", "all", "--limit", "1",
-      "--json", "number,headRefName,baseRefName,state,body,headRefOid",
+      "pr",
+      "list",
+      "--head",
+      head,
+      "--state",
+      "all",
+      "--limit",
+      "1",
+      "--json",
+      "number,headRefName,baseRefName,state,body,headRefOid",
     ]);
     const [pr] = JSON.parse(out) as { number: number; headRefName: string; baseRefName: string; state: string; body: string; headRefOid?: string }[];
     if (!pr) return null;
@@ -266,7 +274,10 @@ export class GhGitHub implements GitHub {
   }
   async listClaims() {
     const refs = await this.paginate<{ ref: string }>(`${REPO}/git/matching-refs/psdd/claims`);
-    return refs.map((r) => /^refs\/psdd\/claims\/(\d+)$/.exec(r.ref)).filter((m) => m !== null).map((m) => Number(m[1]));
+    return refs
+      .map((r) => /^refs\/psdd\/claims\/(\d+)$/.exec(r.ref))
+      .filter((m) => m !== null)
+      .map((m) => Number(m[1]));
   }
   async deleteClaim(n: number) {
     try {

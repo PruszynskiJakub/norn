@@ -233,7 +233,7 @@ export async function closeMergedStory(ctx: Ctx, story: Issue): Promise<boolean>
   if (story.state !== "open" || stateOf(story) !== "merge-queue") return false;
   const branch = storyBranch(story.number, await storySlug(ctx, story));
   const pr = await ctx.github.findPullRequest(branch);
-  if (!pr || pr.state !== "merged") return false;
+  if (pr?.state !== "merged") return false;
   return withShortClaim(ctx, story.number, async () => {
     await ctx.github.comment(story.number, `psdd: merge-queue → closed (automatic)\n\nThe story PR #${pr.number} is merged into ${pr.base}.`);
     await ctx.github.closeIssue(story.number, "completed");
@@ -263,9 +263,7 @@ export async function syncBlocked(ctx: Ctx, story: number): Promise<string[]> {
     const open = (await ctx.github.blockedBy(slice.number)).filter((b) => b.state === "open");
     const want: State = open.length ? "blocked" : "ready-for-agent";
     if (want === state) continue;
-    const why = open.length
-      ? `Blocked by ${open.map((b) => `#${b.number}`).join(", ")}.`
-      : "All blockers are closed.";
+    const why = open.length ? `Blocked by ${open.map((b) => `#${b.number}`).join(", ")}.` : "All blockers are closed.";
     if (await withShortClaim(ctx, slice.number, () => setState(ctx, slice, want, why))) {
       lines.push(`#${slice.number} is now ${want}.`);
     }
@@ -320,10 +318,7 @@ export async function sliceMergeRefusal(ctx: Ctx, slice: Issue): Promise<string[
     ];
   }
   if (pr.state !== "merged") {
-    return [
-      `PR #${pr.number} from ${head} is not merged yet.`,
-      `Merge it into ${pr.base} (resolve conflicts if needed), then run psdd done ${slice.number}.`,
-    ];
+    return [`PR #${pr.number} from ${head} is not merged yet.`, `Merge it into ${pr.base} (resolve conflicts if needed), then run psdd done ${slice.number}.`];
   }
   return null;
 }

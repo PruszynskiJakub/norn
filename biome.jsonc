@@ -1,0 +1,30 @@
+{
+  "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
+  // skills/ and the specs are content for agents, not code.
+  "files": { "includes": ["**", "!skills", "!.agents", "!.claude", "!PRD.html"] },
+  "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 160 },
+  "javascript": {
+    "formatter": { "quoteStyle": "double", "semicolons": "always", "trailingCommas": "all", "arrowParentheses": "always" }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        // Imports are grouped by hand, e.g. node: modules next to the module that needs them; sorting would churn every file.
+        "organizeImports": "off"
+      }
+    }
+  },
+  "linter": {
+    "rules": {
+      "preset": "recommended",
+      "correctness": { "noUnusedImports": "error" },
+      "style": {
+        "noDefaultExport": "error",
+        // `!` marks a value the code just checked, e.g. map.get after map.has, and tests reading what they just seeded.
+        "noNonNullAssertion": "off"
+      },
+      "nursery": { "noFloatingPromises": "error" }
+    }
+  }
+}

@@ -19,7 +19,8 @@ export function parseArgs(argv: string[]): Parsed {
       }
       const value = inline ?? argv[++i];
       if (value === undefined) continue;
-      (out.flags[name] ??= []).push(value);
+      out.flags[name] ??= [];
+      out.flags[name].push(value);
     } else out.positionals.push(a);
   }
   return out;

@@ -22,9 +22,7 @@ export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: State |
   const loc = await locate(issue, ctx);
   const workIn = loc ? [...(await workInLines(loc, ctx.workspace, ctx.github, ctx.config.provider)), ""] : [];
   // take relabels a slice in rework to implementation; `from` and the history say whether this is rework.
-  const rework =
-    step.skill === "implement" &&
-    ((from !== null && FIX_STATES.includes(from)) || fixRounds(await ctx.github.listComments(n)) > 0);
+  const rework = step.skill === "implement" && ((from !== null && FIX_STATES.includes(from)) || fixRounds(await ctx.github.listComments(n)) > 0);
   return [
     wrap(where),
     "",
@@ -68,9 +66,7 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
   const story = loc.story;
   const spec = specPath(story.number, loc.slug);
   const pushSpec = `Commit the spec on ${loc.branch} and push it, so the link psdd posts resolves.`;
-  const rework = isRework
-    ? [`This is rework: the latest review or QA comment on #${n} lists what to fix. ${readIssue}`]
-    : [];
+  const rework = isRework ? [`This is rework: the latest review or QA comment on #${n} lists what to fix. ${readIssue}`] : [];
   if (step.skill === "resolve") {
     const lines = [`The latest needs-human comment gives the reason. ${readIssue}`, `Record the outcome on the issue: gh issue comment ${n}`];
     if (kindOf(issue) === "story") lines.push(`Spec changes go in ${spec}; commit and push them on ${loc.branch}.`);
@@ -118,12 +114,10 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
 /** How QA's results reach the issue: the note, evidence files, and for a person, remarks. */
 function qaLines(issue: Issue, step: Step, loc: Location, readIssue: string): string[] {
   const n = issue.number;
-  const files = "Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: psdd pushes the files and embeds them in the comment. Do not commit them.";
+  const files =
+    "Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: psdd pushes the files and embeds them in the comment. Do not commit them.";
   if (step.skill === "auto-qa") {
-    const lines = [
-      "Your note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.",
-      files,
-    ];
+    const lines = ["Your note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.", files];
     if (kindOf(issue) === "slice" && issue.labels.includes("mode:afk")) {
       lines.push(`No person checks this slice after you. A criterion you cannot check is never passed: run psdd escalate ${n} "reason".`);
     } else {
