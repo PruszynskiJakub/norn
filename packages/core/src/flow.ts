@@ -169,9 +169,20 @@ export function flowStatesOf(issue: Issue, flow: Flow): string[] {
   return Object.keys(flow.states).filter((s) => issue.labels.includes(s));
 }
 
-/** The issue's step in its flow; null when it has no single state there. needs-human is resolved the same in every flow. */
+/**
+ * The issue's step in its flow; null when it has no single state there. needs-human is resolved the same in every flow;
+ * with no state of the flow, e.g. one the flow dropped, resolving moves the issue into the state a person picks.
+ */
 export function flowStep(issue: Issue, flow: Flow): Step | null {
   const states = flowStatesOf(issue, flow);
+  if (states.length === 0 && issue.labels.includes("needs-human")) {
+    return {
+      name: "resolving needs-human",
+      skill: "norn-resolve",
+      attended: true,
+      outcomes: Object.fromEntries(Object.keys(flow.states).map((s) => [s, { to: s, means: `moves it to ${s}, a state of the flow` }])),
+    };
+  }
   if (states.length !== 1) return null;
   const [state] = states;
   if (issue.labels.includes("needs-human")) {

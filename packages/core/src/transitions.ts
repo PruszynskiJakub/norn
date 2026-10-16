@@ -175,7 +175,9 @@ export async function applyOutcome(
 ): Promise<void> {
   const { github } = ctx;
   const n = issue.number;
-  const from = (flow ? flowStatesOf(issue, flow)[0] : stateOf(issue)) ?? "triage";
+  // An issue whose state its flow dropped moves on from that state.
+  const left = flow ? await leftState(ctx, issue, flow) : null;
+  const from = (flow ? (flowStatesOf(issue, flow)[0] ?? left) : stateOf(issue)) ?? "triage";
   // The resolve step has no outcome word and keeps the state; say what it did.
   const resolved = !word && issue.labels.includes("needs-human") && !outcome.needsHuman;
   const why = word || (resolved ? "needs-human resolved" : "");
@@ -206,7 +208,7 @@ export async function applyOutcome(
       add.push("needs-human");
       comment.push("", needsHumanLine(outcome.needsHuman));
     }
-    const remove = ["in-progress", ...(outcome.needsHuman ? [] : ["needs-human"]), ...stateLabels(issue, outcome.to, flow)];
+    const remove = ["in-progress", ...(outcome.needsHuman ? [] : ["needs-human"]), ...stateLabels(issue, outcome.to, flow), ...(left ? [left] : [])];
     await github.addLabels(n, add);
     await github.comment(n, comment.join("\n"));
     await github.removeLabels(n, remove);

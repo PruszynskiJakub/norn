@@ -351,4 +351,19 @@ describe("a flow that changed under issues in progress", () => {
     expect(w.github.comments(40).at(-1)).toBe("norn: needs-human — the state verifying is no longer in the flow bug");
     expect(w.github.claim(40)).toBeNull();
   });
+
+  test("resolving it moves the issue into the state of the flow a person picks", async () => {
+    const w = await leftInVerifying();
+    await w.norn("take", "40");
+
+    const out = (await w.norn("take", "40")).stdout;
+    const res = await w.norn("done", "40", "fixing");
+
+    expect(out).toContain("Invoke the skill: norn-resolve\n");
+    expect(out).toContain("norn done 40 reproducing");
+    expect(out).toContain("norn done 40 fixing");
+    expect(res.exitCode).toBe(0);
+    expect(w.github.labels(40).sort()).toEqual(["fixing", "type:bug"]);
+    expect(w.github.comments(40).at(-1)).toBe("norn: verifying → fixing (fixing)");
+  });
 });
