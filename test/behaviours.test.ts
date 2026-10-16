@@ -210,6 +210,20 @@ describe("humanGate", () => {
   });
 });
 
+describe("humanGate, resolving needs-human", () => {
+  test("an issue that stays at the gate notifies no one again", async () => {
+    const w = bugAt("verifying");
+    w.github.issues.get(40)!.labels.push("needs-human");
+    await w.norn("take", "40");
+
+    const res = await w.norn("done", "40");
+
+    expect(w.github.labels(40).sort()).toEqual(["type:bug", "verifying"]);
+    expect(res.stdout).not.toContain("A person does the next step");
+    expect(w.notifications).toEqual([]);
+  });
+});
+
 describe("norn next on an issue of a flow", () => {
   test("a state an agent runs is offered to an agent", async () => {
     const w = bugAt("reviewing");

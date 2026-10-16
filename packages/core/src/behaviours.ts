@@ -114,8 +114,9 @@ const humanGate: Behaviour = {
     ];
   },
   /** Reaching the gate puts the issue in a person's hands: they are notified, and the agent stops. */
-  async enter({ flowName }, applied) {
-    return applied.outcome.notify ? applied : { ...applied, outcome: { ...applied.outcome, notify: `type:${flowName}` } };
+  async enter({ flowName, from, outcome }, applied) {
+    // Staying at the gate, e.g. needs-human resolved there, is no new hand-over.
+    return from === outcome.to || applied.outcome.notify ? applied : { ...applied, outcome: { ...applied.outcome, notify: `type:${flowName}` } };
   },
 };
 
