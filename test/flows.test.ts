@@ -34,6 +34,30 @@ function prFlow() {
   return flow;
 }
 
+/** A task under a story: done on a branch off the story's, then checked. */
+function taskFlow(over: Record<string, unknown> = {}) {
+  return {
+    description: "A piece of a story, merged into the story's branch.",
+    start: "doing",
+    workspace: "parent",
+    triage: false,
+    states: {
+      doing: {
+        skill: "task-do",
+        attended: false,
+        behaviours: { opensPR: {} },
+        outcomes: { done: { to: "checking", means: "the PR is open, moves on to the check" } },
+      },
+      checking: {
+        skill: "task-check",
+        attended: false,
+        outcomes: { ok: { to: "closed", means: "the PR is merged" } },
+      },
+    },
+    ...over,
+  };
+}
+
 function bugAt(state: string, flow: unknown = bugFlow()) {
   const w = setup();
   w.github.seedFlow("bug", flow);
@@ -93,6 +117,48 @@ describe("the flow's workspace", () => {
     expect(out).toContain("Open one PR from 40-crash-on-empty-input into develop if there is none yet:");
   });
 
+  test("parent: a branch off the parent issue's branch and, with opensPR, one PR into it", async () => {
+    const w = setup();
+    w.github.seedFlow("task", taskFlow());
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"], assignees: ["alice"] });
+    w.github.seedIssue({ number: 140, title: "Per-key limits", labels: ["type:task", "doing"], assignees: ["alice"] });
+    w.github.parents.set(140, 123);
+
+    const out = (await w.norn("take", "140")).stdout;
+
+    expect(out).toContain("Work in: /repo/.agents/worktrees/123-rate-limiting-140 (branch 123-rate-limiting-140)");
+    expect(out).toContain("Spec: .agents/specs/123-rate-limiting/spec.md (story #123)");
+    expect(out).toContain("Commit on 123-rate-limiting-140 and push. Open one PR from 123-rate-limiting-140 into 123-rate-limiting if there is none yet:");
+    expect(out).toContain("  gh pr create --base 123-rate-limiting --head 123-rate-limiting-140 --title 'Per-key limits' --body 'Part of #123. Task #140.'");
+  });
+
+  test("parent: later states see the PR into the parent's branch and its diff", async () => {
+    const w = setup();
+    w.github.seedFlow("task", taskFlow());
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"], assignees: ["alice"] });
+    w.github.seedIssue({ number: 140, title: "Per-key limits", labels: ["type:task", "checking"], assignees: ["alice"] });
+    w.github.parents.set(140, 123);
+
+    const out = (await w.norn("take", "140")).stdout;
+
+    expect(out).toContain("Task PR: 123-rate-limiting-140 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD");
+  });
+
+  test("parent: the transition comment links the parent's spec on the parent's branch", async () => {
+    const w = setup();
+    w.github.seedFlow("task", taskFlow());
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"], assignees: ["alice"] });
+    w.github.seedIssue({ number: 140, title: "Per-key limits", labels: ["type:task", "doing"], assignees: ["alice"] });
+    w.github.parents.set(140, 123);
+    await w.norn("take", "140");
+
+    await w.norn("done", "140", "done");
+
+    expect(w.github.comments(140).at(-1)).toBe(
+      "norn: doing → checking (done)\n\nSpec: https://github.com/acme/app/blob/123-rate-limiting/.agents/specs/123-rate-limiting/spec.md",
+    );
+  });
+
   test("none: no branch, no worktree, no PR", async () => {
     const w = bugAt("fixing");
 
@@ -106,6 +172,16 @@ describe("the flow's workspace", () => {
 });
 
 describe("state labels on demand", () => {
+  test("a missing label of the built-in slice flow is created as norn init makes it", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 131, labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+    await w.norn("take", "131");
+
+    await w.norn("done", "131");
+
+    expect(w.github.labelDefs.get("needs-review")).toEqual({ color: "5319e7", description: "Code review of the slice PR or the story PR" });
+  });
+
   test("a transition into a state whose label is missing creates it from the state's colour and description", async () => {
     const flow = bugFlow();
     Object.assign(flow.states.fixing, { color: "d93f0b", description: "an agent fixes the bug" });
@@ -221,7 +297,7 @@ describe("a broken flow", () => {
     const res = await w.norn("done", "40", "reproduced");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain('  workspace must be "none" or "own".');
+    expect(res.stdout).toContain('  workspace must be "none", "own" or "parent".');
     expect(w.github.labels(40).sort()).toEqual(["in-progress", "reproducing", "type:bug"]);
   });
 

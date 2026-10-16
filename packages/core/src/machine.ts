@@ -26,6 +26,8 @@ export interface Outcome {
   to: string;
   /** How the outcome is described in the briefing. */
   means: string;
+  /** How it is described instead when the issue's mode skips the state it leads to, so it lands further on. */
+  meansSkipped?: string;
   /** The outcome needs a note; this names it, e.g. "reason". */
   note?: string;
   /** After the transition, set needs-human; this is who must do what, e.g. an escalation's reason. */
@@ -80,13 +82,12 @@ export async function slicesOf(github: { subIssues(parent: number): Promise<Issu
   return (await github.subIssues(story)).filter((i) => kindOf(i) === "slice");
 }
 
+/** The step of a story or a new issue; an issue of a flow gets its step from the flow, see flowStep. */
 export function stepFor(issue: Issue): Step | null {
   // Two state labels: either could be the real one, so norn briefs neither.
   if (hasAmbiguousState(issue)) return null;
   const kind = kindOf(issue);
   const state = stateOf(issue);
-  // A story always gets a person's QA after the agent's; a slice only in mode:hil.
-  const hil = kind === "story" || issue.labels.includes("mode:hil");
   if (issue.labels.includes("needs-human") && state) {
     return {
       name: "resolving needs-human",
@@ -95,7 +96,7 @@ export function stepFor(issue: Issue): Step | null {
       outcomes: { "": { to: state, means: `clears needs-human, stays in ${state}` } },
     };
   }
-  if (kind !== "new" && state === "needs-review") {
+  if (kind === "story" && state === "needs-review") {
     return {
       name: "review",
       skill: "norn-review",
@@ -106,26 +107,20 @@ export function stepFor(issue: Issue): Step | null {
       },
     };
   }
-  if (kind !== "new" && state === "needs-qa") {
+  if (kind === "story" && state === "needs-qa") {
     return {
       name: "agent QA",
       skill: "norn-auto-qa",
       attended: false,
       evidence: true,
       outcomes: {
-        pass: hil
-          ? {
-              to: "needs-human-qa",
-              means: "every criterion you could check passed; moves on to QA by a person",
-              note: "evidence",
-              notify: kind === "story" ? "story" : "mode:hil",
-            }
-          : { to: "merge-queue", means: "every criterion passed, moves to the merge queue", note: "evidence" },
+        // A story always gets a person's QA after the agent's.
+        pass: { to: "needs-human-qa", means: "every criterion you could check passed; moves on to QA by a person", note: "evidence", notify: "story" },
         fail: { to: "qa-failed", means: "put the failures with their repros in the note", note: "evidence" },
       },
     };
   }
-  if (kind !== "new" && state === "needs-human-qa") {
+  if (kind === "story" && state === "needs-human-qa") {
     return {
       name: "human QA",
       skill: "norn-qa",
@@ -190,23 +185,6 @@ export function stepFor(issue: Issue): Step | null {
       },
     };
     if (state && phase1[state]) return phase1[state]!;
-  }
-  if (kind === "slice" && state === "merge-queue") {
-    return {
-      name: "merge",
-      skill: "norn-merge",
-      attended: false,
-      outcomes: { "": { to: "closed", means: "slice PR merged into the story branch" } },
-    };
-  }
-  if (kind === "slice" && (state === "ready-for-agent" || state === "implementation" || state === "changes-requested" || state === "qa-failed")) {
-    return {
-      name: "implementation",
-      skill: "norn-implement",
-      attended: false,
-      enterAs: "implementation",
-      outcomes: { "": { to: "needs-review", means: "implementation done, PR open" } },
-    };
   }
   return null;
 }

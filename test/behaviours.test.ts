@@ -61,7 +61,7 @@ describe("behaviours in a flow", () => {
     const res = await w.norn("take", "40");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain('  The state fixing uses the behaviour opensPR, which needs workspace to be "own", for its PR.\n');
+    expect(res.stdout).toContain('  The state fixing uses the behaviour opensPR, which needs workspace to be "own" or "parent", for its PR.\n');
   });
 
   test("a behaviour's parameters are an object, {} for none", async () => {
@@ -135,7 +135,7 @@ describe("countsFixRounds", () => {
     const res = await w.norn("take", "40");
 
     expect(w.github.labels(40).sort()).toEqual(["fixing", "in-progress", "type:bug"]);
-    expect(res.stdout).toContain("This is rework: the latest comment that sent #40 back lists what to fix.");
+    expect(res.stdout).toContain("This is rework: the latest review or QA comment on #40 lists what to fix. Read the issue: gh issue view 40 --comments");
   });
 
   test("rework stays briefed when the issue is taken again in the state it entered as", async () => {
@@ -321,5 +321,166 @@ describe("norn next on an issue of a flow", () => {
     const out = (await w.norn("next", "40")).stdout;
 
     expect(out).toBe('Issue #40 "Crash on empty input" is closed. Nothing left that you can do.');
+  });
+});
+
+/**
+ * A task under story #123, in the story's branch: waiting until its blockers
+ * close, then doing it with a PR into the story's branch, then merging it.
+ */
+function taskFlow(over: Record<string, unknown> = {}) {
+  return {
+    description: "A piece of a story, merged into the story's branch.",
+    start: "doing",
+    workspace: "parent",
+    triage: false,
+    states: {
+      waiting: {
+        skill: "task-do",
+        attended: false,
+        behaviours: { syncsBlocked: { to: "doing" } },
+        outcomes: {},
+      },
+      doing: {
+        skill: "task-do",
+        attended: false,
+        behaviours: { opensPR: {} },
+        outcomes: { done: { to: "merging", means: "the PR is open, moves on to merging" } },
+      },
+      merging: {
+        skill: "task-merge",
+        attended: false,
+        behaviours: { mergesSlice: {} },
+        outcomes: { "": { to: "closed", means: "the PR is merged into the story branch" } },
+      },
+    },
+    ...over,
+  };
+}
+
+/** Story #123 in implementation with task #140 in `state`, and task #141 waiting on #140. */
+function taskAt(state: string, flow: unknown = taskFlow()) {
+  const w = setup();
+  w.github.seedFlow("task", flow);
+  w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"], assignees: ["alice"] });
+  w.github.seedIssue({ number: 140, title: "Per-key limits", labels: ["type:task", state], assignees: ["alice"] });
+  w.github.seedIssue({ number: 141, title: "Docs", labels: ["type:task", "waiting"], assignees: ["alice"] });
+  for (const n of [140, 141]) w.github.parents.set(n, 123);
+  w.github.blockers.set(141, [140]);
+  w.github.branches.add("123-rate-limiting");
+  return w;
+}
+
+describe("mergesSlice", () => {
+  test("needs a flow that works in the parent's branch", async () => {
+    const w = taskAt("merging", taskFlow({ workspace: "own" }));
+
+    const res = await w.norn("take", "140");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain(
+      '  The state merging uses the behaviour mergesSlice, which needs workspace to be "parent", for the PR into the parent\'s branch.\n',
+    );
+  });
+
+  test("the briefing says how to merge the PR into the parent's branch", async () => {
+    const w = taskAt("merging");
+
+    const out = (await w.norn("take", "140")).stdout;
+
+    expect(out).toContain("Merge origin/123-rate-limiting into 123-rate-limiting-140, resolving conflicts if needed, and push.");
+    expect(out).toContain("Then merge the PR: gh pr merge 123-rate-limiting-140 --merge");
+    expect(out).not.toContain("Task PR:");
+  });
+
+  test("done is refused until the PR is merged into the parent's branch", async () => {
+    const w = taskAt("merging");
+    w.github.prs.push({ number: 50, head: "123-rate-limiting-140", base: "123-rate-limiting", state: "open" });
+    await w.norn("take", "140");
+
+    const res = await w.norn("done", "140");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("PR #50 from 123-rate-limiting-140 is not merged yet");
+    expect(w.github.issues.get(140)!.state).toBe("open");
+  });
+
+  test("resolving needs-human in the state needs no merged PR", async () => {
+    const w = taskAt("merging");
+    w.github.issues.get(140)!.labels.push("needs-human");
+    await w.norn("take", "140");
+
+    const res = await w.norn("done", "140");
+
+    expect(res.exitCode).toBe(0);
+    expect(w.github.labels(140).sort()).toEqual(["merging", "type:task"]);
+  });
+
+  test("with the PR merged, done closes the issue and leaves its worktree for tidy", async () => {
+    const w = taskAt("merging");
+    w.github.prs.push({ number: 50, head: "123-rate-limiting-140", base: "123-rate-limiting", state: "merged" });
+    await w.norn("take", "140");
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting-140");
+
+    const res = await w.norn("done", "140");
+
+    expect(res.exitCode).toBe(0);
+    expect(w.github.issues.get(140)!.state).toBe("closed");
+    expect(w.github.labels(140)).toEqual(["type:task"]);
+    expect(res.stdout).toContain(".agents/worktrees/123-rate-limiting-140");
+  });
+});
+
+describe("syncsBlocked", () => {
+  test("names a state of the flow to release to", async () => {
+    const flow = taskFlow();
+    flow.states.waiting.behaviours = { syncsBlocked: { to: "nowhere" } };
+    const w = taskAt("doing", flow);
+
+    const res = await w.norn("take", "140");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("  states.waiting.behaviours.syncsBlocked.to must be a state of the flow.\n");
+  });
+
+  test("an issue in the state has no step while blocked", async () => {
+    const w = taskAt("doing");
+
+    const res = await w.norn("take", "141");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("#141 is blocked by #140");
+    expect(w.github.labels(141).sort()).toEqual(["type:task", "waiting"]);
+  });
+
+  test("closing the last blocker releases the issue to the state syncsBlocked names", async () => {
+    const w = taskAt("merging");
+    w.github.prs.push({ number: 50, head: "123-rate-limiting-140", base: "123-rate-limiting", state: "merged" });
+    await w.norn("take", "140");
+
+    await w.norn("done", "140");
+
+    expect(w.github.labels(141).sort()).toEqual(["doing", "type:task"]);
+    expect(w.github.comments(141).at(-1)).toBe("norn: waiting → doing (automatic)\n\nAll blockers are closed.");
+  });
+
+  test("norn next on the parent releases an issue whose blockers closed", async () => {
+    const w = taskAt("doing");
+    w.github.issues.get(140)!.state = "closed";
+    w.github.issues.get(140)!.labels = ["type:task"];
+
+    await w.norn("next", "123");
+
+    expect(w.github.labels(141).sort()).toEqual(["doing", "type:task"]);
+  });
+
+  test("an issue released whose blocker reopens is blocked again", async () => {
+    const w = taskAt("doing");
+    w.github.issues.get(141)!.labels = ["type:task", "doing"];
+
+    await w.norn("next", "123");
+
+    expect(w.github.labels(141).sort()).toEqual(["type:task", "waiting"]);
+    expect(w.github.comments(141).at(-1)).toBe("norn: doing → waiting (automatic)\n\nBlocked by #140.");
   });
 });

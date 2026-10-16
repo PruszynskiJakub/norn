@@ -1,9 +1,9 @@
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
-import { FIX_STATES, STATES, kindOf, slicesOf, stateOf, type Outcome, type State } from "./machine.js";
+import { FIX_STATES, STATES, kindOf, slicesOf, stateOf, type Outcome } from "./machine.js";
 import { locate } from "./location.js";
 import { SLUG_MARK, slugLine, storySlug, type Slugs } from "./slug.js";
-import { sliceBranch, specPath, storyBranch } from "./text.js";
+import { specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
@@ -193,7 +193,7 @@ export async function applyOutcome(
   const resolved = !word && issue.labels.includes("needs-human") && !outcome.needsHuman;
   const why = word || (resolved ? "needs-human resolved" : "");
   const comment = [`norn: ${from} → ${outcome.to === "not-planned" ? "closed as not planned" : outcome.to}${why ? ` (${why})` : ""}`];
-  const spec = flow ? null : await specLink(ctx, issue);
+  const spec = await specLink(ctx, issue, flow);
   if (spec) comment.push("", `Spec: ${spec}`);
   // Triage may give the issue a repository flow, which it enters here.
   const given = outcome.flow ? await repositoryFlow(ctx, outcome.flow) : null;
@@ -232,22 +232,6 @@ export async function applyOutcome(
   }
 }
 
-/**
- * The automatic transitions after an outcome, run once its claim is released.
- * Each is best effort: norn next repeats them, so a failure is only reported.
- */
-export async function followUps(ctx: Ctx, issue: Issue, outcome: Outcome): Promise<Event[]> {
-  if (kindOf(issue) !== "slice" || outcome.to !== "closed") return [];
-  const story = await ctx.github.parentOf(issue.number);
-  if (!story) return [];
-  const events: Event[] = [];
-  const loc = await locate(issue, ctx);
-  if (loc && (await ctx.workspace.worktreeExists(loc.worktree))) events.push({ kind: "worktree-left-for-tidy", worktree: loc.worktree });
-  events.push(...(await bestEffort("unblock-slices", story, story, () => syncBlocked(ctx, story))));
-  events.push(...(await bestEffort("move-story-on", story, story, () => promoteStory(ctx, story))));
-  return events;
-}
-
 /** Runs fn; a failure becomes an event instead of an error. `retry` is the story whose norn next retries it. */
 export async function bestEffort(what: FollowUpTask, issue: number, retry: number, fn: () => Promise<Event[]>): Promise<Event[]> {
   try {
@@ -269,9 +253,10 @@ export async function ensureStoryBranch(ctx: Ctx, story: Issue): Promise<Ensured
   return { ok: true, created: true, branch };
 }
 
-async function specLink(ctx: Ctx, issue: Issue): Promise<string | null> {
-  let story = kindOf(issue) === "story" ? issue : null;
-  if (kindOf(issue) === "slice") {
+/** The spec a transition comment links: a story's own, or the parent's for an issue that works in its parent's branch. */
+async function specLink(ctx: Ctx, issue: Issue, flow: Flow | null): Promise<string | null> {
+  let story = !flow && kindOf(issue) === "story" ? issue : null;
+  if (flow?.workspace === "parent") {
     const p = await ctx.github.parentOf(issue.number);
     if (p) story = await ctx.github.getIssue(p);
   }
@@ -282,7 +267,7 @@ async function specLink(ctx: Ctx, issue: Issue): Promise<string | null> {
 }
 
 /** Changes labels on an issue this session does not hold, by taking a short claim. */
-async function withShortClaim(ctx: Ctx, n: number, fn: () => Promise<void>): Promise<boolean> {
+export async function withShortClaim(ctx: Ctx, n: number, fn: () => Promise<void>): Promise<boolean> {
   const user = await ctx.github.currentUser();
   const got = await acquire(ctx.github, n, { holder: user, session: ctx.session, since: ctx.now().toISOString() }, ctx.now(), ctx.config.staleAfterMs);
   if (!got.ok) return false;
@@ -295,13 +280,15 @@ async function withShortClaim(ctx: Ctx, n: number, fn: () => Promise<void>): Pro
   return true;
 }
 
-async function setState(ctx: Ctx, issue: Issue, to: State, why: string) {
-  const from = stateOf(issue);
+/** Moves an issue to `to` on norn's own, saying why, under a claim this session holds; `flow` is the issue's, when it runs one. */
+export async function setState(ctx: Ctx, issue: Issue, to: string, why: string, flow: Flow | null = null) {
+  const from = flow ? (flowStatesOf(issue, flow)[0] ?? null) : stateOf(issue);
   // A story from before the slug marker records it here, under the short claim.
-  const slug = kindOf(issue) === "story" ? await slugLine(ctx, issue) : null;
+  const slug = !flow && kindOf(issue) === "story" ? await slugLine(ctx, issue) : null;
+  if (flow) await ensureStateLabel(ctx, flow, to);
   await ctx.github.addLabels(issue.number, [to]);
   await ctx.github.comment(issue.number, `norn: ${from} → ${to} (automatic)\n\n${why}${slug ? `\n\n${slug}` : ""}`);
-  await ctx.github.removeLabels(issue.number, stateLabels(issue, to));
+  await ctx.github.removeLabels(issue.number, stateLabels(issue, to, flow));
 }
 
 /**
@@ -360,9 +347,9 @@ export const DEFAULT_STATE_LABEL = {
 } as const;
 
 /**
- * Creates the label of a state of a repository flow when the repository lacks
- * it, so a merged flow works without norn init. The colour and description come
- * from the state, or a default by kind. Built-in labels are made by norn init.
+ * Creates the label of a state of a flow when the repository lacks it, so a
+ * merged flow works without norn init. The colour and description come from the
+ * state, or a default by kind; a built-in flow's match what norn init makes.
  */
 export async function ensureStateLabel(ctx: Ctx, flow: Flow, state: string): Promise<void> {
   const s = flow.states[state];
@@ -396,26 +383,6 @@ export async function clearClosedState(ctx: Ctx, issue: Issue): Promise<boolean>
   const left = stateLabels(issue);
   if (issue.state !== "closed" || left.length === 0) return false;
   return withShortClaim(ctx, issue.number, () => ctx.github.removeLabels(issue.number, left));
-}
-
-/**
- * Brings blocked / ready-for-agent in line with native blocked-by relations
- * for the open slices of a story. Returns what changed.
- */
-export async function syncBlocked(ctx: Ctx, story: number): Promise<Event[]> {
-  const events: Event[] = [];
-  for (const slice of await slicesOf(ctx.github, story)) {
-    const state = stateOf(slice);
-    if (slice.state !== "open" || (state !== "blocked" && state !== "ready-for-agent")) continue;
-    const open = (await ctx.github.blockedBy(slice.number)).filter((b) => b.state === "open");
-    const want: State = open.length ? "blocked" : "ready-for-agent";
-    if (want === state) continue;
-    const why = open.length ? `Blocked by ${open.map((b) => `#${b.number}`).join(", ")}.` : "All blockers are closed.";
-    if (await withShortClaim(ctx, slice.number, () => setState(ctx, slice, want, why))) {
-      events.push({ kind: "slice-state-changed", issue: slice.number, state: want });
-    }
-  }
-  return events;
 }
 
 /** Once every slice is merged, opens the story PR and moves the story to needs-review. */
@@ -452,16 +419,14 @@ export type MergeRefusal =
   | { kind: "slice-pr-wrong-base"; issue: number; pr: number; head: string; base: string; storyBranch: string; merged: boolean }
   | { kind: "slice-pr-not-merged"; issue: number; pr: number; head: string; base: string };
 
-/** Precondition for finishing a merge: the slice PR is merged into the story branch. */
-export async function sliceMergeRefusal(ctx: Ctx, slice: Issue): Promise<MergeRefusal | null> {
+/** Precondition for finishing a merge: the PR from the issue's branch is merged into its parent's branch. */
+export async function mergeRefusal(ctx: Ctx, issue: Issue, flow: Flow): Promise<MergeRefusal | null> {
   const { github } = ctx;
-  const n = slice.number;
-  const storyNumber = await github.parentOf(n);
-  if (!storyNumber) return { kind: "not-in-story", issue: n };
-  const story = await github.getIssue(storyNumber);
-  const slug = await storySlug(ctx, story);
-  const head = sliceBranch(story.number, slug, n);
-  const base = storyBranch(story.number, slug);
+  const n = issue.number;
+  const loc = await locate(issue, ctx, flow);
+  if (!loc) return { kind: "not-in-story", issue: n };
+  const head = loc.branch;
+  const base = loc.base;
   const pr = await github.findPullRequest(head);
   if (!pr) return { kind: "no-slice-pr", issue: n, head };
   if (pr.base !== base) return { kind: "slice-pr-wrong-base", issue: n, pr: pr.number, head, base: pr.base, storyBranch: base, merged: pr.state === "merged" };

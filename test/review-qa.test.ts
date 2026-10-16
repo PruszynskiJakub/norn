@@ -59,6 +59,27 @@ describe("agent QA (needs-qa)", () => {
     expect(w.github.comments(131).at(-1)).toContain("Behaviour 1: ran it, saw it");
   });
 
+  test("an afk slice's pass goes straight to the merge queue, its one comment saying QA by a person was skipped", async () => {
+    const w = issue(["type:slice", "mode:afk", "needs-qa"]);
+    await w.norn("take", "131");
+
+    await w.norn("done", "131", "pass", "Behaviour 1: ran it, saw it");
+
+    expect(w.github.comments(131)).toEqual([
+      "norn: needs-qa → merge-queue (pass)\n\nSkipped needs-human-qa in mode:afk: it runs in mode:hil only.\n\nBehaviour 1: ran it, saw it",
+    ]);
+  });
+
+  test("a hil slice's pass hands it to a person for QA, notified for its mode", async () => {
+    const w = issue(["type:slice", "mode:hil", "needs-qa"]);
+    await w.norn("take", "131");
+
+    const res = await w.norn("done", "131", "pass", "Behaviour 1: ran it, saw it");
+
+    expect(res.stdout).toContain("A person does the next step, so do not take #131 again. norn has notified the user.");
+    expect(w.notifications.map((n) => n.body.split("\n")[0])).toEqual(["needs human QA (mode:hil)"]);
+  });
+
   test("the note is the evidence pack, so it is required", async () => {
     const w = issue(["type:slice", "mode:afk", "needs-qa"]);
     await w.norn("take", "131");

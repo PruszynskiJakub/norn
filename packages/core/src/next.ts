@@ -5,22 +5,12 @@ import { join } from "node:path";
 import { branchAt, createWorktreeCommand, locate } from "./location.js";
 import { isWithin, type Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
-import { uses } from "./behaviours.js";
-import { type Flow, type FlowError, flowNameOf, flowStatesOf, flowStep, type LoadedFlow, repositoryFlow } from "./flow.js";
+import { gateOf, holds, releaseBlocked, uses } from "./behaviours.js";
+import { type Flow, type FlowError, flowOf, flowStatesOf, flowStep, type LoadedFlow } from "./flow.js";
 import { STATES, kindOf, slicesOf, stateOf, statesOf, type Step, stepFor } from "./machine.js";
 import { storySlug } from "./slug.js";
 import { storyBranch } from "./text.js";
-import {
-  bestEffort,
-  clearClosedState,
-  closeMergedStory,
-  ensureStoryBranch,
-  leftState,
-  needsHumanReason,
-  promoteStory,
-  syncBlocked,
-  type Ctx,
-} from "./transitions.js";
+import { bestEffort, clearClosedState, closeMergedStory, ensureStoryBranch, leftState, needsHumanReason, promoteStory, type Ctx } from "./transitions.js";
 
 /** A repository flow by its name, the type of the issues that run it. */
 export interface NamedFlow {
@@ -161,7 +151,7 @@ async function reconcile(ctx: Ctx, storyNumber: number): Promise<Event[]> {
 export async function computeNext(ctx: Ctx, storyNumber: number, flow: LoadedFlow | null = null): Promise<NextReport> {
   if (flow) return computeNextInFlow(ctx, storyNumber, flow);
   const { github } = ctx;
-  await syncBlocked(ctx, storyNumber);
+  await releaseBlocked(ctx, storyNumber);
   const notes = await reconcile(ctx, storyNumber);
   const story = await github.getIssue(storyNumber);
   const slices = await slicesOf(github, storyNumber);
@@ -205,18 +195,16 @@ export async function computeNext(ctx: Ctx, storyNumber: number, flow: LoadedFlo
   return report;
 }
 
-/** The issue's broken repository flow, if its type names one, e.g. a slice of an overridden slice flow. */
-async function brokenFlow(ctx: Ctx, issue: Issue) {
-  const name = flowNameOf(issue);
-  const loaded = name === null ? null : await repositoryFlow(ctx, name);
-  return loaded && !loaded.ok ? loaded : null;
-}
-
+/** Sorts the story or one of its slices between people and agents; a slice runs its flow. */
 async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   const n = issue.number;
-  const broken = await brokenFlow(ctx, issue);
-  if (broken) {
-    report.waiting.push({ issue: n, reason: "invalid-flow", flow: broken.name, errors: broken.errors });
+  const loaded = await flowOf(ctx, issue);
+  if (loaded && !loaded.ok) {
+    report.waiting.push({ issue: n, reason: "invalid-flow", flow: loaded.name, errors: loaded.errors });
+    return;
+  }
+  if (loaded) {
+    await classifyInFlow(ctx, issue, report, loaded, "slice");
     return;
   }
   const state = stateOf(issue);
@@ -231,7 +219,7 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   }
   // The state itself says a person is needed; their agent takes it with them.
   if (state === "needs-human-qa") {
-    report.waiting.push({ issue: n, reason: "human-qa", of: kindOf(issue) === "story" ? "story" : "mode:hil", ...(await humanWork(ctx, issue)) });
+    report.waiting.push({ issue: n, reason: "human-qa", of: "story", ...(await humanWork(ctx, issue)) });
     return;
   }
   if (!state) {
@@ -239,14 +227,9 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     report.waiting.push({ issue: n, reason: "no-state" });
     return;
   }
-  if (state === "blocked") {
-    const open = (await ctx.github.blockedBy(n)).filter((b) => b.state === "open");
-    report.waiting.push({ issue: n, reason: "blocked", blockers: open.map((b) => b.number) });
-    return;
-  }
   const step = stepFor(issue);
   if (!step) return;
-  await offer(ctx, issue, report, { kind: kindOf(issue) === "slice" ? "slice" : "story", state, step, flow: null });
+  await offer(ctx, issue, report, { kind: "story", state, step, flow: null });
 }
 
 /** What can be done on an issue of a repository flow now: it has no slices, so only the issue itself. */
@@ -279,7 +262,7 @@ async function computeNextInFlow(ctx: Ctx, n: number, loaded: LoadedFlow): Promi
   }
   // A broken flow cannot run: a person fixes it first.
   if (!loaded.ok) report.waiting.push({ issue: n, reason: "invalid-flow", flow: loaded.name, errors: loaded.errors });
-  else await classifyInFlow(ctx, issue, report, loaded);
+  else await classifyInFlow(ctx, issue, report, loaded, "issue");
   report.nothingLeft = report.start.length === 0 && !report.waiting.some((w) => w.reason === "held");
   report.running = report.waiting.filter((w) => w.reason === "held" && w.holder.mine).length;
   report.slots = Math.max(0, ctx.config.maxParallel - report.running);
@@ -288,11 +271,12 @@ async function computeNextInFlow(ctx: Ctx, n: number, loaded: LoadedFlow): Promi
 }
 
 /**
- * Sorts an issue of a repository flow between people and agents: a human gate
- * and needs-human wait for a person, any other state is offered to start,
- * attended or not as the state says.
+ * Sorts an issue of a flow between people and agents: a human gate and
+ * needs-human wait for a person, a state that holds it waits for its blockers,
+ * any other state is offered to start, attended or not as the state says.
+ * `kind` is how it is offered: a slice of the story, or an issue on its own.
  */
-async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, { name, flow }: NamedFlow) {
+async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, { name, flow }: NamedFlow, kind: StartItem["kind"]) {
   const n = issue.number;
   const states = flowStatesOf(issue, flow);
   if (states.length > 1) {
@@ -320,12 +304,17 @@ async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, { name
     state = to;
   }
   if (uses(flow, state, "humanGate")) {
-    report.waiting.push({ issue: n, reason: "human-qa", of: `type:${name}`, ...(await humanWork(ctx, issue, flow)) });
+    report.waiting.push({ issue: n, reason: "human-qa", of: gateOf(flow, state, name), ...(await humanWork(ctx, issue, flow)) });
+    return;
+  }
+  if (holds(flow, state)) {
+    const open = (await ctx.github.blockedBy(n)).filter((b) => b.state === "open");
+    report.waiting.push({ issue: n, reason: "blocked", blockers: open.map((b) => b.number) });
     return;
   }
   const step = flowStep(issue, flow);
   if (!step) return;
-  await offer(ctx, issue, report, { kind: "issue", state, step, flow });
+  await offer(ctx, issue, report, { kind, state, step, flow });
 }
 
 /** Lists an item to start, or as held when a live claim is on it. */
@@ -404,10 +393,11 @@ export const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owne
 /** Why next refuses: n is not a story. */
 export type NotAStory = { kind: "is-a-slice"; issue: number; story: number | null } | { kind: "not-a-story"; issue: number };
 
-export async function notAStory(github: GitHub, n: number): Promise<NotAStory | null> {
-  const issue = await github.getIssue(n);
-  if (kindOf(issue) === "story") return null;
-  if (kindOf(issue) === "slice") return { kind: "is-a-slice", issue: n, story: await github.parentOf(n) };
+/** Why next refuses the issue, of `loaded` flow: one with no flow but a story, or one that works in its parent's branch, which moves on with it. */
+export async function notAStory(github: GitHub, issue: Issue, loaded: LoadedFlow | null): Promise<NotAStory | null> {
+  const n = issue.number;
+  if (loaded?.ok && loaded.flow.workspace === "parent") return { kind: "is-a-slice", issue: n, story: await github.parentOf(n) };
+  if (loaded || kindOf(issue) === "story") return null;
   return { kind: "not-a-story", issue: n };
 }
 
