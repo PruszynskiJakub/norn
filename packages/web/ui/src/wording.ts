@@ -322,7 +322,7 @@ const COUNTS = ["Nothing", "One thing", "Two things", "Three things", "Four thin
 
 export function heroTitle(n: number): string {
   const count = COUNTS[n] ?? `${n} things`;
-  return `${count} ${n === 1 ? "needs" : "need"} you${n ? "" : " right now"}`;
+  return `${count} ${n <= 1 ? "needs" : "need"} you${n ? "" : " right now"}`;
 }
 
 export function heroSub(working: number, quiet: number): string {
