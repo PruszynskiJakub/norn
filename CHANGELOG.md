@@ -4,6 +4,10 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Fixed
+
+- The dashboard shows a selected story's or slice's labels as GitHub has them, under its title; `needs-human` and `needs-human-qa` stand out in colour.
+
 ## [0.5.0] - 2026-10-16
 
 ### Added
