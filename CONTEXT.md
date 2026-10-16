@@ -28,16 +28,16 @@ The person a story is assigned to. They own its slices too, and only they merge 
 ## Process
 
 **Flow**:
-The process for one issue, as data: its states, the skill and outcomes of each, where it starts and its workspace. A repository defines a flow in `.agents/flows/<name>.json`, read from the base branch on GitHub. Stories and slices run norn's built-in process.
+The process for one issue, as data: its states, the skill and outcomes of each, where it starts and its workspace. A repository defines a flow in `.agents/flows/<name>.json`, read from the base branch on GitHub. norn ships the built-in `slice` flow in the same format; stories run norn's built-in process.
 
 **Type**:
 The flow an issue runs, carried as its `type:<name>` label, e.g. `type:bug` runs the flow `bug`.
 
 **Behaviour**:
-A built-in mechanic a state of a flow opts into by name, e.g. `opensPR`, `countsFixRounds` or `humanGate`. It adds its lines to the briefing, its checks and changes to `norn done`, and its follow-ups. The set is closed: a flow names behaviours, it cannot define them.
+A built-in mechanic a state of a flow opts into by name, e.g. `opensPR`, `countsFixRounds`, `humanGate`, `mergesSlice` or `syncsBlocked`. It adds its lines to the briefing, its checks and changes to `norn done`, and its follow-ups. The set is closed: a flow names behaviours, it cannot define them.
 
 **Workspace**:
-Where a flow's work happens: `none`, no branch; `own`, a branch of the issue's own with one PR into the base branch.
+Where a flow's work happens: `none`, no branch; `own`, a branch of the issue's own with one PR into the base branch; `parent`, a branch off the parent issue's branch with one PR into it, as for a slice.
 
 **Orphaned issue**:
 An issue left in a state its flow no longer has. norn moves it to the new name when the flow's `renamed` map names the state, and otherwise hands it to a person through `needs-human`.
