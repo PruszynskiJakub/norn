@@ -52,7 +52,7 @@ You ask your agent `norn-drive <issue>` to shape a story with you. Once it is sl
 norn is not on npm yet. While this repository is private, you need read access to it. Install a release tag, which carries the built CLI:
 
 ```sh
-npm install -D github:PruszynskiJakub/ai-engine#v0.6.1
+npm install -D github:PruszynskiJakub/ai-engine#v0.7.0
 ```
 
 Only release tags can be installed: a branch or commit has no built CLI.

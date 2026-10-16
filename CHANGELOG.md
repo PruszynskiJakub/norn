@@ -4,6 +4,8 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-16
+
 ### Changed
 
 - Every bundled skill is prefixed with `norn-`, so the skills are easy to tell apart from a project's own: `norn-drive <issue>`, `norn-deliver <story>`, and `norn-triage` through `norn-resolve` and `norn-tdd`. Briefings, `norn next`, the herdr hand-off prompts, the dashboard and the `AGENTS.md` section use the new names. After upgrading, run `npx norn init`, then delete the old unprefixed skill directories from `skills/` and their links from `.claude/skills/`.
@@ -154,7 +156,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.6.1...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.5.0...v0.5.1
