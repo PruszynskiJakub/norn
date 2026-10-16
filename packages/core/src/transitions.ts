@@ -58,8 +58,10 @@ const TRANSITION = /^norn: (\S+) → (\S+)/;
  * Fix rounds that count toward the limit, read from norn's transition comments:
  * entries into a fix state from another state, since the last time the limit
  * escalated. A person resolving that escalation so starts a fresh budget.
+ * `fixStates` are the states that count: the built-in ones, or those of a flow
+ * that opt into countsFixRounds.
  */
-export function fixRounds(comments: string[]): number {
+export function fixRounds(comments: string[], fixStates: readonly string[] = FIX_STATES): number {
   let rounds = 0;
   for (const body of comments) {
     if (FIX_LIMIT.test(body)) {
@@ -67,7 +69,7 @@ export function fixRounds(comments: string[]): number {
       continue;
     }
     const m = TRANSITION.exec(body);
-    if (m && m[1] !== m[2] && FIX_STATES.includes(m[2] as State)) rounds++;
+    if (m && m[1] !== m[2] && fixStates.includes(m[2])) rounds++;
   }
   return rounds;
 }

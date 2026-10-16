@@ -5,16 +5,35 @@ import { join } from "node:path";
 import { branchAt, createWorktreeCommand, locate } from "./location.js";
 import { isWithin, type Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
-import { STATES, kindOf, slicesOf, stateOf, statesOf, stepFor, type State } from "./machine.js";
+import { uses } from "./behaviours.js";
+import { type Flow, flowStatesOf, flowStep } from "./flow.js";
+import { STATES, kindOf, slicesOf, stateOf, statesOf, type Step, stepFor } from "./machine.js";
 import { storySlug } from "./slug.js";
 import { storyBranch } from "./text.js";
-import { bestEffort, clearClosedState, closeMergedStory, ensureStoryBranch, needsHumanReason, promoteStory, syncBlocked, type Ctx } from "./transitions.js";
+import {
+  bestEffort,
+  clearClosedState,
+  closeMergedStory,
+  ensureStoryBranch,
+  leftState,
+  needsHumanReason,
+  promoteStory,
+  syncBlocked,
+  type Ctx,
+} from "./transitions.js";
+
+/** A repository flow by its name, the type of the issues that run it. */
+export interface NamedFlow {
+  name: string;
+  flow: Flow;
+}
 
 export interface StartItem {
   issue: number;
-  kind: "story" | "slice";
+  /** An issue of a repository flow is an `issue`. */
+  kind: "story" | "slice" | "issue";
   title: string;
-  state: State;
+  state: string;
   step: string;
   skill: string;
   attended: boolean;
@@ -53,21 +72,28 @@ export type WaitItem = { issue: number } & (
   | { reason: "blocked"; blockers: number[] }
   /** `why` is the reason norn recorded when it set needs-human, as written; null when none is found. */
   | ({ reason: "needs-human"; why: string | null } & HumanPlace)
-  | ({ reason: "human-qa"; of: "story" | "mode:hil" } & HumanPlace)
+  /** `of` says why a person QAs it, as Outcome.notify does. */
+  | ({ reason: "human-qa"; of: string } & HumanPlace)
   /** Held by one of the user's own sessions (`holder.mine`): an agent of theirs at work, using a parallel slot. */
   | { reason: "held"; holder: Holder }
   | { reason: "owner-merge"; owner: string | null; into: string }
   | { reason: "no-state" }
-  | { reason: "ambiguous-state"; states: State[] }
+  | { reason: "ambiguous-state"; states: string[] }
+  /** The issue is in a state its flow no longer has; taking it hands it to a person. */
+  | { reason: "state-left"; state: string; flow: string }
 );
 
 export interface NextReport {
+  /** The story, or the issue of a repository flow, next is about. */
   story: number;
+  /** The repository flow the issue runs; absent for a story, which has slices. */
+  flow?: string;
   provider: Provider;
   maxParallel: number;
   title: string;
-  state: State | null;
-  branch: string;
+  state: string | null;
+  /** The story's branch; for an issue of a flow, its own, or null without a workspace. */
+  branch: string | null;
   slices: { total: number; merged: number };
   /** Housekeeping norn did, e.g. closing a merged story, or could not do. */
   notes: Event[];
@@ -126,8 +152,12 @@ async function reconcile(ctx: Ctx, storyNumber: number): Promise<Event[]> {
   return notes;
 }
 
-/** What can be done on a story now. Syncs blocked labels and catches up on housekeeping first. */
-export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextReport> {
+/**
+ * What can be done on a story now. Syncs blocked labels and catches up on
+ * housekeeping first. With `flow`, on an issue of that repository flow instead.
+ */
+export async function computeNext(ctx: Ctx, storyNumber: number, flow: NamedFlow | null = null): Promise<NextReport> {
+  if (flow) return computeNextInFlow(ctx, storyNumber, flow);
   const { github } = ctx;
   await syncBlocked(ctx, storyNumber);
   const notes = await reconcile(ctx, storyNumber);
@@ -202,12 +232,99 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   }
   const step = stepFor(issue);
   if (!step) return;
+  await offer(ctx, issue, report, { kind: kindOf(issue) === "slice" ? "slice" : "story", state, step, flow: null });
+}
+
+/** What can be done on an issue of a repository flow now: it has no slices, so only the issue itself. */
+async function computeNextInFlow(ctx: Ctx, n: number, flow: NamedFlow): Promise<NextReport> {
+  const issue = await ctx.github.getIssue(n);
+  const loc = await locate(issue, ctx, flow.flow);
+  const report: NextReport = {
+    story: n,
+    flow: flow.name,
+    provider: ctx.config.provider,
+    maxParallel: ctx.config.maxParallel,
+    title: issue.title,
+    state: issue.state === "closed" ? null : (flowStatesOf(issue, flow.flow)[0] ?? null),
+    branch: loc?.branch ?? null,
+    slices: { total: 0, merged: 0 },
+    start: [],
+    waiting: [],
+    notes: [],
+    nothingLeft: false,
+    closed: issue.state === "closed",
+    notPlanned: issue.stateReason === "not_planned",
+    notified: ctx.config.notifications !== null,
+    running: 0,
+    slots: ctx.config.maxParallel,
+  };
+  if (report.closed) {
+    report.nothingLeft = true;
+    return report;
+  }
+  await classifyInFlow(ctx, issue, report, flow);
+  report.nothingLeft = report.start.length === 0 && !report.waiting.some((w) => w.reason === "held");
+  report.running = report.waiting.filter((w) => w.reason === "held" && w.holder.mine).length;
+  report.slots = Math.max(0, ctx.config.maxParallel - report.running);
+  report.notified &&= toNotify(report).length > 0 || !report.waiting.some((w) => "heldBy" in w && w.heldBy);
+  return report;
+}
+
+/**
+ * Sorts an issue of a repository flow between people and agents: a human gate
+ * and needs-human wait for a person, any other state is offered to start,
+ * attended or not as the state says.
+ */
+async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, { name, flow }: NamedFlow) {
+  const n = issue.number;
+  const states = flowStatesOf(issue, flow);
+  if (states.length > 1) {
+    report.waiting.push({ issue: n, reason: "ambiguous-state", states });
+    return;
+  }
+  if (issue.labels.includes("needs-human")) {
+    report.waiting.push({ issue: n, reason: "needs-human", why: await needsHumanReason(ctx.github, n), ...(await humanWork(ctx, issue, flow)) });
+    return;
+  }
+  let state = states[0];
+  if (state === undefined) {
+    const left = await leftState(ctx, issue, flow);
+    const to = left === null ? undefined : flow.renamed?.[left];
+    if (left === null) {
+      report.waiting.push({ issue: n, reason: "no-state" });
+      return;
+    }
+    if (to === undefined) {
+      report.waiting.push({ issue: n, reason: "state-left", state: left, flow: name });
+      return;
+    }
+    // take follows the rename first, so the issue is offered in its new state.
+    issue = { ...issue, labels: [...issue.labels.filter((l) => l !== left), to] };
+    state = to;
+  }
+  if (uses(flow, state, "humanGate")) {
+    report.waiting.push({ issue: n, reason: "human-qa", of: `type:${name}`, ...(await humanWork(ctx, issue, flow)) });
+    return;
+  }
+  const step = flowStep(issue, flow);
+  if (!step) return;
+  await offer(ctx, issue, report, { kind: "issue", state, step, flow });
+}
+
+/** Lists an item to start, or as held when a live claim is on it. */
+async function offer(
+  ctx: Ctx,
+  issue: Issue,
+  report: NextReport,
+  { kind, state, step, flow }: { kind: StartItem["kind"]; state: string; step: Step; flow: Flow | null },
+) {
+  const n = issue.number;
   const held = await heldBy(ctx, n);
   if (held) {
     report.waiting.push({ issue: n, reason: "held", holder: held });
     return;
   }
-  const { loc, worktree, createWorktree, checkedOutAt, here } = await place(ctx, issue);
+  const { loc, worktree, createWorktree, checkedOutAt, here } = await place(ctx, issue, flow);
   report.start.push({
     issue: n,
     branch: loc?.branch ?? null,
@@ -217,7 +334,7 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     here,
     // Fresh for every agent: a new agent on an item whose claim went stale must not pass for the old holder.
     session: ctx.config.provider === "git" ? `norn-${n}-${ctx.nonce()}` : null,
-    kind: kindOf(issue) === "slice" ? "slice" : "story",
+    kind,
     title: issue.title,
     state,
     step: step.name,
@@ -228,8 +345,8 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
 }
 
 /** Where an item is worked on: its worktree, and whether it must be made first or is checked out elsewhere. */
-async function place(ctx: Ctx, issue: Issue) {
-  const loc = await locate(issue, ctx);
+async function place(ctx: Ctx, issue: Issue, flow: Flow | null = null) {
+  const loc = await locate(issue, ctx, flow);
   const worktree = loc ? join(ctx.workspace.root, loc.worktree) : null;
   const here = worktree !== null && isWithin(ctx.workspace.cwd, worktree);
   let createWorktree: string | null = null;
@@ -256,16 +373,16 @@ async function heldBy(ctx: Ctx, n: number): Promise<Holder | null> {
  * Where a person does their item: held by a session, it is being done there.
  * Otherwise, under herdr, in its worktree's pane, like every other step; elsewhere where they are.
  */
-async function humanWork(ctx: Ctx, issue: Issue): Promise<HumanPlace> {
+async function humanWork(ctx: Ctx, issue: Issue, flow: Flow | null = null): Promise<HumanPlace> {
   const held = await heldBy(ctx, issue.number);
   if (held) return { heldBy: held };
   if (ctx.config.provider !== "herdr") return {};
-  const { loc, worktree, createWorktree, checkedOutAt, here } = await place(ctx, issue);
+  const { loc, worktree, createWorktree, checkedOutAt, here } = await place(ctx, issue, flow);
   return { branch: loc?.branch ?? null, worktree, createWorktree, checkedOutAt, here };
 }
 
 /** Waiting items only a person can move on. */
-export const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owner-merge", "no-state", "ambiguous-state"];
+export const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owner-merge", "no-state", "ambiguous-state", "state-left"];
 
 /** Why next refuses: n is not a story. */
 export type NotAStory = { kind: "is-a-slice"; issue: number; story: number | null } | { kind: "not-a-story"; issue: number };

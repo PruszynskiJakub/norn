@@ -1,4 +1,5 @@
-import type { Flow } from "./flow.js";
+import { behaviourLines, EVIDENCE_FILES, humanQaLines } from "./behaviours.js";
+import { type Flow, flowStatesOf } from "./flow.js";
 import type { Issue } from "./github.js";
 import { locate, workIn, type Location, type WorkIn } from "./location.js";
 import { FIX_STATES, kindOf, type State, type Step } from "./machine.js";
@@ -52,7 +53,7 @@ export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: string 
     title: issue.title,
     step: { name: step.name, skill: step.skill, attended: step.attended },
     workIn: loc ? await workIn(loc, ctx.workspace, ctx.github, ctx.config.provider) : null,
-    instructions: flow ? flowLines(issue, step, loc) : processLines(issue, step, loc, rework),
+    instructions: flow ? await flowLines(issue, step, ctx, from, flow, loc) : processLines(issue, step, loc, rework),
     finish: finishCommands(n, step),
   };
 }
@@ -126,27 +127,20 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
   return lines;
 }
 
-/** The process around a step of a repository flow: the issue, and with its own workspace, the branch and its PR into the base branch. */
-function flowLines(issue: Issue, step: Step, loc: Location | null): string[] {
+/** The process around a step of a repository flow: the issue, then what the behaviours of its flow add. */
+async function flowLines(issue: Issue, step: Step, ctx: Ctx, from: string | null, flow: Flow, loc: Location | null): Promise<string[]> {
   const n = issue.number;
   const readIssue = `Read the issue: gh issue view ${n} --comments`;
-  const resolve = [`The latest needs-human comment gives the reason. ${readIssue}`, `Record the outcome on the issue: gh issue comment ${n}`];
-  if (step.skill === "norn-resolve") return resolve;
-  if (!loc) return [readIssue];
-  return [
-    readIssue,
-    `Commit on ${loc.branch} and push. Open one PR from ${loc.branch} into ${loc.base} if there is none yet:`,
-    // The title is free text from GitHub: quoted, so a " or $(...) in it can neither break nor run anything.
-    `  gh pr create --base ${sh(loc.base)} --head ${sh(loc.branch)} --title ${sh(issue.title)} --body ${sh(`Closes #${n}.`)}`,
-    `Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`,
-  ];
+  if (step.skill === "norn-resolve")
+    return [`The latest needs-human comment gives the reason. ${readIssue}`, `Record the outcome on the issue: gh issue comment ${n}`];
+  const state = flowStatesOf(issue, flow)[0] ?? null;
+  return [readIssue, ...(await behaviourLines({ ctx, issue, flow, state, from, step, loc }))];
 }
 
 /** How QA's results reach the issue: the note, evidence files, and for a person, remarks. */
 function qaLines(issue: Issue, step: Step, loc: Location, readIssue: string): string[] {
   const n = issue.number;
-  const files =
-    "Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.";
+  const files = EVIDENCE_FILES;
   if (step.skill === "norn-auto-qa") {
     const lines = ["Your note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.", files];
     if (kindOf(issue) === "slice" && issue.labels.includes("mode:afk")) {
@@ -160,15 +154,7 @@ function qaLines(issue: Issue, step: Step, loc: Location, readIssue: string): st
     return lines;
   }
   if (step.skill === "norn-qa") {
-    return [
-      `Start from the agent's QA comment on #${n}: its evidence, and what it left for a person. ${readIssue}`,
-      `Run the app from ${loc.branch} on this machine and walk the user through what is left, plus anything in the evidence they question.`,
-      "Tie each remark the user brings to a criterion; a remark on a criterion fails it. For a remark outside the criteria, the user decides:",
-      `  follow up (the default): gh issue create --title "<remark>" --body "From QA of #${n}: <remark>" (it goes through triage)`,
-      "  pull it in: it fails this item, like a criterion",
-      "  drop it: say so in the note",
-      `Every failure needs a repro. ${files}`,
-    ];
+    return [`Start from the agent's QA comment on #${n}: its evidence, and what it left for a person. ${readIssue}`, ...humanQaLines(n, loc.branch)];
   }
   return [];
 }

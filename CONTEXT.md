@@ -33,6 +33,9 @@ The process for one issue, as data: its states, the skill and outcomes of each, 
 **Type**:
 The flow an issue runs, carried as its `type:<name>` label, e.g. `type:bug` runs the flow `bug`.
 
+**Behaviour**:
+A built-in mechanic a state of a flow opts into by name, e.g. `opensPR`, `countsFixRounds` or `humanGate`. It adds its lines to the briefing, its checks and changes to `norn done`, and its follow-ups. The set is closed: a flow names behaviours, it cannot define them.
+
 **Workspace**:
 Where a flow's work happens: `none`, no branch; `own`, a branch of the issue's own with one PR into the base branch.
 

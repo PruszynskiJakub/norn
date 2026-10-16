@@ -26,6 +26,13 @@ function bugFlow(over: Record<string, unknown> = {}) {
   };
 }
 
+/** The bug flow with its own branch, where fixing opens the PR. */
+function prFlow() {
+  const flow = bugFlow({ workspace: "own" });
+  Object.assign(flow.states.fixing, { behaviours: ["opensPR"] });
+  return flow;
+}
+
 function bugAt(state: string, flow: unknown = bugFlow()) {
   const w = setup();
   w.github.seedFlow("bug", flow);
@@ -51,8 +58,8 @@ describe("a repository flow", () => {
 });
 
 describe("the flow's workspace", () => {
-  test("own: a branch of the issue's own and one PR from it into the base branch", async () => {
-    const w = bugAt("fixing", bugFlow({ workspace: "own" }));
+  test("own: a branch of the issue's own and, with opensPR, one PR from it into the base branch", async () => {
+    const w = bugAt("fixing", prFlow());
 
     const out = (await w.norn("take", "40")).stdout;
 
@@ -76,9 +83,9 @@ describe("the flow's workspace", () => {
   });
 
   test("own: the PR goes into the team's base branch", async () => {
-    const w = bugAt("fixing", bugFlow({ workspace: "own" }));
+    const w = bugAt("fixing", prFlow());
     w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ baseBranch: "develop" }));
-    w.github.seedFlow("bug", bugFlow({ workspace: "own" }), "develop");
+    w.github.seedFlow("bug", prFlow(), "develop");
 
     const out = (await w.norn("take", "40")).stdout;
 
