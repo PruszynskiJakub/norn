@@ -1,6 +1,6 @@
 ---
 name: norn-deliver
-description: Runs a norn story unattended from implementation until it needs a human. Invoke as `norn-deliver <story id>` once slicing is done.
+description: Runs a norn story's unattended steps, its slices first, until it needs a human. Invoke as `norn-deliver <story id>` once slicing is done.
 argument-hint: "<story>"
 ---
 
@@ -20,8 +20,8 @@ Run `norn tidy` once before the loop: it clears what closed issues left behind.
 
    Prompt for each subagent: `Work in <worktree>. Run norn take <issue>, follow its briefing to the end, and finish with the norn command it gives.`
 3. Wait for the subagents to finish. Under herdr: `herdr agent wait norn-<issue> --until done --until blocked`. Then go back to step 1.
-4. When all slices are merged, `norn next` offers story review, the agent's story QA and any story fixes; run them the same way.
-5. Stop when `norn next` says there is nothing left that you can do. That covers the story reaching QA by a person, only human-waiting items being left (also when a person is already doing them), and the story being closed. Run `norn tidy` once more. If `norn next` says it has already notified the user, it has; if notifications are off it says nothing about it, and your report is the only notice the user gets.
+4. When all slices are merged, `norn next` offers the story's own unattended steps, e.g. its review, the agent's QA and any fixes; run them the same way.
+5. Stop when `norn next` says there is nothing left that you can do. That covers the story reaching a human gate, where a person checks the work, only human-waiting items being left (also when a person is already doing them), and the story being closed. Run `norn tidy` once more. If `norn next` says it has already notified the user, it has; if notifications are off it says nothing about it, and your report is the only notice the user gets.
 
 Done when you have run the final `norn tidy` and given the user the report: what is merged, what is waiting and why, and who needs to act. The reasons come from `norn status <story>` and the "Waiting for a human" list.
 
