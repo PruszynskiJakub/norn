@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { GhGitHub, type Exec } from "../src/gh.js";
+import { type Exec, GhGitHub } from "@psdd/github-gh";
 
 interface Call {
   args: string[];
@@ -78,8 +78,7 @@ describe("GhGitHub claims", () => {
   test("readClaim follows the ref to its commit; a missing ref is no claim", async () => {
     const { exec } = scripted((c) => {
       if (path(c) === "repos/{owner}/{repo}/git/ref/psdd/claims/131") return { stdout: { object: { sha: "c1" } } };
-      if (path(c) === "repos/{owner}/{repo}/git/commits/c1")
-        return { stdout: { message: JSON.stringify({ holder: "a", session: "s", since: "t" }) } };
+      if (path(c) === "repos/{owner}/{repo}/git/commits/c1") return { stdout: { message: JSON.stringify({ holder: "a", session: "s", since: "t" }) } };
       if (path(c) === "repos/{owner}/{repo}/git/ref/psdd/claims/132") return { code: 1, stderr: "Not Found (HTTP 404)" };
     });
     const gh = new GhGitHub(exec);
@@ -131,7 +130,15 @@ describe("GhGitHub paged lists", () => {
   });
 
   test("sub-issues from another repository are left out", async () => {
-    const issue = (number: number, repo: string) => ({ id: number, number, title: "t", state: "open", labels: [], assignees: [], repository_url: `https://api.github.com/repos/${repo}` });
+    const issue = (number: number, repo: string) => ({
+      id: number,
+      number,
+      title: "t",
+      state: "open",
+      labels: [],
+      assignees: [],
+      repository_url: `https://api.github.com/repos/${repo}`,
+    });
     const { exec } = scripted((c) => {
       if (c.args.includes("--paginate")) return { stdout: [issue(131, "acme/app"), issue(7, "acme/other")].map((i) => JSON.stringify(i)).join("\n") };
       if (path(c) === "repos/{owner}/{repo}") return { stdout: { url: "https://api.github.com/repos/acme/app" } };

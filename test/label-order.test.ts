@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 /** Story #123 in implementation with slice #127 in implementation, held by this session. */
 async function sliceInImplementation() {

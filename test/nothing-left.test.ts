@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 function stuckStory() {
   const w = setup();
@@ -78,7 +78,11 @@ describe("psdd next when nothing is left", () => {
     const w = stuckStory();
     const report = JSON.parse((await w.psdd("next", "123", "--json")).stdout);
     expect(report.nothingLeft).toBe(true);
-    expect(report.waiting[1]).toMatchObject({ issue: 131, reason: "needs-human", detail: 'escalated: "Redis client times out in tests" (3 fix rounds reached)' });
+    expect(report.waiting[1]).toMatchObject({
+      issue: 131,
+      reason: "needs-human",
+      detail: 'escalated: "Redis client times out in tests" (3 fix rounds reached)',
+    });
   });
 });
 

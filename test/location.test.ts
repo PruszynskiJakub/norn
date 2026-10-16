@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { createWorktreeCommand, type Location } from "../src/location.js";
+import { createWorktreeCommand, type Location } from "@psdd/core";
 
 const slice: Location = {
   branch: "123-rate-limiting-131",

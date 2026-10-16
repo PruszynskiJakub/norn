@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { acquire } from "../src/claims.js";
-import { FakeGitHub } from "./fake-github.js";
+import { acquire } from "@psdd/core";
+import { FakeGitHub } from "@psdd/testing";
 
 const now = new Date("2026-10-13T15:00:00Z");
 const twoHours = 2 * 3_600_000;
@@ -34,7 +34,11 @@ describe("stale-claim takeover", () => {
     await gh.createClaim(132, { holder: "bob", session: "running", since: now.toISOString() });
 
     expect(await acquire(gh, 131, record("a"), now, twoHours)).toMatchObject({ ok: false });
-    expect(await acquire(gh, 131, record("a"), now, twoHours, { takeover: true })).toMatchObject({ ok: true, ownTakeover: true, tookOver: { session: "stopped" } });
+    expect(await acquire(gh, 131, record("a"), now, twoHours, { takeover: true })).toMatchObject({
+      ok: true,
+      ownTakeover: true,
+      tookOver: { session: "stopped" },
+    });
     expect(await acquire(gh, 132, record("a"), now, twoHours, { takeover: true })).toMatchObject({ ok: false, held: { holder: "bob" } });
     expect(gh.claim(132)?.session).toBe("running");
   });

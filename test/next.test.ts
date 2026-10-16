@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 /** The PRD's example: story #123 with 5 slices, 2 merged. */
 function prdExample() {
@@ -252,10 +252,7 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     const res = await w.psdd("next", "123");
 
     expect(res.stdout).toContain(
-      [
-        "  - #129 needs human QA (mode:hil).",
-        "    You are in its worktree: if the user does it now, take it in this session.",
-      ].join("\n"),
+      ["  - #129 needs human QA (mode:hil).", "    You are in its worktree: if the user does it now, take it in this session."].join("\n"),
     );
     expect(res.stdout).not.toContain("herdr agent start psdd-129");
   });

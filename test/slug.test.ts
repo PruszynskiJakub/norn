@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 function rename(w: ReturnType<typeof setup>, n: number, title: string) {
   w.github.issues.get(n)!.title = title;

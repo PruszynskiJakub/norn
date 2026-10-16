@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 /**
  * Story #123 with slice #127 merged into the story branch and slice #128 still
@@ -143,7 +143,9 @@ describe("psdd tidy", () => {
     const res = await w.psdd("tidy");
 
     expect(w.workspace.removed).toEqual([]);
-    expect(res.stdout).toContain("/repo/.agents/worktrees/123-rate-limiting-127: psdd is running inside it. Run psdd tidy from another directory to remove it.");
+    expect(res.stdout).toContain(
+      "/repo/.agents/worktrees/123-rate-limiting-127: psdd is running inside it. Run psdd tidy from another directory to remove it.",
+    );
   });
 
   test("reports a removal that fails, and the rest still runs", async () => {

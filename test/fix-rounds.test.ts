@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 /** A slice in needs-review whose psdd comments show `rounds` earlier failures. */
 function sliceWithRounds(rounds: number, state = "needs-review") {
@@ -40,9 +40,7 @@ describe("fix-round limit", () => {
     const res = await w.psdd("done", "131", "request-changes", "Redis client times out in tests");
 
     expect(w.github.labels(131).sort()).toEqual(["changes-requested", "mode:afk", "needs-human", "type:slice"]);
-    expect(w.github.comments(131).at(-1)).toContain(
-      'psdd: needs-human — escalated: "Redis client times out in tests" (3 fix rounds reached)',
-    );
+    expect(w.github.comments(131).at(-1)).toContain('psdd: needs-human — escalated: "Redis client times out in tests" (3 fix rounds reached)');
     expect(res.stdout).toContain("#131 has reached 3 fix rounds, so it now needs a human instead of another round of implement.");
   });
 

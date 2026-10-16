@@ -1,4 +1,6 @@
 node_modules
 dist
+.tsbuild/
 .idea/
 .claude/worktrees/
+*.tsbuildinfo

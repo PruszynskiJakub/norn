@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 /** Story #123 in implementation with slices 127 → 131 → 132 chained by blocked-by, plus independent 128. */
 function storyWithSlices() {

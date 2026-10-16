@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 /** Story #123 in implementation whose last open slice #127 has its PR merged. */
 function lastSliceMerged() {

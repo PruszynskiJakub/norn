@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 test("a story runs from new issue to its story PR, driven only through psdd", async () => {
   const w = setup();
@@ -32,7 +32,7 @@ test("a story runs from new issue to its story PR, driven only through psdd", as
   expect(await step("next", "123")).toContain(`psdd take ${redis}`);
   expect(await step("next", "123")).toContain(`#${perKey} is blocked by #${redis}.`);
 
-  const runSlice = async (n: number, title: string, hil: boolean) => {
+  const runSlice = async (n: number, _title: string, hil: boolean) => {
     await step("take", String(n));
     gh.prs.push({ number: n + 5000, head: `123-rate-limiting-${n}`, base: "123-rate-limiting", state: "open" });
     await step("done", String(n));

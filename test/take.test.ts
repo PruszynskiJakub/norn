@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 describe("psdd take", () => {
   test("a new unlabeled issue is claimed and briefed for triage", async () => {
@@ -86,7 +86,9 @@ describe("taking over a stopped session of your own", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe(
-      ["#123 is held by @bob (since 14:02). --takeover only takes over your own sessions.", "Ask them to release it, or wait until the claim goes stale."].join("\n"),
+      ["#123 is held by @bob (since 14:02). --takeover only takes over your own sessions.", "Ask them to release it, or wait until the claim goes stale."].join(
+        "\n",
+      ),
     );
     expect(w.github.claim(123)).toMatchObject({ holder: "bob", session: "bobs-session" });
   });

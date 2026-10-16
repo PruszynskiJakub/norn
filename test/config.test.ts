@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 const TEAM = ".agents/psdd.config.json";
 const LOCAL = ".agents/psdd.config.local.json";
@@ -17,7 +17,9 @@ describe("configuration", () => {
 
     const res = await w.psdd("take", "123");
 
-    expect(res.stdout).toContain("git -C /repo fetch origin develop && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting -b 123-rate-limiting origin/develop");
+    expect(res.stdout).toContain(
+      "git -C /repo fetch origin develop && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting -b 123-rate-limiting origin/develop",
+    );
   });
 
   test("the local provider wins over the team file", async () => {
