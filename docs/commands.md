@@ -33,7 +33,7 @@ Sets norn up in the current repository. Running it again is safe and refreshes w
 - **Agent instructions.** Writes a short norn section between `<!-- norn:start -->` and `<!-- norn:end -->` into `AGENTS.md` and `CLAUDE.md`, whichever exist. With neither, it creates `AGENTS.md` and a `CLAUDE.md` that imports it.
 - **Files.** Creates `.agents/specs/` and the team config `.agents/norn.config.json`, taking `baseBranch` from the repository's default branch. Adds `.agents/worktrees/` and `.agents/norn.config.local.json` to `.gitignore`.
 - **Version.** Records the running norn's version as [`nornVersion`](configuration.md#the-norn-version) in the team config. On a repository set up before, it changes `nornVersion` and no other setting, and reports the change next to the skills it updated, so the two are committed together. It refuses when the repository's `nornVersion` is newer than your norn: upgrade norn instead of rolling the team's skills back.
-- **Labels.** Creates norn's labels on the GitHub repository.
+- **Labels.** Creates norn's labels on the GitHub repository: every state of the valid [flows](flows.md) on the base branch, built-in or the repository's, `type:<flow>` for each flow, and the flags `in-progress`, `needs-human`, `mode:afk` and `mode:hil`. A state's label takes its `color` and `description`, or a default for its kind. An invalid flow is skipped; `norn doctor` reports it. Labels are never deleted.
 
 It ends by suggesting `norn doctor`, which checks what `init` cannot set up.
 
@@ -43,7 +43,7 @@ It ends by suggesting `norn doctor`, which checks what `init` cannot set up.
 npx norn next <story>
 ```
 
-Lists what can be done on the story now, each item with the command that starts it, and what is waiting and why. It is the entry point for `norn-deliver`. On an issue of a [repository flow](how-it-works.md#repository-flows) it lists the issue itself: for a person at a human gate, else to start, attended as its state says.
+Lists what can be done on the story now, each item with the command that starts it, and what is waiting and why. It is the entry point for `norn-deliver`. On an issue of a [repository flow](flows.md) it lists the issue itself: for a person at a human gate, else to start, attended as its state says.
 
 ```text
 Story #123 "Rate limiting" is in implementation. 2 of 7 slices are merged
@@ -173,7 +173,8 @@ Checks the whole setup at once and lists every check, each with the exact comman
 | `git` | You are in a git checkout whose `origin` is on GitHub |
 | `base-branch` | `baseBranch` exists on GitHub |
 | `permission` | You have write access or higher to the repository |
-| `labels` | All of norn's labels exist |
+| `labels` | The labels of every valid flow and norn's flags exist, as `init` creates them; a label no flow uses (a `type:`, a built-in state or a state a flow renamed) warns, and is never deleted |
+| `flows` | The flows on the base branch, and every flow file in your working copy that differs from it, are valid; the skills they name are installed. It lists, as a warning, the open issues your local flow edits would orphan: those in a state the edit drops without naming it in `renamed` |
 | `config` | The team and local config are valid; their warnings show as a warning |
 | `version` | `nornVersion` is set and compatible with your norn; a compatible difference warns |
 | `skills` | Every skill the briefings name is in `skills/` and linked from `.claude/skills/`; a skill that differs from the bundled copy warns, except under `NORN_SKILLS_SOURCE` |
@@ -181,6 +182,8 @@ Checks the whole setup at once and lists every check, each with the exact comman
 | `provider` | The worktree provider matches the environment, as `take` requires |
 
 Each check shows as `✓` ok, `!` warning, `✗` fail, or `-` skipped when a check it needs did not pass, e.g. `skipped, needs gh`. It exits 1 only when a check fails, so CI can run it without failing on a warning. `--json` gives `{ ok, checks: [{ id, level, message, fix }] }`.
+
+The `flows` check validates your uncommitted `.agents/flows/*.json` before you open the PR, so a broken flow never reaches the base branch. A local file the same as the base branch's is reported once, as the base branch's.
 
 `doctor` changes nothing and never refuses: an invalid config, an incompatible version or a run outside a checkout are reported as checks.
 
@@ -190,7 +193,7 @@ Each check shows as `✓` ok, `!` warning, `✗` fail, or `-` skipped when a che
 npx norn flows export <name>
 ```
 
-Writes norn's built-in flow `<name>`, `story` or `slice`, to `.agents/flows/<name>.json` as a starting copy for the team's own version. Once that file is merged into the base branch, it replaces the built-in flow of its name completely: norn takes nothing from the built-in one, for triage, `take`, `done`, `next` and `add-slice` alike. Unchanged, the copy runs exactly like the built-in flow. See [Repository flows](how-it-works.md#repository-flows) for the format.
+Writes norn's built-in flow `<name>`, `story` or `slice`, to `.agents/flows/<name>.json` as a starting copy for the team's own version. Once that file is merged into the base branch, it replaces the built-in flow of its name completely: norn takes nothing from the built-in one, for triage, `take`, `done`, `next` and `add-slice` alike. Unchanged, the copy runs exactly like the built-in flow. See [Repository flows](flows.md) for the format.
 
 ```text
 Wrote .agents/flows/story.json, a copy of the built-in story flow.
