@@ -288,6 +288,35 @@ async function setState(ctx: Ctx, issue: Issue, to: State, why: string) {
 }
 
 /**
+ * The state an issue of a repository flow was left in that the flow no longer
+ * has; null when it carries a state of the flow, or never had one. A label the
+ * flow's `renamed` names counts; else the state norn last moved it to.
+ */
+export async function leftState(ctx: Ctx, issue: Issue, flow: Flow): Promise<string | null> {
+  if (issue.state === "closed" || flowStatesOf(issue, flow).length) return null;
+  const renamed = Object.keys(flow.renamed ?? {}).find((s) => issue.labels.includes(s));
+  if (renamed) return renamed;
+  const comments = await ctx.github.listComments(issue.number);
+  for (const body of [...comments].reverse()) {
+    const t = parseTransitionComment(body);
+    if (!t) continue;
+    const ended = t.to === "closed" || t.to === "closed as not planned";
+    return ended || Object.hasOwn(flow.states, t.to) ? null : t.to;
+  }
+  return null;
+}
+
+/** Moves an issue in a renamed state to its new name, under the claim this session holds. */
+export async function followRename(ctx: Ctx, issue: Issue, flow: Flow, name: string, from: string, to: string): Promise<void> {
+  const n = issue.number;
+  await ensureStateLabel(ctx, flow, to);
+  await ctx.github.addLabels(n, [to]);
+  await ctx.github.comment(n, `norn: ${from} → ${to} (automatic)\n\nThe flow ${name} renamed the state ${from} to ${to}.`);
+  await ctx.github.removeLabels(n, [from]);
+  issue.labels = [...issue.labels.filter((l) => l !== from), to];
+}
+
+/**
  * Every state label on the issue except `keep`: of its repository flow, or of
  * the built-in process. A failed removal can leave two state labels; removing
  * all of them on the next transition cleans that up.

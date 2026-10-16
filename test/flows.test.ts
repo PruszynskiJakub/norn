@@ -315,4 +315,16 @@ describe("a flow that changed under issues in progress", () => {
     expect(res.stdout).toContain("  renamed moves verifying to checking, which is not one of its states.");
     expect(res.stdout).not.toContain("repro to");
   });
+
+  test("take moves an issue in a renamed state to its new name, with a transition comment, and briefs that state", async () => {
+    const w = bugAt("repro", bugFlow({ renamed: { repro: "reproducing" } }));
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("Its step is reproducing.");
+    expect(res.stdout).toContain("Invoke the skill: bug-repro\n");
+    expect(w.github.labels(40).sort()).toEqual(["in-progress", "reproducing", "type:bug"]);
+    expect(w.github.comments(40)).toEqual(["norn: repro → reproducing (automatic)\n\nThe flow bug renamed the state repro to reproducing."]);
+  });
 });
