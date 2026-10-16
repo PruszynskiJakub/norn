@@ -386,6 +386,8 @@ function flowError(e: FlowError): string {
       return `It is not valid JSON: ${e.detail}`;
     case "field-invalid":
       return `${e.path || "The file"} must be ${e.expected}.`;
+    case "field-unknown":
+      return `${e.path} is not a field of a flow; check its spelling.`;
     case "start-unknown":
       return `start names ${e.start}, which is not one of its states.`;
     case "target-unknown":

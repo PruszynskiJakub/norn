@@ -56,6 +56,8 @@ export type FlowError =
   | { kind: "not-json"; detail: string }
   /** A field is missing or has the wrong type; `path` is e.g. "states.fixing.outcomes.fixed.to". */
   | { kind: "field-invalid"; path: string; expected: string }
+  /** A field the format does not have, e.g. a misspelt one, which norn would otherwise ignore. */
+  | { kind: "field-unknown"; path: string }
   | { kind: "start-unknown"; start: string }
   | { kind: "target-unknown"; state: string; word: string; to: string }
   /** `renamed` moves the old state `from` to `to`, which is not a state of the flow. */
@@ -79,6 +81,11 @@ export type FlowError =
   | { kind: "behaviour-needs"; state: string; behaviour: string; field: string; expected: string }
   /** The flow's name is one norn keeps for itself, e.g. reject, triage's outcome. */
   | { kind: "flow-reserved"; flow: string };
+
+/** The fields of a flow file, of a state and of an outcome; $schema lets an editor find the flow JSON Schema. */
+const FLOW_FIELDS = ["$schema", "description", "start", "workspace", "triage", "states", "renamed"];
+const STATE_FIELDS = ["skill", "attended", "name", "enterAs", "description", "color", "evidence", "when", "passThrough", "behaviours", "outcomes"];
+const OUTCOME_FIELDS = ["to", "means", "meansSkipped", "note", "needsHuman", "notify"];
 
 /** Ends every flow can lead to; no state may take these names. */
 export const RESERVED_TARGETS = ["closed", "not-planned"] as const;
@@ -114,6 +121,10 @@ export function validateFlow(data: unknown): FlowError[] {
     field("", "an object");
     return errors;
   }
+  const unknown = (at: string, value: Record<string, unknown>, fields: string[]) => {
+    for (const key of Object.keys(value)) if (!fields.includes(key)) errors.push({ kind: "field-unknown", path: at ? `${at}.${key}` : key });
+  };
+  unknown("", data, FLOW_FIELDS);
   if (typeof data.description !== "string") field("description", "a string");
   if (typeof data.start !== "string") field("start", "a string");
   if (data.workspace !== "none" && data.workspace !== "own" && data.workspace !== "parent") field("workspace", '"none", "own" or "parent"');
@@ -130,9 +141,11 @@ export function validateFlow(data: unknown): FlowError[] {
       field(at, "an object");
       continue;
     }
+    unknown(at, state, STATE_FIELDS);
     if (typeof state.skill !== "string") field(`${at}.skill`, "a string");
     if (typeof state.attended !== "boolean") field(`${at}.attended`, "true or false");
     for (const key of ["name", "description", "color"]) if (state[key] !== undefined && typeof state[key] !== "string") field(`${at}.${key}`, "a string");
+    if (typeof state.color === "string" && !/^[0-9a-fA-F]{6}$/.test(state.color)) field(`${at}.color`, "a hex colour without the #, e.g. 1d76db");
     if (state.evidence !== undefined && typeof state.evidence !== "boolean") field(`${at}.evidence`, "true or false");
     if (state.behaviours !== undefined) checkBehaviours(data, name, state.behaviours, errors);
     if (state.enterAs !== undefined && (typeof state.enterAs !== "string" || !Object.hasOwn(states, state.enterAs))) {
@@ -153,6 +166,7 @@ export function validateFlow(data: unknown): FlowError[] {
         field(o, "an object");
         continue;
       }
+      unknown(o, outcome, OUTCOME_FIELDS);
       if (typeof outcome.means !== "string") field(`${o}.means`, "a string");
       for (const key of ["note", "needsHuman", "meansSkipped"])
         if (outcome[key] !== undefined && typeof outcome[key] !== "string") field(`${o}.${key}`, "a string");
@@ -198,7 +212,13 @@ function checkBehaviours(flow: Record<string, unknown>, state: string, behaviour
     const rule: Behaviour = BEHAVIOURS[behaviour];
     if (!isObject(params)) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}`, expected: "an object of parameters, {} for none" });
     else {
-      for (const p of rule.params?.(params) ?? []) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${p.param}`, expected: p.expected });
+      const declared = rule.params ?? {};
+      for (const [name, p] of Object.entries(declared)) {
+        const value = params[name];
+        if ((value === undefined && p.required) || (value !== undefined && typeof value !== p.type))
+          errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${name}`, expected: p.expected });
+      }
+      for (const name of Object.keys(params)) if (!Object.hasOwn(declared, name)) errors.push({ kind: "field-unknown", path: `${at}.${behaviour}.${name}` });
       const states = isObject(flow.states) ? flow.states : {};
       for (const l of rule.leadsTo?.(params) ?? []) {
         if (!Object.hasOwn(states, l.to) && !(RESERVED_TARGETS as readonly string[]).includes(l.to))
