@@ -19,7 +19,7 @@ export function Feed() {
   const [mode, setMode] = useState<Mode>("everything");
   const [filter, setFilter] = useState<Filter>("all");
   const feed = feedFor(state.feed, selected);
-  const shown = mode === "remarks" ? feed.filter((e) => e.kind === "outcome" && e.note && (filter === "all" || stepGroupOf(e.step) === filter)) : feed;
+  const shown = mode === "remarks" ? feed.filter((e) => e.kind === "outcome" && e.note && (filter === "all" || stepGroupOf(e, state.flows) === filter)) : feed;
   return (
     <div>
       <div className="mb-1.5 flex flex-wrap items-center gap-3">
@@ -90,15 +90,15 @@ function Where({ e }: { e: FeedEvent }) {
 
 function Significant({ e }: { e: FeedEvent }) {
   const { state } = useView();
-  const round = roundNote(e);
+  const round = roundNote(e, state.flows);
   const reason = escalationReason(e);
   return (
     <div className={cn(row, "py-2.5")}>
       <span className={time}>{clock(e.at)}</span>
       <div className="min-w-0">
         <div className="text-foreground">
-          <span className={cn("mr-2 inline-block size-[7px] rounded-full align-[1px]", ATT[attentionOf(e)])} />
-          {sentence(e, state.me)}
+          <span className={cn("mr-2 inline-block size-[7px] rounded-full align-[1px]", ATT[attentionOf(e, state.flows)])} />
+          {sentence(e, state.me, state.flows)}
           {round && <span className="text-muted-foreground"> · {round}</span>}
           <Where e={e} />
         </div>
@@ -109,7 +109,7 @@ function Significant({ e }: { e: FeedEvent }) {
             {FEED.github}
           </a>
         </div>
-        {e.kind === "outcome" && e.note && <Remark note={e.note} evidence={e.evidence} tone={attentionOf(e)} />}
+        {e.kind === "outcome" && e.note && <Remark note={e.note} evidence={e.evidence} tone={attentionOf(e, state.flows)} />}
         {e.kind === "outcome" && !e.note && e.evidence && <EvidenceBlock evidence={e.evidence} compact />}
       </div>
     </div>

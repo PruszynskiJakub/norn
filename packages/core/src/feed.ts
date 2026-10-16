@@ -32,10 +32,12 @@ export type FeedEvent =
    * e.g. review, agent QA, implementation; `outcome` the word, "done" for a
    * step with a single way to end. `fixRound` is the round this outcome
    * starts or finishes, null when it is no fix round. `note` is the agent's
-   * remark as markdown.
+   * remark as markdown. `flow` is the flow the issue ran the step in, null
+   * for triage, before it had one: `from` and `outcome` are its state and word.
    */
   | (FeedBase & {
       kind: "outcome";
+      flow: string | null;
       step: string;
       outcome: string;
       from: string | null;
@@ -138,6 +140,7 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
           ...at,
           id: `outcome:${t.url}`,
           kind: "outcome",
+          flow: flow && from !== null ? target : null,
           step: step?.name ?? from ?? "triage",
           outcome: c.why ?? "done",
           from,
