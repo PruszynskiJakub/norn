@@ -435,7 +435,7 @@ describe("observe: repository flows", () => {
       ["bug", true],
       ["chore", false],
     ]);
-    expect(res.flows.find((f) => f.name === "bug")).toEqual({ ok: true, name: "bug", flow: bugFlow() });
+    expect(res.flows.find((f) => f.name === "bug")).toEqual({ ok: true, name: "bug", flow: bugFlow(), source: "repository" });
     expect(res.flows.find((f) => f.name === "chore")).toMatchObject({ ok: false, errors: [{ kind: "not-json" }] });
     expect(res.feed.find((e) => e.kind === "outcome")).toMatchObject({
       issue: 40,
@@ -477,7 +477,7 @@ describe("observe: repository flows", () => {
     const res = await observe(await w.ctx(), {});
 
     expect(res.board.map((s) => [s.number, s.flow, s.states])).toEqual([[40, "story", ["reproducing"]]]);
-    expect(res.flows.filter((f) => f.name === "story")).toEqual([{ ok: true, name: "story", flow: bugFlow() }]);
+    expect(res.flows.filter((f) => f.name === "story")).toEqual([{ ok: true, name: "story", flow: bugFlow(), source: "overridden" }]);
   });
 
   test("each read reads the flows again, so a merged change shows on the next", async () => {

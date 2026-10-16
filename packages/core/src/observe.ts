@@ -1,7 +1,7 @@
 import { fixStatesOf, slicesAmong, uses } from "./behaviours.js";
 import { isStale } from "./claims.js";
 import { byTime, type FeedEvent, feedOf } from "./feed.js";
-import { type Flow, flowNameOf, flowStatesOf, type LoadedFlow, loadFlow, modeOf, repositoryFlows } from "./flow.js";
+import { type Flow, flowNameOf, flowStatesOf, type LoadedFlow, loadFlow, modeOf, repositoryFlows, type SourcedFlow } from "./flow.js";
 import type { ObservedIssue, ObservedStory } from "./github.js";
 import { recordedSlug } from "./slug.js";
 import { slugify, storyBranch } from "./text.js";
@@ -83,7 +83,7 @@ export interface Observation {
   board: BoardStory[];
   waiting: WaitingItem[];
   /** Every flow of the repository, as norn reads it from the base branch: the built-in ones, overridden or not, then the repository's own. Invalid ones carry their errors. */
-  flows: LoadedFlow[];
+  flows: SourcedFlow[];
   /** Newest first; only events after `since` when one was given. */
   feed: FeedEvent[];
   claims: ClaimSnapshot;

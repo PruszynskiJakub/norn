@@ -120,11 +120,37 @@ describe("the dashboard server", () => {
       ["bug", true],
       ["chore", false],
     ]);
-    expect(now.flows.find((f) => f.name === "bug")).toEqual({ ok: true, name: "bug", flow: bug });
-    expect(now.flows.find((f) => f.name === "chore")).toEqual({ ok: false, name: "chore", errors: [{ kind: "start-unknown", start: "nowhere" }] });
+    expect(now.flows.find((f) => f.name === "bug")).toEqual({ ok: true, name: "bug", flow: bug, source: "repository" });
+    expect(now.flows.find((f) => f.name === "chore")).toEqual({
+      ok: false,
+      name: "chore",
+      errors: [{ kind: "start-unknown", start: "nowhere" }],
+      source: "repository",
+    });
     expect(now.board.map((x) => [x.number, x.flow, x.states, x.slices.map((i) => [i.number, i.flow])])).toEqual([
       [10, "story", ["implementation"], [[11, "slice"]]],
       [40, "bug", ["reproducing"], []],
+    ]);
+  });
+
+  test("says where each flow comes from: built into norn, a built-in one the repository overrides, or the repository's own", async () => {
+    const w = setup({ now: "2026-10-13T12:00:00Z" });
+    w.github.seedFlow("slice", { description: "Broken.", start: "nowhere", workspace: "none", states: {} });
+    w.github.seedFlow("bug", {
+      description: "A defect.",
+      start: "reproducing",
+      workspace: "none",
+      states: { reproducing: { skill: "bug-repro", attended: true, outcomes: { fixed: { to: "closed", means: "fixed" } } } },
+    });
+    const s = await started(await dashboard({ w }));
+    await s.idle();
+
+    const now = await state(s.url);
+
+    expect(now.flows.map((f) => [f.name, f.source, f.ok])).toEqual([
+      ["story", "built-in", true],
+      ["slice", "overridden", false],
+      ["bug", "repository", true],
     ]);
   });
 

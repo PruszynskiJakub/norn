@@ -1,4 +1,4 @@
-import type { BoardStory, FeedEvent, LoadedFlow, WaitingItem } from "@norn/core";
+import type { BoardStory, FeedEvent, SourcedFlow, WaitingItem } from "@norn/core";
 
 /** Why the last read of GitHub failed, as far as norn can tell. */
 export type PollFailure = "auth" | "rate-limit" | "network" | "other";
@@ -15,8 +15,8 @@ export interface DashboardState {
   repoUrl: string | null;
   board: BoardStory[];
   waiting: WaitingItem[];
-  /** The repository's flows, valid or with their errors; each board item names its own by `flow`. Empty before the first good read. */
-  flows: LoadedFlow[];
+  /** The repository's flows, valid or with their errors and with where each comes from; each board item names its own by `flow`. Empty before the first good read. */
+  flows: SourcedFlow[];
   /** Newest first. */
   feed: FeedEvent[];
   /** When the last good read finished, ISO; null before one. */

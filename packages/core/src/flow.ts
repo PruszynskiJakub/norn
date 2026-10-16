@@ -50,6 +50,12 @@ export type Mode = "afk" | "hil";
 /** A flow read from its file: valid, or kept with what is wrong with it. */
 export type LoadedFlow = { ok: true; name: string; flow: Flow } | { ok: false; name: string; errors: FlowError[] };
 
+/** Where a flow in effect comes from: norn's own, the repository's file in place of norn's of that name, or a flow only the repository has. */
+export type FlowSource = "built-in" | "overridden" | "repository";
+
+/** A flow in effect in the repository, with where it comes from. */
+export type SourcedFlow = LoadedFlow & { source: FlowSource };
+
 /** What is wrong with a flow, as facts for a front end to word. */
 export type FlowError =
   /** The file is not JSON; `detail` is the parser's message. */
@@ -402,13 +408,20 @@ export function flowFileNames(files: string[]): string[] {
  * Every flow of the repository, valid or kept with its errors: the built-in
  * ones in their order, then the repository's other files in name order. A
  * repository flow is read from the base branch, and its name must be a type;
- * one named like a built-in flow takes that flow's place.
+ * one named like a built-in flow takes that flow's place. Each says where it comes from.
  */
 export async function repositoryFlows(
   ctx: Parameters<typeof repositoryFlow>[0] & { github: { listFilesAt(dir: string, ref: string): Promise<string[]> } },
-): Promise<LoadedFlow[]> {
+): Promise<SourcedFlow[]> {
   const names = flowFileNames(await ctx.github.listFilesAt(FLOWS_DIR, ctx.config.baseBranch)).filter((name) => !BUILT_IN_FLOWS.includes(name));
-  const loaded = await Promise.all([...BUILT_IN_FLOWS, ...names].map((name) => loadFlow(ctx, name)));
+  const loaded = await Promise.all(
+    [...BUILT_IN_FLOWS, ...names].map(async (name): Promise<SourcedFlow | null> => {
+      const own = await repositoryFlow(ctx, name);
+      if (own) return { ...own, source: BUILT_IN_FLOWS.includes(name) ? "overridden" : "repository" };
+      const builtIn = builtInFlow(name);
+      return builtIn && { ...builtIn, source: "built-in" };
+    }),
+  );
   return loaded.filter((l) => l !== null);
 }
 
