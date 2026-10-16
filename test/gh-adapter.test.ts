@@ -345,6 +345,15 @@ describe("GhGitHub reads for norn doctor", () => {
     expect(await gh.permission()).toBe("none");
   });
 
+  test("openIssues pages through the open issues with a label, leaving out pull requests", async () => {
+    const issue = (number: number, extra: object = {}) =>
+      JSON.stringify({ id: number, number, title: `#${number}`, state: "open", labels: [{ name: "type:bug" }], assignees: [], ...extra });
+    const { exec, calls } = scripted(() => ({ stdout: [issue(12), issue(13, { pull_request: { url: "x" } }), ""].join("\n") }));
+
+    expect(await new GhGitHub(exec).openIssues("type:bug")).toEqual([{ number: 12, title: "#12", state: "open", labels: ["type:bug"], assignees: [] }]);
+    expect(calls[0].args).toEqual(["api", "--paginate", "--jq", ".[]", "repos/{owner}/{repo}/issues?state=open&labels=type%3Abug&per_page=100"]);
+  });
+
   test("labelNames pages through the repository's labels", async () => {
     const { exec, calls } = scripted(() => ({ stdout: [JSON.stringify({ name: "blocked" }), JSON.stringify({ name: "type:story" }), ""].join("\n") }));
 

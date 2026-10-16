@@ -95,6 +95,9 @@ export class FakeGitHub implements GitHub {
   async getIssue(n: number) {
     return structuredClone(this.mustGet(n));
   }
+  async openIssues(label: string) {
+    return [...this.issues.values()].filter((i) => i.state === "open" && i.labels.includes(label)).map((i) => structuredClone(i));
+  }
   async addLabels(n: number, labels: string[]) {
     const i = this.mustGet(n);
     for (const l of labels) {
