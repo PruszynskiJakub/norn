@@ -4,6 +4,8 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-10-16
+
 ### Fixed
 
 - The dashboard shows a selected story's or slice's labels as GitHub has them, under its title; `needs-human` and `needs-human-qa` stand out in colour.
@@ -126,7 +128,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.5.1...HEAD
+[0.5.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.3...v0.3.0
