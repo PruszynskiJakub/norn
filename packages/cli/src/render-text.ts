@@ -354,10 +354,16 @@ function flowError(e: FlowError): string {
       return `The outcome ${e.word} of ${e.state} leads to ${e.to}, which is not one of its states, closed or not-planned.`;
     case "state-reserved":
       return `The state ${e.state} takes a name norn keeps for itself.`;
+    case "pass-through-invalid":
+      return e.word === null
+        ? `The state ${e.state} runs in one mode only, so passThrough must name one of its outcomes.`
+        : `The state ${e.state} passes through ${e.word}, which is not one of its outcomes.`;
     case "renamed-unknown":
       return `renamed moves ${e.from} to ${e.to}, which is not one of its states.`;
     case "end-unreachable":
-      return `From ${e.state}, no outcome ever leads to closed or not-planned.`;
+      return e.mode
+        ? `In mode:${e.mode}, where the states for the other mode are passed through, no outcome from ${e.state} ever leads to closed or not-planned.`
+        : `From ${e.state}, no outcome ever leads to closed or not-planned.`;
     case "behaviour-unknown":
       return `The state ${e.state} uses the behaviour ${e.behaviour}, which this norn does not know; a flow written for a newer norn needs the nornVersion pin raised.`;
     case "behaviours-conflict":

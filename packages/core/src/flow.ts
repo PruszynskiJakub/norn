@@ -33,11 +33,18 @@ export interface FlowState {
   color?: string;
   /** The step can attach evidence files with norn done --evidence <dir>. */
   evidence?: boolean;
+  /** The only mode the state runs in; in the other mode norn follows passThrough instead of entering it. */
+  when?: Mode;
+  /** With when: the outcome word norn follows on its own when the issue's mode skips the state. */
+  passThrough?: string;
   /** Built-in mechanics the state opts into, by name, with their parameters; see behaviours.ts. */
   behaviours?: Partial<Record<BehaviourName, BehaviourParams>>;
   /** Keyed by outcome word. */
   outcomes: Record<string, Outcome>;
 }
+
+/** How an issue is worked, from its mode:afk or mode:hil label: unattended, or with a person in the loop. */
+export type Mode = "afk" | "hil";
 
 /** A flow read from its file: valid, or kept with what is wrong with it. */
 export type LoadedFlow = { ok: true; name: string; flow: Flow } | { ok: false; name: string; errors: FlowError[] };
@@ -54,8 +61,13 @@ export type FlowError =
   | { kind: "renamed-unknown"; from: string; to: string }
   /** A state takes a name norn keeps for itself, e.g. closed. */
   | { kind: "state-reserved"; state: string }
-  /** No path of outcomes leads from the state to closed or not-planned, so an issue there could never end. */
-  | { kind: "end-unreachable"; state: string }
+  /** A state with when has no passThrough (word null), or it names a word that is not one of the state's outcomes. */
+  | { kind: "pass-through-invalid"; state: string; word: string | null }
+  /**
+   * No path of outcomes leads from the state to closed or not-planned, so an issue there could never end. With `mode`, the
+   * path is cut only in that mode, where the states for the other mode are passed through.
+   */
+  | { kind: "end-unreachable"; state: string; mode?: Mode }
   /** A behaviour this norn does not have, e.g. one of a newer norn. */
   | { kind: "behaviour-unknown"; state: string; behaviour: string }
   /** Two behaviours of one state that cannot go together. */
@@ -129,6 +141,11 @@ export function validateFlow(data: unknown): FlowError[] {
       field(`${at}.outcomes`, "an object");
       continue;
     }
+    if (state.when !== undefined && state.when !== "afk" && state.when !== "hil") field(`${at}.when`, '"afk" or "hil"');
+    if (state.passThrough !== undefined && typeof state.passThrough !== "string") field(`${at}.passThrough`, "an outcome word");
+    else if (state.when !== undefined && (state.passThrough === undefined || !Object.hasOwn(state.outcomes, state.passThrough))) {
+      errors.push({ kind: "pass-through-invalid", state: name, word: state.passThrough ?? null });
+    }
     for (const [word, outcome] of Object.entries(state.outcomes)) {
       const o = `${at}.outcomes.${word}`;
       if (!isObject(outcome)) {
@@ -153,7 +170,10 @@ export function validateFlow(data: unknown): FlowError[] {
         else if (!Object.hasOwn(states, to)) errors.push({ kind: "renamed-unknown", from, to });
       }
   }
-  for (const state of statesThatCannotEnd(states)) errors.push({ kind: "end-unreachable", state });
+  const passThroughsValid = !errors.some(
+    (e) => e.kind === "pass-through-invalid" || (e.kind === "field-invalid" && /\.(when|passThrough|outcomes)/.test(e.path)),
+  );
+  errors.push(...endUnreachable(states, passThroughsValid));
   return errors;
 }
 
@@ -187,10 +207,47 @@ function checkBehaviours(flow: Record<string, unknown>, state: string, behaviour
   });
 }
 
-/** The states from which no path of outcomes reaches closed or not-planned, in file order. */
-function statesThatCannotEnd(states: Record<string, unknown>): string[] {
+/** The states that cannot end, then those that cannot end in one mode only, each state reported once. */
+function endUnreachable(states: Record<string, unknown>, passThroughsValid: boolean): FlowError[] {
+  const errors: FlowError[] = statesThatCannotEnd(states).map((state) => ({ kind: "end-unreachable", state }));
+  const conditional = Object.values(states).some((s) => isObject(s) && s.when !== undefined);
+  if (!conditional || !passThroughsValid) return errors;
+  for (const mode of ["afk", "hil"] as const) {
+    for (const state of statesThatCannotEnd(states, mode)) {
+      if (!errors.some((e) => e.kind === "end-unreachable" && e.state === state)) errors.push({ kind: "end-unreachable", state, mode });
+    }
+  }
+  return errors;
+}
+
+/**
+ * The states from which no path of outcomes reaches closed or not-planned, in file order. In a mode, an outcome into a
+ * state for the other mode leads where that state's pass-through leads, and only the states that run in the mode count.
+ */
+function statesThatCannotEnd(states: Record<string, unknown>, mode?: Mode): string[] {
+  const skips = (to: string) => {
+    const s = states[to];
+    return mode !== undefined && isObject(s) && s.when !== undefined && s.when !== mode;
+  };
+  // Where an outcome lands in the mode; null when its pass-throughs go round in a loop.
+  const land = (to: string): string | null => {
+    const seen: string[] = [];
+    while (skips(to)) {
+      if (seen.includes(to)) return null;
+      seen.push(to);
+      const s = states[to] as Record<string, unknown>;
+      const o = (s.outcomes as Record<string, Record<string, unknown>>)[s.passThrough as string];
+      to = o.to as string;
+    }
+    return to;
+  };
   const targets = (state: unknown): string[] =>
-    isObject(state) && isObject(state.outcomes) ? Object.values(state.outcomes).flatMap((o) => (isObject(o) && typeof o.to === "string" ? [o.to] : [])) : [];
+    isObject(state) && isObject(state.outcomes)
+      ? Object.values(state.outcomes).flatMap((o) => {
+          const to = isObject(o) && typeof o.to === "string" ? land(o.to) : null;
+          return to === null ? [] : [to];
+        })
+      : [];
   // An unknown target is reported on its own, so it does not count against the states before it.
   const ends = new Set<string>([
     ...RESERVED_TARGETS,
@@ -208,7 +265,7 @@ function statesThatCannotEnd(states: Record<string, unknown>): string[] {
       }
     }
   }
-  return Object.keys(states).filter((name) => !ends.has(name));
+  return Object.keys(states).filter((name) => !ends.has(name) && !skips(name));
 }
 
 /** The flow named by the issue's `type:<name>` label, for any type but the built-in story and slice; null for none. */
@@ -286,6 +343,33 @@ export function offerFlows(step: Step, flows: { name: string; flow: Flow }[]): S
   const { reject, ...rest } = step.outcomes;
   const offered: Record<string, Outcome> = Object.fromEntries(flows.map(({ name, flow }) => [name, { to: flow.start, means: flow.description, flow: name }]));
   return { ...step, outcomes: { ...rest, ...offered, ...(reject ? { reject } : {}) } };
+}
+
+/** The issue's mode from its mode:afk or mode:hil label; null for none. */
+export function modeOf(issue: Issue): Mode | null {
+  return issue.labels.includes("mode:hil") ? "hil" : issue.labels.includes("mode:afk") ? "afk" : null;
+}
+
+/**
+ * The outcome as it lands: while it leads into a state for the other mode, norn follows that state's pass-through
+ * instead, so the issue goes straight to the first state that runs in its mode. An issue with no mode runs every state.
+ * `skipped` lists the states passed through, in order.
+ */
+export function passThrough(flow: Flow, issue: Issue, outcome: Outcome): { outcome: Outcome; skipped: string[]; mode: Mode | null } {
+  const mode = modeOf(issue);
+  const skipped: string[] = [];
+  let landed = outcome;
+  for (;;) {
+    const state = flow.states[landed.to];
+    // A loop of pass-throughs ends in the first state seen twice.
+    if (!mode || !state?.when || state.when === mode || skipped.includes(landed.to)) break;
+    skipped.push(landed.to);
+    const through = state.outcomes[state.passThrough!];
+    // The words and the note stay the outcome's; only where it leads and whom it notifies come from the pass-through.
+    const { notify: _, ...rest } = landed;
+    landed = { ...rest, to: through.to, ...(through.notify ? { notify: through.notify } : {}) };
+  }
+  return { outcome: landed, skipped, mode };
 }
 
 /** The state labels of the flow that the issue carries. More than one means a label change failed halfway. */

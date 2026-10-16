@@ -185,6 +185,8 @@ A state opts into norn's built-in mechanics by naming its behaviours, each with 
 | `countsFixRounds` | Entering the state from another one counts a fix round, and taking the issue from it (or in the state it enters as, once a round is counted) briefs the step as rework. When an outcome would start a round past `deliver.maxFixRounds`, the issue gets `needs-human` instead. Every state with it counts toward the same limit. |
 | `humanGate` | A person does this state's step. An outcome into it notifies the user and tells the agent to stop; `norn next` lists the issue as waiting for a person. The briefing carries the QA wording: run the app, tie remarks to criteria, a repro for every failure, and evidence with `--evidence <dir>`. |
 
+A state can run in one mode only: `"when": "hil"` or `"when": "afk"`, with `passThrough` naming one of its outcomes, e.g. `"when": "hil", "passThrough": "verified"` on a state where a person verifies the fix. When an outcome leads into it and the issue carries the other mode's label, norn never enters the state: it follows the pass-through outcome at once, through any further such states, and writes one transition comment straight to where the issue lands, e.g. `norn: fixing → closed (fixed)` followed by `Skipped verifying in mode:afk: it runs in mode:hil only.` In the state's own mode the state runs as usual, and so it does for an issue with no `mode:` label.
+
 `norn next <issue>` works on an issue of a flow too: a human gate or `needs-human` waits for a person, and any other state is offered to start, with the user when it is attended.
 
 Triage chooses the type. Its briefing offers `story`, then one outcome per flow named after the flow, with the flow's `description` as what it means, then `reject`. `norn done <issue> bug` adds `type:bug`, moves the issue to the flow's `start` and assigns it to you, with a transition comment. A flow with `"triage": false` is not offered, and neither is a broken one.
@@ -192,7 +194,8 @@ Triage chooses the type. Its briefing offers `story`, then one outcome per flow 
 norn checks a flow strictly before it runs it:
 
 - the fields have the right types, the start state exists, every target is a state, `closed` or `not-planned`, and every `renamed` target is a state;
-- every state can reach `closed` or `not-planned` through its outcomes, so no issue can be stuck in a loop;
+- every state with `when` names one of its outcomes as `passThrough`;
+- every state can reach `closed` or `not-planned` through its outcomes, so no issue can be stuck in a loop, in either mode: in `mode:afk` the states for `hil` are passed through, and the other way round;
 - each state's `behaviours` are ones this norn knows, each with an object of parameters (`{}` for none), allowed together and with what they need, e.g. `opensPR` needs `"workspace": "own"`, and any flow they name exists. A flow written for a newer norn fails here, which is what the `nornVersion` pin protects against;
 - no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`), and no flow is named `reject`, triage's outcome.
 

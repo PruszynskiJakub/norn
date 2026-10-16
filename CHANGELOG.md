@@ -12,6 +12,7 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 - Behaviours in flows: a state opts into `opensPR` (the briefing opens or updates the issue's PR, later states see the PR and its diff), `countsFixRounds` (rework is briefed, and `deliver.maxFixRounds` turns the issue into `needs-human`) and `humanGate` (a person QAs it, with the QA evidence and remarks wording, and is notified). A state lists them as `"behaviours": { "opensPR": {} }`, each with its parameters.
 - `norn next <issue>` works on an issue of a repository flow: a human gate waits for a person, any other state is offered to start, attended or not as the state says.
 - Strict flow validation: a flow is also refused when a state can never reach `closed` or `not-planned`, when a state uses a behaviour this norn does not know (for example one of a newer norn), when `opensPR` is used without `"workspace": "own"`, and when the flow is named `reject`. `norn next` shows the issues of a broken flow as blocked by it, waiting for a person, with what is wrong.
+- Mode-conditional states in flows: a state with `"when": "hil"` (or `"afk"`) and a `passThrough` outcome runs only in that mode. For an issue in the other mode, `norn done` follows the pass-through at once and writes one transition comment to where the issue lands, saying which states were skipped and why. A `when` state without a valid `passThrough`, or one whose skipping leaves a state that can never end in some mode, makes its flow invalid.
 
 ### Changed
 

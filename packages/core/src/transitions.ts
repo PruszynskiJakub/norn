@@ -7,7 +7,7 @@ import { sliceBranch, specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
-import { type Flow, type FlowCache, flowStatesOf, repositoryFlow } from "./flow.js";
+import { type Flow, type FlowCache, type Mode, flowStatesOf, repositoryFlow } from "./flow.js";
 import { notifyHumanQa, notifyNeedsHuman, type Notify } from "./notify.js";
 
 /** The marker norn writes when it sets needs-human; norn next reads the reason back from it. */
@@ -16,6 +16,13 @@ export const NEEDS_HUMAN_MARK = "norn: needs-human — ";
 export function needsHumanLine(reason: string) {
   return `${NEEDS_HUMAN_MARK}${oneLine(reason)}`;
 }
+
+/** Says on a transition comment which states the issue's mode skipped, each of them for the other mode. */
+export function skipLine(skipped: string[], mode: Mode): string {
+  const other = mode === "afk" ? "hil" : "afk";
+  return `Skipped ${skipped.join(", ")} in mode:${mode}: ${skipped.length === 1 ? "it runs" : "they run"} in mode:${other} only.`;
+}
+const SKIP_LINE = /^Skipped .+ in mode:(afk|hil): (it runs|they run) in mode:(afk|hil) only\.$/;
 
 /** Collapses a free-form note onto one line, so the marker line norn reads back stays whole. */
 export function oneLine(text: string) {
@@ -128,10 +135,11 @@ export function parseTransitionComment(body: string): TransitionComment | null {
   let rest = lines.slice(1);
   const needsHuman = needsHumanIn(body);
   if (needsHuman !== null) rest = rest.filter((l) => !l.startsWith(NEEDS_HUMAN_MARK));
-  // The markers come first, each in its own paragraph: the spec link, then the slug.
+  // The markers come first, each in its own paragraph: the spec link, the slug, then the states the mode skipped.
   for (const marker of ["Spec: ", SLUG_MARK]) {
     if (rest[0] === "" && rest[1]?.startsWith(marker)) rest = rest.slice(2);
   }
+  if (rest[0] === "" && SKIP_LINE.test(rest[1] ?? "")) rest = rest.slice(2);
   let evidence: Evidence | null = null;
   let at = rest.length - 1;
   while (at >= 0 && !EVIDENCE_HEAD.test(rest[at])) at--;
@@ -174,6 +182,7 @@ export async function applyOutcome(
   note?: string,
   evidence?: Evidence,
   flow: Flow | null = null,
+  skipped: string | null = null,
 ): Promise<void> {
   const { github } = ctx;
   const n = issue.number;
@@ -193,6 +202,7 @@ export async function applyOutcome(
   const becomesStory = !flow && (kindOf(issue) === "story" || (kindOf(issue) === "new" && !outcome.flow && outcome.to !== "not-planned"));
   const slug = becomesStory || into?.workspace === "own" ? await slugLine(ctx, issue) : null;
   if (slug) comment.push("", slug);
+  if (skipped) comment.push("", skipped);
   if (note) comment.push("", note);
   if (evidence) comment.push("", ...evidenceLines(await github.repoUrl(), evidence));
 
