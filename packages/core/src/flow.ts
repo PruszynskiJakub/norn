@@ -28,7 +28,7 @@ export interface FlowState {
   name?: string;
   /** State label the issue moves to when the step is taken. */
   enterAs?: string;
-  /** What the state means, for its label. */
+  /** What the state means, as a phrase, e.g. "Waiting for review": its label's description and the dashboard's wording; the state's name when missing. */
   description?: string;
   /** The state label's colour, as hex without the #, e.g. "1d76db". */
   color?: string;
@@ -379,23 +379,22 @@ export function flowFileNames(files: string[]): string[] {
 }
 
 /**
- * Every flow in effect, valid or not: the built-in ones in their order, then the repository's other flows in name
- * order. Each is the repository's when it has one, read from the base branch, else the built-in one.
+ * Every flow of the repository, valid or kept with its errors: the built-in
+ * ones in their order, then the repository's other files in name order. A
+ * repository flow is read from the base branch, and its name must be a type;
+ * one named like a built-in flow takes that flow's place.
  */
-export async function flowsInEffect(
+export async function repositoryFlows(
   ctx: Parameters<typeof repositoryFlow>[0] & { github: { listFilesAt(dir: string, ref: string): Promise<string[]> } },
 ): Promise<LoadedFlow[]> {
   const names = flowFileNames(await ctx.github.listFilesAt(FLOWS_DIR, ctx.config.baseBranch)).filter((name) => !BUILT_IN_FLOWS.includes(name));
   const loaded = await Promise.all([...BUILT_IN_FLOWS, ...names].map((name) => loadFlow(ctx, name)));
-  return loaded.flatMap((l) => (l ? [l] : []));
+  return loaded.filter((l) => l !== null);
 }
 
-/**
- * The flows triage offers: the flows in effect that are valid and do not set triage to false. reject is never one: it
- * is triage's own outcome.
- */
-export async function triageFlows(ctx: Parameters<typeof flowsInEffect>[0]): Promise<{ name: string; flow: Flow }[]> {
-  return (await flowsInEffect(ctx)).flatMap((l) =>
+/** The flows triage offers: the repository's flows that are valid, not named like triage's reject, and not setting triage to false. */
+export async function triageFlows(ctx: Parameters<typeof repositoryFlows>[0]): Promise<{ name: string; flow: Flow }[]> {
+  return (await repositoryFlows(ctx)).flatMap((l) =>
     l.ok && !RESERVED_FLOWS.includes(l.name) && l.flow.triage !== false ? [{ name: l.name, flow: l.flow }] : [],
   );
 }
@@ -434,13 +433,6 @@ export function flowLabels(flows: { name: string; flow: Flow }[]): LabelDefiniti
   const states = new Map<string, LabelDefinition>();
   for (const { flow } of flows) for (const state of Object.keys(flow.states)) if (!states.has(state)) states.set(state, stateLabel(flow, state));
   return [...states.values(), ...flows.map(({ name }) => typeLabel(name))];
-}
-
-/** The built-in flow the issue runs, read without GitHub, e.g. for the read model, which stays pure; null for none. */
-export function builtInFlowOf(issue: Issue): Flow | null {
-  const name = flowNameOf(issue);
-  const loaded = name === null ? null : builtInFlow(name);
-  return loaded?.ok ? loaded.flow : null;
 }
 
 /** Triage's step with an outcome for each offered flow, before reject. */

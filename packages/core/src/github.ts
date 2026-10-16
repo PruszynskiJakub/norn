@@ -122,8 +122,8 @@ export interface GitHub {
   deleteClaim(number: number): Promise<void>;
 
   /**
-   * The developer's norn work in one read, for the dashboard: their stories with
-   * slices, labels, blockers, linked PRs, norn's comments and the timeline since
+   * The developer's norn work in one read, for the dashboard: their issues of
+   * every flow type with their sub-issues, labels, blockers, linked PRs, norn's comments and the timeline since
    * `since`, and the claims. Read-only and cheap: one query, plus the claim refs.
    */
   observeWork(query: WorkQuery): Promise<Work>;
@@ -199,8 +199,9 @@ export interface ClaimRef {
 export interface Work {
   repoUrl: string;
   /**
-   * Stories assigned to the user, open or closed since `closedSince`, plus the
-   * story of any item a claim of the user's points at.
+   * Top-level issues assigned to the user, open or closed since `closedSince`:
+   * those with a `type:` label whose parent, if any, has none. Plus the
+   * top-level issue of any item a claim of the user's points at.
    */
   stories: ObservedStory[];
   claims: ClaimRef[];

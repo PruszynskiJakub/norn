@@ -7,7 +7,7 @@ import {
   type FlowError,
   flowFileNames,
   flowStatesOf,
-  flowsInEffect,
+  repositoryFlows,
   parseFlow,
   type LoadedFlow,
   STATES,
@@ -181,7 +181,7 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
   }
 
   // The flows in effect, read from the base branch on GitHub, as norn commands read them.
-  const inEffect = needsForGitHub || needsForConfig ? null : await attempt(() => flowsInEffect({ github: d.github, config: config as Config }));
+  const inEffect = needsForGitHub || needsForConfig ? null : await attempt(() => repositoryFlows({ github: d.github, config: config as Config }));
 
   if (needsForGitHub || needsForConfig) skip("labels", (needsForGitHub ?? needsForConfig) as CheckId);
   else {

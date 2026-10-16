@@ -33,7 +33,7 @@ norn is built for a team that works in a particular way. It checks some of these
 
 | Assumption | Checked by norn? |
 | --- | --- |
-| **Each issue has exactly one owner**: its GitHub assignee, who is responsible for it end to end, including its slices and PRs. Slices created by norn get the story's assignee. | No. norn reads the first assignee as the owner; the dashboard shows the stories assigned to you. |
+| **Each issue has exactly one owner**: its GitHub assignee, who is responsible for it end to end, including its slices and PRs. Slices created by norn get the story's assignee. | No. norn reads the first assignee as the owner; the dashboard shows the issues assigned to you, of every flow. |
 | **Only the story's owner merges the story PR** into the base branch. | Partly. An agent that takes a story in `merge-queue` is refused and told who the owner is. |
 | **A story and its slices live in one repository.** Slices are the story's sub-issues labelled `type:slice` in the same repository; other sub-issues are ignored. | Yes. |
 | **Stories merge into one base branch** (`baseBranch`, the repository's default branch unless configured). | Yes. |
@@ -178,7 +178,7 @@ A repository file named like a built-in flow, `story.json` or `slice.json`, repl
 
 - `description` says what the flow is for; `start` names the state an issue enters the flow in.
 - `workspace` says where the work happens: `none` gives no branch; `own` gives the issue a branch of its own, named from its slug like a story's, and one PR into the base branch; `parent` gives the issue a branch off its parent issue's branch, named like a slice's (`<parent>-<parent slug>-<n>`), and one PR into the parent's branch. The briefing names the branch and the worktree, and with `parent` the parent's spec, which transition comments link too; the PR command comes from the `opensPR` behaviour.
-- Each state names the `skill` that runs it, whether it is `attended`, and its `outcomes`. Optional fields: `name` (the step's name in the briefing, the state's name by default), `enterAs` (the state the issue moves to when taken), `evidence` (the step may attach evidence), `behaviours` (the built-in mechanics the state opts into, below), and `color` and `description` for the state's label.
+- Each state names the `skill` that runs it, whether it is `attended`, and its `outcomes`. Optional fields: `name` (the step's name in the briefing, the state's name by default), `enterAs` (the state the issue moves to when taken), `evidence` (the step may attach evidence), `behaviours` (the built-in mechanics the state opts into, below), and `color` and `description` for the state's label. The dashboard words the state with its `description` (its name without one) and colours it with its `color` (a default by kind without one: attended, agent or human gate).
 - Each outcome has a target `to`, what it `means`, and optionally a `note` it requires, `needsHuman` and `notify`. `to` is a state of the flow, `closed` or `not-planned`; those two close the issue. `meansSkipped` says what the outcome means instead when the issue's mode skips the state it leads to (see `when` below).
 - An agent's step with `evidence` is QA: its briefing says the note is the evidence pack, and whether a person checks the work after it, in the issue's mode, or nobody does and what cannot be checked is escalated.
 - The first transition into a state whose label is missing creates the label, with the state's colour and description, or a default for an attended or an agent step.

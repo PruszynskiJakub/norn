@@ -99,7 +99,7 @@ describe("norn init: labels from the flows", () => {
     expect(w.github.labelDefs.get("reproducing")).toEqual({ color: "c5def5", description: "a person takes part in this step" });
     expect(w.github.labelDefs.get("fixing")).toEqual({ color: "123456", description: "Being fixed" });
     expect(w.github.labelDefs.get("type:bug")).toEqual({ color: "ededed", description: "norn bug flow" });
-    expect(w.github.labelDefs.get("needs-review")).toEqual({ color: "5319e7", description: "Code review of the slice PR or the story PR" });
+    expect(w.github.labelDefs.get("needs-review")).toEqual({ color: "5319e7", description: "Waiting for review" });
     expect(res.stdout).toContain(`  - ${w.github.labelDefs.size} labels on the repository`);
   });
 

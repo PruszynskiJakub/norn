@@ -5,7 +5,7 @@ import {
   DEFAULT_TEAM_CONFIG,
   ENGINE_FLAGS,
   flowLabels,
-  flowsInEffect,
+  repositoryFlows,
   type GitHub,
   isVersion,
   type LabelDefinition,
@@ -127,7 +127,7 @@ export async function init({ github, cwd, installSkills, version }: InitDeps): P
   const instructed = writeAgentInstructions(cwd);
 
   // The flows on the base branch decide the states; an invalid one is left for norn doctor to report.
-  const labels = labelDefinitions(await flowsInEffect({ github, config: { baseBranch } }));
+  const labels = labelDefinitions(await repositoryFlows({ github, config: { baseBranch } }));
   await github.ensureLabels(labels);
 
   return {

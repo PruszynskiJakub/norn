@@ -25,6 +25,7 @@ const EMPTY: DashboardState = {
   repoUrl: null,
   board: [],
   waiting: [],
+  flows: [],
   feed: [],
   lastUpdated: null,
   lastError: null,
@@ -110,7 +111,7 @@ export function App() {
   const toggleTheme = useTheme();
   const [selectedNumber, setSelected] = useState<number | null>(null);
 
-  const items = useMemo(() => allItems(state.board), [state.board]);
+  const items = useMemo(() => allItems(state.board, state.flows), [state.board, state.flows]);
   const byNumber = useMemo(() => new Map(items.map((x) => [x.number, x])), [items]);
   // An item that left the board (unassigned, or out of the 7-day window) is no longer selectable.
   const selected = selectedNumber === null ? null : (byNumber.get(selectedNumber) ?? null);

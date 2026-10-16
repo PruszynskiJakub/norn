@@ -93,6 +93,41 @@ describe("the dashboard server", () => {
     expect(d.due.map((x) => x.ms)).toEqual([120_000]);
   });
 
+  test("answers the repository's flows, valid or with their errors, and each issue's flow", async () => {
+    const w = setup({ now: "2026-10-13T12:00:00Z" });
+    const bug = {
+      description: "A defect.",
+      start: "reproducing",
+      workspace: "none",
+      states: {
+        reproducing: { skill: "bug-repro", attended: true, description: "Waiting for a repro", outcomes: { fixed: { to: "closed", means: "fixed" } } },
+      },
+    };
+    w.github.seedFlow("bug", bug);
+    w.github.seedFlow("chore", { description: "Broken.", start: "nowhere", workspace: "none", states: {} });
+    w.github.seedIssue({ number: 10, title: "Rate limiting", labels: ["type:story", "implementation"], assignees: ["alice"] });
+    w.github.seedIssue({ number: 11, title: "Redis store", labels: ["type:slice", "mode:afk", "ready-for-agent"], assignees: ["alice"] });
+    w.github.parents.set(11, 10);
+    w.github.seedIssue({ number: 40, title: "Crash", labels: ["type:bug", "reproducing"], assignees: ["alice"] });
+    const s = await started(await dashboard({ w }));
+    await s.idle();
+
+    const now = await state(s.url);
+
+    expect(now.flows.map((f) => [f.name, f.ok])).toEqual([
+      ["story", true],
+      ["slice", true],
+      ["bug", true],
+      ["chore", false],
+    ]);
+    expect(now.flows.find((f) => f.name === "bug")).toEqual({ ok: true, name: "bug", flow: bug });
+    expect(now.flows.find((f) => f.name === "chore")).toEqual({ ok: false, name: "chore", errors: [{ kind: "start-unknown", start: "nowhere" }] });
+    expect(now.board.map((x) => [x.number, x.flow, x.states, x.slices.map((i) => [i.number, i.flow])])).toEqual([
+      [10, "story", ["implementation"], [[11, "slice"]]],
+      [40, "bug", ["reproducing"], []],
+    ]);
+  });
+
   test("polls on the interval, adding what happened since to the feed", async () => {
     const d = await dashboard();
     const s = await started(d);

@@ -174,6 +174,20 @@ describe("GhGitHub.observeWork", () => {
     expect(calls.map((c) => c.vars.openAfter ?? c.vars.after ?? "-")).toEqual(["-", "s1", "p1", "t1"]);
   });
 
+  test("reads my issues of every flow type, top-level only: no type label and a typed parent leave an issue out", async () => {
+    const bug = item(40, { labels: page([{ name: "type:bug" }, { name: "reproducing" }]), parent: null, subIssues: page([]) });
+    const untyped = item(41, { labels: page([{ name: "question" }]), parent: null, subIssues: page([]) });
+    const slice = item(42, { labels: page([{ name: "type:slice" }]), parent: { labels: page([{ name: "type:story" }]) }, subIssues: page([]) });
+    const underPlain = item(43, { labels: page([{ name: "type:bug" }]), parent: { labels: page([{ name: "epic" }]) }, subIssues: page([]) });
+    const { github, calls } = scripted(() => repo({ open: page([bug, untyped, slice, underPlain]) }), "");
+
+    const work = await github.observeWork(QUERY);
+
+    // GitHub cannot filter by a label prefix, so the query asks for every issue of mine and norn keeps the typed ones.
+    expect(calls[0].query).not.toContain("labels: [");
+    expect(work.stories.map((s) => s.number)).toEqual([40, 43]);
+  });
+
   test("a claim of mine on an item outside my stories brings its story in", async () => {
     const lines = `${SHA}\trefs/norn/claims/31\n${OTHER}\trefs/norn/claims/41\nffff\trefs/heads/main\n`;
     const bobs = item(30, { labels: page([{ name: "type:story" }]), assignees: page([{ login: "bob" }]), subIssues: page([item(31)]) });
