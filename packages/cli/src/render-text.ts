@@ -1,17 +1,34 @@
 import { parseArgs } from "./args.js";
-import type { Briefing, FinishCommand } from "./briefing.js";
-import { type ConfigProblem, type ConfigWarning, LOCAL_CONFIG, TEAM_CONFIG } from "./config.js";
-import type { Event, FollowUpTask } from "./events.js";
-import type { Notification } from "./notify.js";
+import {
+  type AddSliceResult,
+  type Briefing,
+  type ConfigProblem,
+  type ConfigWarning,
+  type DoneResult,
+  type EscalateResult,
+  type Event,
+  type FinishCommand,
+  type FollowUpTask,
+  FOR_HUMAN,
+  type Holder,
+  type Kept,
+  LOCAL_CONFIG,
+  type NextReport,
+  type NextResult,
+  type Notification,
+  type Refusal,
+  type ReleaseResult,
+  type Removal,
+  type Row,
+  sh,
+  type State,
+  type StatusResult,
+  type TakeResult,
+  TEAM_CONFIG,
+  type TidyResult,
+  type WaitItem,
+} from "@psdd/core";
 import type { InitResult, MissingSkills } from "./init.js";
-import type { Holder, NextReport, WaitItem } from "./next.js";
-import { FOR_HUMAN } from "./next.js";
-import type { AddSliceResult, DoneResult, EscalateResult, NextResult, ReleaseResult, TakeResult } from "./operations.js";
-import type { Refusal } from "./refusals.js";
-import type { Row, StatusResult } from "./status.js";
-import { sh } from "./text.js";
-import type { Kept, Removal, TidyResult } from "./tidy.js";
-import type { State } from "./machine.js";
 
 /**
  * Every sentence psdd prints. Each union is switched on exhaustively, so a

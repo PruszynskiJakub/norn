@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 /**
  * Story #123 with slice #127 merged into the story branch and slice #128 still

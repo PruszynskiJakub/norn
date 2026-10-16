@@ -1,6 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { makeNotifier } from "../src/notifier.js";
-import type { Run } from "../src/local-workspace.js";
+import { makeNotifier, type Run } from "@psdd/workspace-local";
 
 function recording(code = 0) {
   const calls: [string, string[]][] = [];

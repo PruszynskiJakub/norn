@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 function stuckStory() {
   const w = setup();

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 /** A slice in needs-review whose psdd comments show `rounds` earlier failures. */
 function sliceWithRounds(rounds: number, state = "needs-review") {

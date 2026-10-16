@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 test("a story runs from new issue to its story PR, driven only through psdd", async () => {
   const w = setup();

@@ -1,4 +1,4 @@
-import type { ClaimRecord, FileToPush, GitHub, Issue, PullRequest } from "../src/github.js";
+import type { ClaimRecord, FileToPush, GitHub, Issue, PullRequest } from "@psdd/core";
 
 export class FakeGitHub implements GitHub {
   issues = new Map<number, Issue>();

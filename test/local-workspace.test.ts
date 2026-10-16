@@ -2,8 +2,8 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { LocalWorkspace, type Run } from "../src/local-workspace.js";
-import { isWithin, samePath } from "../src/workspace.js";
+import { LocalWorkspace, type Run } from "@psdd/workspace-local";
+import { isWithin, samePath } from "@psdd/core";
 
 function scripted(handler: (cmd: string, args: string[]) => { code?: number; stdout?: string } | undefined) {
   const calls: string[] = [];

@@ -1,5 +1,5 @@
 import { runCommand, type Run } from "./local-workspace.js";
-import type { Channel } from "./notify.js";
+import type { Channel } from "@psdd/core";
 
 /** A notification as worded by the front end. */
 export interface Message {

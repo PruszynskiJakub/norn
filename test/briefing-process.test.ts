@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 /** The briefing carries the process around each skill, so the skills need not know psdd. */
 describe("briefing carries the process", () => {
