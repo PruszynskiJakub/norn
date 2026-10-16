@@ -1,8 +1,8 @@
 // The dashboard's renderer: every sentence the page shows is worded here, from
 // the typed read model, so the rest of the UI only lays words out.
-import type { BoardItem, ClaimHolder, FeedEvent, State, WaitingItem } from "@norn/core";
+import type { ClaimHolder, FeedEvent, WaitingItem } from "@norn/core";
 import type { DashboardState, PollFailure } from "../../src/contract.ts";
-import { stateOf } from "./model.ts";
+import { atGate, type Item, isSliced, stateOf } from "./model.ts";
 
 function unreachable(x: never): never {
   throw new Error(`no wording for ${JSON.stringify(x)}`);
@@ -46,7 +46,7 @@ export function actorOf(e: FeedEvent, me: string | null): string {
   return login(e.actor, me);
 }
 
-function capitalise(s: string): string {
+export function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
@@ -76,9 +76,7 @@ function outcomeSentence(e: Extract<FeedEvent, { kind: "outcome" }>, me: string 
     case "resolving needs-human":
       return "Escalation resolved";
     case "triage":
-      if (e.outcome === "story") return "Accepted at triage as a story";
-      if (e.outcome === "reject") return "Rejected at triage";
-      break;
+      return e.outcome === "reject" ? "Rejected at triage" : `Accepted at triage as a ${e.outcome}`;
     case "refinement":
       if (e.outcome === "clear") return "Refined, no open questions";
       if (e.outcome === "questions") return "Refinement raised questions";
@@ -136,7 +134,7 @@ export function sentence(e: FeedEvent, me: string | null): string {
     case "needs-human":
       return e.action === "raised" ? "Escalated to you" : "Escalation resolved";
     case "pr":
-      return e.action === "merged" ? `${e.target === "story" ? "Story" : "Slice"} PR #${e.pr} merged` : routineText(e);
+      return e.action === "merged" ? `${capitalise(e.target)} PR #${e.pr} merged` : routineText(e);
     case "claim":
       return e.action === "stale" ? `Agent ${e.session} went quiet` : routineText(e);
     case "step":
@@ -172,46 +170,20 @@ export function routineRun(n: number): string {
   return `${n} routine updates`;
 }
 
-function stateWords(s: State): string {
-  switch (s) {
-    case "needs-refinement":
-      return "Waiting for refinement";
-    case "needs-clarification":
-      return "Waiting for answers to its open questions";
-    case "needs-plan":
-      return "Waiting for a plan";
-    case "needs-slicing":
-      return "Waiting to be sliced";
-    case "blocked":
-      return "Blocked";
-    case "ready-for-agent":
-      return "Ready for an agent";
-    case "implementation":
-      return "Being implemented";
-    case "needs-review":
-      return "Waiting for review";
-    case "changes-requested":
-      return "Back for fixes after review";
-    case "needs-qa":
-      return "Waiting for agent QA";
-    case "needs-human-qa":
-      return "Waiting for your QA";
-    case "qa-failed":
-      return "Back for fixes after QA";
-    case "merge-queue":
-      return "Queued to merge";
-    default:
-      return unreachable(s);
-  }
+/** Where an item stands, as a sentence without its full stop: its state's description in its flow, else the state's name. */
+export function stateSentence(x: Item): string {
+  const s = stateOf(x);
+  if (s === "merged") return x.flowDef?.workspace === "none" ? "Done" : "Merged";
+  if (s === "closed") return "Closed without merging";
+  if (x.flowInvalid) return `Stopped: its flow, ${x.flow}, is invalid`;
+  if (s === null) return x.states.length ? `Its state labels disagree: ${x.states.join(" and ")}` : "Has no norn state label";
+  return x.flowDef?.states[s]?.description ?? s;
 }
 
-/** Where an item stands, as a sentence without its full stop. */
-export function stateSentence(x: BoardItem): string {
-  const s = stateOf(x);
-  if (s === "merged") return "Merged";
-  if (s === "closed") return "Closed without merging";
-  if (s === null) return x.states.length ? `Its state labels disagree: ${x.states.join(" and ")}` : "Has no norn state label";
-  return stateWords(s);
+/** What the item is, above its title: its flow, e.g. Story, or Slice of its story. */
+export function kicker(x: Item): string {
+  const flow = x.flow === null ? "Issue" : capitalise(x.flow);
+  return x.isStory ? flow : `${flow} of`;
 }
 
 /** Who holds an item, as a sentence. */
@@ -238,9 +210,9 @@ export function progressCount(merged: number, total: number): string {
 }
 
 /** The short flag beside an item in the sidebar, only where it needs attention. */
-export function itemFlag(x: BoardItem): { text: string; tone: "bad" | "warn" } | null {
+export function itemFlag(x: Item): { text: string; tone: "bad" | "warn" } | null {
   if (x.needsHuman) return { text: "needs you", tone: "bad" };
-  if (x.states.includes("needs-human-qa")) return { text: "your QA", tone: "warn" };
+  if (atGate(x)) return { text: "your QA", tone: "warn" };
   if (x.holder?.stale) return { text: "quiet", tone: "warn" };
   return null;
 }
@@ -254,8 +226,6 @@ export const SIDEBAR = {
 };
 
 export const DETAIL = {
-  story: "Story",
-  sliceOf: "Slice of",
   waitsFor: "Waits for",
   and: "and",
   humanQa: "You QA this one before it merges",
@@ -264,8 +234,12 @@ export const DETAIL = {
   openOnGitHub: "Open on GitHub ↗",
   progress: "Progress",
   noStories: "Nothing in progress.",
-  pipeline: ["build", "review", "QA", "merge"],
 };
+
+/** A stop of the pipeline that runs in one mode only. */
+export function onlyIn(when: "afk" | "hil"): string {
+  return `only in mode:${when}`;
+}
 
 export const FEED = {
   everything: "Everything",
@@ -306,13 +280,14 @@ export function waitingHeading(w: WaitingItem): string {
   }
 }
 
-/** Why an item waits for the developer, in plain words. */
-export function waitingReason(w: WaitingItem): string {
+/** Why an item waits for the developer, in plain words; `x` is the item, when on the board. */
+export function waitingReason(w: WaitingItem, x: Item | undefined): string {
   switch (w.kind) {
     case "needs-human":
       return w.reason ?? "Someone flagged it needs-human by hand; its comments say why.";
     case "needs-human-qa":
-      return w.issue === w.story ? "Every slice merged and agent QA passed. Your QA closes the story." : "Agent QA passed. A few checks need a person.";
+      if (w.issue !== w.story) return "Agent QA passed. A few checks need a person.";
+      return x && isSliced(x) ? `Every slice merged and agent QA passed. Your QA closes the ${x.flow}.` : "A few checks need a person.";
     default:
       return unreachable(w.kind);
   }

@@ -1,23 +1,33 @@
-import type { BoardItem, BoardStory, FeedEvent, State } from "@norn/core";
+import type { BoardItem, BoardStory, FeedEvent, Flow, FlowState, LoadedFlow } from "@norn/core";
 
-/** A board item with the story it belongs to. */
+/** A board item with the top-level issue it belongs to and the flow it runs. */
 export interface Item extends BoardItem {
+  /** A top-level issue, e.g. a story, rather than one of its slices. */
   isStory: boolean;
   story: number;
+  /** Its flow when valid; null when it has none, or it is invalid. */
+  flowDef: Flow | null;
+  /** Its flow is invalid: norn refuses to move it until the flow is fixed. */
+  flowInvalid: boolean;
 }
 
-/** Every story and slice on the board, stories first within their group. */
-export function allItems(board: BoardStory[]): Item[] {
+/** Every item on the board, each top-level issue before its slices, with the flows of the read. */
+export function allItems(board: BoardStory[], flows: LoadedFlow[]): Item[] {
+  const byName = new Map(flows.map((f) => [f.name, f]));
+  const flowed = (x: BoardItem) => {
+    const f = x.flow === null ? undefined : byName.get(x.flow);
+    return { flowDef: f?.ok ? f.flow : null, flowInvalid: f !== undefined && !f.ok };
+  };
   const out: Item[] = [];
   for (const s of board) {
-    out.push({ ...s, isStory: true, story: s.number });
-    for (const x of s.slices) out.push({ ...x, isStory: false, story: s.number });
+    out.push({ ...s, isStory: true, story: s.number, ...flowed(s) });
+    for (const x of s.slices) out.push({ ...x, isStory: false, story: s.number, ...flowed(x) });
   }
   return out;
 }
 
 /** Where an item stands: its single state label, or how it closed. Null for no label, or more than one. */
-export function stateOf(x: BoardItem): State | "merged" | "closed" | null {
+export function stateOf(x: BoardItem): string | "merged" | "closed" | null {
   if (x.status !== "open") return x.status;
   return x.states.length === 1 ? x.states[0]! : null;
 }
@@ -29,14 +39,63 @@ export function isDone(x: BoardItem): boolean {
 /** The colour that an item's dot in the sidebar gets. */
 export type Dot = "bad" | "warn" | "done" | "blocked" | "live" | "none";
 
-export function dotOf(x: BoardItem): Dot {
+export function dotOf(x: Item): Dot {
   if (x.needsHuman) return "bad";
-  if (x.states.includes("needs-human-qa")) return "warn";
+  if (atGate(x)) return "warn";
   if (x.holder?.stale) return "warn";
   if (isDone(x)) return "done";
-  if (x.states.includes("blocked")) return "blocked";
+  if (isHeld(x)) return "blocked";
   if (x.holder) return "live";
   return "none";
+}
+
+const uses = (s: FlowState | undefined, behaviour: string) => Object.hasOwn(s?.behaviours ?? {}, behaviour);
+
+/** The state of the item's flow it is in; undefined without a single one. */
+function current(x: Item): FlowState | undefined {
+  const s = stateOf(x);
+  return s === null ? undefined : x.flowDef?.states[s];
+}
+
+/** The item waits at a human gate of its flow: a person QAs it. */
+export function atGate(x: Item): boolean {
+  return !isDone(x) && uses(current(x), "humanGate");
+}
+
+/** Whether the label is a human gate of the item's flow. */
+export function isGateLabel(x: Item, label: string): boolean {
+  return uses(x.flowDef?.states[label], "humanGate");
+}
+
+/** The item cannot move: its flow holds it until its blockers close, or its flow is invalid. */
+export function isHeld(x: Item): boolean {
+  return !isDone(x) && (x.flowInvalid || uses(current(x), "syncsBlocked"));
+}
+
+/** Its flow creates slices: its progress is its slices', not a pipeline of its own. */
+export function isSliced(x: Item): boolean {
+  return Object.values(x.flowDef?.states ?? {}).some((s) => uses(s, "slices"));
+}
+
+/** Its flow counts fix rounds toward a limit. */
+export function countsFixRounds(x: Item): boolean {
+  return Object.values(x.flowDef?.states ?? {}).some((s) => uses(s, "countsFixRounds"));
+}
+
+/** A state's kind, as norn colours its label when the flow names no colour: a human gate, attended, or run by an agent. */
+export type StateKind = "gate" | "attended" | "agent";
+
+export function kindOf(s: FlowState): StateKind {
+  return uses(s, "humanGate") ? "gate" : s.attended ? "attended" : "agent";
+}
+
+/** The default label colours by kind, as norn creates labels; a human gate takes the built-in human QA's. */
+const KIND_COLOR: Record<StateKind, string> = { gate: "e99695", attended: "c5def5", agent: "bfd4f2" };
+
+/** The colour of a state of the item's flow, as a CSS colour: its own, else its kind's. Null for a label that is no state of the flow. */
+export function stateColor(x: Item, label: string): string | null {
+  const s = x.flowDef?.states[label];
+  return s ? `#${s.color ?? KIND_COLOR[kindOf(s)]}` : null;
 }
 
 /** How much a feed event asks for the developer's eye. */
@@ -100,15 +159,70 @@ export function latestEvidenceOf(x: BoardItem, feed: FeedEvent[]) {
   return null;
 }
 
-/** The QA pipeline of a slice, as five stops and how far it got; -1 when it has not started. */
-export const PIPELINE: readonly State[] = ["ready-for-agent", "implementation", "needs-review", "needs-qa", "merge-queue"];
+/** One stop of a pipeline: a state, and the mode it runs in only, if any. */
+export interface Stop {
+  state: string;
+  /** The step's name, e.g. review. */
+  name: string;
+  when: "afk" | "hil" | null;
+}
 
-export function pipelinePosition(x: BoardItem): number {
-  if (isDone(x)) return PIPELINE.length;
+/** Where a state leads on its first outcome, or where a behaviour moves it, e.g. waitsForSlices; undefined at an end. */
+function firstTarget(s: FlowState): string | undefined {
+  const outcome = Object.values(s.outcomes)[0];
+  if (outcome) return outcome.to;
+  for (const params of Object.values(s.behaviours ?? {})) if (typeof params?.to === "string") return params.to;
+  return undefined;
+}
+
+/**
+ * The item's pipeline: the path from its flow's start to closed, following each state's first outcome, through the state
+ * a step is taken as. A state for the other mode than the item's is passed through, as norn does.
+ */
+export function pipelineOf(x: Item): Stop[] {
+  const flow = x.flowDef;
+  if (!flow) return [];
+  const stops: Stop[] = [];
+  const seen = new Set<string>();
+  for (let at: string | undefined = flow.start; at !== undefined && Object.hasOwn(flow.states, at) && !seen.has(at); ) {
+    seen.add(at);
+    const s: FlowState = flow.states[at];
+    if (s.when && x.mode && s.when !== x.mode) {
+      at = s.outcomes[s.passThrough ?? ""]?.to;
+      continue;
+    }
+    stops.push({ state: at, name: s.name ?? at, when: s.when ?? null });
+    at = s.enterAs && !seen.has(s.enterAs) ? s.enterAs : firstTarget(s);
+  }
+  return stops;
+}
+
+/** How far along its pipeline the item is: the stop it is at; past the last when done; -1 when it is at none. */
+export function pipelinePosition(x: Item, stops: Stop[]): number {
+  if (isDone(x)) return stops.length;
   const s = stateOf(x);
-  if (s === "changes-requested" || s === "qa-failed") return 1;
-  if (s === "needs-human-qa") return 3;
-  return s ? PIPELINE.indexOf(s as State) : -1;
+  const flow = x.flowDef;
+  if (s === null || !flow) return -1;
+  const at = (state: string) => stops.findIndex((p) => p.state === state);
+  if (at(s) >= 0) return at(s);
+  // A state off the path, e.g. back for fixes: at the stop it is taken as, else just before the stop it leads back to.
+  const enterAs = flow.states[s]?.enterAs;
+  if (enterAs && at(enterAs) >= 0) return at(enterAs);
+  const seen = new Set<string>();
+  for (
+    let next = flow.states[s] && firstTarget(flow.states[s]);
+    next !== undefined && !seen.has(next);
+    next = flow.states[next] && firstTarget(flow.states[next])
+  ) {
+    seen.add(next);
+    if (at(next) >= 0) return Math.max(0, at(next) - 1);
+  }
+  return -1;
+}
+
+/** The names under a pipeline: each step once, where the stops of one step run together. */
+export function pipelineNames(stops: Stop[]): string[] {
+  return stops.map((p) => p.name).filter((name, i, all) => i === 0 || all[i - 1] !== name);
 }
 
 export function mergedSlices(s: BoardStory): number {

@@ -265,10 +265,12 @@ export class FakeGitHub implements GitHub {
     this.observed++;
     const repoUrl = await this.repoUrl();
     const claims = [...this.claims].map(([issue, record]) => ({ issue, sha: this.claimShas.get(issue) ?? "seeded", record: { ...record } }));
-    const storyOf = (n: number) => (this.mustGet(n).labels.includes("type:slice") ? (this.parents.get(n) ?? null) : n);
+    const typed = (n: number | undefined) => n !== undefined && (this.issues.get(n)?.labels.some((l) => l.startsWith("type:")) ?? false);
+    const topLevel = (n: number) => typed(n) && !typed(this.parents.get(n));
+    const storyOf = (n: number) => (topLevel(n) ? n : (this.parents.get(n) ?? null));
     const held = new Set(claims.filter((c) => c.record.holder === query.user).map((c) => storyOf(c.issue)));
     const stories = [...this.issues.values()].filter((i) => {
-      if (!i.labels.includes("type:story")) return false;
+      if (!topLevel(i.number)) return false;
       if (held.has(i.number)) return true;
       if (!i.assignees.includes(query.user)) return false;
       return i.state === "open" || (this.closedAt.get(i.number) ?? "") >= query.closedSince;

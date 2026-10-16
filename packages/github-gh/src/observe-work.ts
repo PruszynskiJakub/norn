@@ -61,6 +61,7 @@ export const FRAGMENTS = `fragment Item on Issue {
 }
 fragment Story on Issue {
   ...Item
+  parent { labels(first: 30) { nodes { name } } }
   assignees(first: 5) { nodes { login } }
   subIssues(first: 20) { pageInfo { hasNextPage endCursor } nodes { ...Item } }
 }`;
@@ -68,10 +69,10 @@ fragment Story on Issue {
 const STORIES = `query($owner: String!, $name: String!, $user: String!, $closedSince: DateTime!, $openAfter: String, $closedAfter: String) {
   repository(owner: $owner, name: $name) {
     url
-    open: issues(first: 10, after: $openAfter, states: OPEN, labels: ["type:story"], filterBy: { assignee: $user }) {
+    open: issues(first: 10, after: $openAfter, states: OPEN, filterBy: { assignee: $user }) {
       pageInfo { hasNextPage endCursor } nodes { ...Story }
     }
-    closed: issues(first: 5, after: $closedAfter, states: CLOSED, labels: ["type:story"], filterBy: { assignee: $user, since: $closedSince }, orderBy: { field: UPDATED_AT, direction: DESC }) {
+    closed: issues(first: 5, after: $closedAfter, states: CLOSED, filterBy: { assignee: $user, since: $closedSince }, orderBy: { field: UPDATED_AT, direction: DESC }) {
       pageInfo { hasNextPage endCursor } nodes { ...Story }
     }
     __CLAIMS__
@@ -130,7 +131,14 @@ interface RawItem {
   blockedBy: Page<{ number: number; state: "OPEN" | "CLOSED" }>;
   timelineItems: Page<RawEvent>;
   subIssues?: Page<RawItem>;
+  /** Read for top-level issues only, to tell them from sub-issues of another flow's issue. */
+  parent?: { labels: Page<{ name: string }> } | null;
 }
+
+const typed = (labels: Page<{ name: string }> | undefined) => labels?.nodes.some((l) => l.name.startsWith("type:")) ?? false;
+
+/** An issue on the board in its own right: it has a type, so a flow, and its parent, if any, has none. */
+const topLevel = (raw: RawItem) => typed(raw.labels) && !typed(raw.parent?.labels);
 
 /** Claim refs as git ls-remote prints them; anything not under refs/norn/claims/<number> is not a claim. */
 export function parseLsRemote(out: string): { issue: number; sha: string }[] {
@@ -151,13 +159,13 @@ export async function observeWork(graphql: GraphQl, lsRemote: LsRemote, query: W
     ((await graphql(text, { user: query.user, closedSince: query.closedSince, openAfter, closedAfter })) as { data: { repository: Repo } }).data.repository;
 
   const first = await read(null, null);
-  const raws = [...first.open.nodes, ...first.closed.nodes];
+  const raws = [...first.open.nodes, ...first.closed.nodes].filter(topLevel);
   let { open, closed } = first;
   while (open.pageInfo?.hasNextPage || closed.pageInfo?.hasNextPage) {
     const next = await read(open.pageInfo?.hasNextPage ? open.pageInfo.endCursor : null, closed.pageInfo?.hasNextPage ? closed.pageInfo.endCursor : null);
     // A list that is done is read again from its start; only the one paged on counts.
-    if (open.pageInfo?.hasNextPage) raws.push(...next.open.nodes);
-    if (closed.pageInfo?.hasNextPage) raws.push(...next.closed.nodes);
+    if (open.pageInfo?.hasNextPage) raws.push(...next.open.nodes.filter(topLevel));
+    if (closed.pageInfo?.hasNextPage) raws.push(...next.closed.nodes.filter(topLevel));
     open = open.pageInfo?.hasNextPage ? next.open : { nodes: [] };
     closed = closed.pageInfo?.hasNextPage ? next.closed : { nodes: [] };
   }
@@ -179,7 +187,7 @@ export async function observeWork(graphql: GraphQl, lsRemote: LsRemote, query: W
       data: { repository: Record<string, (RawItem & { parent: RawItem | null }) | null> };
     };
     for (const hit of Object.values(res.data.repository)) {
-      const raw = hit?.labels.nodes.some((l) => l.name === "type:story") ? hit : hit?.parent;
+      const raw = hit && topLevel(hit) ? hit : hit?.parent;
       if (raw && !stories.some((s) => s.number === raw.number)) stories.push(await story(graphql, raw, repoUrl, query.since));
     }
   }
