@@ -177,6 +177,13 @@ export class FakeGitHub implements GitHub {
   async readFileAt(path: string, ref: string) {
     return this.files.get(ref)?.get(path) ?? null;
   }
+  async listFilesAt(dir: string, ref: string) {
+    const prefix = `${dir.replace(/\/+$/, "")}/`;
+    return [...(this.files.get(ref)?.keys() ?? [])]
+      .filter((p) => p.startsWith(prefix) && !p.slice(prefix.length).includes("/"))
+      .map((p) => p.slice(prefix.length))
+      .sort();
+  }
   /** gh's state; when logged in, only to the hosts in ghHosts. */
   ghAuthState: GhAuth = { kind: "logged-in" };
   ghHosts = ["github.com"];
