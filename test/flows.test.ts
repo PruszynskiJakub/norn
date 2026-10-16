@@ -270,6 +270,19 @@ describe("a broken flow", () => {
     expect(res.stdout).toContain("  The name reject is norn's own: triage uses it to close an issue as not planned.\n");
   });
 
+  test("norn next shows its issues as blocked by the flow, with the reason, for a person", async () => {
+    const w = bugAt("reproducing", "{ not json");
+
+    const res = await w.norn("next", "40");
+    const json = JSON.parse((await w.norn("next", "40", "--json")).stdout);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("Waiting for a human:\n  - #40 is blocked by its flow bug, which is broken: It is not valid JSON: ");
+    expect(res.stdout).toContain("Fix .agents/flows/bug.json on the base branch.\n");
+    expect(json.nothingLeft).toBe(true);
+    expect(json.waiting).toEqual([{ issue: 40, reason: "invalid-flow", detail: expect.stringContaining("is blocked by its flow bug, which is broken") }]);
+  });
+
   test("issues of other types are not affected", async () => {
     const w = bugAt("reproducing", "{ not json");
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });

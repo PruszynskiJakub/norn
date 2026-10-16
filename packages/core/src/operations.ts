@@ -324,7 +324,7 @@ export async function addSlice(ctx: Ctx, story: number, input: { title?: string;
 
 /** What can be done on a story now; when nothing is left, the user is notified of what waits for them. */
 export async function next(ctx: Ctx, n: number): Promise<NextResult | Refused> {
-  const r = await notAStory(ctx.github, n);
+  const r = await notAStory(ctx, n);
   if (r) return refuse(r);
   const report = await computeNext(ctx, n);
   if (report.nothingLeft && !report.closed) await notifyWaiting(ctx, report);

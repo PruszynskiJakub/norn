@@ -759,6 +759,8 @@ export function waitDetail(w: WaitItem): string {
       return "has no state label; a person must set one";
     case "ambiguous-state":
       return `has more than one state label (${w.states.join(", ")}); a person must remove the stale one`;
+    case "invalid-flow":
+      return `is blocked by its flow ${w.flow}, which is broken: ${w.errors.map(flowError).join(" ")} Fix .agents/flows/${w.flow}.json on the base branch`;
     default:
       return unreachable(w);
   }

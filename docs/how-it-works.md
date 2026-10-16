@@ -162,7 +162,14 @@ A repository can run other kinds of work through processes of its own. A flow is
 
 Triage chooses the type. Its briefing offers `story`, then one outcome per flow named after the flow, with the flow's `description` as what it means, then `reject`. `norn done <issue> bug` adds `type:bug`, moves the issue to the flow's `start` and assigns it to you, with a transition comment. A flow with `"triage": false` is not offered, and neither is a broken one.
 
-norn checks a flow before it runs it: the start state exists, every target is a state, `closed` or `not-planned`, and no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`). A broken flow is refused, with what is wrong, only for the issues of its own type.
+norn checks a flow strictly before it runs it:
+
+- the fields have the right types, the start state exists, and every target is a state, `closed` or `not-planned`;
+- every state can reach `closed` or `not-planned` through its outcomes, so no issue can be stuck in a loop;
+- each state's `behaviours` are ones this norn knows, allowed together, and any flow they name exists. A flow written for a newer norn fails here, which is what the `nornVersion` pin protects against;
+- no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`), and no flow is named `reject`, triage's outcome.
+
+A broken flow stops only the issues of its own type. `norn take` and `norn done` refuse them with every problem found, triage stops offering the flow, and `norn next` shows them waiting for a person, blocked by the broken flow. Issues of other types keep working.
 
 ## Steps, skills and outcomes
 

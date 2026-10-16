@@ -1,10 +1,11 @@
 import { isStale } from "./claims.js";
 import type { Event } from "./events.js";
+import { type FlowError, flowNameOf, repositoryFlow } from "./flow.js";
 import { send } from "./notify.js";
 import { join } from "node:path";
 import { branchAt, createWorktreeCommand, locate } from "./location.js";
 import { isWithin, type Provider } from "./workspace.js";
-import type { GitHub, Issue } from "./github.js";
+import type { Issue } from "./github.js";
 import { STATES, kindOf, slicesOf, stateOf, statesOf, stepFor, type State } from "./machine.js";
 import { storySlug } from "./slug.js";
 import { storyBranch } from "./text.js";
@@ -59,6 +60,8 @@ export type WaitItem = { issue: number } & (
   | { reason: "owner-merge"; owner: string | null; into: string }
   | { reason: "no-state" }
   | { reason: "ambiguous-state"; states: State[] }
+  /** The issue's type names a repository flow that is broken, so norn cannot run it until a person fixes the flow. */
+  | { reason: "invalid-flow"; flow: string; errors: FlowError[] }
 );
 
 export interface NextReport {
@@ -173,8 +176,20 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
   return report;
 }
 
+/** The issue's broken repository flow, if its type names one. */
+async function brokenFlow(ctx: Ctx, issue: Issue) {
+  const name = flowNameOf(issue);
+  const loaded = name === null ? null : await repositoryFlow(ctx, name);
+  return loaded && !loaded.ok ? loaded : null;
+}
+
 async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   const n = issue.number;
+  const broken = await brokenFlow(ctx, issue);
+  if (broken) {
+    report.waiting.push({ issue: n, reason: "invalid-flow", flow: broken.name, errors: broken.errors });
+    return;
+  }
   const state = stateOf(issue);
   const states = statesOf(issue);
   if (states.length > 1) {
@@ -265,14 +280,17 @@ async function humanWork(ctx: Ctx, issue: Issue): Promise<HumanPlace> {
 }
 
 /** Waiting items only a person can move on. */
-export const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owner-merge", "no-state", "ambiguous-state"];
+export const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owner-merge", "no-state", "ambiguous-state", "invalid-flow"];
 
 /** Why next refuses: n is not a story. */
 export type NotAStory = { kind: "is-a-slice"; issue: number; story: number | null } | { kind: "not-a-story"; issue: number };
 
-export async function notAStory(github: GitHub, n: number): Promise<NotAStory | null> {
+export async function notAStory(ctx: Ctx, n: number): Promise<NotAStory | null> {
+  const { github } = ctx;
   const issue = await github.getIssue(n);
   if (kindOf(issue) === "story") return null;
+  // Shown as blocked by its broken flow rather than refused.
+  if (await brokenFlow(ctx, issue)) return null;
   if (kindOf(issue) === "slice") return { kind: "is-a-slice", issue: n, story: await github.parentOf(n) };
   return { kind: "not-a-story", issue: n };
 }
