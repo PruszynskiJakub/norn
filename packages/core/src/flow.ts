@@ -302,10 +302,12 @@ export function builtInFlow(name: string): LoadedFlow | null {
   return errors.length ? { ok: false, name, errors } : { ok: true, name, flow };
 }
 
-/** The flow `name`: a built-in one, or the repository's; null when there is none. */
-export function loadFlow(ctx: Parameters<typeof repositoryFlow>[0], name: string): Promise<LoadedFlow | null> {
-  const builtIn = builtInFlow(name);
-  return builtIn ? Promise.resolve(builtIn) : repositoryFlow(ctx, name);
+/**
+ * The flow `name`: the repository's, or else the built-in one; null when there is none. A repository flow
+ * replaces the built-in flow of its name wholesale, with nothing merged from it.
+ */
+export async function loadFlow(ctx: Parameters<typeof repositoryFlow>[0], name: string): Promise<LoadedFlow | null> {
+  return (await repositoryFlow(ctx, name)) ?? builtInFlow(name);
 }
 
 /** The flow the issue runs, from its type; null when its type names none, e.g. a new issue. */
@@ -356,13 +358,11 @@ async function checkFlowsNamed(ctx: Parameters<typeof repositoryFlow>[0], loaded
   return errors.length ? { ok: false, name: loaded.name, errors } : loaded;
 }
 
-/** Outcome words of triage that no repository flow can take: the built-in flows' names, and reject. */
-const NOT_A_FLOW_WORD = [...BUILT_IN_FLOWS, "reject"];
-
 /**
  * The flows triage offers: the built-in ones in their order, then the
  * repository's in name order, each valid and not setting triage to false. A
- * repository flow is read from the base branch, and its name must be a type.
+ * repository flow is read from the base branch, and its name must be a type; one
+ * named like a built-in flow takes that flow's place.
  */
 export async function triageFlows(
   ctx: Parameters<typeof repositoryFlow>[0] & { github: { listFilesAt(dir: string, ref: string): Promise<string[]> } },
@@ -370,9 +370,9 @@ export async function triageFlows(
   const names = (await ctx.github.listFilesAt(FLOWS_DIR, ctx.config.baseBranch))
     .filter((file) => file.endsWith(".json"))
     .map((file) => file.slice(0, -".json".length))
-    .filter((name) => /^[a-z0-9][a-z0-9_-]*$/.test(name) && !NOT_A_FLOW_WORD.includes(name))
+    .filter((name) => /^[a-z0-9][a-z0-9_-]*$/.test(name) && !BUILT_IN_FLOWS.includes(name) && !RESERVED_FLOWS.includes(name))
     .sort();
-  const loaded = [...BUILT_IN_FLOWS.map(builtInFlow), ...(await Promise.all(names.map((name) => repositoryFlow(ctx, name))))];
+  const loaded = await Promise.all([...BUILT_IN_FLOWS, ...names].map((name) => loadFlow(ctx, name)));
   return loaded.flatMap((l) => (l?.ok && l.flow.triage !== false ? [{ name: l.name, flow: l.flow }] : []));
 }
 
