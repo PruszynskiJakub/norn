@@ -218,6 +218,7 @@ class Poller {
       repoUrl: last?.repoUrl ?? null,
       board: last?.board ?? [],
       waiting: last?.waiting ?? [],
+      flows: last?.flows ?? [],
       feed: this.feed,
       lastUpdated: last?.at ?? null,
       lastError: this.lastError,

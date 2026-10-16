@@ -28,7 +28,7 @@ export interface FlowState {
   name?: string;
   /** State label the issue moves to when the step is taken. */
   enterAs?: string;
-  /** What the state means, for its label. */
+  /** What the state means, as a phrase, e.g. "Waiting for review": its label's description and the dashboard's wording; the state's name when missing. */
   description?: string;
   /** The state label's colour, as hex without the #, e.g. "1d76db". */
   color?: string;
@@ -359,28 +359,28 @@ async function checkFlowsNamed(ctx: Parameters<typeof repositoryFlow>[0], loaded
 }
 
 /**
- * The flows triage offers: the built-in ones in their order, then the
- * repository's in name order, each valid and not setting triage to false. A
- * repository flow is read from the base branch, and its name must be a type; one
- * named like a built-in flow takes that flow's place.
+ * Every flow of the repository, valid or kept with its errors: the built-in
+ * ones in their order, then the repository's other files in name order. A
+ * repository flow is read from the base branch, and its name must be a type;
+ * one named like a built-in flow takes that flow's place.
  */
-export async function triageFlows(
+export async function repositoryFlows(
   ctx: Parameters<typeof repositoryFlow>[0] & { github: { listFilesAt(dir: string, ref: string): Promise<string[]> } },
-): Promise<{ name: string; flow: Flow }[]> {
+): Promise<LoadedFlow[]> {
   const names = (await ctx.github.listFilesAt(FLOWS_DIR, ctx.config.baseBranch))
     .filter((file) => file.endsWith(".json"))
     .map((file) => file.slice(0, -".json".length))
-    .filter((name) => /^[a-z0-9][a-z0-9_-]*$/.test(name) && !BUILT_IN_FLOWS.includes(name) && !RESERVED_FLOWS.includes(name))
+    .filter((name) => /^[a-z0-9][a-z0-9_-]*$/.test(name) && !BUILT_IN_FLOWS.includes(name))
     .sort();
   const loaded = await Promise.all([...BUILT_IN_FLOWS, ...names].map((name) => loadFlow(ctx, name)));
-  return loaded.flatMap((l) => (l?.ok && l.flow.triage !== false ? [{ name: l.name, flow: l.flow }] : []));
+  return loaded.filter((l) => l !== null);
 }
 
-/** The built-in flow the issue runs, read without GitHub, e.g. for the read model, which stays pure; null for none. */
-export function builtInFlowOf(issue: Issue): Flow | null {
-  const name = flowNameOf(issue);
-  const loaded = name === null ? null : builtInFlow(name);
-  return loaded?.ok ? loaded.flow : null;
+/** The flows triage offers: the repository's flows that are valid, not named like triage's reject, and not setting triage to false. */
+export async function triageFlows(ctx: Parameters<typeof repositoryFlows>[0]): Promise<{ name: string; flow: Flow }[]> {
+  return (await repositoryFlows(ctx)).flatMap((l) =>
+    l.ok && !RESERVED_FLOWS.includes(l.name) && l.flow.triage !== false ? [{ name: l.name, flow: l.flow }] : [],
+  );
 }
 
 /** Triage's step with an outcome for each offered flow, before reject. */

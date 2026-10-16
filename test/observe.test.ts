@@ -36,6 +36,7 @@ describe("observe: the board", () => {
       title: "Rate limiting",
       url: "https://github.com/acme/app/issues/10",
       status: "open",
+      flow: "story",
       states: ["implementation"],
       owner: "alice",
       branch: "10-rate-limiting",
@@ -47,6 +48,7 @@ describe("observe: the board", () => {
         title: "Redis store",
         url: "https://github.com/acme/app/issues/11",
         status: "open",
+        flow: "slice",
         states: ["implementation"],
         labels: ["type:slice", "mode:afk", "implementation", "in-progress"],
         mode: "afk",
@@ -381,5 +383,111 @@ describe("observe: review fixes", () => {
     const second = await observe(await w.ctx(), { since: "2026-10-13T13:59:30.000Z", previous: first });
 
     expect(second.feed.filter((e) => e.kind === "claim")).toEqual([]);
+  });
+});
+
+/** A bug flow of the repository: reproduce, fix, then a person checks it. */
+function bugFlow() {
+  return {
+    description: "A defect: reproduce it, fix it, check it.",
+    start: "reproducing",
+    workspace: "none",
+    states: {
+      reproducing: {
+        name: "reproduction",
+        skill: "bug-repro",
+        attended: false,
+        description: "Waiting for a repro",
+        outcomes: { reproduced: { to: "fixing", means: "reproduced" } },
+      },
+      fixing: { skill: "bug-fix", attended: false, color: "123456", outcomes: { fixed: { to: "checking", means: "fixed" } } },
+      checking: {
+        skill: "bug-check",
+        attended: true,
+        behaviours: { humanGate: {} },
+        outcomes: { ok: { to: "closed", means: "checked" }, "not-ok": { to: "fixing", means: "still broken" } },
+      },
+    },
+  };
+}
+
+describe("observe: repository flows", () => {
+  test("an issue of a repository flow is on the board with its flow, and the read carries the repository's flows", async () => {
+    const w = setup({ now: "2026-10-13T12:00:00Z" });
+    w.github.seedFlow("bug", bugFlow());
+    w.github.seedFlow("chore", "{ not json");
+    w.github.seedIssue({ number: 40, title: "Crash on empty input", labels: ["type:bug", "reproducing"], assignees: ["alice"] });
+    w.github.seedIssue({ number: 41, title: "Tidy", labels: ["type:chore", "doing"], assignees: ["alice"] });
+    w.github.seedIssue({ number: 42, title: "Untriaged", labels: [], assignees: ["alice"] });
+    await w.norn("take", "40");
+    await w.norn("done", "40", "reproduced");
+
+    const res = await observe(await w.ctx(), {});
+
+    expect(res.board.map((s) => [s.number, s.flow, s.states])).toEqual([
+      [40, "bug", ["fixing"]],
+      [41, "chore", []],
+    ]);
+    expect(res.board[0]).toMatchObject({ branch: null, slices: [], humanQa: true });
+    expect(res.flows.map((f) => [f.name, f.ok])).toEqual([
+      ["story", true],
+      ["slice", true],
+      ["bug", true],
+      ["chore", false],
+    ]);
+    expect(res.flows.find((f) => f.name === "bug")).toEqual({ ok: true, name: "bug", flow: bugFlow() });
+    expect(res.flows.find((f) => f.name === "chore")).toMatchObject({ ok: false, errors: [{ kind: "not-json" }] });
+    expect(res.feed.find((e) => e.kind === "outcome")).toMatchObject({
+      issue: 40,
+      story: 40,
+      step: "reproduction",
+      outcome: "reproduced",
+      from: "reproducing",
+      to: "fixing",
+    });
+  });
+
+  test("an issue at a human gate of a repository flow waits for me", async () => {
+    const w = setup({ now: "2026-10-13T12:00:00Z" });
+    w.github.seedFlow("bug", bugFlow());
+    w.github.seedIssue({ number: 40, title: "Crash on empty input", labels: ["type:bug", "fixing"], assignees: ["alice"] });
+    await w.norn("take", "40");
+    await w.norn("done", "40", "fixed");
+
+    const res = await observe(await w.ctx(), {});
+
+    expect(res.waiting).toEqual([
+      {
+        issue: 40,
+        story: 40,
+        title: "Crash on empty input",
+        kind: "needs-human-qa",
+        reason: null,
+        since: "2026-10-13T12:00:00.000Z",
+        command: "norn-drive 40",
+      },
+    ]);
+  });
+
+  test("a repository flow named like a built-in one replaces it on the board and in the flows", async () => {
+    const w = setup({ now: "2026-10-13T12:00:00Z" });
+    w.github.seedFlow("story", bugFlow());
+    w.github.seedIssue({ number: 40, title: "Crash on empty input", labels: ["type:story", "reproducing"], assignees: ["alice"] });
+
+    const res = await observe(await w.ctx(), {});
+
+    expect(res.board.map((s) => [s.number, s.flow, s.states])).toEqual([[40, "story", ["reproducing"]]]);
+    expect(res.flows.filter((f) => f.name === "story")).toEqual([{ ok: true, name: "story", flow: bugFlow() }]);
+  });
+
+  test("each read reads the flows again, so a merged change shows on the next", async () => {
+    const w = setup({ now: "2026-10-13T12:00:00Z" });
+    w.github.seedIssue({ number: 40, title: "Crash on empty input", labels: ["type:bug", "fixing"], assignees: ["alice"] });
+    const ctx = await w.ctx();
+    expect((await observe(ctx, {})).board).toEqual([]);
+
+    w.github.seedFlow("bug", bugFlow());
+
+    expect((await observe(ctx, {})).board.map((s) => [s.number, s.flow, s.states])).toEqual([[40, "bug", ["fixing"]]]);
   });
 });
