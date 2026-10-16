@@ -59,7 +59,7 @@ export interface WaitingItem {
   reason: string | null;
   /** When it started waiting, as norn's comments record it; null when unknown. */
   since: string | null;
-  /** What to tell an agent, e.g. "drive 61". */
+  /** What to tell an agent, e.g. "norn-drive 61". */
   command: string;
 }
 
@@ -157,7 +157,7 @@ export async function observe(ctx: Ctx, opts: { since?: string | null; previous?
         kind,
         reason: kind === "needs-human" ? lastNeedsHumanReason(bodies) : null,
         since: entered?.at ?? null,
-        command: `drive ${i.number}`,
+        command: `norn-drive ${i.number}`,
       });
     }
   }

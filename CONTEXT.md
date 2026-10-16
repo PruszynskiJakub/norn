@@ -111,10 +111,10 @@ The tool that makes worktrees and starts agents in them: herdr, Claude Code or p
 The instructions an agent follows for a step's craft. A step skill knows nothing of norn; the briefing carries the process around it.
 
 **Process skill**:
-A skill that runs norn itself: drive, which takes one issue through its steps with the user, and deliver.
+A skill that runs norn itself: norn-drive, which takes one issue through its steps with the user, and norn-deliver.
 
 **Delivery**:
-Running a sliced story unattended with the deliver skill, a fresh agent per step, until only a person can move it on.
+Running a sliced story unattended with the norn-deliver skill, a fresh agent per step, until only a person can move it on.
 _Avoid_: autopilot
 
 **Parallel slot**:

@@ -58,7 +58,7 @@ describe("briefing carries the process", () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan", "needs-human"] });
     const out = (await w.norn("take", "123")).stdout;
-    expect(out).toContain("Invoke the skill: resolve");
+    expect(out).toContain("Invoke the skill: norn-resolve");
     expect(out).toContain("The latest needs-human comment gives the reason. Read the issue: gh issue view 123 --comments");
     expect(out).toContain("Record the outcome on the issue: gh issue comment 123");
     expect(out).toContain("Spec changes go in .agents/specs/123-rate-limiting/spec.md; commit and push them on 123-rate-limiting.");

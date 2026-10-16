@@ -18,7 +18,7 @@ describe("take names the worktree", () => {
         "It does not exist yet. Create it first:",
         "  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting -b 123-rate-limiting origin/main",
         "",
-        "Invoke the skill: refine",
+        "Invoke the skill: norn-refine",
         "Spec to work on: .agents/specs/123-rate-limiting/spec.md",
         "Read the issue: gh issue view 123 --comments",
         "Commit the spec on 123-rate-limiting and push it, so the link norn posts resolves.",

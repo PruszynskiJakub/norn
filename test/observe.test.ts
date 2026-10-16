@@ -124,9 +124,9 @@ describe("observe: waiting for me", () => {
         kind: "needs-human",
         reason: 'escalated: "Which store?"',
         since: "2026-10-13T12:10:00.000Z",
-        command: "drive 11",
+        command: "norn-drive 11",
       },
-      { issue: 13, story: 10, title: "Docs", kind: "needs-human-qa", reason: null, since: "2026-10-13T12:05:00.000Z", command: "drive 13" },
+      { issue: 13, story: 10, title: "Docs", kind: "needs-human-qa", reason: null, since: "2026-10-13T12:05:00.000Z", command: "norn-drive 13" },
     ]);
   });
 });

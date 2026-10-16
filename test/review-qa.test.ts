@@ -15,7 +15,7 @@ describe("review", () => {
   ])("%j in needs-review finished with %s", async (labels, word, after) => {
     const w = issue([...labels, "needs-review"]);
     const take = await w.norn("take", "131");
-    expect(take.stdout).toContain("Invoke the skill: review");
+    expect(take.stdout).toContain("Invoke the skill: norn-review");
 
     const res = await w.norn("done", "131", word, "Review notes");
 
@@ -49,7 +49,7 @@ describe("agent QA (needs-qa)", () => {
   ])("%j, %s → %s", async (labels, word, to) => {
     const w = issue([...labels, "needs-qa"]);
     const take = await w.norn("take", "131");
-    expect(take.stdout).toContain("Invoke the skill: auto-qa");
+    expect(take.stdout).toContain("Invoke the skill: norn-auto-qa");
     expect(take.stdout).not.toContain("attended");
 
     const res = await w.norn("done", "131", word, "Behaviour 1: ran it, saw it");
@@ -95,7 +95,7 @@ describe("QA by a person (needs-human-qa)", () => {
   ])("%j, %s → %s", async (labels, word, to) => {
     const w = issue([...labels, "needs-human-qa"]);
     const take = await w.norn("take", "131");
-    expect(take.stdout).toContain("Invoke the skill: qa");
+    expect(take.stdout).toContain("Invoke the skill: norn-qa");
     expect(take.stdout.replace(/\s+/g, " ")).toContain("This step is attended");
 
     await w.norn("done", "131", word, "QA notes");
@@ -115,7 +115,7 @@ describe("QA by a person (needs-human-qa)", () => {
   test("needs-human on an item in QA is an escalation, cleared by resolve; the state stays", async () => {
     const w = issue(["type:slice", "mode:hil", "needs-human-qa", "needs-human"]);
     const take = await w.norn("take", "131");
-    expect(take.stdout).toContain("Invoke the skill: resolve");
+    expect(take.stdout).toContain("Invoke the skill: norn-resolve");
     await w.norn("done", "131");
     expect(w.github.labels(131).sort()).toEqual(["mode:hil", "needs-human-qa", "type:slice"]);
   });
@@ -190,7 +190,7 @@ describe("story fixes", () => {
     const w = issue(["type:story", state], 123);
     w.github.issues.get(123)!.title = "Rate limiting";
     const take = await w.norn("take", "123");
-    expect(take.stdout).toContain("Invoke the skill: implement");
+    expect(take.stdout).toContain("Invoke the skill: norn-implement");
     expect(take.stdout).toContain("123-rate-limiting");
     expect(w.github.labels(123)).toContain(state);
 

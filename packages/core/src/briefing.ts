@@ -40,7 +40,7 @@ export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: State |
   const n = issue.number;
   const loc = await locate(issue, ctx);
   // take relabels a slice in rework to implementation; `from` and the history say whether this is rework.
-  const rework = step.skill === "implement" && ((from !== null && FIX_STATES.includes(from)) || fixRounds(await ctx.github.listComments(n)) > 0);
+  const rework = step.skill === "norn-implement" && ((from !== null && FIX_STATES.includes(from)) || fixRounds(await ctx.github.listComments(n)) > 0);
   return {
     issue: n,
     noun: noun(issue),
@@ -69,7 +69,7 @@ export function finishCommands(n: number, step: Step): FinishCommand[] {
 function processLines(issue: Issue, step: Step, loc: Location | null, isRework: boolean): string[] {
   const n = issue.number;
   const readIssue = `Read the issue: gh issue view ${n} --comments`;
-  if (step.skill === "triage") {
+  if (step.skill === "norn-triage") {
     return [readIssue, `On accept, post what triage established on the issue first: gh issue comment ${n}`];
   }
   if (!loc) return [];
@@ -77,16 +77,16 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
   const spec = specPath(story.number, loc.slug);
   const pushSpec = `Commit the spec on ${loc.branch} and push it, so the link norn posts resolves.`;
   const rework = isRework ? [`This is rework: the latest review or QA comment on #${n} lists what to fix. ${readIssue}`] : [];
-  if (step.skill === "resolve") {
+  if (step.skill === "norn-resolve") {
     const lines = [`The latest needs-human comment gives the reason. ${readIssue}`, `Record the outcome on the issue: gh issue comment ${n}`];
     if (kindOf(issue) === "story") lines.push(`Spec changes go in ${spec}; commit and push them on ${loc.branch}.`);
     return lines;
   }
   if (kindOf(issue) === "story") {
     const lines = [`Spec to work on: ${spec}`];
-    if (step.skill === "refine" || step.skill === "clarify") lines.push(readIssue, pushSpec);
-    if (step.skill === "plan") lines.push(pushSpec);
-    if (step.skill === "slice") {
+    if (step.skill === "norn-refine" || step.skill === "norn-clarify") lines.push(readIssue, pushSpec);
+    if (step.skill === "norn-plan") lines.push(pushSpec);
+    if (step.skill === "norn-slice") {
       lines.push(
         "Create the slices in dependency order, blockers first, one command per slice:",
         `  norn add-slice ${n} "title" --mode afk|hil [--blocked-by <slice>]...`,
@@ -95,22 +95,22 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
         `Push ${loc.branch} once the slices exist, so slice PRs can target it.`,
       );
     }
-    if (step.skill === "implement") lines.push(...rework, `Commit the fixes straight onto the story branch ${loc.branch} and push them.`);
-    if (step.skill === "review" || step.skill === "auto-qa" || step.skill === "qa") {
+    if (step.skill === "norn-implement") lines.push(...rework, `Commit the fixes straight onto the story branch ${loc.branch} and push them.`);
+    if (step.skill === "norn-review" || step.skill === "norn-auto-qa" || step.skill === "norn-qa") {
       lines.push(`Story PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`);
     }
     lines.push(...qaLines(issue, step, loc, readIssue));
     return lines;
   }
   const lines = [`Spec: ${spec} (story #${story.number})`, readIssue];
-  if (step.skill === "implement") {
+  if (step.skill === "norn-implement") {
     lines.push(
       ...rework,
       `Commit on ${loc.branch} and push. Open one PR from ${loc.branch} into ${loc.base} if there is none yet:`,
       // The title is free text from GitHub: quoted, so a " or $(...) in it can neither break nor run anything.
       `  gh pr create --base ${sh(loc.base)} --head ${sh(loc.branch)} --title ${sh(issue.title)} --body ${sh(`Part of #${story.number}. Slice #${n}.`)}`,
     );
-  } else if (step.skill === "merge") {
+  } else if (step.skill === "norn-merge") {
     lines.push(
       `Merge origin/${loc.base} into ${loc.branch}, resolving conflicts if needed, and push.`,
       `Then merge the PR: gh pr merge ${sh(loc.branch)} --merge`,
@@ -126,7 +126,7 @@ function qaLines(issue: Issue, step: Step, loc: Location, readIssue: string): st
   const n = issue.number;
   const files =
     "Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.";
-  if (step.skill === "auto-qa") {
+  if (step.skill === "norn-auto-qa") {
     const lines = ["Your note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.", files];
     if (kindOf(issue) === "slice" && issue.labels.includes("mode:afk")) {
       lines.push(`No person checks this slice after you. A criterion you cannot check is never passed: run norn escalate ${n} "reason".`);
@@ -138,7 +138,7 @@ function qaLines(issue: Issue, step: Step, loc: Location, readIssue: string): st
     }
     return lines;
   }
-  if (step.skill === "qa") {
+  if (step.skill === "norn-qa") {
     return [
       `Start from the agent's QA comment on #${n}: its evidence, and what it left for a person. ${readIssue}`,
       `Run the app from ${loc.branch} on this machine and walk the user through what is left, plus anything in the evidence they question.`,

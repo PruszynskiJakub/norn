@@ -118,7 +118,7 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
         const step = stepAt(issue, from);
         // Review or QA sending the issue back starts a round; the implement after it finishes that round.
         const entersFix = FIX_STATES.includes(to as State) && from !== to;
-        const fixRound = entersFix ? fixRounds(upTo.slice(0, -1)) + 1 : step?.skill === "implement" ? fixRounds(upTo) || null : null;
+        const fixRound = entersFix ? fixRounds(upTo.slice(0, -1)) + 1 : step?.skill === "norn-implement" ? fixRounds(upTo) || null : null;
         events.push({
           ...at,
           id: `outcome:${t.url}`,

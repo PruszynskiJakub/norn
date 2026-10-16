@@ -343,7 +343,7 @@ export function renderAnswer(a: Answer): string[] {
     case "done":
       return renderDone(a);
     case "escalated":
-      return [`#${a.issue} now needs a human. The claim is released.`, "Do not work on it further. A person picks it up with the resolve skill."];
+      return [`#${a.issue} now needs a human. The claim is released.`, "Do not work on it further. A person picks it up with the norn-resolve skill."];
     case "released":
       return [`Released #${a.issue}. Its state is unchanged. Do not work on it further.`];
     case "slice-added": {
@@ -369,7 +369,7 @@ export function renderAnswer(a: Answer): string[] {
         `  - how to work with norn in ${a.instructed.join(" and ")}`,
         `  - ${a.labels} labels on the repository`,
         "",
-        `Commit skills/, .claude/skills/, .agents/, .gitignore and ${a.instructed.join(", ")}. Then ask your agent: drive <issue>`,
+        `Commit skills/, .claude/skills/, .agents/, .gitignore and ${a.instructed.join(", ")}. Then ask your agent: norn-drive <issue>`,
       ];
     default:
       return unreachable(a);
@@ -464,7 +464,7 @@ function renderDone(d: DoneResult): string[] {
   if (d.fixLimit !== null) lines.push(`#${n} has reached ${d.fixLimit} fix rounds, so it now needs a human instead of another round of implement.`);
   if (d.storyBranchCreated) lines.push(...renderEvent({ kind: "story-branch-created", branch: d.storyBranchCreated }));
   lines.push(...d.followUps.flatMap(renderEvent));
-  if (d.deliverable) lines.push(`To run the story unattended until it needs a human, the user can start the deliver skill: deliver ${n}`);
+  if (d.deliverable) lines.push(`To run the story unattended until it needs a human, the user can start the norn-deliver skill: norn-deliver ${n}`);
   if (d.personNext) lines.push(`A person does the next step, so do not take #${n} again. norn has notified the user.`);
   return lines;
 }
@@ -604,7 +604,7 @@ function humanHandOff(w: WaitItem): string[] {
     "    If the user does it now, hand it to an agent in its worktree:",
     ...(w.createWorktree ? [`      Create the worktree: ${w.createWorktree}`] : []),
     `      herdr agent start norn-${w.issue} --kind claude --pane <pane of ${w.worktree}>`,
-    `      herdr agent prompt norn-${w.issue} "drive ${w.issue}"`,
+    `      herdr agent prompt norn-${w.issue} "norn-drive ${w.issue}"`,
     `      herdr agent focus norn-${w.issue}`,
   ];
 }
@@ -699,7 +699,7 @@ export function renderNext(r: NextReport): string {
           out.push(
             "    Hand the story to an agent in its worktree, which drives it on with the user:",
             `      ${start}`,
-            `      herdr agent prompt norn-${s.issue} "drive ${r.story}"`,
+            `      herdr agent prompt norn-${s.issue} "norn-drive ${r.story}"`,
             `      herdr agent focus norn-${s.issue}`,
           );
         }

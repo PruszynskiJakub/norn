@@ -13,7 +13,7 @@ norn answers in prose written as instructions to the agent, always in the same o
 | [`norn status <story>`](#norn-status) | Read-only overview of the story and its slices |
 | [`norn tidy`](#norn-tidy) | Remove what belongs to closed issues |
 | [`norn dashboard`](#norn-dashboard) | Watch your work in the browser |
-| [`norn add-slice <story> "title"`](#norn-add-slice) | Create a slice (used by the `slice` skill) |
+| [`norn add-slice <story> "title"`](#norn-add-slice) | Create a slice (used by the `norn-slice` skill) |
 | [`norn escalate <issue> "reason"`](#norn-escalate) | Set `needs-human` and release the claim |
 | [`norn release <issue>`](#norn-release) | Give up the claim without a transition |
 
@@ -25,7 +25,7 @@ npx norn init
 
 Sets norn up in the current repository. Running it again is safe and refreshes what it wrote.
 
-- **Skills.** Copies the bundled skills into `skills/` and links them into `.claude/skills/`: one per step (`triage`, `refine`, `clarify`, `plan`, `slice`, `implement`, `review`, `auto-qa`, `qa`, `merge`, `resolve`), the process skills (`drive`, `deliver`) and the reference skills they use (`interview`, `codebase-design`, `tdd`). After upgrading norn, run `init` again: it replaces any bundled skill that differs from the new version and names them; `git diff skills/` shows the changes. Set `NORN_SKILLS_SOURCE=<repo>` to install the skills with `npx skills add <repo>` instead; skills from that source already in place are kept.
+- **Skills.** Copies the bundled skills into `skills/` and links them into `.claude/skills/`: one per step (`norn-triage`, `norn-refine`, `norn-clarify`, `norn-plan`, `norn-slice`, `norn-implement`, `norn-review`, `norn-auto-qa`, `norn-qa`, `norn-merge`, `norn-resolve`), the process skills (`norn-drive`, `norn-deliver`) and the reference skills they use (`norn-interview`, `norn-codebase-design`, `norn-tdd`). After upgrading norn, run `init` again: it replaces any bundled skill that differs from the new version and names them; `git diff skills/` shows the changes. Set `NORN_SKILLS_SOURCE=<repo>` to install the skills with `npx skills add <repo>` instead; skills from that source already in place are kept.
 - **Agent instructions.** Writes a short norn section between `<!-- norn:start -->` and `<!-- norn:end -->` into `AGENTS.md` and `CLAUDE.md`, whichever exist. With neither, it creates `AGENTS.md` and a `CLAUDE.md` that imports it.
 - **Files.** Creates `.agents/specs/` and the team config `.agents/norn.config.json`, taking `baseBranch` from the repository's default branch. Adds `.agents/worktrees/` and `.agents/norn.config.local.json` to `.gitignore`.
 - **Labels.** Creates norn's labels on the GitHub repository.
@@ -36,7 +36,7 @@ Sets norn up in the current repository. Running it again is safe and refreshes w
 npx norn next <story>
 ```
 
-Lists what can be done on the story now, each item with the command that starts it, and what is waiting and why. It is the entry point for `deliver`.
+Lists what can be done on the story now, each item with the command that starts it, and what is waiting and why. It is the entry point for `norn-deliver`.
 
 ```text
 Story #123 "Rate limiting" is in implementation. 2 of 7 slices are merged
@@ -128,7 +128,7 @@ A read-only overview of the story and its slices: the story's owner and branch, 
 npx norn tidy [--dry-run]
 ```
 
-Removes what belongs to closed issues: QA evidence branches, worktrees, merged branches and claim refs. Anything with uncommitted or unpushed work is named and kept. `--dry-run` only lists. `deliver` and `drive` run it for you.
+Removes what belongs to closed issues: QA evidence branches, worktrees, merged branches and claim refs. Anything with uncommitted or unpushed work is named and kept. `--dry-run` only lists. `norn-deliver` and `norn-drive` run it for you.
 
 ## norn dashboard
 
@@ -138,7 +138,7 @@ npx norn dashboard [--port <n>] [--interval <duration>] [--no-open]
 
 Serves a read-only page on `127.0.0.1` over your norn work in this repository and opens it in your browser:
 
-- what needs you (`needs-human` and `needs-human-qa`), each with its `drive` command;
+- what needs you (`needs-human` and `needs-human-qa`), each with its `norn-drive` command;
 - what is worth a look: stale claims and items one fix round from the limit;
 - your stories with their slices and progress;
 - a feed of what happened, with the agents' implement, review and QA remarks and links to their evidence.
@@ -158,7 +158,7 @@ It reads GitHub as you every 2 minutes (30s at the least), with one GraphQL quer
 npx norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...
 ```
 
-Creates a slice as a sub-issue of the story, with its labels, the story's assignee, its native "blocked by" relations and its mode. The `slice` skill calls it; you rarely need it by hand.
+Creates a slice as a sub-issue of the story, with its labels, the story's assignee, its native "blocked by" relations and its mode. The `norn-slice` skill calls it; you rarely need it by hand.
 
 ## norn escalate
 
@@ -166,7 +166,7 @@ Creates a slice as a sub-issue of the story, with its labels, the story's assign
 npx norn escalate <issue> "reason"
 ```
 
-Sets `needs-human` with the reason as a comment and releases the claim. A person clears it with `drive <issue>`, which runs the `resolve` skill.
+Sets `needs-human` with the reason as a comment and releases the claim. A person clears it with `norn-drive <issue>`, which runs the `norn-resolve` skill.
 
 ## norn release
 

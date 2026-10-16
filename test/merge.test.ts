@@ -21,7 +21,7 @@ describe("merge-queue on a slice", () => {
   test("is briefed with the merge skill and the PR into the story branch", async () => {
     const w = storyWithSlices();
     const res = await w.norn("take", "127");
-    expect(res.stdout).toContain("Invoke the skill: merge");
+    expect(res.stdout).toContain("Invoke the skill: norn-merge");
     expect(res.stdout).toContain("Merge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.");
     expect(res.stdout).toContain("Then merge the PR: gh pr merge 123-rate-limiting-127 --merge");
   });
