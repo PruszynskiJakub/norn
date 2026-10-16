@@ -1,6 +1,6 @@
 {
   "name": "norn",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "CLI for the SDD process: GitHub labels as the only source of truth",
   "type": "module",
   "bin": {
