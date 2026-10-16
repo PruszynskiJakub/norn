@@ -1,5 +1,5 @@
-import { behaviourLines, EVIDENCE_FILES, readIssue as readIssueLine } from "./behaviours.js";
-import { type Flow, flowNameOf, flowStatesOf, gateAhead, hasSpec, usedIn, uses } from "./flow.js";
+import { behaviourLines, EVIDENCE_FILES, inFlowOf, readIssue as readIssueLine } from "./behaviours.js";
+import { type Flow, flowStatesOf, gateAhead, hasSpec, type NamedFlow, usedIn, uses } from "./flow.js";
 import { flowOf, validFlow } from "./flow-loading.js";
 import type { Issue } from "./github.js";
 import { locate, workIn, type Location, type WorkIn } from "./location.js";
@@ -44,8 +44,9 @@ export interface Briefing {
  * `from` is the state the issue was in before take moved it, e.g. changes-requested.
  * `flow` is the issue's flow, when it runs one.
  */
-export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: string | null, flow: Flow | null = null): Promise<Briefing> {
+export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: string | null, named: NamedFlow | null): Promise<Briefing> {
   const n = issue.number;
+  const flow = named?.flow ?? null;
   const loc = await locate(issue, ctx, flow);
   return {
     issue: n,
@@ -53,7 +54,7 @@ export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: string 
     title: issue.title,
     step: { name: step.name, skill: step.skill, attended: step.attended },
     workIn: loc ? await workIn(loc, ctx.workspace, ctx.github, ctx.config.provider) : null,
-    instructions: flow ? await flowLines(issue, step, ctx, from, flow, loc) : triageLines(n),
+    instructions: named ? await flowLines(issue, step, ctx, from, named, loc) : triageLines(n),
     finish: finishCommands(n, step),
   };
 }
@@ -78,8 +79,9 @@ function triageLines(n: number): string[] {
  * spec or the issue, then what the behaviours of its flow add, then how QA
  * evidence reaches it. The skills themselves know none of this.
  */
-async function flowLines(issue: Issue, step: Step, ctx: Ctx, from: string | null, flow: Flow, loc: Location | null): Promise<string[]> {
+async function flowLines(issue: Issue, step: Step, ctx: Ctx, from: string | null, named: NamedFlow, loc: Location | null): Promise<string[]> {
   const n = issue.number;
+  const { flow } = named;
   const readIssue = readIssueLine(n);
   // Without the branch its workspace names, e.g. a parent, norn has nothing to say about the work.
   if (flow.workspace !== "none" && !loc) return [];
@@ -94,8 +96,7 @@ async function flowLines(issue: Issue, step: Step, ctx: Ctx, from: string | null
   // Work in the parent's branch follows the parent's spec.
   const what = noun(loc && flow.workspace === "parent" ? validFlow(await flowOf(ctx, loc.story)) : null);
   const spec = loc && flow.workspace === "parent" ? [`Spec: ${specPath(loc.story.number, loc.slug)} (${what} #${loc.story.number})`] : [];
-  const flowName = flowNameOf(issue) ?? "";
-  const lines = [...spec, ...(ownSpec ? [] : [readIssue]), ...(await behaviourLines({ ctx, issue, flow, flowName, state, from, step, loc }))];
+  const lines = [...spec, ...(ownSpec ? [] : [readIssue]), ...(await behaviourLines({ ...inFlowOf(ctx, issue, named), state, from, step, loc }))];
   // An agent's step with evidence is QA: its note is the evidence pack.
   if (state !== null && flow.states[state].evidence && !uses(flow, state, "humanGate"))
     lines.push(...agentQaLines(n, noun(flow), gateAhead(flow, issue, state)));

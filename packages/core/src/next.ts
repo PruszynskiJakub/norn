@@ -5,8 +5,8 @@ import { join } from "node:path";
 import { branchAt, createWorktreeCommand, locate } from "./location.js";
 import { isWithin, type Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
-import { gateOf, heldInput, heldWaiting, holds, needsBranch, reconcileState, releaseBlocked, slicesOf } from "./behaviours.js";
-import { type Flow, flowNameOf, flowStatesOf, flowStep, type NamedFlow, usedIn, uses } from "./flow.js";
+import { gateOf, heldInput, heldWaiting, holds, inFlowOf, needsBranch, reconcileState, releaseBlocked, slicesOf } from "./behaviours.js";
+import { type Flow, flowStatesOf, flowStep, type NamedFlow, usedIn, uses } from "./flow.js";
 import { flowOf, validFlow } from "./flow-loading.js";
 import type { LoadedFlow } from "./flow-validation.js";
 import type { Holder, HumanPlace, WaitItem } from "./waiting.js";
@@ -70,11 +70,12 @@ export interface NextReport {
  * clearing state labels left on closed issues. Removing what closed issues
  * leave behind is norn tidy's. Returns what changed or failed.
  */
-async function reconcile(ctx: Ctx, n: number, flow: Flow): Promise<Event[]> {
+async function reconcile(ctx: Ctx, n: number, named: NamedFlow): Promise<Event[]> {
   const { github } = ctx;
+  const { flow } = named;
   const notes: Event[] = [];
   const issue = await github.getIssue(n);
-  const held = issue.state === "open" ? heldInput(ctx, issue, flow) : null;
+  const held = issue.state === "open" ? heldInput(ctx, issue, named) : null;
   if (held && needsBranch(flow, held.state)) {
     try {
       const branch = await ensureOwnBranch(ctx, issue);
@@ -109,7 +110,7 @@ export async function computeNext(ctx: Ctx, n: number, loaded: LoadedFlow): Prom
   // An issue with slices is a story: next runs it with its slices.
   const story = flow !== null && usedIn(flow, "slices");
   if (story) await releaseBlocked(ctx, n);
-  const notes = flow ? await reconcile(ctx, n, flow) : [];
+  const notes = loaded.ok ? await reconcile(ctx, n, loaded) : [];
   const issue = await github.getIssue(n);
   const slices = flow ? await slicesOf(github, n, flow) : [];
   const loc = flow ? await locate(issue, ctx, flow) : null;
@@ -169,7 +170,8 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
  * any other state is offered to start, attended or not as the state says.
  * `kind` is how it is offered: a slice of the story, or an issue on its own.
  */
-async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, { name, flow }: NamedFlow, kind: StartItem["kind"]) {
+async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, named: NamedFlow, kind: StartItem["kind"]) {
+  const { name, flow } = named;
   const n = issue.number;
   const states = flowStatesOf(issue, flow);
   if (states.length > 1) {
@@ -202,7 +204,7 @@ async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, { name
   }
   if (holds(flow, state)) {
     // What holds it says what it waits for, if anything a listing needs.
-    const item = await heldWaiting({ ctx, issue, flow, flowName: flowNameOf(issue) ?? name, state });
+    const item = await heldWaiting({ ...inFlowOf(ctx, issue, named), state });
     if (item) report.waiting.push(item);
     return;
   }

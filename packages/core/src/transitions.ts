@@ -171,20 +171,23 @@ export function evidenceLines(repoUrl: string, e: Evidence): string[] {
   return lines;
 }
 
+/** How an outcome is applied: the word said, the note and evidence that go in the comment, and what the mode skipped. */
+export interface Applying {
+  /** The outcome word; empty for a step with a single way to end. */
+  word: string;
+  note?: string;
+  evidence?: Evidence;
+  /** The issue's flow; null for a new issue, which triage gives one. */
+  flow: Flow | null;
+  /** The line naming the states the issue's mode skipped; null for none. */
+  skipped: string | null;
+}
+
 /**
  * Applies an outcome to an issue whose claim this session holds: labels,
  * comment and closing. The automatic transitions that follow are in followUps.
  */
-export async function applyOutcome(
-  ctx: Ctx,
-  issue: Issue,
-  outcome: Outcome,
-  word: string,
-  note?: string,
-  evidence?: Evidence,
-  flow: Flow | null = null,
-  skipped: string | null = null,
-): Promise<void> {
+export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, { word, note, evidence, flow, skipped }: Applying): Promise<void> {
   const { github } = ctx;
   const n = issue.number;
   // An issue whose state its flow dropped moves on from that state.

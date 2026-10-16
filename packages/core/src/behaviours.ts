@@ -1,4 +1,4 @@
-import { type Flow, flowNameOf, flowStatesOf, hasSpec, usedIn, uses } from "./flow.js";
+import { type Flow, flowStatesOf, hasSpec, type NamedFlow, usedIn, uses } from "./flow.js";
 import { flowOf, validFlow } from "./flow-loading.js";
 import type { GitHub, Issue } from "./github.js";
 import { locate, type Location } from "./location.js";
@@ -21,13 +21,22 @@ import { bestEffort, type Ctx, fixLimitReason, fixRounds, mergeRefusal, oneLine,
 /** A behaviour's parameters, as written in the flow; `{}` when it takes none. */
 export type BehaviourParams = Record<string, unknown>;
 
-/** What a behaviour sees of a step being briefed in a flow that uses it. */
-export interface BriefingInput {
+/** An issue in its flow, as every hook sees it. */
+export interface IssueInFlow {
   ctx: Ctx;
   issue: Issue;
   flow: Flow;
   /** The flow's name, the issue's type. */
   flowName: string;
+}
+
+/** The issue in the flow it runs, for the hooks. */
+export function inFlowOf(ctx: Ctx, issue: Issue, { name, flow }: NamedFlow): IssueInFlow {
+  return { ctx, issue, flow, flowName: name };
+}
+
+/** What a behaviour sees of a step being briefed in a flow that uses it. */
+export interface BriefingInput extends IssueInFlow {
   /** The issue's state after take, e.g. fixing. */
   state: string | null;
   /** The state the issue was in before take moved it, e.g. changes-requested. */
@@ -38,12 +47,7 @@ export interface BriefingInput {
 }
 
 /** What a behaviour sees of an outcome done applies in a flow. */
-export interface OutcomeInput {
-  ctx: Ctx;
-  issue: Issue;
-  flow: Flow;
-  /** The flow's name, the issue's type. */
-  flowName: string;
+export interface OutcomeInput extends IssueInFlow {
   /** The state the issue leaves; null with none. */
   from: string | null;
   /** The outcome as the flow declares it. */
@@ -52,12 +56,7 @@ export interface OutcomeInput {
 }
 
 /** What a behaviour sees of an issue in a state of its flow, e.g. one that holds it. */
-export interface HeldInput {
-  ctx: Ctx;
-  issue: Issue;
-  flow: Flow;
-  /** The flow's name, the issue's type. */
-  flowName: string;
+export interface HeldInput extends IssueInFlow {
   state: string;
 }
 
@@ -107,7 +106,7 @@ export interface Behaviour {
 }
 
 /** The flow's name as a word that starts a sentence, e.g. Slice. */
-const named = (flowName: string) => flowName.charAt(0).toUpperCase() + flowName.slice(1);
+const capitalised = (flowName: string) => flowName.charAt(0).toUpperCase() + flowName.slice(1);
 
 /** The params of the behaviour in the state, `{}` when it takes none; undefined when the state does not use it. */
 function paramsOf(flow: Flow, state: string | null, name: BehaviourName): BehaviourParams | undefined {
@@ -216,7 +215,7 @@ const waitsForSlices: Behaviour = {
     const wait = waitState(flow);
     if (!loc || !wait || state === null || !reachable(flow, wait.to).has(state)) return [];
     if (uses(flow, state, "countsFixRounds")) return [`Commit the fixes straight onto the ${flowName} branch ${loc.branch} and push them.`];
-    return [`${named(flowName)} PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`];
+    return [`${capitalised(flowName)} PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`];
   },
   async reconcile({ ctx, issue }) {
     return bestEffort("move-story-on", issue.number, issue.number, () => moveOnFromSlices(ctx, issue.number));
@@ -247,7 +246,7 @@ export async function moveOnFromSlices(ctx: Ctx, n: number): Promise<Event[]> {
         title: issue.title,
         body: `Closes #${n}${hasSpec(flow) ? `\n\nSpec: ${specPath(n, loc.slug)}` : ""}`,
       }));
-    await setState(ctx, issue, wait.to, `Every slice is merged into ${loc.branch}. ${named(loaded.name)} PR: #${pr.number}.`, flow);
+    await setState(ctx, issue, wait.to, `Every slice is merged into ${loc.branch}. ${capitalised(loaded.name)} PR: #${pr.number}.`, flow);
   });
   return moved ? [{ kind: "story-promoted", story: n }] : [];
 }
@@ -303,7 +302,7 @@ const opensPR: Behaviour = {
     const diff = `Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`;
     const parent = flow.workspace === "parent";
     if (uses(flow, state, "opensPR")) {
-      const body = parent ? `Part of #${loc.story.number}. ${named(flowName)} #${issue.number}.` : `Closes #${issue.number}.`;
+      const body = parent ? `Part of #${loc.story.number}. ${capitalised(flowName)} #${issue.number}.` : `Closes #${issue.number}.`;
       return [
         `Commit on ${loc.branch} and push. Open one PR from ${loc.branch} into ${loc.base} if there is none yet:`,
         // The title is free text from GitHub: quoted, so a " or $(...) in it can neither break nor run anything.
@@ -313,7 +312,7 @@ const opensPR: Behaviour = {
     }
     // Where the PR gets merged, mergesSlice says what to do with it instead.
     if (uses(flow, state, "mergesSlice")) return [];
-    if (parent) return [`${named(flowName)} PR: ${loc.branch} into ${loc.base}. ${diff}`];
+    if (parent) return [`${capitalised(flowName)} PR: ${loc.branch} into ${loc.base}. ${diff}`];
     const pr = await ctx.github.findPullRequest(loc.branch);
     return pr ? [`PR #${pr.number}: ${loc.branch} into ${pr.base}. ${diff}`] : [];
   },
@@ -531,9 +530,9 @@ export async function reconcileState(h: HeldInput): Promise<Event[]> {
 }
 
 /** An issue in a state of its flow, as the hooks above see it; null without a single state. */
-export function heldInput(ctx: Ctx, issue: Issue, flow: Flow): HeldInput | null {
-  const states = flowStatesOf(issue, flow);
-  return states.length === 1 ? { ctx, issue, flow, flowName: flowNameOf(issue) ?? "", state: states[0] } : null;
+export function heldInput(ctx: Ctx, issue: Issue, named: NamedFlow): HeldInput | null {
+  const states = flowStatesOf(issue, named.flow);
+  return states.length === 1 ? { ...inFlowOf(ctx, issue, named), state: states[0] } : null;
 }
 
 /** The flow's state that holds issues until their blockers close, and the state syncsBlocked releases them to; null for none. */
