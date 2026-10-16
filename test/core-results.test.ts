@@ -27,7 +27,7 @@ describe("done", () => {
     const res = await done(ctx, 41, {});
 
     expect(res).toMatchObject({ ok: true, kind: "done", issue: 41, from: "merge-queue", to: "closed" });
-    expect(res.ok && res.followUps).toEqual([{ kind: "story-promoted", story: 40 }]);
+    expect(res.ok && res.followUps).toEqual([{ kind: "story-promoted", story: 40, to: "needs-review" }]);
   });
 
   test("a follow-up that fails is an event saying what failed and which norn next retries it", async () => {
@@ -95,7 +95,7 @@ describe("take", () => {
 
     const res = await take(ctx, 41, { takeover: false });
 
-    if (!res.ok) throw new Error("refused");
+    if (!res.ok || res.kind !== "taken") throw new Error("not taken");
     expect(res.briefing).toMatchObject({
       issue: 41,
       noun: "slice",

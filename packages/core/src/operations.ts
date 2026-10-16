@@ -3,23 +3,23 @@ import {
   entering,
   heldRefusal,
   holds,
+  inFlowOf,
   leaveRefusal,
   needsBranch,
   type OutcomeInput,
   sliceType,
   slicingState,
   startState,
-  usedIn,
-  uses,
 } from "./behaviours.js";
 import { briefing, type Briefing, finishCommands } from "./briefing.js";
 import { acquire } from "./claims.js";
 import type { Event } from "./events.js";
-import { type Flow, flowNameOf, flowOf, flowStatesOf, flowStep, loadFlow, offerFlows, passThrough, triageFlows } from "./flow.js";
+import { flowStatesOf, flowStep, type NamedFlow, offerFlows, passThrough, usedIn, uses } from "./flow.js";
+import { flowOf, loadFlow, triageFlows } from "./flow-loading.js";
 import type { Issue } from "./github.js";
 import { locate } from "./location.js";
 import { type Step, TRIAGE } from "./machine.js";
-import { computeNext, type NextReport, notAStory, notifyWaiting } from "./next.js";
+import { computeNext, type NextReport, nextRefusal, notifyWaiting } from "./next.js";
 import { notifyNeedsHuman } from "./notify.js";
 import { type Refusal, type Refused, refuse } from "./refusals.js";
 import { storySlug } from "./slug.js";
@@ -30,12 +30,13 @@ import {
   type Ctx,
   ensureOwnBranch,
   ensureStateLabel,
+  ensureTypeLabel,
   type Evidence,
-  followRename,
-  handOverLeft,
   leftState,
   needsHumanLine,
   oneLine,
+  type Settled,
+  settleLeftState,
   skipLine,
   stateLabels,
 } from "./transitions.js";
@@ -79,6 +80,16 @@ export interface DoneResult {
   personNext: boolean;
 }
 
+/** take found the issue in a state its flow no longer has and handed it to a person through needs-human; the claim is released. */
+export interface HandedOverResult {
+  ok: true;
+  kind: "handed-over";
+  issue: number;
+  /** The state the issue was in, which the flow no longer has. */
+  state: string;
+  flow: string;
+}
+
 export interface EscalateResult {
   ok: true;
   kind: "escalated";
@@ -97,6 +108,8 @@ export interface AddSliceResult {
   slice: number;
   title: string;
   mode: "afk" | "hil";
+  /** The state the slice starts in: its flow's start, or the state it is held in while a blocker is open. */
+  state: string;
   /** The blockers still open; with any, the slice starts blocked. */
   blockedBy: number[];
 }
@@ -110,48 +123,49 @@ export interface NextResult {
 /** GitHub's API takes blobs up to 100 MB; evidence is screenshots, logs and output, far smaller. */
 export const MAX_EVIDENCE_BYTES = 25 * 1024 * 1024;
 
-/** The issue's step: from its flow when its type names one, else triage, which chooses its type. */
-async function stepOf(ctx: Ctx, issue: Issue): Promise<{ ok: true; step: Step | null; flow: Flow | null } | Refused> {
+/** The issue's step: from its flow when its type names one, else triage, which chooses its type. `flow` is the flow it runs, with its name. */
+async function stepOf(ctx: Ctx, issue: Issue): Promise<{ ok: true; step: Step | null; flow: NamedFlow | null } | Refused> {
   const loaded = await flowOf(ctx, issue);
   if (!loaded) return { ok: true, step: offerFlows(TRIAGE, await triageFlows(ctx)), flow: null };
   if (!loaded.ok) return refuse({ kind: "flow-invalid", issue: issue.number, flow: loaded.name, errors: loaded.errors });
-  return { ok: true, step: flowStep(issue, loaded.flow), flow: loaded.flow };
+  return { ok: true, step: flowStep(issue, loaded.flow), flow: loaded };
 }
 
 /** The issue's state in its flow; null for none, or for an issue with no flow yet. */
-function stateIn(issue: Issue, flow: Flow | null): string | null {
-  return flow ? (flowStatesOf(issue, flow)[0] ?? null) : null;
+function stateIn(issue: Issue, named: NamedFlow | null): string | null {
+  return named ? (flowStatesOf(issue, named.flow)[0] ?? null) : null;
 }
 
 /** Why an issue has no step to take. */
-async function noStepRefusal(issue: Issue, ctx: Ctx, flow: Flow | null = null): Promise<Refusal> {
+async function noStepRefusal(issue: Issue, ctx: Ctx, named: NamedFlow | null): Promise<Refusal> {
   const { github } = ctx;
   const n = issue.number;
   if (issue.state === "closed") return { kind: "closed", issue: n };
-  if (!flow) return { kind: "no-step", issue: n, state: null, story: null };
+  if (!named) return { kind: "no-step", issue: n, state: null, story: null };
+  const { flow } = named;
   // Work in the parent's branch is run from the parent, and an issue with slices from itself: norn next on it has something else to do.
   const story = flow.workspace === "parent" ? await github.parentOf(n) : usedIn(flow, "slices") ? n : null;
   const states = flowStatesOf(issue, flow);
   if (states.length > 1) return { kind: "ambiguous-state", issue: n, states, story };
   const state = states[0] ?? null;
-  if (state !== null && holds(flow, state)) return heldRefusal({ ctx, issue, flow, flowName: flowNameOf(issue) ?? "", state }, story);
+  if (state !== null && holds(flow, state)) return heldRefusal({ ...inFlowOf(ctx, issue, named), state }, story);
   return { kind: "no-step", issue: n, state, story };
 }
 
-export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Promise<TakeResult | Refused> {
+export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Promise<TakeResult | HandedOverResult | Refused> {
   const { github } = ctx;
   const before = await github.getIssue(n);
   const first = await stepOf(ctx, before);
   if (!first.ok) return first;
   // An issue left in a state its flow no longer has is moved or handed to a person under the claim.
-  const left = first.flow && !first.step ? await leftState(ctx, before, first.flow) : null;
+  const left = first.flow && !first.step ? await leftState(ctx, before, first.flow.flow) : null;
   if ((!first.step && !left) || before.state === "closed") return refuse(await noStepRefusal(before, ctx, first.flow));
 
   const user = await github.currentUser();
   const record = { holder: user, session: ctx.session, since: ctx.now().toISOString() };
   const claim = await acquire(github, n, record, ctx.now(), ctx.config.staleAfterMs, { takeover: opts.takeover });
   if (!claim.ok) {
-    const slice = first.flow?.workspace === "parent";
+    const slice = first.flow?.flow.workspace === "parent";
     const since = claim.held?.since ?? null;
     if (claim.held?.holder === user) return refuse({ kind: "held-by-your-session", issue: n, slice, since });
     if (opts.takeover && claim.held) return refuse({ kind: "held-by-teammate", issue: n, slice, holder: claim.held.holder, since });
@@ -161,27 +175,26 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
   const issue = await github.getIssue(n);
   let resolved = await stepOf(ctx, issue);
   if (resolved.ok && resolved.flow && !resolved.step) {
-    const from = await leftState(ctx, issue, resolved.flow);
-    const to = from === null ? undefined : resolved.flow.renamed?.[from];
-    const name = flowNameOf(issue)!;
-    if (from !== null && to !== undefined) {
-      await followRename(ctx, issue, resolved.flow, name, from, to);
-      resolved = await stepOf(ctx, issue);
-    } else if (from !== null) {
-      try {
-        await handOverLeft(ctx, issue, name, from);
-      } finally {
-        await github.deleteClaim(n);
-      }
-      return refuse({ kind: "state-left", issue: n, state: from, flow: name });
+    let settled: Settled | null;
+    try {
+      settled = await settleLeftState(ctx, issue, resolved.flow);
+    } catch (e) {
+      await github.deleteClaim(n);
+      throw e;
+    }
+    if (settled?.kind === "state-renamed") resolved = await stepOf(ctx, issue);
+    else if (settled?.kind === "handed-over") {
+      await github.deleteClaim(n);
+      return { ok: true, kind: "handed-over", issue: n, state: settled.state, flow: settled.flow };
     }
   }
   if (!resolved.ok || !resolved.step) {
     await github.deleteClaim(n);
     return resolved.ok ? refuse(await noStepRefusal(issue, ctx, resolved.flow)) : resolved;
   }
-  const { step, flow } = resolved;
-  const state = stateIn(issue, flow);
+  const { step, flow: named } = resolved;
+  const flow = named?.flow ?? null;
+  const state = stateIn(issue, named);
   // The new state goes on before the old one comes off, so a failure in between never leaves the issue without a state.
   if (step.enterAs && step.enterAs !== state) {
     const old = stateLabels(issue, step.enterAs, flow);
@@ -203,9 +216,9 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
     ok: true,
     kind: "taken",
     issue: n,
-    state: stateIn(issue, flow),
+    state: stateIn(issue, named),
     step: { name: step.name, skill: step.skill, attended: step.attended, outcomes: Object.keys(step.outcomes).filter(Boolean) },
-    briefing: await briefing(issue, step, ctx, state, flow),
+    briefing: await briefing(issue, step, ctx, state, named),
     reacquired: claim.reacquired ?? false,
     tookOver,
   };
@@ -227,8 +240,9 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   const issue = await github.getIssue(n);
   const resolved = await stepOf(ctx, issue);
   if (!resolved.ok) return resolved;
-  const { step, flow } = resolved;
-  if (!step) return refuse(await noStepRefusal(issue, ctx, flow));
+  const { step, flow: named } = resolved;
+  const flow = named?.flow ?? null;
+  if (!step) return refuse(await noStepRefusal(issue, ctx, named));
   const outcome = step.outcomes[word ?? ""];
   if (!outcome) {
     const finish = finishCommands(n, step);
@@ -240,7 +254,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   const through = flow ? passThrough(flow, issue, outcome) : null;
   const skipped = through?.skipped.length && through.mode ? skipLine(through.skipped, through.mode) : null;
   const landed = through?.outcome ?? outcome;
-  const inFlow: OutcomeInput | null = flow ? { ctx, issue, flow, flowName: flowNameOf(issue) ?? "", from: stateIn(issue, flow), outcome: landed, note } : null;
+  const inFlow: OutcomeInput | null = named ? { ...inFlowOf(ctx, issue, named), from: stateIn(issue, named), outcome: landed, note } : null;
   if (inFlow) {
     const r = await leaveRefusal(inFlow);
     if (r) return refuse(r);
@@ -272,7 +286,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   let fixLimit: number | null = null;
   if (inFlow) ({ outcome: applied, fixLimit } = await entering(inFlow));
   try {
-    await applyOutcome(ctx, issue, applied, word ?? "", note, evidence, flow, skipped);
+    await applyOutcome(ctx, issue, applied, { word: word ?? "", note, evidence, flow: named, skipped });
   } finally {
     await github.deleteClaim(n);
   }
@@ -280,7 +294,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     ok: true,
     kind: "done",
     issue: n,
-    from: stateIn(issue, flow),
+    from: stateIn(issue, named),
     to: landed.to,
     ...(evidence ? { evidence } : {}),
     fixLimit,
@@ -332,15 +346,19 @@ export async function addSlice(ctx: Ctx, story: number, input: { title?: string;
   // The slices run the flow of their type, starting held while a blocker is open.
   const flow = (await loadFlow(ctx, type))!;
   if (!flow.ok) return refuse({ kind: "flow-invalid", issue: story, flow: flow.name, errors: flow.errors });
+  const start = startState(flow.flow, open.length > 0);
+  // Labels GitHub would otherwise create grey and undescribed.
+  await ensureStateLabel(ctx, flow.flow, start);
+  await ensureTypeLabel(ctx, type);
   const slice = await github.createIssue({
     title,
     body: `Slice of #${story}. Spec: ${specPath(story, await storySlug(ctx, parent))}`,
-    labels: [`type:${type}`, `mode:${mode}`, startState(flow.flow, open.length > 0)],
+    labels: [`type:${type}`, `mode:${mode}`, start],
     assignees: parent.assignees,
   });
   await github.addSubIssue(story, slice.number);
   for (const b of blockers) await github.addBlockedBy(slice.number, b.number);
-  return { ok: true, kind: "slice-added", slice: slice.number, title, mode, blockedBy: open.map((b) => b.number) };
+  return { ok: true, kind: "slice-added", slice: slice.number, title, mode, state: start, blockedBy: open.map((b) => b.number) };
 }
 
 /**
@@ -351,7 +369,7 @@ export async function next(ctx: Ctx, n: number): Promise<NextResult | Refused> {
   const issue = await ctx.github.getIssue(n);
   // An issue of a broken flow is not refused: next shows it blocked by the flow.
   const loaded = await flowOf(ctx, issue);
-  const r = await notAStory(ctx.github, issue, loaded);
+  const r = await nextRefusal(ctx.github, issue, loaded);
   if (r || !loaded) return refuse(r ?? { kind: "not-a-story", issue: n });
   const report = await computeNext(ctx, n, loaded);
   if (report.nothingLeft && !report.closed) await notifyWaiting(ctx, report);

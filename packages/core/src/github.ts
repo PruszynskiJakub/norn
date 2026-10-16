@@ -76,8 +76,8 @@ export interface GitHub {
 
   /** Create or update labels. */
   ensureLabels(labels: { name: string; color: string; description: string }[]): Promise<void>;
-  /** The names of the labels on the repository. */
-  labelNames(): Promise<string[]>;
+  /** The labels on the repository, with their colour and description ("" for none). */
+  repositoryLabels(): Promise<{ name: string; color: string; description: string }[]>;
 
   /** The text of a file at a ref (branch, tag or commit), e.g. .agents/flows/bug.json on main; null when it is not there. Read-only. */
   readFileAt(path: string, ref: string): Promise<string | null>;

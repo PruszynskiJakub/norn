@@ -68,6 +68,26 @@ describe("the slices behaviour", () => {
     expect(w.github.labels(task).sort()).toEqual(["doing", "mode:afk", "type:task"]);
   });
 
+  test("add-slice says the state the slice starts in, its flow's start", async () => {
+    const w = epicAt("shaping");
+    await w.norn("take", "50");
+
+    const res = await w.norn("add-slice", "50", "Index", "--mode", "afk");
+
+    const [task] = w.github.subIssueNumbers(50);
+    expect(res.stdout).toBe(`Created slice #${task} "Index" (mode:afk, doing).`);
+  });
+
+  test("add-slice creates the labels of the slice's start state and type when the repository lacks them", async () => {
+    const w = epicAt("shaping");
+    await w.norn("take", "50");
+
+    await w.norn("add-slice", "50", "Index", "--mode", "afk");
+
+    expect(w.github.labelDefs.get("doing")).toEqual({ color: "bfd4f2", description: "an agent runs this step unattended (norn)" });
+    expect(w.github.labelDefs.get("type:task")).toEqual({ color: "ededed", description: "Runs the task flow (norn)" });
+  });
+
   test("add-slice is refused outside the state with slices, naming that state", async () => {
     const w = epicAt("checking");
     await w.norn("take", "50");
@@ -157,6 +177,17 @@ describe("the waitsForSlices behaviour", () => {
     expect(pr.base).toBe("main");
     expect(w.github.comments(50).at(-1)).toContain("norn: waiting → checking (automatic)");
     expect(w.github.comments(50).at(-1)).toContain(`Every slice is merged into 50-search. Epic PR: #${pr.number}.`);
+  });
+
+  test("norn next says the state the issue moved on to, as its flow names it", async () => {
+    const w = epicAt("waiting");
+    w.github.branches.add("50-search");
+    w.github.seedIssue({ number: 51, title: "Index", state: "closed", labels: ["type:task"] });
+    w.github.parents.set(51, 50);
+
+    const res = await w.norn("next", "50");
+
+    expect(res.stdout).toContain("Every slice is merged. Story #50 is now in checking.");
   });
 
   test("is not entered while a slice is open", async () => {

@@ -172,7 +172,7 @@ exports[`output of every command, text and --json > doctor with problems > json 
     {
       "id": "flows",
       "level": "ok",
-      "message": "all 2 flows are valid: story, slice",
+      "message": "all 2 flows are valid: story, slice; story makes slices of type slice",
       "fix": null
     },
     {
@@ -217,7 +217,7 @@ exports[`output of every command, text and --json > doctor with problems > text 
 ✓ permission: you have write access to the repository
 ✗ labels: 19 of norn's labels are missing: needs-refinement, needs-clarification, needs-plan, needs-slicing, implementation, needs-review, changes-requested, needs-qa, needs-human-qa, qa-failed, merge-queue, blocked, ready-for-agent, type:story, type:slice, in-progress, needs-human, mode:afk, mode:hil
   fix: norn init
-✓ flows: all 2 flows are valid: story, slice
+✓ flows: all 2 flows are valid: story, slice; story makes slices of type slice
 ✓ config: the team and local config are valid
 ! version: norn 1.4.2, repo has no nornVersion
   fix: norn init
@@ -910,7 +910,7 @@ exports[`output of every command, text and --json > next closes a merged story >
 "exit 0
 {
   "ok": true,
-  "story": 30,
+  "issue": 30,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "Ship",
@@ -945,7 +945,7 @@ exports[`output of every command, text and --json > next creates the story branc
 "exit 0
 {
   "ok": true,
-  "story": 40,
+  "issue": 40,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "All done",
@@ -967,6 +967,7 @@ exports[`output of every command, text and --json > next creates the story branc
       "kind": "story",
       "title": "All done",
       "state": "needs-review",
+      "description": "Waiting for review",
       "step": "review",
       "skill": "norn-review",
       "attended": false,
@@ -984,7 +985,7 @@ exports[`output of every command, text and --json > next creates the story branc
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Created the story branch 40-all-done.\\nEvery slice is merged. Story #40 is now in needs-review.\\n\\nStory #40 \\"All done\\" is in needs-review. 1 of 1 slices are merged into\\n40-all-done.\\n\\nYou can start 1 item now, in its own fresh subagent, told to work in the item's worktree:\\n\\n  - Story #40 \\"All done\\" needs review.\\n    Worktree: /repo/.agents/worktrees/40-all-done\\n    Start it with: norn take 40\\n\\nEach phase gets a new agent. When an item is done, run norn next 40 again."
+  "message": "Created the story branch 40-all-done.\\nEvery slice is merged. Story #40 is now in needs-review.\\n\\nStory #40 \\"All done\\" is in needs-review. 1 of 1 slices are merged into\\n40-all-done.\\n\\nYou can start 1 item now, in its own fresh subagent, told to work in the item's worktree:\\n\\n  - Story #40 \\"All done\\" is in needs-review: Waiting for review.\\n    Worktree: /repo/.agents/worktrees/40-all-done\\n    Start it with: norn take 40\\n\\nEach phase gets a new agent. When an item is done, run norn next 40 again."
 }"
 `;
 
@@ -998,7 +999,7 @@ Story #40 "All done" is in needs-review. 1 of 1 slices are merged into
 
 You can start 1 item now, in its own fresh subagent, told to work in the item's worktree:
 
-  - Story #40 "All done" needs review.
+  - Story #40 "All done" is in needs-review: Waiting for review.
     Worktree: /repo/.agents/worktrees/40-all-done
     Start it with: norn take 40
 
@@ -1035,7 +1036,7 @@ exports[`output of every command, text and --json > next on a story closed as no
 "exit 0
 {
   "ok": true,
-  "story": 31,
+  "issue": 31,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "Nope",
@@ -1067,7 +1068,7 @@ exports[`output of every command, text and --json > next on a story in implement
 "exit 0
 {
   "ok": true,
-  "story": 123,
+  "issue": 123,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "Rate limiting",
@@ -1089,6 +1090,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "kind": "slice",
       "title": "Redis store",
       "state": "merge-queue",
+      "description": "Queued to merge",
       "step": "merge",
       "skill": "norn-merge",
       "attended": false,
@@ -1105,6 +1107,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "kind": "slice",
       "title": "Limit headers",
       "state": "needs-review",
+      "description": "Waiting for review",
       "step": "review",
       "skill": "norn-review",
       "attended": false,
@@ -1121,6 +1124,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "kind": "slice",
       "title": "Docs",
       "state": "ready-for-agent",
+      "description": "Ready for an agent",
       "step": "implementation",
       "skill": "norn-implement",
       "attended": false,
@@ -1146,7 +1150,7 @@ exports[`output of every command, text and --json > next on a story in implement
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each in its own fresh subagent, told to work in the item's\\nworktree:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Start it with: norn take 127\\n  - Slice #128 \\"Limit headers\\" needs review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Start it with: norn take 128\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start it with: norn take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
+  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each in its own fresh subagent, told to work in the item's\\nworktree:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue: Queued to merge.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Start it with: norn take 127\\n  - Slice #128 \\"Limit headers\\" is in needs-review: Waiting for review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Start it with: norn take 128\\n  - Slice #132 \\"Docs\\" is in ready-for-agent: Ready for an agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start it with: norn take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
 }"
 `;
 
@@ -1159,13 +1163,13 @@ You can start 3 items now. They are independent, so run them in parallel, at
 most 2 at a time, each in its own fresh subagent, told to work in the item's
 worktree:
 
-  - Slice #127 "Redis store" is in merge-queue.
+  - Slice #127 "Redis store" is in merge-queue: Queued to merge.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-127
     Start it with: norn take 127
-  - Slice #128 "Limit headers" needs review.
+  - Slice #128 "Limit headers" is in needs-review: Waiting for review.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-128
     Start it with: norn take 128
-  - Slice #132 "Docs" is ready-for-agent.
+  - Slice #132 "Docs" is in ready-for-agent: Ready for an agent.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-132
     Start it with: norn take 132
 
@@ -1180,7 +1184,7 @@ exports[`output of every command, text and --json > next on a story in implement
 "exit 0
 {
   "ok": true,
-  "story": 123,
+  "issue": 123,
   "provider": "git",
   "maxParallel": 2,
   "title": "Rate limiting",
@@ -1202,6 +1206,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "kind": "slice",
       "title": "Redis store",
       "state": "merge-queue",
+      "description": "Queued to merge",
       "step": "merge",
       "skill": "norn-merge",
       "attended": false,
@@ -1218,6 +1223,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "kind": "slice",
       "title": "Docs",
       "state": "ready-for-agent",
+      "description": "Ready for an agent",
       "step": "implementation",
       "skill": "norn-implement",
       "attended": false,
@@ -1249,7 +1255,7 @@ exports[`output of every command, text and --json > next on a story in implement
   "notified": true,
   "running": 1,
   "slots": 1,
-  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 2 items now. They are independent, so run them in parallel, at\\nmost 1 at a time (1 of your agents is running, the limit is 2), each in a\\nnew agent session started in the item's worktree:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n    Start an agent in /repo/.agents/worktrees/123-rate-limiting-127 with NORN_SESSION=norn-127-n1 set.\\n    Start it with: norn take 127\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting\\n    Start an agent in /repo/.agents/worktrees/123-rate-limiting-132 with NORN_SESSION=norn-132-n2 set.\\n    Start it with: norn take 132\\n\\nWaiting, nothing to do for you:\\n  - #128 is held by another session of yours (since 11:00).\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
+  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 2 items now. They are independent, so run them in parallel, at\\nmost 1 at a time (1 of your agents is running, the limit is 2), each in a\\nnew agent session started in the item's worktree:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue: Queued to merge.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n    Start an agent in /repo/.agents/worktrees/123-rate-limiting-127 with NORN_SESSION=norn-127-n1 set.\\n    Start it with: norn take 127\\n  - Slice #132 \\"Docs\\" is in ready-for-agent: Ready for an agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting\\n    Start an agent in /repo/.agents/worktrees/123-rate-limiting-132 with NORN_SESSION=norn-132-n2 set.\\n    Start it with: norn take 132\\n\\nWaiting, nothing to do for you:\\n  - #128 is held by another session of yours (since 11:00).\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
 }"
 `;
 
@@ -1262,12 +1268,12 @@ You can start 2 items now. They are independent, so run them in parallel, at
 most 1 at a time (1 of your agents is running, the limit is 2), each in a
 new agent session started in the item's worktree:
 
-  - Slice #127 "Redis store" is in merge-queue.
+  - Slice #127 "Redis store" is in merge-queue: Queued to merge.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-127
     Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting
     Start an agent in /repo/.agents/worktrees/123-rate-limiting-127 with NORN_SESSION=norn-127-n1 set.
     Start it with: norn take 127
-  - Slice #132 "Docs" is ready-for-agent.
+  - Slice #132 "Docs" is in ready-for-agent: Ready for an agent.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-132
     Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting
     Start an agent in /repo/.agents/worktrees/123-rate-limiting-132 with NORN_SESSION=norn-132-n2 set.
@@ -1285,7 +1291,7 @@ exports[`output of every command, text and --json > next on a story in implement
 "exit 0
 {
   "ok": true,
-  "story": 123,
+  "issue": 123,
   "provider": "herdr",
   "maxParallel": 2,
   "title": "Rate limiting",
@@ -1307,6 +1313,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "kind": "slice",
       "title": "Redis store",
       "state": "merge-queue",
+      "description": "Queued to merge",
       "step": "merge",
       "skill": "norn-merge",
       "attended": false,
@@ -1323,6 +1330,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "kind": "slice",
       "title": "Limit headers",
       "state": "needs-review",
+      "description": "Waiting for review",
       "step": "review",
       "skill": "norn-review",
       "attended": false,
@@ -1339,6 +1347,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "kind": "slice",
       "title": "Docs",
       "state": "ready-for-agent",
+      "description": "Ready for an agent",
       "step": "implementation",
       "skill": "norn-implement",
       "attended": false,
@@ -1369,7 +1378,7 @@ exports[`output of every command, text and --json > next on a story in implement
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each as a new herdr agent in the item's worktree pane:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n    Start an agent: herdr agent start norn-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>\\n    Then prompt it: herdr agent prompt norn-127 \\"Work in /repo/.agents/worktrees/123-rate-limiting-127. Run norn take 127, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 127\\n  - Slice #128 \\"Limit headers\\" needs review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus\\n    Start an agent: herdr agent start norn-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>\\n    Then prompt it: herdr agent prompt norn-128 \\"Work in /repo/.agents/worktrees/123-rate-limiting-128. Run norn take 128, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 128\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start an agent: herdr agent start norn-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>\\n    Then prompt it: herdr agent prompt norn-132 \\"Work in /repo/.agents/worktrees/123-rate-limiting-132. Run norn take 132, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus\\n      herdr agent start norn-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>\\n      herdr agent prompt norn-133 \\"norn-drive 133\\"\\n      herdr agent focus norn-133\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
+  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each as a new herdr agent in the item's worktree pane:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue: Queued to merge.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n    Start an agent: herdr agent start norn-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>\\n    Then prompt it: herdr agent prompt norn-127 \\"Work in /repo/.agents/worktrees/123-rate-limiting-127. Run norn take 127, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 127\\n  - Slice #128 \\"Limit headers\\" is in needs-review: Waiting for review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus\\n    Start an agent: herdr agent start norn-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>\\n    Then prompt it: herdr agent prompt norn-128 \\"Work in /repo/.agents/worktrees/123-rate-limiting-128. Run norn take 128, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 128\\n  - Slice #132 \\"Docs\\" is in ready-for-agent: Ready for an agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start an agent: herdr agent start norn-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>\\n    Then prompt it: herdr agent prompt norn-132 \\"Work in /repo/.agents/worktrees/123-rate-limiting-132. Run norn take 132, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus\\n      herdr agent start norn-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>\\n      herdr agent prompt norn-133 \\"norn-drive 133\\"\\n      herdr agent focus norn-133\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
 }"
 `;
 
@@ -1381,19 +1390,19 @@ into 123-rate-limiting.
 You can start 3 items now. They are independent, so run them in parallel, at
 most 2 at a time, each as a new herdr agent in the item's worktree pane:
 
-  - Slice #127 "Redis store" is in merge-queue.
+  - Slice #127 "Redis store" is in merge-queue: Queued to merge.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-127
     Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.
     Start an agent: herdr agent start norn-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>
     Then prompt it: herdr agent prompt norn-127 "Work in /repo/.agents/worktrees/123-rate-limiting-127. Run norn take 127, follow its briefing to the end, and finish with the norn command it gives."
     Start it with: norn take 127
-  - Slice #128 "Limit headers" needs review.
+  - Slice #128 "Limit headers" is in needs-review: Waiting for review.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-128
     Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus
     Start an agent: herdr agent start norn-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>
     Then prompt it: herdr agent prompt norn-128 "Work in /repo/.agents/worktrees/123-rate-limiting-128. Run norn take 128, follow its briefing to the end, and finish with the norn command it gives."
     Start it with: norn take 128
-  - Slice #132 "Docs" is ready-for-agent.
+  - Slice #132 "Docs" is in ready-for-agent: Ready for an agent.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-132
     Start an agent: herdr agent start norn-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>
     Then prompt it: herdr agent prompt norn-132 "Work in /repo/.agents/worktrees/123-rate-limiting-132. Run norn take 132, follow its briefing to the end, and finish with the norn command it gives."
@@ -1415,7 +1424,7 @@ exports[`output of every command, text and --json > next on a story in merge-que
 "exit 0
 {
   "ok": true,
-  "story": 30,
+  "issue": 30,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "Ship",
@@ -1456,7 +1465,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
 "exit 0
 {
   "ok": true,
-  "story": 32,
+  "issue": 32,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "Refine me",
@@ -1478,6 +1487,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
       "kind": "story",
       "title": "Refine me",
       "state": "needs-refinement",
+      "description": "Waiting for refinement",
       "step": "refinement",
       "skill": "norn-refine",
       "attended": true,
@@ -1492,7 +1502,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #32 \\"Refine me\\" is in needs-refinement.\\n\\nYou can start 1 item now, with the user:\\n\\n  - Story #32 \\"Refine me\\" is in needs-refinement: refinement (attended: the user takes part).\\n    Worktree: /repo/.agents/worktrees/32-refine-me\\n    Start it with: norn take 32"
+  "message": "Story #32 \\"Refine me\\" is in needs-refinement.\\n\\nYou can start 1 item now, with the user:\\n\\n  - Story #32 \\"Refine me\\" is in needs-refinement: Waiting for refinement (attended: the user takes part).\\n    Worktree: /repo/.agents/worktrees/32-refine-me\\n    Start it with: norn take 32"
 }"
 `;
 
@@ -1502,7 +1512,7 @@ Story #32 "Refine me" is in needs-refinement.
 
 You can start 1 item now, with the user:
 
-  - Story #32 "Refine me" is in needs-refinement: refinement (attended: the user takes part).
+  - Story #32 "Refine me" is in needs-refinement: Waiting for refinement (attended: the user takes part).
     Worktree: /repo/.agents/worktrees/32-refine-me
     Start it with: norn take 32"
 `;
@@ -1511,7 +1521,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
 "exit 0
 {
   "ok": true,
-  "story": 32,
+  "issue": 32,
   "provider": "herdr",
   "maxParallel": 2,
   "title": "Refine me",
@@ -1533,6 +1543,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
       "kind": "story",
       "title": "Refine me",
       "state": "needs-refinement",
+      "description": "Waiting for refinement",
       "step": "refinement",
       "skill": "norn-refine",
       "attended": true,
@@ -1547,7 +1558,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #32 \\"Refine me\\" is in needs-refinement.\\n\\nYou can start 1 item now, with the user:\\n\\n  - Story #32 \\"Refine me\\" is in needs-refinement: refinement (attended: the user takes part).\\n    Worktree: /repo/.agents/worktrees/32-refine-me\\n    Create the worktree: git -C /repo fetch origin main && git -C /repo branch --no-track 32-refine-me origin/main && herdr worktree create --cwd /repo --branch 32-refine-me --path /repo/.agents/worktrees/32-refine-me --no-focus\\n    Hand the story to an agent in its worktree, which drives it on with the user:\\n      herdr agent start norn-32 --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>\\n      herdr agent prompt norn-32 \\"norn-drive 32\\"\\n      herdr agent focus norn-32\\n    Start it with: norn take 32"
+  "message": "Story #32 \\"Refine me\\" is in needs-refinement.\\n\\nYou can start 1 item now, with the user:\\n\\n  - Story #32 \\"Refine me\\" is in needs-refinement: Waiting for refinement (attended: the user takes part).\\n    Worktree: /repo/.agents/worktrees/32-refine-me\\n    Create the worktree: git -C /repo fetch origin main && git -C /repo branch --no-track 32-refine-me origin/main && herdr worktree create --cwd /repo --branch 32-refine-me --path /repo/.agents/worktrees/32-refine-me --no-focus\\n    Hand the story to an agent in its worktree, which drives it on with the user:\\n      herdr agent start norn-32 --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>\\n      herdr agent prompt norn-32 \\"norn-drive 32\\"\\n      herdr agent focus norn-32\\n    Start it with: norn take 32"
 }"
 `;
 
@@ -1557,7 +1568,7 @@ Story #32 "Refine me" is in needs-refinement.
 
 You can start 1 item now, with the user:
 
-  - Story #32 "Refine me" is in needs-refinement: refinement (attended: the user takes part).
+  - Story #32 "Refine me" is in needs-refinement: Waiting for refinement (attended: the user takes part).
     Worktree: /repo/.agents/worktrees/32-refine-me
     Create the worktree: git -C /repo fetch origin main && git -C /repo branch --no-track 32-refine-me origin/main && herdr worktree create --cwd /repo --branch 32-refine-me --path /repo/.agents/worktrees/32-refine-me --no-focus
     Hand the story to an agent in its worktree, which drives it on with the user:
@@ -1571,7 +1582,7 @@ exports[`output of every command, text and --json > next when the story branch c
 "exit 0
 {
   "ok": true,
-  "story": 40,
+  "issue": 40,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "No base",
@@ -1609,7 +1620,7 @@ exports[`output of every command, text and --json > next with every slot taken >
 "exit 0
 {
   "ok": true,
-  "story": 123,
+  "issue": 123,
   "provider": "claude-code",
   "maxParallel": 1,
   "title": "Rate limiting",
@@ -1631,6 +1642,7 @@ exports[`output of every command, text and --json > next with every slot taken >
       "kind": "slice",
       "title": "Redis store",
       "state": "merge-queue",
+      "description": "Queued to merge",
       "step": "merge",
       "skill": "norn-merge",
       "attended": false,
@@ -1647,6 +1659,7 @@ exports[`output of every command, text and --json > next with every slot taken >
       "kind": "slice",
       "title": "Docs",
       "state": "ready-for-agent",
+      "description": "Ready for an agent",
       "step": "implementation",
       "skill": "norn-implement",
       "attended": false,
@@ -1678,7 +1691,7 @@ exports[`output of every command, text and --json > next with every slot taken >
   "notified": true,
   "running": 1,
   "slots": 0,
-  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\n2 items are ready, but 1 of your agents are running, the limit of\\ndeliver.maxParallel. Wait for one to finish, then run norn next 123 again.\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n\\nWaiting, nothing to do for you:\\n  - #128 is held by another session of yours (since 11:00).\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
+  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\n2 items are ready, but 1 of your agents are running, the limit of\\ndeliver.maxParallel. Wait for one to finish, then run norn next 123 again.\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue: Queued to merge.\\n  - Slice #132 \\"Docs\\" is in ready-for-agent: Ready for an agent.\\n\\nWaiting, nothing to do for you:\\n  - #128 is held by another session of yours (since 11:00).\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
 }"
 `;
 
@@ -1690,8 +1703,8 @@ into 123-rate-limiting.
 2 items are ready, but 1 of your agents are running, the limit of
 deliver.maxParallel. Wait for one to finish, then run norn next 123 again.
 
-  - Slice #127 "Redis store" is in merge-queue.
-  - Slice #132 "Docs" is ready-for-agent.
+  - Slice #127 "Redis store" is in merge-queue: Queued to merge.
+  - Slice #132 "Docs" is in ready-for-agent: Ready for an agent.
 
 Waiting, nothing to do for you:
   - #128 is held by another session of yours (since 11:00).
@@ -1705,7 +1718,7 @@ exports[`output of every command, text and --json > next with nothing left > jso
 "exit 0
 {
   "ok": true,
-  "story": 20,
+  "issue": 20,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "Waits",
@@ -1759,7 +1772,7 @@ exports[`output of every command, text and --json > next with nothing left under
 "exit 0
 {
   "ok": true,
-  "story": 20,
+  "issue": 20,
   "provider": "herdr",
   "maxParallel": 2,
   "title": "Waits",

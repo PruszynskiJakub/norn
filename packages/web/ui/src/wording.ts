@@ -1,8 +1,8 @@
 // The dashboard's renderer: every sentence the page shows is worded here, from
 // the typed read model, so the rest of the UI only lays words out.
-import type { ClaimHolder, FeedEvent, Flow, FlowError, FlowSource, WaitingItem } from "@norn/core";
+import type { ClaimHolder, Expected, FeedEvent, Flow, FlowError, FlowSource, LoadedFlow, WaitingItem } from "@norn/core";
 import type { DashboardState, PollFailure } from "../../src/contract.ts";
-import { atGate, type Item, isSliced, stateOf } from "./model.ts";
+import { atGate, atGateStep, type Item, isSliced, stateOf, stepGroupOf } from "./model.ts";
 
 function unreachable(x: never): never {
   throw new Error(`no wording for ${JSON.stringify(x)}`);
@@ -50,47 +50,17 @@ export function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function qaWho(step: string, actor: string | null, me: string | null): string {
-  if (step === "agent QA") return "Agent QA";
-  return actor !== null && actor === me ? "Your QA" : "Human QA";
-}
-
-/** An outcome as a sentence: "Review asked for changes", "Agent QA passed". */
-function outcomeSentence(e: Extract<FeedEvent, { kind: "outcome" }>, me: string | null): string {
-  switch (e.step) {
-    case "implementation":
-      return e.fixRound ? `Fix round ${e.fixRound} pushed` : "Implementation pushed";
-    case "fixing":
-      return e.fixRound ? `Story fixes pushed, round ${e.fixRound}` : "Story fixes pushed";
-    case "review":
-      if (e.outcome === "approve") return "Review approved";
-      if (e.outcome === "request-changes") return "Review asked for changes";
-      break;
-    case "agent QA":
-    case "human QA":
-      if (e.outcome === "pass") return `${qaWho(e.step, e.actor, me)} passed`;
-      if (e.outcome === "fail") return `${qaWho(e.step, e.actor, me)} failed`;
-      break;
-    case "merge":
-      return "Merged into the story branch";
-    case "resolving needs-human":
-      return "Escalation resolved";
-    case "triage":
-      return e.outcome === "reject" ? "Rejected at triage" : `Accepted at triage as a ${e.outcome}`;
-    case "refinement":
-      if (e.outcome === "clear") return "Refined, no open questions";
-      if (e.outcome === "questions") return "Refinement raised questions";
-      break;
-    case "clarification":
-      if (e.outcome === "answered") return "Questions answered";
-      if (e.outcome === "questions") return "Questions remain after clarification";
-      break;
-    case "planning":
-      return "Plan written";
-    case "slicing":
-      return "Sliced";
-  }
-  return e.outcome === "done" ? `${capitalise(e.step)} done` : `${capitalise(e.step)}: ${e.outcome}`;
+/**
+ * An outcome as a sentence, from its step and word as its flow names them: "Review: request-changes", "Your QA: pass",
+ * "Implementation done, fix round 2". Triage and resolving needs-human are norn's own steps in every flow.
+ */
+function outcomeSentence(e: Extract<FeedEvent, { kind: "outcome" }>, me: string | null, flows: LoadedFlow[]): string {
+  if (e.flow === null) return e.to === "not-planned" ? "Rejected at triage" : `Accepted at triage as a ${e.outcome}`;
+  if (e.step === "resolving needs-human") return "Escalation resolved";
+  // At a human gate, the developer's own check is theirs.
+  const step = atGateStep(e, flows) && e.actor !== null && e.actor === me ? "Your QA" : capitalise(e.step);
+  const round = e.fixRound && stepGroupOf(e, flows) === "implement" ? `, fix round ${e.fixRound}` : "";
+  return e.outcome === "done" ? `${step} done${round}` : `${step}: ${e.outcome}${round}`;
 }
 
 function otherActivity(e: Extract<FeedEvent, { kind: "other-activity" }>): string {
@@ -127,10 +97,10 @@ export function routineText(e: FeedEvent): string {
 }
 
 /** A significant event as a plain sentence; anything else keeps norn's terms. */
-export function sentence(e: FeedEvent, me: string | null): string {
+export function sentence(e: FeedEvent, me: string | null, flows: LoadedFlow[]): string {
   switch (e.kind) {
     case "outcome":
-      return outcomeSentence(e, me);
+      return outcomeSentence(e, me, flows);
     case "needs-human":
       return e.action === "raised" ? "Escalated to you" : "Escalation resolved";
     case "pr":
@@ -148,8 +118,8 @@ export function sentence(e: FeedEvent, me: string | null): string {
 }
 
 /** "· round 2 of 3" after a review or QA outcome inside a fix round. */
-export function roundNote(e: FeedEvent): string | null {
-  if (e.kind !== "outcome" || !e.fixRound || e.step === "implementation" || e.step === "fixing") return null;
+export function roundNote(e: FeedEvent, flows: LoadedFlow[]): string | null {
+  if (e.kind !== "outcome" || !e.fixRound || stepGroupOf(e, flows) === "implement") return null;
   return `round ${e.fixRound} of ${e.maxFixRounds}`;
 }
 
@@ -406,13 +376,41 @@ export function behaviourParams(params: Record<string, unknown> | undefined): st
     .join(", ");
 }
 
+/** What a field of a flow must be. */
+function expectedText(e: Expected): string {
+  switch (e.kind) {
+    case "string":
+      return "text";
+    case "boolean":
+      return "true or false";
+    case "object":
+      return "an object";
+    case "hex-colour":
+      return "a hex colour like 1d76db";
+    case "state":
+      return "a state of the flow";
+    case "outcome-word":
+      return "one of the state's outcomes";
+    case "flow-name":
+      return "a flow's name";
+    case "behaviours":
+      return "an object of behaviours";
+    case "params":
+      return "an object of parameters, {} for none";
+    case "one-of":
+      return e.values.map((v) => `"${v}"`).join(" or ");
+    default:
+      return unreachable(e);
+  }
+}
+
 /** What is wrong with a flow, as a sentence. */
 export function flowErrorText(e: FlowError): string {
   switch (e.kind) {
     case "not-json":
       return `The file isn't JSON: ${e.detail}`;
     case "field-invalid":
-      return e.path ? `${e.path} must be ${e.expected}.` : `The flow must be ${e.expected}.`;
+      return e.path ? `${e.path} must be ${expectedText(e.expected)}.` : `The flow must be ${expectedText(e.expected)}.`;
     case "field-unknown":
       return `${e.path} is no field of the flow format.`;
     case "start-unknown":
@@ -436,7 +434,7 @@ export function flowErrorText(e: FlowError): string {
     case "flow-unknown":
       return `${e.behaviour} of ${e.state} names the flow ${e.flow}, which the repository doesn't have.`;
     case "behaviour-needs":
-      return `${e.behaviour} of ${e.state} needs ${e.field} to be ${e.expected}.`;
+      return `${e.behaviour} of ${e.state} needs workspace to be ${e.workspace.map((w) => `"${w}"`).join(" or ")}.`;
     case "flow-reserved":
       return `The name ${e.flow} is one norn keeps for itself.`;
     default:

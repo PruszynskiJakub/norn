@@ -62,7 +62,7 @@ describe("the flow JSON Schema", () => {
           when: "afk",
           passThrough: "fixed",
           behaviours: { opensPR: {}, writesSpec: { readsIssue: true } },
-          ...outcome({ note: "what", needsHuman: "who", notify: "story", meansSkipped: "skipped" }),
+          ...outcome({ note: "what", needsHuman: "who", notify: true, meansSkipped: "skipped" }),
         },
       ),
       true,
@@ -85,7 +85,7 @@ describe("the flow JSON Schema", () => {
     ["an unknown parameter", flow({}, { behaviours: { opensPR: { draft: true } } }), false],
     ["an outcome without means", flow({}, outcome({ means: undefined })), false],
     ["an outcome with an unknown field", flow({}, outcome({ goto: "x" })), false],
-    ["an unknown notify", flow({}, outcome({ notify: "team" })), false],
+    ["a notify that names who, not true or false", flow({}, outcome({ notify: "story" })), false],
   ])("%s: the schema and norn's validator agree", (_, data, valid) => {
     const json = JSON.parse(JSON.stringify(data));
     expect(validate(json), JSON.stringify(validate.errors)).toBe(valid);

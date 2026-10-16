@@ -36,13 +36,13 @@ describe("norn next", () => {
         "most 2 at a time, each in its own fresh subagent, told to work in the item's",
         "worktree:",
         "",
-        '  - Slice #131 "Per-key limits" is ready-for-agent.',
+        '  - Slice #131 "Per-key limits" is in ready-for-agent: Ready for an agent.',
         "    Worktree: /repo/.agents/worktrees/123-rate-limiting-131",
         "    Start it with: norn take 131",
-        '  - Slice #128 "Limit headers" needs review.',
+        '  - Slice #128 "Limit headers" is in needs-review: Waiting for review.',
         "    Worktree: /repo/.agents/worktrees/123-rate-limiting-128",
         "    Start it with: norn take 128",
-        '  - Slice #127 "Redis store" is in merge-queue.',
+        '  - Slice #127 "Redis store" is in merge-queue: Queued to merge.',
         "    Worktree: /repo/.agents/worktrees/123-rate-limiting-127",
         "    Start it with: norn take 127",
         "",
@@ -115,7 +115,7 @@ describe("norn next", () => {
     const res = await w.norn("next", "123");
 
     expect(w.github.labels(132)).toContain("ready-for-agent");
-    expect(res.stdout).toContain('Slice #132 "Docs" is ready-for-agent.');
+    expect(res.stdout).toContain('Slice #132 "Docs" is in ready-for-agent: Ready for an agent.');
   });
 
   test("refuses a number that is not a story", async () => {
@@ -430,8 +430,8 @@ describe("running agents count against the parallel limit", () => {
         "2 items are ready, but 2 of your agents are running, the limit of",
         "deliver.maxParallel. Wait for one to finish, then run norn next 123 again.",
         "",
-        '  - Slice #133 "Slice 133" is ready-for-agent.',
-        '  - Slice #134 "Slice 134" is ready-for-agent.',
+        '  - Slice #133 "Slice 133" is in ready-for-agent: Ready for an agent.',
+        '  - Slice #134 "Slice 134" is in ready-for-agent: Ready for an agent.',
       ].join("\n"),
     );
     expect(res.stdout).not.toContain("Start it with");

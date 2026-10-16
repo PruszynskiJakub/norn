@@ -1,4 +1,5 @@
-import type { BoardItem, BoardStory, FeedEvent, Flow, FlowState, LoadedFlow } from "@norn/core";
+import type { BoardItem, BoardStory, FeedEvent, Flow, FlowState, LoadedFlow, StateKind } from "@norn/core";
+import type { DashboardState } from "../../src/contract.ts";
 
 /** A board item with the top-level issue it belongs to and the flow it runs. */
 export interface Item extends BoardItem {
@@ -82,44 +83,64 @@ export function countsFixRounds(x: Item): boolean {
   return Object.values(x.flowDef?.states ?? {}).some((s) => uses(s, "countsFixRounds"));
 }
 
-/** A state's kind, as norn colours its label when the flow names no colour: a human gate, attended, or run by an agent. */
-export type StateKind = "gate" | "attended" | "agent";
-
-export function kindOf(s: FlowState): StateKind {
+/** A state's kind, as norn's stateKindOf has it: a human gate, attended, or run by an agent. */
+function kindOf(s: FlowState): StateKind {
   return uses(s, "humanGate") ? "gate" : s.attended ? "attended" : "agent";
 }
 
-/** The default label colours by kind, as norn creates labels; a human gate takes the built-in human QA's. */
-const KIND_COLOR: Record<StateKind, string> = { gate: "e99695", attended: "c5def5", agent: "bfd4f2" };
-
 /** The colour of a state of the item's flow, as a CSS colour: its own, else its kind's. Null for a label that is no state of the flow. */
-export function stateColor(x: Item, label: string): string | null {
+export function stateColor(x: Item, label: string, defaults: DashboardState["stateLabelDefaults"]): string | null {
   const s = x.flowDef?.states[label];
-  return s ? colorOf(s) : null;
+  return s ? colorOf(s, defaults) : null;
 }
 
-/** A state's colour as a CSS colour: its own, else its kind's. */
-export function colorOf(s: FlowState): string {
-  return `#${s.color ?? KIND_COLOR[kindOf(s)]}`;
+/** A state's colour as a CSS colour: its own, else its kind's, from the defaults the server sends, as norn creates labels. */
+export function colorOf(s: FlowState, defaults: DashboardState["stateLabelDefaults"]): string {
+  return `#${s.color ?? defaults[kindOf(s)].color}`;
 }
 
 /** How much a feed event asks for the developer's eye. */
 export type Attention = "bad" | "warn" | "ok" | "none";
 
-export function attentionOf(e: FeedEvent): Attention {
+export function attentionOf(e: FeedEvent, flows: LoadedFlow[]): Attention {
   if (e.kind === "needs-human") return e.action === "raised" ? "bad" : "ok";
   if (e.kind === "claim") return e.action === "stale" ? "warn" : "none";
   if (e.kind === "pr") return e.action === "merged" ? "ok" : "none";
   if (e.kind === "outcome") {
-    if (sentBack(e.outcome)) return "warn";
-    return stepGroupOf(e.step) === "implement" ? "none" : "ok";
+    if (sentBack(e, flows)) return "warn";
+    return stepGroupOf(e, flows) === "implement" ? "none" : "ok";
   }
   return "none";
 }
 
-/** Outcomes that send work back or stop it. */
-function sentBack(outcome: string): boolean {
-  return outcome === "fail" || outcome === "request-changes" || outcome === "reject";
+type Outcome = Extract<FeedEvent, { kind: "outcome" }>;
+
+/** The valid flow the outcome's issue ran its step in; null for triage, or a flow that is not valid. */
+function flowOfOutcome(e: Outcome, flows: LoadedFlow[]): Flow | null {
+  const f = e.flow === null ? undefined : flows.find((l) => l.name === e.flow);
+  return f?.ok ? f.flow : null;
+}
+
+/** The state of its flow the outcome's step was taken in. */
+export function stepStateOf(e: Outcome, flows: LoadedFlow[]): FlowState | undefined {
+  return e.from === null ? undefined : flowOfOutcome(e, flows)?.states[e.from];
+}
+
+/** The states of the flow that count fix rounds: what an outcome into one sends back. */
+function fixStates(flow: Flow): string[] {
+  return Object.keys(flow.states).filter((s) => uses(flow.states[s], "countsFixRounds"));
+}
+
+/** Whether the outcome sends the work back for fixes, as its flow has it, or ends it unplanned, e.g. triage's reject. */
+export function sentBack(e: Outcome, flows: LoadedFlow[]): boolean {
+  if (e.to === "not-planned") return true;
+  const flow = flowOfOutcome(e, flows);
+  return flow !== null && e.from !== e.to && fixStates(flow).includes(e.to);
+}
+
+/** Whether a person checks the work in the outcome's step: a human gate of its flow. */
+export function atGateStep(e: Outcome, flows: LoadedFlow[]): boolean {
+  return uses(stepStateOf(e, flows), "humanGate");
 }
 
 /** Outcomes, escalations, merges and quiet agents stand out; everything else folds into routine runs. */
@@ -129,11 +150,20 @@ export function isSignificant(e: FeedEvent): boolean {
 
 export type StepGroup = "implement" | "review" | "qa" | "other";
 
-/** The Remarks filter an outcome's step belongs to. */
-export function stepGroupOf(step: string): StepGroup {
-  if (step === "implementation" || step === "fixing") return "implement";
-  if (step === "review") return "review";
-  if (step === "agent QA" || step === "human QA") return "qa";
+/**
+ * The Remarks filter an outcome's step belongs to, from what its state does in its flow: QA when it takes evidence or
+ * is a human gate, implementing when it opens the PR or fixes what was sent back (or is the state such a state is
+ * taken as), review when one of its outcomes sends the work back for fixes.
+ */
+export function stepGroupOf(e: Outcome, flows: LoadedFlow[]): StepGroup {
+  const flow = flowOfOutcome(e, flows);
+  const s = stepStateOf(e, flows);
+  if (!flow || !s || e.from === null) return "other";
+  if (s.evidence || uses(s, "humanGate")) return "qa";
+  const fixes = fixStates(flow);
+  const from = e.from;
+  if (uses(s, "opensPR") || fixes.includes(from) || fixes.some((f) => flow.states[f].enterAs === from)) return "implement";
+  if (Object.values(s.outcomes).some((o) => fixes.includes(o.to))) return "review";
   return "other";
 }
 

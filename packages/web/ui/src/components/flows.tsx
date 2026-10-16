@@ -179,6 +179,7 @@ function edgeLabel(e: FlowEdge): string {
 
 /** One state: its name, its step and who runs it, its colour, and the mode and behaviours it carries. */
 function StateNode({ name, s, start, b }: { name: string; s: FlowState; start: boolean; b: Box }) {
+  const { state } = useView();
   const marks = [...(s.when ? [onlyIn(s.when)] : []), ...Object.keys(s.behaviours ?? {})];
   return (
     <g>
@@ -193,7 +194,7 @@ function StateNode({ name, s, start, b }: { name: string; s: FlowState; start: b
         strokeWidth={start ? 1.5 : 1}
         strokeDasharray={s.when ? "5 3" : undefined}
       />
-      <rect x={b.x + 8} y={b.y + 11} width={7} height={7} rx={3.5} fill={colorOf(s)} />
+      <rect x={b.x + 8} y={b.y + 11} width={7} height={7} rx={3.5} fill={colorOf(s, state.stateLabelDefaults)} />
       <foreignObject x={b.x + 20} y={b.y + 4} width={NODE_W - 26} height={b.h - 8}>
         <div className="flex h-full flex-col justify-center gap-px overflow-hidden text-[11.5px] leading-[1.35]">
           <div className="truncate font-medium font-mono text-[12px] text-foreground" title={name}>
@@ -216,6 +217,7 @@ function StateNode({ name, s, start, b }: { name: string; s: FlowState; start: b
 
 /** Every state in words, for what the graph leaves out: what it means, its skill, its behaviours' parameters, each outcome's meaning. */
 function StateList({ flow }: { flow: Flow }) {
+  const { state } = useView();
   const { layers, ends } = flowGraph(flow);
   const states = layers.flat().filter((s) => !ends.has(s));
   return (
@@ -227,7 +229,7 @@ function StateList({ flow }: { flow: Flow }) {
           return (
             <li key={name} className="border-border border-t py-2.5 text-soft">
               <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-block size-[7px] rounded-full" style={{ background: colorOf(s) }} />
+                <span className="inline-block size-[7px] rounded-full" style={{ background: colorOf(s, state.stateLabelDefaults) }} />
                 <span className="font-medium font-mono text-[12.5px] text-foreground">{name}</span>
                 <span className="text-muted-foreground">{s.description ?? ""}</span>
               </div>

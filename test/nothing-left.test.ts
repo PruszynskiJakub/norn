@@ -70,7 +70,7 @@ describe("norn next when nothing is left", () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-qa"] });
     const res = await w.norn("next", "123");
-    expect(res.stdout).toContain('  - Story #123 "Rate limiting" needs QA by an agent.');
+    expect(res.stdout).toContain('  - Story #123 "Rate limiting" is in needs-qa: Waiting for agent QA.');
     expect(res.stdout).not.toContain("attended");
   });
 

@@ -75,7 +75,7 @@ export function Detail({ x }: { x: Item }) {
       {x.labels.length > 0 && (
         <div className="mb-2.5 flex flex-wrap gap-1" title={DETAIL.labels}>
           {x.labels.map((l) => {
-            const color = stateColor(x, l);
+            const color = stateColor(x, l, state.stateLabelDefaults);
             return (
               <Badge key={l} tone={labelTone(x, l)}>
                 {color && <i className="mr-1 inline-block size-[7px] rounded-full" style={{ background: color }} />}

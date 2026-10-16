@@ -79,7 +79,7 @@ Each state names the `skill` that runs it, whether it is `attended` (a person ta
 - `when` and `passThrough`: the only mode the state runs in (see [`when`](#mode-conditional-states-when)).
 - `color` (hex without the `#`) and `description`: the state's label. The dashboard words the state with its `description` (its name without one) and colours it with its `color` (a default by kind without one: attended, agent or human gate).
 
-Each outcome, keyed by its word, has a target `to` and what it `means`, the line the briefing gives it. `to` is a state of the flow, `closed` or `not-planned`; those two close the issue. The empty word `""` is the single way a step ends when it has only one. Optional fields: `note`, which makes `norn done` require a note and names it, e.g. `reason`; `needsHuman`, which sets `needs-human` after the transition, saying who must do what; `notify` (`story` or `mode:hil`), which tells a person their QA is waiting; and `meansSkipped`, what the outcome means instead when the issue's mode skips the state it leads to.
+Each outcome, keyed by its word, has a target `to` and what it `means`, the line the briefing gives it. `to` is a state of the flow, `closed` or `not-planned`; those two close the issue. The empty word `""` is the single way a step ends when it has only one. Optional fields: `note`, which makes `norn done` require a note and names it, e.g. `reason`; `needsHuman`, which sets `needs-human` after the transition, saying who must do what; `notify` (`true` or `false`), which tells a person their step is waiting, as entering a `humanGate` state does on its own (the notice names the flow, or the mode for a state with `when`); and `meansSkipped`, what the outcome means instead when the issue's mode skips the state it leads to.
 
 `needs-human`, claims and `in-progress` are norn's own and work in every flow as they do for stories and slices.
 
@@ -127,7 +127,7 @@ A repository file named like a built-in flow, `story.json` or `slice.json`, repl
 
 ## Labels
 
-A flow's states are labels on GitHub, and its type is `type:<name>`. `norn init` creates the labels of every valid flow on the base branch, with each state's `color` and `description` or a default for its kind (attended or agent), and the first transition into a state whose label is missing creates it, so a merged flow works without running `init`. `norn doctor` reports missing labels, and lists as a warning the labels no flow uses any more: a `type:` with no flow, a built-in state a replacement dropped, or a state a flow renamed. norn never deletes a label, so closed issues keep their history; delete one on GitHub yourself once no issue needs it.
+A flow's states are labels on GitHub, and its type is `type:<name>`. `norn init` creates the labels of every valid flow on the base branch, with each state's `color` and `description` or a default for its kind (a human gate, attended or agent), and the first transition into a state whose label is missing creates it, so a merged flow works without running `init`. Every label norn creates has a description that ends in `(norn)`, e.g. `Waiting for review (norn)`; that is how norn tells its labels from the team's own. `norn doctor` reports missing labels, and lists as a warning the labels no flow uses any more: one norn created (by that mark) for a state a flow has since dropped or renamed, a `type:` with no flow, or a state a flow's `renamed` names. A label whose description someone edited loses the mark, and doctor no longer counts it as norn's. norn never deletes a label, so closed issues keep their history; delete one on GitHub yourself once no issue needs it.
 
 ## Validation
 
@@ -147,9 +147,11 @@ A broken flow stops only the issues of its own type. `norn take` and `norn done`
 
 ## Changing a flow under issues in progress
 
-Flows have no versions: an issue in progress follows the current flow from its next step. Adding a state or an outcome needs nothing more. Removing or renaming a state leaves the issues in it behind. When `norn take` finds an issue in a state its flow no longer has (the state norn last moved it to, by its transition comments):
+Flows have no versions: an issue in progress follows the current flow from its next step. Adding a state or an outcome needs nothing more. Removing or renaming a state leaves the issues in it behind. When `norn take` or `norn next` next touches an issue in a state its flow no longer has (the state norn last moved it to, by its transition comments):
 
-- if the flow's optional `renamed` map, e.g. `"renamed": { "repro": "reproducing" }`, names the old state, norn moves the issue to the new state with a transition comment and takes it there;
-- otherwise the issue is orphaned: norn sets `needs-human` with a comment naming the missing state and the flow, takes the old state's label off and refuses the take. Taking the issue again runs `norn-resolve`, whose outcomes are the flow's states: `norn done <issue> <state>` moves it there.
+- if the flow's optional `renamed` map, e.g. `"renamed": { "repro": "reproducing" }`, names the old state, norn moves the issue to the new state with a transition comment; `take` takes it there and `next` offers it there;
+- otherwise the issue is orphaned: norn sets `needs-human` with a comment naming the missing state and the flow, takes the old state's label off and notifies the user. `take` answers that it handed the issue over and releases the claim; `next` lists it as waiting for a person. Taking the issue again runs `norn-resolve`, whose outcomes are the flow's states: `norn done <issue> <state>` moves it there.
+
+`norn next` makes these changes as it makes its other housekeeping, under a short claim; an issue another session holds is only listed as in a state its flow no longer has.
 
 Before merging such a change, run `norn doctor` on the branch with the edit: its `flows` check lists the open issues the edit would orphan, with their states, so you can add the states to `renamed` or move those issues on first. The old state's label stays on the repository, and `doctor` lists it as one no flow uses.

@@ -1,9 +1,8 @@
 import type { FinishCommand } from "./briefing.js";
 import type { ConfigProblem, VersionIncompatible } from "./config.js";
 import type { BaseBranchMissing } from "./events.js";
-import type { FlowError } from "./flow.js";
+import type { FlowError } from "./flow-validation.js";
 
-import type { NotAStory } from "./next.js";
 import type { MergeRefusal } from "./transitions.js";
 import type { Provider } from "./workspace.js";
 
@@ -28,8 +27,6 @@ export type Refusal =
   | { kind: "no-step"; issue: number; state: string | null; story: number | null }
   /** The issue's type names a repository flow that is broken; issues of other types are unaffected. */
   | { kind: "flow-invalid"; issue: number; flow: string; errors: FlowError[] }
-  /** The issue was in `state`, which its flow no longer has; norn set needs-human on it. */
-  | { kind: "state-left"; issue: number; state: string; flow: string }
   // Claims
   | { kind: "held"; issue: number; slice: boolean; since: string | null; story: number | null }
   /** Held by another session of the same user, who may take it over. */
@@ -54,7 +51,10 @@ export type Refusal =
   | { kind: "add-slice-usage"; story: number }
   /** Slices are added only in `slicing`, the state of the issue's flow with slices; null when its flow has none. */
   | { kind: "story-not-slicing"; story: number; state: string | null; slicing: string | null }
-  | NotAStory;
+  | NextRefusal;
+
+/** Why norn next refuses an issue: one that works in its parent's branch, which moves on with it, or one with no flow yet. */
+export type NextRefusal = { kind: "is-a-slice"; issue: number; story: number | null } | { kind: "not-a-story"; issue: number };
 
 export interface Refused {
   ok: false;

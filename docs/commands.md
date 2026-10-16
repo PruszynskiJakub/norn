@@ -53,13 +53,13 @@ You can start 3 items now. They are independent, so run them in parallel, at
 most 2 at a time, each in its own fresh subagent, told to work in the item's
 worktree:
 
-  - Slice #131 "Per-key limits" is ready-for-agent.
+  - Slice #131 "Per-key limits" is in ready-for-agent: Ready for an agent.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-131
     Start it with: norn take 131
-  - Slice #128 "Limit headers" needs review.
+  - Slice #128 "Limit headers" is in needs-review: Waiting for review.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-128
     Start it with: norn take 128
-  - Slice #127 "Redis store" is in merge-queue.
+  - Slice #127 "Redis store" is in merge-queue: Queued to merge.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-127
     Start it with: norn take 127
 
@@ -174,8 +174,8 @@ Checks the whole setup at once and lists every check, each with the exact comman
 | `git` | You are in a git checkout whose `origin` is on GitHub |
 | `base-branch` | `baseBranch` exists on GitHub |
 | `permission` | You have write access or higher to the repository |
-| `labels` | The labels of every valid flow and norn's flags exist, as `init` creates them; a label no flow uses (a `type:`, a built-in state or a state a flow renamed) warns, and is never deleted |
-| `flows` | The flows on the base branch, and every flow file in your working copy that differs from it, are valid; the skills they name are installed. It lists, as a warning, the open issues your local flow edits would orphan: those in a state the edit drops without naming it in `renamed` |
+| `labels` | The labels of every valid flow and norn's flags exist, as `init` creates them; a label of norn's that no flow uses (one norn created, by the `(norn)` at the end of its description, a `type:`, or a state a flow renamed) warns, and is never deleted |
+| `flows` | The flows on the base branch, and every flow file in your working copy that differs from it, are valid; the skills they name are installed. It names the type of the slices each flow makes, and lists, as warnings, the labels your local flow edits need that the repository lacks and the open issues they would orphan: those in a state the edit drops without naming it in `renamed` |
 | `config` | The team and local config are valid; their warnings show as a warning |
 | `version` | `nornVersion` is set and compatible with your norn; a compatible difference warns |
 | `skills` | Every skill the briefings name is in `skills/` and linked from `.claude/skills/`; a skill that differs from the bundled copy warns, except under `NORN_SKILLS_SOURCE` |
@@ -209,7 +209,7 @@ It refuses when the file exists, leaving it as it is, and names the built-in flo
 npx norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...
 ```
 
-Creates a slice as a sub-issue of the story, with its labels, the story's assignee, its native "blocked by" relations and its mode. The `norn-slice` skill calls it; you rarely need it by hand.
+Creates a slice as a sub-issue of the story, with its labels, the story's assignee, its native "blocked by" relations and its mode. The slice gets the type the story's flow names and starts in that type's start state, or held while a blocker is open; the answer names that state. A missing label for either is created first, with its colour and description. The `norn-slice` skill calls it; you rarely need it by hand.
 
 ## norn escalate
 

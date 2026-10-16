@@ -3,13 +3,17 @@ import {
   type AddSliceResult,
   type Briefing,
   type ConfigProblem,
+  type BehaviourName,
   type ConfigWarning,
   type DoneResult,
   type EscalateResult,
   type Event,
+  type Expected,
   type FinishCommand,
   FLOWS_DIR,
   type FlowError,
+  type Gate,
+  type HandedOverResult,
   type FollowUpTask,
   FOR_HUMAN,
   type Holder,
@@ -43,6 +47,7 @@ import type { InitResult, InitWouldDowngrade, MissingSkills } from "./init.js";
 /** What a command can answer with. */
 export type Answer =
   | TakeResult
+  | HandedOverResult
   | DoneResult
   | EscalateResult
   | ReleaseResult
@@ -271,11 +276,6 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
         ...r.errors.map((e) => `  ${flowError(e)}`),
         `Fix .agents/flows/${r.flow}.json on the base branch, then run the command again. Issues of other types are not affected.`,
       ];
-    case "state-left":
-      return [
-        `#${r.issue} is in ${r.state}, which the flow ${r.flow} no longer has, so it now needs a human.`,
-        `Run norn take ${r.issue} to resolve it: a person moves it to a state of the flow.`,
-      ];
     case "held":
       return [
         `${heldWhat(r)} is already held by another session (since ${heldSince(r.since)}).`,
@@ -369,15 +369,64 @@ function flowsCheck(f: FlowsFact): { message: string; fix: string | null } {
     messages.push(`skills the flows name are not in skills/: ${named.join(", ")}`);
     fixes.push("add the skills to skills/ and link them from .claude/skills/");
   }
+  if (f.missingLabels.length) {
+    messages.push(`labels the local flows need are not on GitHub yet: ${f.missingLabels.map((m) => `${m.label} (${m.flow} in this checkout)`).join(", ")}`);
+    fixes.push("norn creates each one when an issue first gets it; to create them up front, run norn init once the change is merged");
+  }
   for (const flow of [...new Set(f.orphans.map((o) => o.flow))]) {
     const of = f.orphans.filter((o) => o.flow === flow);
     const gone = of.length === 1 ? "its state is gone, so it would go to needs-human" : "their states are gone, so they would go to needs-human";
     messages.push(`the local ${file(flow)} would orphan ${of.map((o) => `#${o.issue} (${o.state})`).join(", ")}: ${gone}`);
     fixes.push(`name the new state of each removed one in renamed in ${file(flow)}, or move these issues on first`);
   }
-  if (!messages.length) return { message: `all ${plural(f.names.length, "flow")} are valid: ${f.names.join(", ")}`, fix: null };
+  // With nothing to fix, what the flows make of each other: the type of the slices each one makes.
+  const slices = f.slices.map((s) => `${s.flow}${s.local ? " in this checkout" : ""} makes slices of type ${s.type}`);
+  if (!messages.length) return { message: [`all ${plural(f.names.length, "flow")} are valid: ${f.names.join(", ")}`, ...slices].join("; "), fix: null };
   return { message: messages.join("; "), fix: fixes.join("; ") };
 }
+
+/** Values as a choice, e.g. "own" or "parent". */
+const oneOf = (values: readonly string[]) => {
+  const quoted = values.map((v) => JSON.stringify(v));
+  return quoted.length > 1 ? `${quoted.slice(0, -1).join(", ")} or ${quoted.at(-1)}` : (quoted[0] ?? "");
+};
+
+/** What a field of a flow must be. */
+function expectedText(e: Expected): string {
+  switch (e.kind) {
+    case "string":
+      return "a string";
+    case "boolean":
+      return "true or false";
+    case "object":
+      return "an object";
+    case "hex-colour":
+      return "a hex colour without the #, e.g. 1d76db";
+    case "state":
+      return "a state of the flow";
+    case "outcome-word":
+      return "an outcome word";
+    case "flow-name":
+      return "a flow's name";
+    case "behaviours":
+      return "an object of behaviour names";
+    case "params":
+      return "an object of parameters, {} for none";
+    case "one-of":
+      return oneOf(e.values);
+    default:
+      return unreachable(e);
+  }
+}
+
+/** What a behaviour that works in some workspaces only needs its workspace for. */
+const WORKSPACE_FOR: Partial<Record<BehaviourName, string>> = {
+  writesSpec: "for the spec's branch",
+  opensPR: "for its PR",
+  waitsForSlices: "for the branch its slices merge into",
+  mergesSlice: "for the PR into the parent's branch",
+  waitsForMerge: "for the PR its owner merges",
+};
 
 /** One thing wrong with a flow file. */
 function flowError(e: FlowError): string {
@@ -385,7 +434,7 @@ function flowError(e: FlowError): string {
     case "not-json":
       return `It is not valid JSON: ${e.detail}`;
     case "field-invalid":
-      return `${e.path || "The file"} must be ${e.expected}.`;
+      return `${e.path || "The file"} must be ${expectedText(e.expected)}.`;
     case "field-unknown":
       return `${e.path} is not a field of a flow; check its spelling.`;
     case "start-unknown":
@@ -411,7 +460,7 @@ function flowError(e: FlowError): string {
     case "flow-reserved":
       return `The name ${e.flow} is norn's own: triage uses it to close an issue as not planned.`;
     case "behaviour-needs":
-      return `The state ${e.state} uses the behaviour ${e.behaviour}, which needs ${e.field} to be ${e.expected}.`;
+      return `The state ${e.state} uses the behaviour ${e.behaviour}, which needs workspace to be ${oneOf(e.workspace)}${WORKSPACE_FOR[e.behaviour] ? `, ${WORKSPACE_FOR[e.behaviour]}` : ""}.`;
     case "flow-unknown":
       return `The behaviour ${e.behaviour} of ${e.state} names the flow ${e.flow}, which the repository does not have.`;
     default:
@@ -442,8 +491,12 @@ export function renderEvent(e: Event): string[] {
       return [`Its worktree ${e.worktree} is removed by the next norn tidy.`];
     case "slice-state-changed":
       return [`#${e.issue} is now ${e.state}.`];
+    case "state-renamed":
+      return [`#${e.issue} moved from ${e.from} to ${e.to}: the flow ${e.flow} renamed the state.`];
+    case "handed-over":
+      return [`#${e.issue} was in ${e.state}, which the flow ${e.flow} no longer has, so it now needs a human.`];
     case "story-promoted":
-      return [`Every slice is merged. Story #${e.story} is now in needs-review.`];
+      return [`Every slice is merged. Story #${e.story} is now in ${e.to}.`];
     case "story-closed":
       return [`The story PR is merged. Closed story #${e.story}.`];
     case "follow-up-failed": {
@@ -463,12 +516,17 @@ export function renderAnswer(a: Answer): string[] {
       return renderTake(a);
     case "done":
       return renderDone(a);
+    case "handed-over":
+      return [
+        `#${a.issue} was in ${a.state}, which the flow ${a.flow} no longer has, so it now needs a human. The claim is released.`,
+        "Do not work on it further. A person picks it up with the norn-resolve skill and moves it to a state of the flow.",
+      ];
     case "escalated":
       return [`#${a.issue} now needs a human. The claim is released.`, "Do not work on it further. A person picks it up with the norn-resolve skill."];
     case "released":
       return [`Released #${a.issue}. Its state is unchanged. Do not work on it further.`];
     case "slice-added": {
-      const status = a.blockedBy.length ? `blocked by ${issues(a.blockedBy)}` : "ready-for-agent";
+      const status = a.blockedBy.length ? `blocked by ${issues(a.blockedBy)}` : a.state;
       return [`Created slice #${a.slice} "${a.title}" (mode:${a.mode}, ${status}).`];
     }
     case "next":
@@ -792,15 +850,13 @@ function renderTidy(r: TidyResult): string {
 
 // next
 
-const DESCRIBE: Partial<Record<string, string>> = {
-  "ready-for-agent": "is ready-for-agent",
-  implementation: "is in implementation with no one holding it",
-  "needs-review": "needs review",
-  "changes-requested": "has changes requested",
-  "needs-qa": "needs QA by an agent",
-  "qa-failed": "failed QA",
-  "merge-queue": "is in merge-queue",
-};
+/** Where an item to start is, in its flow's words: its state, and what the state means, or the step's name without a description. */
+function startState(s: StartItem): string {
+  return `is in ${s.state}: ${s.description ?? s.step}`;
+}
+
+/** Why a person QAs an issue: the mode its gate runs in only, else its flow, e.g. mode:hil or story. */
+const gateText = (g: Gate) => (g.mode ? `mode:${g.mode}` : g.flow);
 
 /** Which session holds an item, and since when. */
 export function holderText(h: Holder) {
@@ -816,7 +872,7 @@ export function waitDetail(w: WaitItem): string {
     case "needs-human":
       return w.why ?? "see its latest comment";
     case "human-qa":
-      return `needs human QA (${w.of})`;
+      return `needs human QA (${gateText(w.gate)})`;
     case "held":
       return `is held by ${holderText(w.holder)}`;
     case "owner-merge":
@@ -827,7 +883,7 @@ export function waitDetail(w: WaitItem): string {
       return `has more than one state label (${w.states.join(", ")}); a person must remove the stale one`;
     case "state-left":
       return `is in ${w.state}, which the flow ${w.flow} no longer has; taking it hands it to a person`;
-    case "invalid-flow":
+    case "flow-invalid":
       return `is blocked by its flow ${w.flow}, which is broken: ${w.errors.map(flowError).join(" ")} Fix .agents/flows/${w.flow}.json on the base branch`;
     default:
       return unreachable(w);
@@ -882,7 +938,7 @@ function runningNote(r: NextReport) {
 
 /** What next is about, e.g. `Story #123 "Rate limiting"`. */
 function subject(r: NextReport) {
-  return `${r.flow ? "Issue" : "Story"} #${r.story} "${r.title}"`;
+  return `${r.flow ? "Issue" : "Story"} #${r.issue} "${r.title}"`;
 }
 
 /** An item to start, e.g. `Slice #131 "Per-key limits"`. */
@@ -903,15 +959,15 @@ export function renderNext(r: NextReport): string {
   out.push(wrap(head), "");
 
   if (r.start.length === 0) {
-    out.push(`Nothing can be started now. Wait for the running items to finish, then run norn next ${r.story} again.`);
+    out.push(`Nothing can be started now. Wait for the running items to finish, then run norn next ${r.issue} again.`);
   } else if (r.slots === 0 && r.start.every((s) => !s.attended)) {
     const ready = `${r.start.length} item${r.start.length === 1 ? " is" : "s are"} ready`;
     out.push(
       wrap(
-        `${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run norn next ${r.story} again.`,
+        `${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run norn next ${r.issue} again.`,
       ),
       "",
-      ...r.start.map((s) => `  - ${itemWhat(s)} ${s.kind !== "issue" && DESCRIBE[s.state] ? DESCRIBE[s.state] : `is in ${s.state}`}.`),
+      ...r.start.map((s) => `  - ${itemWhat(s)} ${startState(s)}.`),
     );
   } else {
     // Attended steps are done with the user, not by a fresh agent of their own.
@@ -932,12 +988,7 @@ export function renderNext(r: NextReport): string {
     );
     for (const s of r.start) {
       const what = itemWhat(s);
-      // An issue of a flow names its own states; DESCRIBE words the built-in ones.
-      const desc =
-        s.kind === "issue" || (s.kind === "story" && !DESCRIBE[s.state])
-          ? `is in ${s.state}: ${s.step}${s.attended ? " (attended: the user takes part)" : ""}.`
-          : `${DESCRIBE[s.state] ?? `is in ${s.state}`}${s.attended ? " (attended: the user takes part)" : ""}.`;
-      out.push(`  - ${what} ${desc}`);
+      out.push(`  - ${what} ${startState(s)}${s.attended ? " (attended: the user takes part)" : ""}.`);
       if (s.worktree) out.push(`    Worktree: ${s.worktree}`);
       if (s.createWorktree) out.push(`    Create the worktree: ${s.createWorktree}`);
       if (s.checkedOutAt && s.branch) out.push(`    ${checkedOutElsewhere(s.branch, s.checkedOutAt)}`);
@@ -952,7 +1003,7 @@ export function renderNext(r: NextReport): string {
           out.push(
             "    Hand the story to an agent in its worktree, which drives it on with the user:",
             `      ${start}`,
-            `      herdr agent prompt norn-${s.issue} "norn-drive ${r.story}"`,
+            `      herdr agent prompt norn-${s.issue} "norn-drive ${r.issue}"`,
             `      herdr agent focus norn-${s.issue}`,
           );
         }
@@ -965,7 +1016,7 @@ export function renderNext(r: NextReport): string {
     out.push("", "Waiting, nothing to do for you:");
     for (const w of r.waiting) out.push(waitLine(w), ...humanHandOff(w));
   }
-  if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. When an item is done, run norn next ${r.story} again.`);
+  if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. When an item is done, run norn next ${r.issue} again.`);
   return out.join("\n");
 }
 
@@ -977,7 +1028,12 @@ export function renderNotification(n: Notification): { title: string; body: stri
     case "needs-human":
       return { title: `norn: #${n.issue} needs you`, body: `${n.reason}\n${n.url}` };
     case "needs-human-qa":
-      return { title: `norn: #${n.issue} needs you`, body: `needs human QA (${n.of})\n${n.url}` };
+      return { title: `norn: #${n.issue} needs you`, body: `needs human QA (${gateText(n.gate)})\n${n.url}` };
+    case "state-left":
+      return {
+        title: `norn: #${n.issue} needs you`,
+        body: `#${n.issue} was in ${n.state}, which the flow ${n.flow} no longer has; move it to a state of the flow\n${n.url}`,
+      };
     case "story-waiting":
       return {
         title: `norn: story #${n.story} is waiting for you`,

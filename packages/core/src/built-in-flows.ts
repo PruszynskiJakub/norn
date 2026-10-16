@@ -176,8 +176,7 @@ export const STORY_FLOW: Flow = {
       color: "5319e7",
       description: "Waiting for agent QA",
       outcomes: {
-        // A story always gets a person's QA after the agent's; the notice says it is the story's.
-        pass: { to: "needs-human-qa", means: "every criterion you could check passed; moves on to QA by a person", note: "evidence", notify: "story" },
+        pass: { to: "needs-human-qa", means: "every criterion you could check passed; moves on to QA by a person", note: "evidence" },
         fail: { to: "qa-failed", means: "put the failures with their repros in the note", note: "evidence" },
       },
     },
@@ -208,25 +207,3 @@ export const STORY_FLOW: Flow = {
 
 /** The built-in flows, by name, in the order triage offers them. */
 export const BUILT_IN: Record<string, Flow> = { story: STORY_FLOW, slice: SLICE_FLOW };
-
-/** The states of the built-in flows. */
-export const STATES = [
-  "needs-refinement",
-  "needs-clarification",
-  "needs-plan",
-  "needs-slicing",
-  "blocked",
-  "ready-for-agent",
-  "implementation",
-  "needs-review",
-  "changes-requested",
-  "needs-qa",
-  "needs-human-qa",
-  "qa-failed",
-  "merge-queue",
-] as const;
-/** A state of a built-in flow; the dashboard words these until it reads the flows. */
-export type State = (typeof STATES)[number];
-
-/** A built-in state, or one of the ends every flow has. */
-export type Target = State | "closed" | "not-planned";

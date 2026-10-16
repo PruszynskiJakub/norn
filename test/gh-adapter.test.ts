@@ -354,10 +354,19 @@ describe("GhGitHub reads for norn doctor", () => {
     expect(calls[0].args).toEqual(["api", "--paginate", "--jq", ".[]", "repos/{owner}/{repo}/issues?state=open&labels=type%3Abug&per_page=100"]);
   });
 
-  test("labelNames pages through the repository's labels", async () => {
-    const { exec, calls } = scripted(() => ({ stdout: [JSON.stringify({ name: "blocked" }), JSON.stringify({ name: "type:story" }), ""].join("\n") }));
+  test("repositoryLabels pages through the repository's labels, with their colour and description", async () => {
+    const { exec, calls } = scripted(() => ({
+      stdout: [
+        JSON.stringify({ name: "blocked", color: "b60205", description: "Blocked (norn)" }),
+        JSON.stringify({ name: "frontend", color: "ededed", description: null }),
+        "",
+      ].join("\n"),
+    }));
 
-    expect(await new GhGitHub(exec).labelNames()).toEqual(["blocked", "type:story"]);
+    expect(await new GhGitHub(exec).repositoryLabels()).toEqual([
+      { name: "blocked", color: "b60205", description: "Blocked (norn)" },
+      { name: "frontend", color: "ededed", description: "" },
+    ]);
     expect(calls[0].args).toEqual(["api", "--paginate", "--jq", ".[]", "repos/{owner}/{repo}/labels"]);
   });
 });

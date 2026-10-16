@@ -1,7 +1,8 @@
 import { join, relative } from "node:path";
 import { slicesOf } from "./behaviours.js";
 import { noun } from "./briefing.js";
-import { type Flow, flowOf } from "./flow.js";
+import type { Flow } from "./flow.js";
+import { flowOf, validFlow } from "./flow-loading.js";
 import type { Issue, PullRequest } from "./github.js";
 import { storySlug } from "./slug.js";
 import { sliceBranch, storyBranch, worktreePath } from "./text.js";
@@ -161,12 +162,12 @@ async function ownerOf(ctx: Ctx, branch: string, issue: (n: number) => Promise<I
   const m = /^(\d+)-/.exec(branch);
   if (!m) return null;
   const story = await issue(Number(m[1]));
-  const loaded = story ? await flowOf(ctx, story) : null;
-  if (!story || !loaded?.ok || loaded.flow.workspace !== "own") return null;
+  const flow = story ? validFlow(await flowOf(ctx, story)) : null;
+  if (!story || flow?.workspace !== "own") return null;
   const own = storyBranch(story.number, await storySlug(ctx, story));
-  if (branch === own) return { branch, issue: story, into: ctx.config.baseBranch, flow: loaded.flow };
+  if (branch === own) return { branch, issue: story, into: ctx.config.baseBranch, flow };
   if (!branch.startsWith(`${own}-`)) return null;
-  if (!slices.has(story.number)) slices.set(story.number, slicesOf(ctx.github, story.number, loaded.flow));
+  if (!slices.has(story.number)) slices.set(story.number, slicesOf(ctx.github, story.number, flow));
   const slice = (await slices.get(story.number)!).find((s) => sliceBranch(story.number, own.slice(`${story.number}-`.length), s.number) === branch);
   const sliceFlow = slice ? await flowOf(ctx, slice) : null;
   return slice && sliceFlow?.ok ? { branch, issue: slice, into: own, flow: sliceFlow.flow } : null;

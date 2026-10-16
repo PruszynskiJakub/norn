@@ -6,11 +6,14 @@ import {
   FLOWS_DIR,
   type FlowError,
   flowFileNames,
+  flowLabels,
+  sliceType,
   flowStatesOf,
+  renamedTo,
   repositoryFlows,
   parseFlow,
   type LoadedFlow,
-  STATES,
+  isNornLabel,
   type ConfigProblem,
   type ConfigWarning,
   type GhAuth,
@@ -56,15 +59,18 @@ export type CheckFact =
 
 /**
  * What the flows check found: the flows in effect by name; the invalid ones on the base branch, and in the checkout's
- * working copy where it differs; skills a valid flow names that are not installed; and the open issues the working
- * copy's flows would orphan, in a state they drop without renaming it.
+ * working copy where it differs; the type of the slices each valid flow makes; skills a valid flow names that are not
+ * installed; the labels the working copy's valid flows need that the repository lacks (the labels check covers the
+ * flows in effect); and the open issues the working copy's flows would orphan, in a state they drop without renaming it.
  */
 export interface FlowsFact {
   kind: "flows";
   baseBranch: string;
   names: string[];
   invalid: { flow: string; local: boolean; errors: FlowError[] }[];
+  slices: { flow: string; local: boolean; type: string }[];
   missingSkills: { skill: string; flow: string; local: boolean; state: string }[];
+  missingLabels: { label: string; flow: string }[];
   orphans: { flow: string; issue: number; state: string }[];
 }
 
@@ -98,8 +104,14 @@ export function doctorFailed(r: DoctorResult): boolean {
   return r.checks.some((c) => c.level === "fail");
 }
 
+/** A read that worked, or the gh-error fact of one that failed. */
+type Attempt<T> = { ok: true; value: T } | { ok: false; fact: CheckFact };
+
+/** What a check works on, or a check it needs that did not pass, so it is skipped; a read that failed instead carries its fact. */
+type Ready<T> = Attempt<T> | { ok: false; needs: CheckId };
+
 /** Runs a GitHub read, turning a failure into a gh-error fact so doctor itself never fails. */
-async function attempt<T>(read: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; fact: CheckFact }> {
+async function attempt<T>(read: () => Promise<T>): Promise<Attempt<T>> {
   try {
     return { ok: true, value: await read() };
   } catch (e) {
@@ -159,12 +171,13 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
   const needsForGitHub: CheckId | null = !ghOk ? "gh" : !gitOk ? "git" : null;
 
   const loaded = inCheckout ? await loadConfig(d.workspace) : null;
-  const config: Config | null = loaded?.ok ? loaded.config : null;
-  const needsForConfig: CheckId | null = !inCheckout ? "git" : config ? null : "config";
+  // The checks on the configuration need it read; those on GitHub need gh and the checkout first.
+  const withConfig: Ready<Config> = loaded?.ok ? { ok: true, value: loaded.config } : { ok: false, needs: inCheckout ? "config" : "git" };
+  const withRepo: Ready<Config> = needsForGitHub ? { ok: false, needs: needsForGitHub } : withConfig;
 
-  if (needsForGitHub || needsForConfig) skip("base-branch", (needsForGitHub ?? needsForConfig) as CheckId);
+  if (!withRepo.ok) skip("base-branch", withRepo.needs);
   else {
-    const branch = (config as Config).baseBranch;
+    const branch = withRepo.value.baseBranch;
     const exists = await attempt(() => d.github.branchExists(branch));
     if (!exists.ok) add("base-branch", "fail", exists.fact);
     else {
@@ -181,36 +194,42 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
   }
 
   // The flows in effect, read from the base branch on GitHub, as norn commands read them.
-  const inEffect = needsForGitHub || needsForConfig ? null : await attempt(() => repositoryFlows({ github: d.github, config: config as Config }));
+  const inEffect: Ready<{ config: Config; flows: LoadedFlow[] }> = !withRepo.ok
+    ? withRepo
+    : await attempt(async () => ({ config: withRepo.value, flows: await repositoryFlows({ github: d.github, config: withRepo.value }) }));
 
-  if (needsForGitHub || needsForConfig) skip("labels", (needsForGitHub ?? needsForConfig) as CheckId);
+  if (!inEffect.ok && "needs" in inEffect) skip("labels", inEffect.needs);
   else {
-    const names = await attempt(() => d.github.labelNames());
-    if (!names.ok) add("labels", "fail", names.fact);
-    else if (!inEffect?.ok) add("labels", "fail", (inEffect as { fact: CheckFact }).fact);
+    const onRepo = await attempt(() => d.github.repositoryLabels());
+    if (!onRepo.ok) add("labels", "fail", onRepo.fact);
+    else if (!inEffect.ok) add("labels", "fail", inEffect.fact);
     else {
-      const wanted = labelDefinitions(inEffect.value).map((l) => l.name);
-      const missing = wanted.filter((l) => !names.value.includes(l));
-      const unused = names.value.filter((l) => !wanted.includes(l) && looksLikeNorns(l, inEffect.value));
+      const wanted = labelDefinitions(inEffect.value.flows).map((l) => l.name);
+      const missing = wanted.filter((name) => !onRepo.value.some((l) => l.name === name));
+      const unused = onRepo.value.filter((l) => !wanted.includes(l.name) && isNorns(l, inEffect.value.flows)).map((l) => l.name);
       add("labels", missing.length ? "fail" : unused.length ? "warning" : "ok", { kind: "labels", total: wanted.length, missing, unused });
     }
   }
 
-  if (needsForGitHub || needsForConfig) skip("flows", (needsForGitHub ?? needsForConfig) as CheckId);
-  else if (!inEffect?.ok) add("flows", "fail", (inEffect as { fact: CheckFact }).fact);
+  if (!inEffect.ok && "needs" in inEffect) skip("flows", inEffect.needs);
+  else if (!inEffect.ok) add("flows", "fail", inEffect.fact);
   else {
-    const fact = await attempt(() => flows(d, config as Config, inEffect.value));
+    const { config, flows: loaded } = inEffect.value;
+    const fact = await attempt(() => flows(d, config, loaded));
     if (!fact.ok) add("flows", "fail", fact.fact);
-    else add("flows", fact.value.invalid.length || fact.value.missingSkills.length ? "fail" : fact.value.orphans.length ? "warning" : "ok", fact.value);
+    else {
+      const f = fact.value;
+      add("flows", f.invalid.length || f.missingSkills.length ? "fail" : f.orphans.length || f.missingLabels.length ? "warning" : "ok", f);
+    }
   }
 
   if (!loaded) skip("config", "git");
   else if (!loaded.ok) add("config", "fail", { kind: "config", problems: loaded.refusal.problems, warnings: [] });
   else add("config", loaded.warnings.length ? "warning" : "ok", { kind: "config", problems: [], warnings: loaded.warnings });
 
-  if (needsForConfig) skip("version", needsForConfig);
+  if (!withConfig.ok) skip("version", withConfig.needs);
   else {
-    const repo = (config as Config).nornVersion;
+    const repo = withConfig.value.nornVersion;
     const match = repo === null ? null : versionMatch(d.version, repo);
     const level = match === null ? "warning" : match.kind === "same" || match.kind === "patch" ? "ok" : match.compatible ? "warning" : "fail";
     add("version", level, { kind: "version", running: d.version, repo, match });
@@ -228,9 +247,9 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
     add("agent-instructions", files.length ? "ok" : "fail", { kind: "agent-instructions", files });
   }
 
-  if (needsForConfig) skip("provider", needsForConfig);
+  if (!withConfig.ok) skip("provider", withConfig.needs);
   else {
-    const c = config as Config;
+    const c = withConfig.value;
     const mismatch = providerRefusal(c, d.workspace.env);
     add("provider", mismatch ? "fail" : "ok", { kind: "provider", provider: c.provider, unsetVariable: mismatch?.variable ?? null });
   }
@@ -272,12 +291,24 @@ async function flows(d: DoctorDeps, config: Config, inEffect: LoadedFlow[]): Pro
     }
   }
 
+  const slices = all.flatMap(({ l, local }) => {
+    const type = l.ok ? sliceType(l.flow) : null;
+    return type === null ? [] : [{ flow: l.name, local, type }];
+  });
+
+  const onRepo = (await d.github.repositoryLabels()).map((l) => l.name);
+  const missingLabels: FlowsFact["missingLabels"] = [];
+  for (const l of local) {
+    if (!l.ok) continue;
+    for (const { name } of flowLabels([l])) if (!onRepo.includes(name)) missingLabels.push({ label: name, flow: l.name });
+  }
+
   const orphans: FlowsFact["orphans"] = [];
   for (const after of local) {
     const before = inEffect.find((l) => l.name === after.name);
     if (!after.ok || !before?.ok) continue;
     // As take would: a state renamed is followed, any other state the flow dropped sends the issue to needs-human.
-    const kept = (state: string) => Object.hasOwn(after.flow.states, state) || Object.hasOwn(after.flow.renamed ?? {}, state);
+    const kept = (state: string) => Object.hasOwn(after.flow.states, state) || renamedTo(after.flow, state) !== null;
     const removed = Object.keys(before.flow.states).filter((state) => !kept(state));
     if (!removed.length) continue;
     for (const issue of await d.github.openIssues(`type:${after.name}`)) {
@@ -286,13 +317,16 @@ async function flows(d: DoctorDeps, config: Config, inEffect: LoadedFlow[]): Pro
     }
   }
 
-  return { kind: "flows", baseBranch: config.baseBranch, names: inEffect.map((l) => l.name), invalid, missingSkills, orphans };
+  return { kind: "flows", baseBranch: config.baseBranch, names: inEffect.map((l) => l.name), invalid, slices, missingSkills, missingLabels, orphans };
 }
 
-/** Whether a label is one norn may have made: a type, a state of a built-in flow, or a state a flow renamed. */
-function looksLikeNorns(label: string, flows: LoadedFlow[]): boolean {
-  if (label.startsWith("type:") || (STATES as readonly string[]).includes(label)) return true;
-  return flows.some((l) => l.ok && Object.hasOwn(l.flow.renamed ?? {}, label));
+/**
+ * Whether a label is norn's: norn marked it when it created it (see LABEL_MARK), it is a type, whose prefix is norn's,
+ * or a flow's renamed map names it as an old state.
+ */
+function isNorns(label: { name: string; description: string }, flows: LoadedFlow[]): boolean {
+  if (isNornLabel(label) || label.name.startsWith("type:")) return true;
+  return flows.some((l) => l.ok && renamedTo(l.flow, label.name) !== null);
 }
 
 /** The skills norn briefings name: in skills/, linked from .claude/skills/, and the same as the bundled ones. */

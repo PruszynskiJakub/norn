@@ -1,10 +1,13 @@
-import { type Flow, flowNameOf, flowOf, flowStatesOf } from "./flow.js";
+import { type Flow, flowStatesOf, hasSpec, type NamedFlow, usedIn, uses, type WorkspaceMode } from "./flow.js";
+import type { Expected } from "./flow-validation.js";
+import { flowOf, validFlow } from "./flow-loading.js";
 import type { GitHub, Issue } from "./github.js";
 import { locate, type Location } from "./location.js";
 import type { Event } from "./events.js";
 import type { Outcome, Step } from "./machine.js";
-import type { WaitItem } from "./next.js";
+import type { Gate } from "./notify.js";
 import type { Refusal } from "./refusals.js";
+import type { WaitItem } from "./waiting.js";
 import { sh, specPath } from "./text.js";
 import { bestEffort, type Ctx, fixLimitReason, fixRounds, mergeRefusal, oneLine, setState, stateLabels, withShortClaim } from "./transitions.js";
 
@@ -20,13 +23,22 @@ import { bestEffort, type Ctx, fixLimitReason, fixRounds, mergeRefusal, oneLine,
 /** A behaviour's parameters, as written in the flow; `{}` when it takes none. */
 export type BehaviourParams = Record<string, unknown>;
 
-/** What a behaviour sees of a step being briefed in a flow that uses it. */
-export interface BriefingInput {
+/** An issue in its flow, as every hook sees it. */
+export interface IssueInFlow {
   ctx: Ctx;
   issue: Issue;
   flow: Flow;
   /** The flow's name, the issue's type. */
   flowName: string;
+}
+
+/** The issue in the flow it runs, for the hooks. */
+export function inFlowOf(ctx: Ctx, issue: Issue, { name, flow }: NamedFlow): IssueInFlow {
+  return { ctx, issue, flow, flowName: name };
+}
+
+/** What a behaviour sees of a step being briefed in a flow that uses it. */
+export interface BriefingInput extends IssueInFlow {
   /** The issue's state after take, e.g. fixing. */
   state: string | null;
   /** The state the issue was in before take moved it, e.g. changes-requested. */
@@ -37,12 +49,7 @@ export interface BriefingInput {
 }
 
 /** What a behaviour sees of an outcome done applies in a flow. */
-export interface OutcomeInput {
-  ctx: Ctx;
-  issue: Issue;
-  flow: Flow;
-  /** The flow's name, the issue's type. */
-  flowName: string;
+export interface OutcomeInput extends IssueInFlow {
   /** The state the issue leaves; null with none. */
   from: string | null;
   /** The outcome as the flow declares it. */
@@ -51,12 +58,7 @@ export interface OutcomeInput {
 }
 
 /** What a behaviour sees of an issue in a state of its flow, e.g. one that holds it. */
-export interface HeldInput {
-  ctx: Ctx;
-  issue: Issue;
-  flow: Flow;
-  /** The flow's name, the issue's type. */
-  flowName: string;
+export interface HeldInput extends IssueInFlow {
   state: string;
 }
 
@@ -70,8 +72,8 @@ export interface Applied {
 export interface BehaviourParam {
   type: "string" | "boolean";
   required: boolean;
-  /** What it must be, e.g. "a state of the flow". */
-  expected: string;
+  /** What it must be, e.g. a state of the flow. */
+  expected: Expected;
 }
 
 export interface Behaviour {
@@ -79,12 +81,15 @@ export interface Behaviour {
   params?: Record<string, BehaviourParam>;
   /** Behaviours the same state cannot also have. */
   excludes?: readonly string[];
-  /** What the flow must be like for the behaviour to work, e.g. a workspace; the field and what it must be. */
-  requires?(flow: Record<string, unknown>): { field: string; expected: string } | null;
+  /** The workspaces the behaviour works in, e.g. own for a PR into the base branch; any when missing. */
+  workspaces?: readonly WorkspaceMode[];
   /** The flows its parameters name, e.g. the type slices get; each must exist. */
   flowsNamed?(params: BehaviourParams): string[];
-  /** The states its parameters name, which it moves an issue to on its own: each must be a state, and counts as a way on. */
-  leadsTo?(params: BehaviourParams): { param: string; to: string }[];
+  /**
+   * Where it moves an issue on its own, which counts as a way on: a state a parameter names, which must be a state, or an
+   * end it always leads to, with no parameter.
+   */
+  leadsTo?(params: BehaviourParams): { param: string | null; to: string }[];
   /** An issue in the state has no step to take: the behaviour moves it on by itself. */
   holds?: boolean;
   /** Why take and done refuse an issue the behaviour holds; `story` is the issue to run norn next on, if any. */
@@ -105,33 +110,18 @@ export interface Behaviour {
   followUps?(o: OutcomeInput, applied: Applied): Promise<Event[]>;
 }
 
-/** Whether the state of the flow opts into the behaviour. */
-export function uses(flow: Flow, state: string | null, name: BehaviourName): boolean {
-  return state !== null && Object.hasOwn(flow.states[state]?.behaviours ?? {}, name);
-}
-
-/** Whether any state of the flow opts into the behaviour. */
-export function usedIn(flow: Flow, name: BehaviourName): boolean {
-  return Object.keys(flow.states).some((s) => uses(flow, s, name));
-}
-
 /** The flow's name as a word that starts a sentence, e.g. Slice. */
-const named = (flowName: string) => flowName.charAt(0).toUpperCase() + flowName.slice(1);
+const capitalised = (flowName: string) => flowName.charAt(0).toUpperCase() + flowName.slice(1);
 
 /** The params of the behaviour in the state, `{}` when it takes none; undefined when the state does not use it. */
 function paramsOf(flow: Flow, state: string | null, name: BehaviourName): BehaviourParams | undefined {
   return state === null ? undefined : flow.states[state]?.behaviours?.[name];
 }
 
-/** Whether the flow's issues have a spec of their own: one of its states writes it. */
-export function hasSpec(flow: Flow): boolean {
-  return usedIn(flow, "writesSpec");
-}
-
 const writesSpec: Behaviour = {
-  params: { readsIssue: { type: "boolean", required: false, expected: "true or false" } },
+  params: { readsIssue: { type: "boolean", required: false, expected: { kind: "boolean" } } },
   /** The spec lives on the issue's own branch. */
-  requires: (flow) => (flow.workspace === "own" ? null : { field: "workspace", expected: '"own", for the spec\'s branch' }),
+  workspaces: ["own"],
   /** Every step works on the spec; in its state, the step writes it, from the issue's discussion when readsIssue says so, and pushes it. */
   async briefing({ issue, flow, state, loc }) {
     if (!loc) return [];
@@ -171,7 +161,7 @@ export async function slicesOf(github: Pick<GitHub, "subIssues">, parent: number
 }
 
 const slices: Behaviour = {
-  params: { type: { type: "string", required: true, expected: "a flow's name" } },
+  params: { type: { type: "string", required: true, expected: { kind: "flow-name" } } },
   /** The slices get the type it names, which must be a flow. */
   flowsNamed: (p) => (typeof p.type === "string" ? [p.type] : []),
   /** In its state, how to create the slices with norn add-slice and give them bodies. */
@@ -213,10 +203,10 @@ function waitState(flow: Flow): { held: string; to: string } | null {
 }
 
 const waitsForSlices: Behaviour = {
-  params: { to: { type: "string", required: true, expected: "a state of the flow" } },
+  params: { to: { type: "string", required: true, expected: { kind: "state" } } },
   leadsTo: (p) => (typeof p.to === "string" ? [{ param: "to", to: p.to }] : []),
   /** The slices' PRs go into the issue's own branch, and its own PR into the base branch. */
-  requires: (flow) => (flow.workspace === "own" ? null : { field: "workspace", expected: '"own", for the branch its slices merge into' }),
+  workspaces: ["own"],
   holds: true,
   needsBranch: true,
   async held({ issue, state }) {
@@ -230,7 +220,7 @@ const waitsForSlices: Behaviour = {
     const wait = waitState(flow);
     if (!loc || !wait || state === null || !reachable(flow, wait.to).has(state)) return [];
     if (uses(flow, state, "countsFixRounds")) return [`Commit the fixes straight onto the ${flowName} branch ${loc.branch} and push them.`];
-    return [`${named(flowName)} PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`];
+    return [`${capitalised(flowName)} PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`];
   },
   async reconcile({ ctx, issue }) {
     return bestEffort("move-story-on", issue.number, issue.number, () => moveOnFromSlices(ctx, issue.number));
@@ -245,7 +235,7 @@ export async function moveOnFromSlices(ctx: Ctx, n: number): Promise<Event[]> {
   const { github } = ctx;
   const issue = await github.getIssue(n);
   const loaded = await flowOf(ctx, issue);
-  const flow = loaded?.ok ? loaded.flow : null;
+  const flow = validFlow(loaded);
   const wait = flow ? waitState(flow) : null;
   if (!flow || !loaded || !wait || issue.state !== "open" || flowStatesOf(issue, flow).join() !== wait.held) return [];
   const slices = await slicesOf(github, n, flow);
@@ -261,16 +251,16 @@ export async function moveOnFromSlices(ctx: Ctx, n: number): Promise<Event[]> {
         title: issue.title,
         body: `Closes #${n}${hasSpec(flow) ? `\n\nSpec: ${specPath(n, loc.slug)}` : ""}`,
       }));
-    await setState(ctx, issue, wait.to, `Every slice is merged into ${loc.branch}. ${named(loaded.name)} PR: #${pr.number}.`, flow);
+    await setState(ctx, issue, wait.to, `Every slice is merged into ${loc.branch}. ${capitalised(loaded.name)} PR: #${pr.number}.`, flow);
   });
-  return moved ? [{ kind: "story-promoted", story: n }] : [];
+  return moved ? [{ kind: "story-promoted", story: n, to: wait.to }] : [];
 }
 
 const waitsForMerge: Behaviour = {
   /** It ends the issue on its own, once its PR is merged. */
-  leadsTo: () => [{ param: "", to: "closed" }],
+  leadsTo: () => [{ param: null, to: "closed" }],
   /** The PR comes from the issue's own branch into the base branch. */
-  requires: (flow) => (flow.workspace === "own" ? null : { field: "workspace", expected: '"own", for the PR its owner merges' }),
+  workspaces: ["own"],
   holds: true,
   async held({ issue, state }) {
     return { kind: "story-in-merge-queue", issue: issue.number, owner: issue.assignees[0] ?? null, state };
@@ -307,7 +297,7 @@ async function closeMerged({ ctx, issue, flow, flowName, state }: HeldInput): Pr
 
 const opensPR: Behaviour = {
   /** The PR comes from the issue's own branch, into the base branch or the parent's. */
-  requires: (flow) => (flow.workspace === "own" || flow.workspace === "parent" ? null : { field: "workspace", expected: '"own" or "parent", for its PR' }),
+  workspaces: ["own", "parent"],
   /**
    * In its state, how to open or update the PR; in the others, the PR and its diff: a PR into the base branch once it
    * exists, one into the parent's branch always, as its branch and base are known.
@@ -317,7 +307,7 @@ const opensPR: Behaviour = {
     const diff = `Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`;
     const parent = flow.workspace === "parent";
     if (uses(flow, state, "opensPR")) {
-      const body = parent ? `Part of #${loc.story.number}. ${named(flowName)} #${issue.number}.` : `Closes #${issue.number}.`;
+      const body = parent ? `Part of #${loc.story.number}. ${capitalised(flowName)} #${issue.number}.` : `Closes #${issue.number}.`;
       return [
         `Commit on ${loc.branch} and push. Open one PR from ${loc.branch} into ${loc.base} if there is none yet:`,
         // The title is free text from GitHub: quoted, so a " or $(...) in it can neither break nor run anything.
@@ -327,7 +317,7 @@ const opensPR: Behaviour = {
     }
     // Where the PR gets merged, mergesSlice says what to do with it instead.
     if (uses(flow, state, "mergesSlice")) return [];
-    if (parent) return [`${named(flowName)} PR: ${loc.branch} into ${loc.base}. ${diff}`];
+    if (parent) return [`${capitalised(flowName)} PR: ${loc.branch} into ${loc.base}. ${diff}`];
     const pr = await ctx.github.findPullRequest(loc.branch);
     return pr ? [`PR #${pr.number}: ${loc.branch} into ${pr.base}. ${diff}`] : [];
   },
@@ -354,15 +344,9 @@ export function humanQaLines(n: number, branch: string | null): string[] {
   ];
 }
 
-/**
- * Why a person QAs an issue at the gate `state` of the flow `name`: what the outcomes into it notify, when they say;
- * else its mode, for a gate that runs in one mode only; else its type.
- */
-export function gateOf(flow: Flow, state: string, name: string): string {
-  const said = Object.values(flow.states).flatMap((s) => Object.values(s.outcomes).filter((o) => o.to === state && o.notify));
-  if (said.length) return said[0].notify!;
-  const when = flow.states[state]?.when;
-  return when ? `mode:${when}` : `type:${name}`;
+/** Where a person QAs an issue: the state `state` of the flow `name`, and the mode it runs in only, if it runs in one. */
+export function gateOf({ name, flow }: NamedFlow, state: string): Gate {
+  return { flow: name, mode: flow.states[state]?.when ?? null };
 }
 
 const humanGate: Behaviour = {
@@ -375,10 +359,10 @@ const humanGate: Behaviour = {
     ];
   },
   /** Reaching the gate puts the issue in a person's hands: they are notified, and the agent stops. */
-  async enter({ flow, flowName, from, outcome }, applied) {
+  async enter({ from, outcome }, applied) {
     // Staying at the gate, e.g. needs-human resolved there, is no new hand-over.
-    if (from === outcome.to || applied.outcome.notify) return applied;
-    return { ...applied, outcome: { ...applied.outcome, notify: gateOf(flow, outcome.to, flowName) } };
+    if (from === outcome.to) return applied;
+    return { ...applied, outcome: { ...applied.outcome, notify: true } };
   },
 };
 
@@ -410,7 +394,7 @@ const countsFixRounds: Behaviour = {
 
 const mergesSlice: Behaviour = {
   /** The PR it merges goes into the parent's branch. */
-  requires: (flow) => (flow.workspace === "parent" ? null : { field: "workspace", expected: '"parent", for the PR into the parent\'s branch' }),
+  workspaces: ["parent"],
   /** In its state, how to bring the branch up to date and merge its PR. */
   async briefing({ flow, state, loc }) {
     if (!loc || !uses(flow, state, "mergesSlice")) return [];
@@ -441,7 +425,7 @@ const mergesSlice: Behaviour = {
 };
 
 const syncsBlocked: Behaviour = {
-  params: { to: { type: "string", required: true, expected: "a state of the flow" } },
+  params: { to: { type: "string", required: true, expected: { kind: "state" } } },
   leadsTo: (p) => (typeof p.to === "string" ? [{ param: "to", to: p.to }] : []),
   holds: true,
   async held({ ctx, issue }, story) {
@@ -471,11 +455,9 @@ export const BEHAVIOURS = {
 
 export type BehaviourName = keyof typeof BEHAVIOURS;
 
-const REGISTRY: Record<BehaviourName, Behaviour> = BEHAVIOURS;
-
 /** The behaviours a flow uses anywhere, in registry order. */
 function inFlow(flow: Flow): Behaviour[] {
-  return (Object.entries(REGISTRY) as [BehaviourName, Behaviour][]).filter(([name]) => usedIn(flow, name)).map(([, b]) => b);
+  return (Object.entries(BEHAVIOURS) as [BehaviourName, Behaviour][]).filter(([name]) => usedIn(flow, name)).map(([, b]) => b);
 }
 
 /** The briefing lines every behaviour of the flow contributes to the step. */
@@ -487,7 +469,7 @@ export async function behaviourLines(b: BriefingInput): Promise<string[]> {
 
 /** The behaviours of one state of the flow, in registry order. */
 function inState(flow: Flow, state: string | null): Behaviour[] {
-  return (Object.entries(REGISTRY) as [BehaviourName, Behaviour][]).filter(([name]) => uses(flow, state, name)).map(([, b]) => b);
+  return (Object.entries(BEHAVIOURS) as [BehaviourName, Behaviour][]).filter(([name]) => uses(flow, state, name)).map(([, b]) => b);
 }
 
 /** Why the behaviours of the state the issue leaves stop the outcome; null when none does. */
@@ -547,9 +529,9 @@ export async function reconcileState(h: HeldInput): Promise<Event[]> {
 }
 
 /** An issue in a state of its flow, as the hooks above see it; null without a single state. */
-export function heldInput(ctx: Ctx, issue: Issue, flow: Flow): HeldInput | null {
-  const states = flowStatesOf(issue, flow);
-  return states.length === 1 ? { ctx, issue, flow, flowName: flowNameOf(issue) ?? "", state: states[0] } : null;
+export function heldInput(ctx: Ctx, issue: Issue, named: NamedFlow): HeldInput | null {
+  const states = flowStatesOf(issue, named.flow);
+  return states.length === 1 ? { ...inFlowOf(ctx, issue, named), state: states[0] } : null;
 }
 
 /** The flow's state that holds issues until their blockers close, and the state syncsBlocked releases them to; null for none. */
@@ -574,8 +556,7 @@ export async function releaseBlocked(ctx: Ctx, parent: number): Promise<Event[]>
   const events: Event[] = [];
   for (const issue of await ctx.github.subIssues(parent)) {
     if (issue.state !== "open") continue;
-    const loaded = await flowOf(ctx, issue);
-    const flow = loaded?.ok ? loaded.flow : null;
+    const flow = validFlow(await flowOf(ctx, issue));
     const states = flow ? blockedStates(flow) : null;
     if (!flow || !states) continue;
     const current = flowStatesOf(issue, flow);

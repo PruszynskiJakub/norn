@@ -172,6 +172,7 @@ describe("observe: outcomes and their remarks", () => {
     expect(outcomes[0]).toMatchObject({
       issue: 11,
       story: 10,
+      flow: "slice",
       actor: "alice",
       from: "needs-qa",
       to: "merge-queue",
@@ -440,6 +441,7 @@ describe("observe: repository flows", () => {
     expect(res.feed.find((e) => e.kind === "outcome")).toMatchObject({
       issue: 40,
       story: 40,
+      flow: "bug",
       step: "reproduction",
       outcome: "reproduced",
       from: "reproducing",

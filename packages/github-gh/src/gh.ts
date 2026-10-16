@@ -225,8 +225,9 @@ export class GhGitHub implements GitHub {
     }
   }
 
-  async labelNames() {
-    return (await this.paginate<{ name: string }>(`${REPO}/labels`)).map((l) => l.name);
+  async repositoryLabels() {
+    const labels = await this.paginate<{ name: string; color: string; description: string | null }>(`${REPO}/labels`);
+    return labels.map((l) => ({ name: l.name, color: l.color, description: l.description ?? "" }));
   }
 
   async ghAuth(host: string): Promise<GhAuth> {

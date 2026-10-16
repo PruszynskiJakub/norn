@@ -7,9 +7,9 @@ import { specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
-import { type Flow, type FlowCache, type Mode, flowStatesOf, loadFlow, stateLabel } from "./flow.js";
-import { hasSpec } from "./behaviours.js";
-import { notifyHumanQa, notifyNeedsHuman, type Notify } from "./notify.js";
+import { type Flow, flowStatesOf, hasSpec, type LabelDefinition, type Mode, type NamedFlow, renamedTo, stateLabel, typeLabel } from "./flow.js";
+import { type FlowCache, loadFlow, validFlow } from "./flow-loading.js";
+import { notifyHumanQa, notifyNeedsHuman, notifyStateLeft, type Notify } from "./notify.js";
 
 /** The marker norn writes when it sets needs-human; norn next reads the reason back from it. */
 export const NEEDS_HUMAN_MARK = "norn: needs-human — ";
@@ -171,21 +171,25 @@ export function evidenceLines(repoUrl: string, e: Evidence): string[] {
   return lines;
 }
 
+/** How an outcome is applied: the word said, the note and evidence that go in the comment, and what the mode skipped. */
+export interface Applying {
+  /** The outcome word; empty for a step with a single way to end. */
+  word: string;
+  note?: string;
+  evidence?: Evidence;
+  /** The issue's flow, with its name; null for a new issue, which triage gives one. */
+  flow: NamedFlow | null;
+  /** The line naming the states the issue's mode skipped; null for none. */
+  skipped: string | null;
+}
+
 /**
  * Applies an outcome to an issue whose claim this session holds: labels,
  * comment and closing. The automatic transitions that follow are in followUps.
  */
-export async function applyOutcome(
-  ctx: Ctx,
-  issue: Issue,
-  outcome: Outcome,
-  word: string,
-  note?: string,
-  evidence?: Evidence,
-  flow: Flow | null = null,
-  skipped: string | null = null,
-): Promise<void> {
+export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, { word, note, evidence, flow: named, skipped }: Applying): Promise<void> {
   const { github } = ctx;
+  const flow = named?.flow ?? null;
   const n = issue.number;
   // An issue whose state its flow dropped moves on from that state.
   const left = flow ? await leftState(ctx, issue, flow) : null;
@@ -197,8 +201,7 @@ export async function applyOutcome(
   const spec = await specLink(ctx, issue, flow);
   if (spec) comment.push("", `Spec: ${spec}`);
   // Triage gives the issue its flow, which it enters here.
-  const given = outcome.flow ? await loadFlow(ctx, outcome.flow) : null;
-  const into = flow ?? (given?.ok ? given.flow : null);
+  const into = flow ?? (outcome.flow ? validFlow(await loadFlow(ctx, outcome.flow)) : null);
   // An issue whose flow gives it a branch of its own records its slug the first time norn writes on it, triage included.
   const slug = into?.workspace === "own" ? await slugLine(ctx, issue) : null;
   if (slug) comment.push("", slug);
@@ -216,6 +219,7 @@ export async function applyOutcome(
     const add: string[] = [outcome.to];
     if (into) await ensureStateLabel(ctx, into, outcome.to);
     if (!flow && outcome.flow) {
+      await ensureTypeLabel(ctx, outcome.flow);
       add.push(`type:${outcome.flow}`);
       await github.assign(n, [await github.currentUser()]);
     }
@@ -228,7 +232,7 @@ export async function applyOutcome(
     await github.comment(n, comment.join("\n"));
     await github.removeLabels(n, remove);
     if (outcome.needsHuman) await notifyNeedsHuman(ctx, n, outcome.needsHuman);
-    else if (outcome.notify) await notifyHumanQa(ctx, n, outcome.notify);
+    else if (outcome.notify && named) await notifyHumanQa(ctx, n, { flow: named.name, mode: flow?.states[outcome.to]?.when ?? null });
   }
 }
 
@@ -310,8 +314,28 @@ export async function leftState(ctx: Ctx, issue: Issue, flow: Flow): Promise<str
   return null;
 }
 
+/** What norn did with an issue left in a state its flow no longer has. */
+export type Settled = Extract<Event, { kind: "state-renamed" | "handed-over" }>;
+
+/**
+ * For an issue in a state its flow no longer has: follows the flow's `renamed` to the state's new name, or hands the
+ * issue to a person through needs-human. Null, changing nothing, for an issue in a state of its flow. Runs under a
+ * claim this session holds; `issue` is changed to what it left.
+ */
+export async function settleLeftState(ctx: Ctx, issue: Issue, { name, flow }: NamedFlow): Promise<Settled | null> {
+  const from = await leftState(ctx, issue, flow);
+  if (from === null) return null;
+  const to = renamedTo(flow, from);
+  if (to !== null) {
+    await followRename(ctx, issue, flow, name, from, to);
+    return { kind: "state-renamed", issue: issue.number, from, to, flow: name };
+  }
+  await handOverLeft(ctx, issue, name, from);
+  return { kind: "handed-over", issue: issue.number, state: from, flow: name };
+}
+
 /** Moves an issue in a renamed state to its new name, under the claim this session holds. */
-export async function followRename(ctx: Ctx, issue: Issue, flow: Flow, name: string, from: string, to: string): Promise<void> {
+async function followRename(ctx: Ctx, issue: Issue, flow: Flow, name: string, from: string, to: string): Promise<void> {
   const n = issue.number;
   await ensureStateLabel(ctx, flow, to);
   await ctx.github.addLabels(n, [to]);
@@ -321,14 +345,14 @@ export async function followRename(ctx: Ctx, issue: Issue, flow: Flow, name: str
 }
 
 /** Hands an issue in a state its flow no longer has to a person, under the claim this session holds. */
-export async function handOverLeft(ctx: Ctx, issue: Issue, name: string, state: string): Promise<void> {
+async function handOverLeft(ctx: Ctx, issue: Issue, name: string, state: string): Promise<void> {
   const n = issue.number;
-  const why = `the state ${state} is no longer in the flow ${name}`;
   await ctx.github.addLabels(n, ["needs-human"]);
-  await ctx.github.comment(n, needsHumanLine(why));
+  await ctx.github.comment(n, needsHumanLine(`the state ${state} is no longer in the flow ${name}`));
   // The old label goes, so the resolve step moves the issue into a state of the flow.
   await ctx.github.removeLabels(n, [state, "in-progress"]);
-  await notifyNeedsHuman(ctx, n, why);
+  issue.labels = [...issue.labels.filter((l) => l !== state && l !== "in-progress"), "needs-human"];
+  await notifyStateLeft(ctx, n, state, name);
 }
 
 /**
@@ -346,8 +370,17 @@ export function stateLabels(issue: Issue, keep?: string, flow: Flow | null = nul
  * state, or a default by kind; a built-in flow's match what norn init makes.
  */
 export async function ensureStateLabel(ctx: Ctx, flow: Flow, state: string): Promise<void> {
-  if (!flow.states[state] || (await ctx.github.labelNames()).includes(state)) return;
-  await ctx.github.ensureLabels([stateLabel(flow, state)]);
+  if (flow.states[state]) await ensureLabel(ctx, stateLabel(flow, state));
+}
+
+/** Creates the label type:<name> of a flow when the repository lacks it, as norn init makes it. */
+export async function ensureTypeLabel(ctx: Ctx, name: string): Promise<void> {
+  await ensureLabel(ctx, typeLabel(name));
+}
+
+/** Creates a label when the repository lacks it; one it has is left as it is. */
+async function ensureLabel(ctx: Ctx, label: LabelDefinition): Promise<void> {
+  if (!(await ctx.github.repositoryLabels()).some((l) => l.name === label.name)) await ctx.github.ensureLabels([label]);
 }
 
 /**

@@ -1,7 +1,9 @@
-import { fixStatesOf, slicesAmong, uses } from "./behaviours.js";
+import { fixStatesOf, slicesAmong } from "./behaviours.js";
 import { isStale } from "./claims.js";
 import { byTime, type FeedEvent, feedOf } from "./feed.js";
-import { type Flow, flowNameOf, flowStatesOf, type LoadedFlow, loadFlow, modeOf, repositoryFlows, type SourcedFlow } from "./flow.js";
+import { type Flow, flowNameOf, flowStatesOf, modeOf, uses } from "./flow.js";
+import { loadFlow, repositoryFlows, type SourcedFlow } from "./flow-loading.js";
+import type { LoadedFlow } from "./flow-validation.js";
 import type { ObservedIssue, ObservedStory } from "./github.js";
 import { recordedSlug } from "./slug.js";
 import { slugify, storyBranch } from "./text.js";
@@ -113,9 +115,9 @@ export async function observe(given: Ctx, opts: { since?: string | null; previou
     if (l) loaded.set(name, l);
   }
   const valid = new Map([...loaded].flatMap(([name, l]) => (l.ok ? [[name, l.flow] as const] : [])));
-  const flowOf = (i: ObservedIssue): Flow | null => valid.get(flowNameOf(i) ?? "") ?? null;
+  const flowFor = (i: ObservedIssue): Flow | null => valid.get(flowNameOf(i) ?? "") ?? null;
   const slicesOf = (s: ObservedStory): ObservedIssue[] => {
-    const flow = flowOf(s);
+    const flow = flowFor(s);
     return flow ? slicesAmong(s.subIssues, flow) : [];
   };
   const claims = new Map(work.claims.flatMap((c) => (c.record ? [[c.issue, { ...c.record, sha: c.sha }] as const] : [])));
@@ -126,7 +128,7 @@ export async function observe(given: Ctx, opts: { since?: string | null; previou
   const item = (i: ObservedIssue): BoardItem => {
     const closed = i.state === "closed";
     const bodies = i.nornComments.map((c) => c.body);
-    const flow = flowOf(i);
+    const flow = flowFor(i);
     const name = flowNameOf(i);
     return {
       number: i.number,
@@ -162,7 +164,7 @@ export async function observe(given: Ctx, opts: { since?: string | null; previou
     return {
       ...item(s),
       owner: s.assignees[0] ?? null,
-      branch: flowOf(s)?.workspace === "own" ? storyBranch(s.number, slug) : null,
+      branch: flowFor(s)?.workspace === "own" ? storyBranch(s.number, slug) : null,
       slices: slicesOf(s).map(item),
     };
   });
@@ -170,7 +172,7 @@ export async function observe(given: Ctx, opts: { since?: string | null; previou
   for (const s of ours.filter((s) => s.assignees.includes(me) && s.state === "open")) {
     for (const i of [s, ...slicesOf(s)]) {
       if (i.state !== "open") continue;
-      const flow = flowOf(i);
+      const flow = flowFor(i);
       const states = flow ? flowStatesOf(i, flow) : [];
       // At a human gate, a person QAs it.
       const gate = flow && states.length === 1 && uses(flow, states[0], "humanGate") ? states[0] : null;
