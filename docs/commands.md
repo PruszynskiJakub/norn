@@ -174,8 +174,8 @@ Checks the whole setup at once and lists every check, each with the exact comman
 | `git` | You are in a git checkout whose `origin` is on GitHub |
 | `base-branch` | `baseBranch` exists on GitHub |
 | `permission` | You have write access or higher to the repository |
-| `labels` | The labels of every valid flow and norn's flags exist, as `init` creates them; a label no flow uses (a `type:`, a built-in state or a state a flow renamed) warns, and is never deleted |
-| `flows` | The flows on the base branch, and every flow file in your working copy that differs from it, are valid; the skills they name are installed. It lists, as a warning, the open issues your local flow edits would orphan: those in a state the edit drops without naming it in `renamed` |
+| `labels` | The labels of every valid flow and norn's flags exist, as `init` creates them; a label of norn's that no flow uses (one norn created, by the `(norn)` at the end of its description, a `type:`, or a state a flow renamed) warns, and is never deleted |
+| `flows` | The flows on the base branch, and every flow file in your working copy that differs from it, are valid; the skills they name are installed. It names the type of the slices each flow makes, and lists, as warnings, the labels your local flow edits need that the repository lacks and the open issues they would orphan: those in a state the edit drops without naming it in `renamed` |
 | `config` | The team and local config are valid; their warnings show as a warning |
 | `version` | `nornVersion` is set and compatible with your norn; a compatible difference warns |
 | `skills` | Every skill the briefings name is in `skills/` and linked from `.claude/skills/`; a skill that differs from the bundled copy warns, except under `NORN_SKILLS_SOURCE` |

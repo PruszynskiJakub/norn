@@ -179,7 +179,7 @@ describe("state labels on demand", () => {
 
     await w.norn("done", "131");
 
-    expect(w.github.labelDefs.get("needs-review")).toEqual({ color: "5319e7", description: "Waiting for review" });
+    expect(w.github.labelDefs.get("needs-review")).toEqual({ color: "5319e7", description: "Waiting for review (norn)" });
   });
 
   test("a transition into a state whose label is missing creates it from the state's colour and description", async () => {
@@ -190,7 +190,7 @@ describe("state labels on demand", () => {
 
     await w.norn("done", "40", "reproduced");
 
-    expect(w.github.labelDefs.get("fixing")).toEqual({ color: "d93f0b", description: "an agent fixes the bug" });
+    expect(w.github.labelDefs.get("fixing")).toEqual({ color: "d93f0b", description: "an agent fixes the bug (norn)" });
   });
 
   test("without colour or description, the label gets the default for the state's kind", async () => {
@@ -208,8 +208,8 @@ describe("state labels on demand", () => {
     await w.norn("take", "40");
     await w.norn("done", "40", "ok");
 
-    expect(w.github.labelDefs.get("verifying")).toEqual({ color: "c5def5", description: "a person takes part in this step" });
-    expect(w.github.labelDefs.get("patching")).toEqual({ color: "bfd4f2", description: "an agent runs this step unattended" });
+    expect(w.github.labelDefs.get("verifying")).toEqual({ color: "c5def5", description: "a person takes part in this step (norn)" });
+    expect(w.github.labelDefs.get("patching")).toEqual({ color: "bfd4f2", description: "an agent runs this step unattended (norn)" });
   });
 
   test("a label that is already there is left as it is", async () => {
@@ -489,7 +489,7 @@ describe("triage offers the flows", () => {
 
     await w.norn("done", "7", "bug");
 
-    expect(w.github.labelDefs.get("type:bug")).toEqual({ color: "ededed", description: "norn bug flow" });
+    expect(w.github.labelDefs.get("type:bug")).toEqual({ color: "ededed", description: "Runs the bug flow (norn)" });
   });
 
   test("the issue then runs the flow it was given", async () => {

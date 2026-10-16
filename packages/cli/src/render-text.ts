@@ -369,13 +369,19 @@ function flowsCheck(f: FlowsFact): { message: string; fix: string | null } {
     messages.push(`skills the flows name are not in skills/: ${named.join(", ")}`);
     fixes.push("add the skills to skills/ and link them from .claude/skills/");
   }
+  if (f.missingLabels.length) {
+    messages.push(`labels the local flows need are not on GitHub yet: ${f.missingLabels.map((m) => `${m.label} (${m.flow} in this checkout)`).join(", ")}`);
+    fixes.push("norn creates each one when an issue first gets it; to create them up front, run norn init once the change is merged");
+  }
   for (const flow of [...new Set(f.orphans.map((o) => o.flow))]) {
     const of = f.orphans.filter((o) => o.flow === flow);
     const gone = of.length === 1 ? "its state is gone, so it would go to needs-human" : "their states are gone, so they would go to needs-human";
     messages.push(`the local ${file(flow)} would orphan ${of.map((o) => `#${o.issue} (${o.state})`).join(", ")}: ${gone}`);
     fixes.push(`name the new state of each removed one in renamed in ${file(flow)}, or move these issues on first`);
   }
-  if (!messages.length) return { message: `all ${plural(f.names.length, "flow")} are valid: ${f.names.join(", ")}`, fix: null };
+  // With nothing to fix, what the flows make of each other: the type of the slices each one makes.
+  const slices = f.slices.map((s) => `${s.flow}${s.local ? " in this checkout" : ""} makes slices of type ${s.type}`);
+  if (!messages.length) return { message: [`all ${plural(f.names.length, "flow")} are valid: ${f.names.join(", ")}`, ...slices].join("; "), fix: null };
   return { message: messages.join("; "), fix: fixes.join("; ") };
 }
 

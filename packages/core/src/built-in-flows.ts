@@ -207,6 +207,3 @@ export const STORY_FLOW: Flow = {
 
 /** The built-in flows, by name, in the order triage offers them. */
 export const BUILT_IN: Record<string, Flow> = { story: STORY_FLOW, slice: SLICE_FLOW };
-
-/** The states of the built-in flows, each once, in the flows' order. */
-export const STATES: readonly string[] = [...new Set(Object.values(BUILT_IN).flatMap((flow) => Object.keys(flow.states)))];

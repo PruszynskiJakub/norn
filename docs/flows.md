@@ -127,7 +127,7 @@ A repository file named like a built-in flow, `story.json` or `slice.json`, repl
 
 ## Labels
 
-A flow's states are labels on GitHub, and its type is `type:<name>`. `norn init` creates the labels of every valid flow on the base branch, with each state's `color` and `description` or a default for its kind (a human gate, attended or agent), and the first transition into a state whose label is missing creates it, so a merged flow works without running `init`. `norn doctor` reports missing labels, and lists as a warning the labels no flow uses any more: a `type:` with no flow, a built-in state a replacement dropped, or a state a flow renamed. norn never deletes a label, so closed issues keep their history; delete one on GitHub yourself once no issue needs it.
+A flow's states are labels on GitHub, and its type is `type:<name>`. `norn init` creates the labels of every valid flow on the base branch, with each state's `color` and `description` or a default for its kind (a human gate, attended or agent), and the first transition into a state whose label is missing creates it, so a merged flow works without running `init`. Every label norn creates has a description that ends in `(norn)`, e.g. `Waiting for review (norn)`; that is how norn tells its labels from the team's own. `norn doctor` reports missing labels, and lists as a warning the labels no flow uses any more: one norn created (by that mark) for a state a flow has since dropped or renamed, a `type:` with no flow, or a state a flow's `renamed` names. A label whose description someone edited loses the mark, and doctor no longer counts it as norn's. norn never deletes a label, so closed issues keep their history; delete one on GitHub yourself once no issue needs it.
 
 ## Validation
 

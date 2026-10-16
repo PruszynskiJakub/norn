@@ -109,16 +109,35 @@ export const DEFAULT_STATE_LABEL: Record<StateKind, { color: string; description
   agent: { color: "bfd4f2", description: "an agent runs this step unattended" },
 };
 
+/**
+ * What ends the description of every label norn creates. It is how norn tells its labels from a team's own, e.g. one
+ * it made for a state a flow has since removed, which nothing else names any more.
+ */
+export const LABEL_MARK = " (norn)";
+
+/** GitHub refuses a label description longer than this. */
+const LABEL_DESCRIPTION_MAX = 100;
+
+/** A label as norn creates it: its description says what it means, and ends in LABEL_MARK. */
+export function nornLabel(name: string, color: string, means: string): LabelDefinition {
+  return { name, color, description: `${means.slice(0, LABEL_DESCRIPTION_MAX - LABEL_MARK.length)}${LABEL_MARK}` };
+}
+
+/** Whether norn created the label, by the mark at the end of its description. */
+export function isNornLabel(label: { description: string }): boolean {
+  return label.description.endsWith(LABEL_MARK);
+}
+
 /** The label of a state of the flow: the state's colour and description, or the defaults of its kind. */
 export function stateLabel(flow: Flow, state: string): LabelDefinition {
   const s = flow.states[state];
   const fallback = DEFAULT_STATE_LABEL[stateKindOf(s)];
-  return { name: state, color: s.color ?? fallback.color, description: s.description ?? fallback.description };
+  return nornLabel(state, s.color ?? fallback.color, s.description ?? fallback.description);
 }
 
 /** The label of the type that runs the flow. */
 export function typeLabel(name: string): LabelDefinition {
-  return { name: `type:${name}`, color: "ededed", description: `norn ${name} flow` };
+  return nornLabel(`type:${name}`, "ededed", `Runs the ${name} flow`);
 }
 
 /**

@@ -240,7 +240,7 @@ describe("humanGate", () => {
 
     await w.norn("done", "40", "approve");
 
-    expect(w.github.labelDefs.get("verifying")).toEqual({ color: "e99695", description: "a person checks the work here" });
+    expect(w.github.labelDefs.get("verifying")).toEqual({ color: "e99695", description: "a person checks the work here (norn)" });
   });
 
   test("a gate for mode:afk only notifies with that mode, as one for mode:hil does", async () => {

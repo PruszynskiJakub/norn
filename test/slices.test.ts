@@ -84,8 +84,8 @@ describe("the slices behaviour", () => {
 
     await w.norn("add-slice", "50", "Index", "--mode", "afk");
 
-    expect(w.github.labelDefs.get("doing")).toEqual({ color: "bfd4f2", description: "an agent runs this step unattended" });
-    expect(w.github.labelDefs.get("type:task")).toEqual({ color: "ededed", description: "norn task flow" });
+    expect(w.github.labelDefs.get("doing")).toEqual({ color: "bfd4f2", description: "an agent runs this step unattended (norn)" });
+    expect(w.github.labelDefs.get("type:task")).toEqual({ color: "ededed", description: "Runs the task flow (norn)" });
   });
 
   test("add-slice is refused outside the state with slices, naming that state", async () => {

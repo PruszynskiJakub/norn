@@ -172,7 +172,7 @@ exports[`output of every command, text and --json > doctor with problems > json 
     {
       "id": "flows",
       "level": "ok",
-      "message": "all 2 flows are valid: story, slice",
+      "message": "all 2 flows are valid: story, slice; story makes slices of type slice",
       "fix": null
     },
     {
@@ -217,7 +217,7 @@ exports[`output of every command, text and --json > doctor with problems > text 
 ✓ permission: you have write access to the repository
 ✗ labels: 19 of norn's labels are missing: needs-refinement, needs-clarification, needs-plan, needs-slicing, implementation, needs-review, changes-requested, needs-qa, needs-human-qa, qa-failed, merge-queue, blocked, ready-for-agent, type:story, type:slice, in-progress, needs-human, mode:afk, mode:hil
   fix: norn init
-✓ flows: all 2 flows are valid: story, slice
+✓ flows: all 2 flows are valid: story, slice; story makes slices of type slice
 ✓ config: the team and local config are valid
 ! version: norn 1.4.2, repo has no nornVersion
   fix: norn init

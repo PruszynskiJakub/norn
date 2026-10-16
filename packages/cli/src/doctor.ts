@@ -6,12 +6,14 @@ import {
   FLOWS_DIR,
   type FlowError,
   flowFileNames,
+  flowLabels,
+  sliceType,
   flowStatesOf,
   renamedTo,
   repositoryFlows,
   parseFlow,
   type LoadedFlow,
-  STATES,
+  isNornLabel,
   type ConfigProblem,
   type ConfigWarning,
   type GhAuth,
@@ -57,15 +59,18 @@ export type CheckFact =
 
 /**
  * What the flows check found: the flows in effect by name; the invalid ones on the base branch, and in the checkout's
- * working copy where it differs; skills a valid flow names that are not installed; and the open issues the working
- * copy's flows would orphan, in a state they drop without renaming it.
+ * working copy where it differs; the type of the slices each valid flow makes; skills a valid flow names that are not
+ * installed; the labels the working copy's valid flows need that the repository lacks (the labels check covers the
+ * flows in effect); and the open issues the working copy's flows would orphan, in a state they drop without renaming it.
  */
 export interface FlowsFact {
   kind: "flows";
   baseBranch: string;
   names: string[];
   invalid: { flow: string; local: boolean; errors: FlowError[] }[];
+  slices: { flow: string; local: boolean; type: string }[];
   missingSkills: { skill: string; flow: string; local: boolean; state: string }[];
+  missingLabels: { label: string; flow: string }[];
   orphans: { flow: string; issue: number; state: string }[];
 }
 
@@ -195,13 +200,13 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
 
   if (!inEffect.ok && "needs" in inEffect) skip("labels", inEffect.needs);
   else {
-    const names = await attempt(() => d.github.labelNames());
-    if (!names.ok) add("labels", "fail", names.fact);
+    const onRepo = await attempt(() => d.github.repositoryLabels());
+    if (!onRepo.ok) add("labels", "fail", onRepo.fact);
     else if (!inEffect.ok) add("labels", "fail", inEffect.fact);
     else {
       const wanted = labelDefinitions(inEffect.value.flows).map((l) => l.name);
-      const missing = wanted.filter((l) => !names.value.includes(l));
-      const unused = names.value.filter((l) => !wanted.includes(l) && looksLikeNorns(l, inEffect.value.flows));
+      const missing = wanted.filter((name) => !onRepo.value.some((l) => l.name === name));
+      const unused = onRepo.value.filter((l) => !wanted.includes(l.name) && isNorns(l, inEffect.value.flows)).map((l) => l.name);
       add("labels", missing.length ? "fail" : unused.length ? "warning" : "ok", { kind: "labels", total: wanted.length, missing, unused });
     }
   }
@@ -212,7 +217,10 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
     const { config, flows: loaded } = inEffect.value;
     const fact = await attempt(() => flows(d, config, loaded));
     if (!fact.ok) add("flows", "fail", fact.fact);
-    else add("flows", fact.value.invalid.length || fact.value.missingSkills.length ? "fail" : fact.value.orphans.length ? "warning" : "ok", fact.value);
+    else {
+      const f = fact.value;
+      add("flows", f.invalid.length || f.missingSkills.length ? "fail" : f.orphans.length || f.missingLabels.length ? "warning" : "ok", f);
+    }
   }
 
   if (!loaded) skip("config", "git");
@@ -283,6 +291,18 @@ async function flows(d: DoctorDeps, config: Config, inEffect: LoadedFlow[]): Pro
     }
   }
 
+  const slices = all.flatMap(({ l, local }) => {
+    const type = l.ok ? sliceType(l.flow) : null;
+    return type === null ? [] : [{ flow: l.name, local, type }];
+  });
+
+  const onRepo = (await d.github.repositoryLabels()).map((l) => l.name);
+  const missingLabels: FlowsFact["missingLabels"] = [];
+  for (const l of local) {
+    if (!l.ok) continue;
+    for (const { name } of flowLabels([l])) if (!onRepo.includes(name)) missingLabels.push({ label: name, flow: l.name });
+  }
+
   const orphans: FlowsFact["orphans"] = [];
   for (const after of local) {
     const before = inEffect.find((l) => l.name === after.name);
@@ -297,13 +317,16 @@ async function flows(d: DoctorDeps, config: Config, inEffect: LoadedFlow[]): Pro
     }
   }
 
-  return { kind: "flows", baseBranch: config.baseBranch, names: inEffect.map((l) => l.name), invalid, missingSkills, orphans };
+  return { kind: "flows", baseBranch: config.baseBranch, names: inEffect.map((l) => l.name), invalid, slices, missingSkills, missingLabels, orphans };
 }
 
-/** Whether a label is one norn may have made: a type, a state of a built-in flow, or a state a flow renamed. */
-function looksLikeNorns(label: string, flows: LoadedFlow[]): boolean {
-  if (label.startsWith("type:") || (STATES as readonly string[]).includes(label)) return true;
-  return flows.some((l) => l.ok && Object.hasOwn(l.flow.renamed ?? {}, label));
+/**
+ * Whether a label is norn's: norn marked it when it created it (see LABEL_MARK), it is a type, whose prefix is norn's,
+ * or a flow's renamed map names it as an old state.
+ */
+function isNorns(label: { name: string; description: string }, flows: LoadedFlow[]): boolean {
+  if (isNornLabel(label) || label.name.startsWith("type:")) return true;
+  return flows.some((l) => l.ok && renamedTo(l.flow, label.name) !== null);
 }
 
 /** The skills norn briefings name: in skills/, linked from .claude/skills/, and the same as the bundled ones. */

@@ -380,7 +380,7 @@ export async function ensureTypeLabel(ctx: Ctx, name: string): Promise<void> {
 
 /** Creates a label when the repository lacks it; one it has is left as it is. */
 async function ensureLabel(ctx: Ctx, label: LabelDefinition): Promise<void> {
-  if (!(await ctx.github.labelNames()).includes(label.name)) await ctx.github.ensureLabels([label]);
+  if (!(await ctx.github.repositoryLabels()).some((l) => l.name === label.name)) await ctx.github.ensureLabels([label]);
 }
 
 /**

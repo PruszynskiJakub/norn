@@ -96,10 +96,10 @@ describe("norn init: labels from the flows", () => {
     const res = await norn("init");
 
     expect(res.exitCode).toBe(0);
-    expect(w.github.labelDefs.get("reproducing")).toEqual({ color: "c5def5", description: "a person takes part in this step" });
-    expect(w.github.labelDefs.get("fixing")).toEqual({ color: "123456", description: "Being fixed" });
-    expect(w.github.labelDefs.get("type:bug")).toEqual({ color: "ededed", description: "norn bug flow" });
-    expect(w.github.labelDefs.get("needs-review")).toEqual({ color: "5319e7", description: "Waiting for review" });
+    expect(w.github.labelDefs.get("reproducing")).toEqual({ color: "c5def5", description: "a person takes part in this step (norn)" });
+    expect(w.github.labelDefs.get("fixing")).toEqual({ color: "123456", description: "Being fixed (norn)" });
+    expect(w.github.labelDefs.get("type:bug")).toEqual({ color: "ededed", description: "Runs the bug flow (norn)" });
+    expect(w.github.labelDefs.get("needs-review")).toEqual({ color: "5319e7", description: "Waiting for review (norn)" });
     expect(res.stdout).toContain(`  - ${w.github.labelDefs.size} labels on the repository`);
   });
 

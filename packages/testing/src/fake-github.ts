@@ -162,8 +162,8 @@ export class FakeGitHub implements GitHub {
   async ensureLabels(labels: { name: string; color: string; description: string }[]) {
     for (const l of labels) this.labelDefs.set(l.name, { color: l.color, description: l.description });
   }
-  async labelNames() {
-    return [...this.labelDefs.keys()];
+  async repositoryLabels() {
+    return [...this.labelDefs].map(([name, l]) => ({ name, ...l }));
   }
   /** Files on GitHub by ref, then path: what readFileAt reads. Tests seed them with seedFile. */
   files = new Map<string, Map<string, string>>();
