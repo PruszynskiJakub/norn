@@ -39,7 +39,7 @@ norn is built for a team that works in a particular way. It checks some of these
 | **Stories merge into one base branch** (`baseBranch`, the repository's default branch unless configured). | Yes. |
 | **Labels are changed only through norn.** A label changed by hand can leave an issue with two states, which norn refuses to brief until a person fixes it. | Yes, it detects the mess but does not prevent it. |
 | **Everyone works through their own `gh`**, logged in with write access to the repository. | Yes, every command fails without it. |
-| **The labels are fixed**, so every repository that uses norn works the same way. | Yes. They are not configurable. |
+| **Stories and slices run norn's built-in process**, so every repository that uses norn works the same way for them. | Yes. Other kinds of work run the repository's own [flows](#repository-flows). |
 
 ## Labels and flags
 
@@ -63,7 +63,7 @@ Each issue carries exactly one state label from its type's set. Flags sit alongs
 
 | Flag | Meaning |
 | --- | --- |
-| `type:story`, `type:slice` | Which state machine applies |
+| `type:story`, `type:slice`, `type:<flow>` | Which process applies: the built-in story or slice, or a [repository flow](#repository-flows) |
 | `in-progress` | Someone holds the claim (it mirrors the git-ref claim) |
 | `needs-human` | Something went wrong or a person is needed; cleared with the `norn-resolve` skill |
 | `mode:afk`, `mode:hil` | Whether a slice also gets QA by a person |
@@ -123,6 +123,44 @@ flowchart LR
 ```
 
 `blocked` and `ready-for-agent` follow GitHub's native "blocked by" relations. Both failure states go back to implementation. A slice in `merge-queue` is merged into the story branch by an agent, which resolves conflicts if needed.
+
+## Repository flows
+
+A repository can run other kinds of work through processes of its own. A flow is a JSON file, `.agents/flows/<name>.json`, and an issue labelled `type:<name>` runs it. norn reads flows from the base branch on GitHub, never from the working tree, so a change to a flow takes effect once it is merged, and everyone runs the same process.
+
+```json
+{
+  "description": "A defect: reproduce it, fix it, close it.",
+  "start": "reproducing",
+  "workspace": "own",
+  "states": {
+    "reproducing": {
+      "skill": "bug-repro",
+      "attended": true,
+      "outcomes": {
+        "reproduced": { "to": "fixing", "means": "the bug is reproduced, moves on to the fix" },
+        "cannot-reproduce": { "to": "not-planned", "means": "no repro; give what you tried", "note": "attempts" }
+      }
+    },
+    "fixing": {
+      "skill": "bug-fix",
+      "attended": false,
+      "color": "d93f0b",
+      "description": "an agent fixes the bug",
+      "outcomes": { "fixed": { "to": "closed", "means": "the fix is merged" } }
+    }
+  }
+}
+```
+
+- `description` says what the flow is for; `start` names the state an issue enters the flow in.
+- `workspace` says where the work happens: `none` gives no branch; `own` gives the issue a branch of its own, named from its slug like a story's, and one PR into the base branch. The briefing names the branch, the worktree and the PR command.
+- Each state names the `skill` that runs it, whether it is `attended`, and its `outcomes`. Optional fields: `name` (the step's name in the briefing, the state's name by default), `enterAs` (the state the issue moves to when taken), `evidence` (the step may attach evidence), and `color` and `description` for the state's label.
+- Each outcome has a target `to`, what it `means`, and optionally a `note` it requires, `needsHuman` and `notify`. `to` is a state of the flow, `closed` or `not-planned`; those two close the issue.
+- The first transition into a state whose label is missing creates the label, with the state's colour and description, or a default for an attended or an agent step.
+- `needs-human`, claims and `in-progress` work in every flow as they do for stories and slices.
+
+norn checks a flow before it runs it: the start state exists, every target is a state, `closed` or `not-planned`, and no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`). A broken flow is refused, with what is wrong, only for the issues of its own type.
 
 ## Steps, skills and outcomes
 

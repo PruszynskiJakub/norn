@@ -27,6 +27,15 @@ The person a story is assigned to. They own its slices too, and only they merge 
 
 ## Process
 
+**Flow**:
+The process for one issue, as data: its states, the skill and outcomes of each, where it starts and its workspace. A repository defines a flow in `.agents/flows/<name>.json`, read from the base branch on GitHub. Stories and slices run norn's built-in process.
+
+**Type**:
+The flow an issue runs, carried as its `type:<name>` label, e.g. `type:bug` runs the flow `bug`.
+
+**Workspace**:
+Where a flow's work happens: `none`, no branch; `own`, a branch of the issue's own with one PR into the base branch.
+
 **State**:
 Where an issue is in its process, carried as exactly one state label, e.g. `needs-review`. Two state labels mean a label change failed halfway, and norn acts on neither.
 
