@@ -1,5 +1,5 @@
 import type { FinishCommand } from "./briefing.js";
-import type { ConfigProblem } from "./config.js";
+import type { ConfigProblem, VersionIncompatible } from "./config.js";
 import type { BaseBranchMissing } from "./events.js";
 import type { State } from "./machine.js";
 import type { NotAStory } from "./next.js";
@@ -13,6 +13,7 @@ import type { Provider } from "./workspace.js";
  */
 export type Refusal =
   | { kind: "config-invalid"; problems: ConfigProblem[] }
+  | VersionIncompatible
   /** The provider is named outright, but its environment variable is not set. */
   | { kind: "provider-mismatch"; provider: Provider; variable: string }
   // No step to take

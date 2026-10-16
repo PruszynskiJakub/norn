@@ -14,8 +14,10 @@ import {
   status,
   take,
   tidy,
+  versionCheck,
 } from "@norn/core";
 import { dashboard, type StartDashboard } from "./dashboard.js";
+import { doctor, doctorFailed } from "./doctor.js";
 import { init } from "./init.js";
 import { renderJson } from "./render-json.js";
 import { type Answer, type CliRefusal, NEEDS_NUMBER, renderAnswer, renderRefusal, renderWarning } from "./render-text.js";
@@ -26,6 +28,12 @@ export type Deps = Omit<Ctx, "config" | "slugs"> & {
   installSkills: (cwd: string) => Promise<string[]>;
   /** Starts the dashboard server; the CLI only works out how. */
   dashboard: StartDashboard;
+  /** The running norn's version, e.g. 0.7.0. */
+  version: string;
+  /** The skills bundled with the running norn, which norn doctor compares the installed ones with. */
+  bundledSkills: string;
+  /** Why norn is not in a checkout it can work in; null when it is. Only doctor runs without one. */
+  checkoutProblem: string | null;
 };
 
 export interface Result {
@@ -43,9 +51,11 @@ interface Reply {
 
 export async function run(argv: string[], deps: Deps): Promise<Result> {
   const { bools } = parseArgs(argv);
+  if (bools.has("version")) return { exitCode: 0, stdout: deps.version };
   const { answer, warnings } = await dispatch(argv, deps);
   const usage = ["usage", "needs-number", "bad-dashboard-flag"];
-  const exitCode = answer.ok ? 0 : usage.includes(answer.refusal.kind) ? 2 : 1;
+  // doctor answers even when a check fails, but exits 1 so CI notices.
+  const exitCode = answer.ok ? (answer.kind === "doctor" && doctorFailed(answer) ? 1 : 0) : usage.includes(answer.refusal.kind) ? 2 : 1;
   const head = warnings.length ? ["norn warning:", ...warnings.map((w) => `  ${renderWarning(w)}`), ""] : [];
   const body = answer.ok ? renderAnswer(answer) : renderRefusal(answer.refusal);
   if (bools.has("json")) return { exitCode, stdout: renderJson(answer, warnings) };
@@ -56,7 +66,7 @@ export async function run(argv: string[], deps: Deps): Promise<Result> {
 const USES_WORKTREES = new Set(["take", "next", "done", "tidy"]);
 
 /** Commands that take no issue number. */
-const NO_NUMBER = new Set(["init", "tidy", "dashboard"]);
+const NO_NUMBER = new Set(["init", "tidy", "dashboard", "doctor"]);
 
 const refused = (refusal: Refusal | CliRefusal): Refused => ({ ok: false, refusal });
 
@@ -66,8 +76,13 @@ async function dispatch(argv: string[], input: Deps): Promise<Reply> {
   if (!cmd || !(cmd in NEEDS_NUMBER || NO_NUMBER.has(cmd))) return { answer: refused({ kind: "usage" }), warnings: [] };
   if (cmd in NEEDS_NUMBER && !/^\d+$/.test(rest[0] ?? "")) return { answer: refused({ kind: "needs-number", command: cmd }), warnings: [] };
   if (cmd === "init") return { answer: await init(input), warnings: [] };
+  // doctor reports a bad config, version or provider as checks, so none of them stops it.
+  if (cmd === "doctor") return { answer: await doctor(input), warnings: [] };
   const loaded = await loadConfig(input.workspace);
   if (!loaded.ok) return { answer: loaded, warnings: [] };
+  const version = versionCheck(loaded.config, input.version);
+  const warnings = [...loaded.warnings, ...version.warnings];
+  if (version.refusal) return { answer: refused(version.refusal), warnings };
   const ctx: Ctx = { ...input, config: loaded.config, slugs: new Map() as Slugs };
   const provider = USES_WORKTREES.has(cmd) ? providerRefusal(ctx.config, ctx.workspace.env) : null;
   const answer = provider
@@ -75,7 +90,7 @@ async function dispatch(argv: string[], input: Deps): Promise<Reply> {
     : cmd === "dashboard"
       ? await dashboard({ ...ctx, dashboard: input.dashboard }, flags, bools)
       : await command(cmd, rest, flags, bools, ctx);
-  return { answer, warnings: loaded.warnings };
+  return { answer, warnings };
 }
 
 async function command(cmd: string, rest: string[], flags: Record<string, string[]>, bools: Set<string>, ctx: Ctx): Promise<Answer | Refused> {

@@ -4,7 +4,7 @@ import { type Ctx, loadConfig } from "@norn/core";
 import { FakeGitHub } from "./fake-github.js";
 import { FakeWorkspace } from "./fake-workspace.js";
 
-export function setup(opts: { now?: string; session?: string; user?: string } = {}) {
+export function setup(opts: { now?: string; session?: string; user?: string; version?: string } = {}) {
   const github = new FakeGitHub(opts.user ?? "alice");
   github.clock = () => now;
   const workspace = new FakeWorkspace();
@@ -34,6 +34,9 @@ export function setup(opts: { now?: string; session?: string; user?: string } = 
       launches.push(opts);
       return dashboard.answer ?? { kind: "started", url: `http://127.0.0.1:${opts.port}`, port: opts.port, opened: opts.open };
     },
+    version: opts.version ?? "1.4.2",
+    bundledSkills: "/nonexistent",
+    checkoutProblem: null,
   };
   return {
     github,
@@ -58,6 +61,10 @@ export function setup(opts: { now?: string; session?: string; user?: string } = 
     },
     withProject(cwd: string, installSkills: (cwd: string) => Promise<string[]>) {
       return (...argv: string[]) => run(argv, { ...deps, cwd, installSkills });
+    },
+    /** norn with some of its dependencies replaced, e.g. a project directory and the bundled skills. */
+    withDeps(overrides: Partial<Deps>) {
+      return (...argv: string[]) => run(argv, { ...deps, ...overrides });
     },
     withNotify(notify: Deps["notify"]) {
       return (...argv: string[]) => run(argv, { ...deps, notify });

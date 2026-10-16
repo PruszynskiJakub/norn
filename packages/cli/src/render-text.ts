@@ -29,7 +29,8 @@ import {
   type WaitItem,
 } from "@norn/core";
 import type { DashboardRefusal, DashboardResult } from "./dashboard.js";
-import type { InitResult, MissingSkills } from "./init.js";
+import { type CheckFact, type DoctorCheck, type DoctorResult, doctorFailed } from "./doctor.js";
+import type { InitResult, InitWouldDowngrade, MissingSkills } from "./init.js";
 
 /**
  * Every sentence norn prints. Each union is switched on exhaustively, so a
@@ -47,10 +48,11 @@ export type Answer =
   | StatusResult
   | TidyResult
   | InitResult
-  | DashboardResult;
+  | DashboardResult
+  | DoctorResult;
 
 /** Refusals only the CLI makes: how it was called, and init's skill install. */
-export type CliRefusal = { kind: "usage" } | { kind: "needs-number"; command: string } | MissingSkills | DashboardRefusal;
+export type CliRefusal = { kind: "usage" } | { kind: "needs-number"; command: string } | MissingSkills | InitWouldDowngrade | DashboardRefusal;
 
 export function unreachable(x: never): never {
   throw new Error(`no wording for ${JSON.stringify(x)}`);
@@ -99,6 +101,8 @@ export const USAGE = [
   "  norn tidy [--dry-run]              Remove what belongs to closed issues",
   "  norn dashboard [--port <n>] [--interval <duration>] [--no-open]",
   "                                     Watch your work in the browser; Ctrl-C stops it",
+  "  norn doctor                        Check the whole setup and say what to fix",
+  "  norn --version                     Print the running norn's version",
   "",
   "Add --json for machine-readable output.",
 ].join("\n");
@@ -130,10 +134,14 @@ export function ghFailureMessage(argv: string[], error: string): string {
   } else {
     lines.push("Check gh auth status and that you are inside the repository, then retry the command.");
   }
+  lines.push("Run norn doctor for a full check.");
   return lines.join("\n");
 }
 
 // Configuration
+
+/** The command that installs norn at a version. */
+export const upgradeNorn = (version: string) => `npm install -D github:PruszynskiJakub/norn#v${version}`;
 
 function problem(p: ConfigProblem): string {
   switch (p.kind) {
@@ -159,6 +167,10 @@ function problem(p: ConfigProblem): string {
       return `${p.file}: dashboard is each developer's own; set it in ${p.local}`;
     case "bad-dashboard-setting":
       return p.key === "port" ? `${p.file}: dashboard.port must be a port number` : `${p.file}: dashboard.interval must be a duration like 30s or 2m`;
+    case "norn-version-in-local-file":
+      return `${p.file}: nornVersion is the team's; norn init sets it in ${p.team}`;
+    case "bad-norn-version":
+      return `${p.file}: nornVersion must be a plain version such as 1.2.3`;
     default:
       return unreachable(p);
   }
@@ -170,6 +182,12 @@ export function renderWarning(w: ConfigWarning): string {
       return `${w.file}: claims.staleAfter ${w.value} is below the ${w.minimum} minimum, so norn uses ${w.minimum}; shorter, and live claims get taken over`;
     case "team-setting-in-local-file":
       return `${w.file}: ${w.setting} is shared by the team, so norn ignores it here; set it in ${w.team}`;
+    case "norn-version-missing":
+      return `${w.file}: nornVersion is not set; run norn init to record the norn version this repository uses`;
+    case "norn-version-differs":
+      return `${w.file}: nornVersion is ${w.repo} and your norn is ${w.running}; ${
+        w.direction === "newer" ? "run norn init to update the skills and nornVersion for the team" : `upgrade norn with ${upgradeNorn(w.repo)}`
+      }`;
     default:
       return unreachable(w);
   }
@@ -199,6 +217,19 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       return [r.flag === "port" ? "--port takes a port number, e.g. 4477." : "--interval takes a duration such as 30s, 2m or 1h."];
     case "missing-skills":
       return [`Missing skills: ${r.missing.join(", ")}. The skill install did not provide them into skills/.`, "Fix the install and run norn init again."];
+    case "init-would-downgrade":
+      return [
+        `This repository is set up with norn ${r.repo}, newer than your norn ${r.running}. norn init would roll its skills back.`,
+        `Upgrade norn: ${upgradeNorn(r.repo)}, then run norn init again.`,
+      ];
+    case "version-incompatible":
+      return [
+        `This repository uses norn ${r.repo}, which your norn ${r.running} cannot work with.`,
+        r.direction === "older"
+          ? `Upgrade norn: ${upgradeNorn(r.repo)}`
+          : `Run norn init to bring the repository to ${r.running} and commit the change, or install norn ${r.repo}.`,
+        "Then run norn doctor for a full check of the setup.",
+      ];
     case "config-invalid":
       return ["norn cannot read its configuration:", ...r.problems.map((p) => `  ${problem(p)}`), "Fix the file and run the command again."];
     case "provider-mismatch": {
@@ -358,11 +389,14 @@ export function renderAnswer(a: Answer): string[] {
       return [renderTidy(a)];
     case "dashboard":
       return renderDashboard(a);
+    case "doctor":
+      return renderDoctor(a);
     case "initialized":
       return [
         "norn is set up in this project:",
         `  - ${a.skills} skills in skills/, linked into .claude/skills/`,
         ...(a.updated.length ? [`  - updated to this norn version: ${a.updated.join(", ")} (git diff skills/ shows the changes)`] : []),
+        ...(a.version ? [`  - nornVersion ${a.version.from ? `${a.version.from} → ${a.version.to}` : `set to ${a.version.to}`} in ${TEAM_CONFIG}`] : []),
         "  - .agents/specs/ for story specs",
         `  - ${TEAM_CONFIG} with the team settings (each developer can override in ${LOCAL_CONFIG})`,
         "  - .agents/worktrees/ and the local config in .gitignore",
@@ -370,9 +404,112 @@ export function renderAnswer(a: Answer): string[] {
         `  - ${a.labels} labels on the repository`,
         "",
         `Commit skills/, .claude/skills/, .agents/, .gitignore and ${a.instructed.join(", ")}. Then ask your agent: norn-drive <issue>`,
+        "Run norn doctor to check what init cannot set up: gh, your access to the repository, the worktree provider.",
       ];
     default:
       return unreachable(a);
+  }
+}
+
+// Doctor
+
+const MARK = { ok: "✓", warning: "!", fail: "✗", skipped: "-" } as const;
+
+const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? "" : "s"}`;
+
+function renderDoctor(r: DoctorResult): string[] {
+  const out = r.checks.flatMap((c) => {
+    const { message, fix } = renderCheck(c);
+    return [`${MARK[c.level]} ${c.id}: ${message}`, ...(fix ? [`  fix: ${fix}`] : [])];
+  });
+  const failed = r.checks.filter((c) => c.level === "fail").length;
+  const warned = r.checks.filter((c) => c.level === "warning").length;
+  const summary = doctorFailed(r)
+    ? `${plural(failed, "check")} failed${warned ? ` and ${warned} warned` : ""}. Run the fixes above, then norn doctor again.`
+    : warned
+      ? `Nothing failed, but ${plural(warned, "check")} warned. Run the fixes above when you can.`
+      : "Everything norn needs is set up.";
+  return [...out, "", summary];
+}
+
+/** One check's finding and, for a warning or failure, what fixes it. */
+export function renderCheck(c: DoctorCheck): { message: string; fix: string | null } {
+  const f: CheckFact = c.fact;
+  const ok = c.level === "ok";
+  switch (f.kind) {
+    case "skipped":
+      return { message: `skipped, needs ${f.needs}`, fix: null };
+    case "gh-error":
+      return { message: `gh failed: ${f.detail}`, fix: "gh auth status" };
+    case "gh":
+      if (f.auth.kind === "missing") return { message: "gh is not installed", fix: "install gh from https://cli.github.com, then run gh auth login" };
+      if (f.auth.kind === "logged-out") return { message: `gh is not logged in to ${f.host}`, fix: `gh auth login --hostname ${f.host}` };
+      return { message: `logged in to ${f.host}`, fix: null };
+    case "not-a-checkout":
+      return { message: f.detail, fix: "cd into the repository's checkout and run norn doctor there" };
+    case "no-origin":
+      return { message: "this checkout has no origin remote", fix: "git remote add origin <the repository's GitHub URL>" };
+    case "origin":
+      return f.onGitHub
+        ? { message: `origin is ${f.origin}`, fix: null }
+        : {
+            message: `origin ${f.origin} is not on GitHub`,
+            fix: `git remote set-url origin <the repository's GitHub URL>${f.host ? `, or for GitHub Enterprise: gh auth login --hostname ${f.host}` : ""}`,
+          };
+    case "base-branch":
+      return f.exists
+        ? { message: `${f.branch} exists on GitHub`, fix: null }
+        : {
+            message: `baseBranch ${f.branch} does not exist on GitHub`,
+            fix: `set baseBranch in ${TEAM_CONFIG} to a branch that exists on GitHub${f.defaultBranch ? `, e.g. ${f.defaultBranch}` : ""}`,
+          };
+    case "permission": {
+      const role = f.permission === "none" ? "no" : f.permission;
+      return ok
+        ? { message: `you have ${role} access to the repository`, fix: null }
+        : { message: `you have ${role} access to the repository; norn needs write or higher`, fix: "ask an admin of the repository for write access" };
+    }
+    case "labels":
+      return f.missing.length
+        ? { message: `${f.missing.length} of norn's labels are missing: ${f.missing.join(", ")}`, fix: "norn init" }
+        : { message: `all ${f.total} of norn's labels exist`, fix: null };
+    case "config":
+      if (f.problems.length) return { message: f.problems.map(problem).join("; "), fix: "edit the config files as described, then run norn doctor again" };
+      if (f.warnings.length) return { message: f.warnings.map(renderWarning).join("; "), fix: "edit the config files as described" };
+      return { message: "the team and local config are valid", fix: null };
+    case "version": {
+      if (f.repo === null || f.match === null) return { message: `norn ${f.running}, repo has no nornVersion`, fix: "norn init" };
+      const versions = `norn ${f.running}, repo ${f.repo}`;
+      if (f.match.kind === "same" || f.match.kind === "patch") return { message: versions, fix: null };
+      const fix = f.match.kind === "newer" ? "norn init" : upgradeNorn(f.repo);
+      return { message: f.match.compatible ? versions : `${versions}: not compatible`, fix };
+    }
+    case "skills": {
+      if (f.missing.length || f.unlinked.length) {
+        const parts = [
+          ...(f.missing.length ? [`missing from skills/: ${f.missing.join(", ")}`] : []),
+          ...(f.unlinked.length ? [`not linked from .claude/skills/: ${f.unlinked.join(", ")}`] : []),
+        ];
+        return { message: parts.join("; "), fix: "norn init" };
+      }
+      if (f.drifted?.length) return { message: `differ from the skills bundled with this norn: ${f.drifted.join(", ")}`, fix: "norn init" };
+      const source = f.drifted === null ? " (from NORN_SKILLS_SOURCE, so not compared with the bundled ones)" : "";
+      return { message: `all ${f.total} skills are in skills/ and linked from .claude/skills/${source}`, fix: null };
+    }
+    case "agent-instructions":
+      return f.files.length
+        ? { message: `the norn block is in ${f.files.join(" and ")}`, fix: null }
+        : { message: "neither AGENTS.md nor CLAUDE.md has the norn block", fix: "norn init" };
+    case "provider": {
+      if (f.unsetVariable === null) return { message: `${f.provider} matches the environment`, fix: null };
+      const start = f.provider === "herdr" ? "start norn from a herdr pane" : "start norn from a Claude Code session";
+      return {
+        message: `the worktree provider is ${f.provider}, but ${f.unsetVariable} is not set`,
+        fix: `${start}, or set worktrees.provider in ${LOCAL_CONFIG}`,
+      };
+    }
+    default:
+      return unreachable(f);
   }
 }
 

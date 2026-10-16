@@ -48,6 +48,8 @@ export interface Workspace {
   hasUnpushedCommits(branch: string): Promise<boolean>;
   /** Deletes a local branch; the caller has made sure nothing on it would be lost. */
   deleteLocalBranch(branch: string): Promise<void>;
+  /** The URL of the origin remote; null when there is none. */
+  originUrl(): Promise<string | null>;
   /** Updates the remote-tracking branches from GitHub, dropping those deleted there. */
   fetchRemote(): Promise<void>;
   /**

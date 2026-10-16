@@ -1,23 +1,7 @@
 import { spawnSync } from "node:child_process";
 import { cpSync, existsSync, readdirSync, readFileSync, rmSync, statSync } from "node:fs";
-import { dirname, join, relative } from "node:path";
-import { fileURLToPath } from "node:url";
-
-/**
- * The skills shipped inside the norn package: skills/ next to its package.json.
- * Looked up from this module, which runs from packages/cli/src/ in the repository
- * and from dist/ in the built package.
- */
-export const BUNDLED_SKILLS = findSkills(dirname(fileURLToPath(import.meta.url)));
-
-function findSkills(from: string): string {
-  for (let dir = from; ; dir = dirname(dir)) {
-    const manifest = join(dir, "package.json");
-    if (existsSync(manifest) && JSON.parse(readFileSync(manifest, "utf8")).name === "norn") return join(dir, "skills");
-    // Not found: the path the built package has, so init names it when it cannot read it.
-    if (dirname(dir) === dir) return join(from, "..", "skills");
-  }
-}
+import { join, relative } from "node:path";
+import { BUNDLED_SKILLS } from "./package.js";
 
 /**
  * Installs norn's skills into <cwd>/skills/ and returns the names of those it
@@ -48,7 +32,7 @@ export async function installSkills(cwd: string, env = process.env): Promise<str
 }
 
 /** Whether two directories hold the same files with the same contents. */
-function sameTree(a: string, b: string) {
+export function sameTree(a: string, b: string) {
   const fa = files(a);
   const fb = files(b);
   return fa.length === fb.length && fa.every((f, i) => f === fb[i] && readFileSync(join(a, f)).equals(readFileSync(join(b, f))));

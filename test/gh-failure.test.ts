@@ -11,6 +11,7 @@ describe("the message when a gh call fails partway", () => {
       "gh api failed: HTTP 502",
       "See where things stand with: norn status 131 (for a slice, norn status <its story> shows the whole story)",
       "Check gh auth status and that you are inside the repository, then retry: norn done 131 request-changes 'Still flaky'",
+      "Run norn doctor for a full check.",
     ]);
   });
 
@@ -24,5 +25,6 @@ describe("the message when a gh call fails partway", () => {
     expect(msg).toContain("may already be applied");
     expect(msg).not.toContain("norn status");
     expect(msg).toContain("then retry the command.");
+    expect(msg.split("\n").at(-1)).toBe("Run norn doctor for a full check.");
   });
 });

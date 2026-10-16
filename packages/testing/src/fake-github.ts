@@ -1,11 +1,13 @@
 import {
   type ClaimRecord,
   type FileToPush,
+  type GhAuth,
   type GitHub,
   type Issue,
   isNornComment,
   type LinkedPullRequest,
   type ObservedIssue,
+  type Permission,
   type PullRequest,
   type TimelineItem,
   type Work,
@@ -156,6 +158,20 @@ export class FakeGitHub implements GitHub {
   labelDefs = new Map<string, { color: string; description: string }>();
   async ensureLabels(labels: { name: string; color: string; description: string }[]) {
     for (const l of labels) this.labelDefs.set(l.name, { color: l.color, description: l.description });
+  }
+  async labelNames() {
+    return [...this.labelDefs.keys()];
+  }
+  /** gh's state; when logged in, only to the hosts in ghHosts. */
+  ghAuthState: GhAuth = { kind: "logged-in" };
+  ghHosts = ["github.com"];
+  async ghAuth(host: string): Promise<GhAuth> {
+    if (this.ghAuthState.kind !== "logged-in") return this.ghAuthState;
+    return { kind: this.ghHosts.includes(host) ? "logged-in" : "logged-out" };
+  }
+  permissionLevel: Permission = "write";
+  async permission() {
+    return this.permissionLevel;
   }
   async branchExists(name: string) {
     return this.branches.has(name);

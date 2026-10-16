@@ -269,3 +269,39 @@ describe("GhGitHub branches and evidence", () => {
     expect(path(calls[0])).toBe("repos/{owner}/{repo}/git/refs/heads/123-x-127");
   });
 });
+
+describe("GhGitHub reads for norn doctor", () => {
+  test("ghAuth asks gh auth status about the host", async () => {
+    const { exec, calls } = scripted((c) => (c.args.includes("github.com") ? { code: 0 } : { code: 1, stderr: "not logged in" }));
+    const gh = new GhGitHub(exec);
+
+    expect(await gh.ghAuth("github.com")).toEqual({ kind: "logged-in" });
+    expect(await gh.ghAuth("github.example.com")).toEqual({ kind: "logged-out" });
+    expect(calls[0].args).toEqual(["auth", "status", "--hostname", "github.com"]);
+  });
+
+  test("ghAuth reads gh that cannot be started as not installed", async () => {
+    const exec: Exec = async () => {
+      throw Object.assign(new Error("spawn gh ENOENT"), { code: "ENOENT" });
+    };
+    expect(await new GhGitHub(exec).ghAuth("github.com")).toEqual({ kind: "missing" });
+  });
+
+  test("permission is the viewer's permission on the repository, lower-cased; null is none", async () => {
+    let answer = "WRITE\n";
+    const { exec, calls } = scripted(() => ({ stdout: answer }));
+    const gh = new GhGitHub(exec);
+
+    expect(await gh.permission()).toBe("write");
+    expect(calls[0].args).toEqual(["repo", "view", "--json", "viewerPermission", "--jq", ".viewerPermission"]);
+    answer = "null\n";
+    expect(await gh.permission()).toBe("none");
+  });
+
+  test("labelNames pages through the repository's labels", async () => {
+    const { exec, calls } = scripted(() => ({ stdout: [JSON.stringify({ name: "blocked" }), JSON.stringify({ name: "type:story" }), ""].join("\n") }));
+
+    expect(await new GhGitHub(exec).labelNames()).toEqual(["blocked", "type:story"]);
+    expect(calls[0].args).toEqual(["api", "--paginate", "--jq", ".[]", "repos/{owner}/{repo}/labels"]);
+  });
+});

@@ -5,6 +5,7 @@ import {
   holderText,
   unreachable,
   renderAnswer,
+  renderCheck,
   renderEvent,
   renderFailure,
   renderKept,
@@ -15,6 +16,7 @@ import {
   tidyNotes,
   waitDetail,
 } from "./render-text.js";
+import { doctorFailed } from "./doctor.js";
 
 /**
  * --json: `{ ok: true, ...data, message }` or `{ ok: false, refusal }`, plus
@@ -22,6 +24,11 @@ import {
  * outputs cannot drift apart; the data is picked from the result.
  */
 export function renderJson(answer: Answer | { ok: false; refusal: Refusal | CliRefusal }, warnings: ConfigWarning[]): string {
+  // doctor answers with its checks instead: ok is false when one failed, and the config warnings are a check.
+  if (answer.ok && answer.kind === "doctor") {
+    const checks = answer.checks.map((c) => ({ id: c.id, level: c.level, ...renderCheck(c) }));
+    return JSON.stringify({ ok: !doctorFailed(answer), checks }, null, 2);
+  }
   const body = answer.ok
     ? { ok: true, ...data(answer), message: renderAnswer(answer).join("\n") }
     : { ok: false, refusal: renderRefusal(answer.refusal).join("\n") };
@@ -55,6 +62,8 @@ function data(a: Answer): Record<string, unknown> {
     case "slice-added":
     case "initialized":
       return {};
+    case "doctor":
+      return { checks: a.checks };
     default:
       return unreachable(a);
   }

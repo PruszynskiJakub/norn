@@ -4,7 +4,15 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- `norn doctor` checks the whole setup at once: `gh` and its login, the git checkout and `origin`, `baseBranch` on GitHub, your write access, the labels, the config, the norn version, the skills, the agent instructions and the worktree provider. It lists every check with the command that fixes it, changes nothing, and exits 1 only when a check fails, so CI can run it. `--json` gives `{ ok, checks }`. It runs outside a checkout too, and says so.
+- The team config records the norn version that last set the repository up, as `nornVersion`. `norn init` writes it, and on an existing repository changes it and nothing else. Every other command compares it with your norn: silent on a patch difference, a warning on a compatible one, and a refusal on an incompatible one (another major version, or another minor version while the major is 0). `norn init` refuses when your norn is older than the repository's. After upgrading, run `npx norn init` and commit `.agents/norn.config.json` with the skills.
+- `norn --version` prints the running version.
+
 ### Changed
+
+- When a `gh` call fails, and after `norn init`, norn points to `norn doctor` for a full check.
 
 - The repository is renamed from `ai-engine` to `norn`. Install with `npm install -D github:PruszynskiJakub/norn#<tag>`; GitHub redirects the old name, so existing installs keep working, but update the URL in your `package.json` and run `git remote set-url origin git@github.com:PruszynskiJakub/norn.git` in a clone.
 

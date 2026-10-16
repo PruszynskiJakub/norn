@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { ClaimRecord, FileToPush, GitHub, Issue, PullRequest, WorkQuery } from "@norn/core";
+import type { ClaimRecord, FileToPush, GhAuth, GitHub, Issue, Permission, PullRequest, WorkQuery } from "@norn/core";
 import { observeWork } from "./observe-work.js";
 
 export type Exec = (args: string[], input?: string) => Promise<{ code: number; stdout: string; stderr: string }>;
@@ -199,6 +199,26 @@ export class GhGitHub implements GitHub {
     for (const l of labels) {
       await this.gh(["label", "create", l.name, "--color", l.color, "--description", l.description, "--force"]);
     }
+  }
+
+  async labelNames() {
+    return (await this.paginate<{ name: string }>(`${REPO}/labels`)).map((l) => l.name);
+  }
+
+  async ghAuth(host: string): Promise<GhAuth> {
+    let r: Awaited<ReturnType<Exec>>;
+    try {
+      r = await this.exec(["auth", "status", "--hostname", host]);
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return { kind: "missing" };
+      throw e;
+    }
+    return { kind: r.code === 0 ? "logged-in" : "logged-out" };
+  }
+  async permission(): Promise<Permission> {
+    const out = (await this.gh(["repo", "view", "--json", "viewerPermission", "--jq", ".viewerPermission"])).trim().toLowerCase();
+    // GitHub answers null for a repository the user cannot see at all.
+    return (["admin", "maintain", "write", "triage", "read"] as const).find((p) => p === out) ?? "none";
   }
 
   async branchExists(name: string) {

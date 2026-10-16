@@ -36,6 +36,12 @@ export interface HeldClaim extends ClaimRecord {
   sha: string;
 }
 
+/** Whether the user's gh is installed and logged in to a host. */
+export type GhAuth = { kind: "missing" } | { kind: "logged-out" } | { kind: "logged-in" };
+
+/** The user's role on the repository, as GitHub names them. */
+export type Permission = "admin" | "maintain" | "write" | "triage" | "read" | "none";
+
 /**
  * Everything norn needs from GitHub. The real adapter shells out to the
  * user's own `gh`; tests use an in-memory fake.
@@ -68,6 +74,13 @@ export interface GitHub {
 
   /** Create or update labels. */
   ensureLabels(labels: { name: string; color: string; description: string }[]): Promise<void>;
+  /** The names of the labels on the repository. */
+  labelNames(): Promise<string[]>;
+
+  /** Whether gh is installed and logged in to `host`, e.g. github.com. Read-only, for norn doctor. */
+  ghAuth(host: string): Promise<GhAuth>;
+  /** The user's role on the repository. */
+  permission(): Promise<Permission>;
 
   branchExists(name: string): Promise<boolean>;
   /** Branches on GitHub whose name starts with `prefix`. */

@@ -119,6 +119,10 @@ export class LocalWorkspace implements Workspace {
     await this.must("git", ["-C", this.root, "branch", "-D", branch]);
   }
 
+  async originUrl() {
+    const r = await this.run("git", ["-C", this.root, "remote", "get-url", "origin"]);
+    return r.code === 0 ? r.stdout.trim() || null : null;
+  }
   async fetchRemote() {
     await this.must("git", ["-C", this.root, "fetch", "--prune", "origin"]);
   }
