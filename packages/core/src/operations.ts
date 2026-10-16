@@ -2,7 +2,7 @@ import { behaviourFollowUps, entering, leaveRefusal, type OutcomeInput } from ".
 import { briefing, type Briefing, finishCommands } from "./briefing.js";
 import { acquire } from "./claims.js";
 import type { Event } from "./events.js";
-import { type Flow, flowNameOf, flowStatesOf, flowStep, offerFlows, repositoryFlow, triageFlows } from "./flow.js";
+import { type Flow, flowNameOf, flowStatesOf, flowStep, offerFlows, passThrough, repositoryFlow, triageFlows } from "./flow.js";
 import type { Issue } from "./github.js";
 import { locate } from "./location.js";
 import { FIX_STATES, kindOf, slicesOf, stateOf, statesOf, type Step, stepFor, type State } from "./machine.js";
@@ -26,6 +26,7 @@ import {
   followUps,
   needsHumanLine,
   oneLine,
+  skipLine,
   sliceMergeRefusal,
   stateLabels,
 } from "./transitions.js";
@@ -247,7 +248,11 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     const r = await sliceMergeRefusal(ctx, issue);
     if (r) return refuse(r);
   }
-  const inFlow: OutcomeInput | null = flow ? { ctx, issue, flow, flowName: flowNameOf(issue) ?? "", from: stateIn(issue, flow), outcome, note } : null;
+  // A state for the other mode is passed through here, so the issue lands in one transition, its comment naming what was skipped.
+  const through = flow ? passThrough(flow, issue, outcome) : null;
+  const skipped = through?.skipped.length && through.mode ? skipLine(through.skipped, through.mode) : null;
+  const landed = through?.outcome ?? outcome;
+  const inFlow: OutcomeInput | null = flow ? { ctx, issue, flow, flowName: flowNameOf(issue) ?? "", from: stateIn(issue, flow), outcome: landed, note } : null;
   if (inFlow) {
     const r = await leaveRefusal(inFlow);
     if (r) return refuse(r);
@@ -287,7 +292,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     }
   }
   try {
-    await applyOutcome(ctx, issue, applied, word ?? "", note, evidence, flow);
+    await applyOutcome(ctx, issue, applied, word ?? "", note, evidence, flow, skipped);
   } finally {
     await github.deleteClaim(n);
   }
@@ -296,7 +301,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     kind: "done",
     issue: n,
     from: stateIn(issue, flow),
-    to: outcome.to,
+    to: landed.to,
     ...(evidence ? { evidence } : {}),
     fixLimit,
     storyBranchCreated,

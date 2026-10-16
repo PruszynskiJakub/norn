@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { parseTransitionComment } from "@norn/core";
 import { setup } from "@norn/testing";
 
 /** A small bug flow: reproduce, then fix, then close. */
@@ -484,6 +485,64 @@ describe("a state for one mode only (when)", () => {
     w.github.seedIssue({ number: 40, title: "Crash on empty input", labels: ["type:bug", "fixing", ...(mode ? [mode] : [])], assignees: ["alice"] });
     return w;
   }
+
+  test("in afk the state is skipped through its pass-through outcome, with one transition comment saying why", async () => {
+    const w = fixingIn("mode:afk");
+    await w.norn("take", "40");
+
+    const res = await w.norn("done", "40", "fixed");
+
+    expect(res.exitCode).toBe(0);
+    expect(w.github.issues.get(40)!.state).toBe("closed");
+    expect(w.github.labels(40).sort()).toEqual(["mode:afk", "type:bug"]);
+    expect(w.github.comments(40)).toEqual(["norn: fixing → closed (fixed)\n\nSkipped verifying in mode:afk: it runs in mode:hil only."]);
+  });
+
+  test("in hil the state is entered, briefed and runs", async () => {
+    const w = fixingIn("mode:hil");
+    await w.norn("take", "40");
+
+    await w.norn("done", "40", "fixed");
+    const res = await w.norn("take", "40");
+
+    expect(w.github.comments(40)).toEqual(["norn: fixing → verifying (fixed)"]);
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("Its step is verifying.");
+    expect(res.stdout).toContain("Invoke the skill: bug-verify\n");
+    expect(res.stdout).toContain("norn done 40 verified");
+  });
+
+  test("an issue with no mode runs the state", async () => {
+    const w = fixingIn(null);
+    await w.norn("take", "40");
+
+    await w.norn("done", "40", "fixed");
+
+    expect(w.github.labels(40).sort()).toEqual(["type:bug", "verifying"]);
+  });
+
+  test("skips follow one another, and the comment names every skipped state", async () => {
+    const flow = verifiedFlow({ outcomes: { verified: { to: "signing-off", means: "on to sign-off" } } });
+    Object.assign(flow.states, {
+      "signing-off": { skill: "bug-sign-off", attended: true, when: "hil", passThrough: "signed", outcomes: { signed: { to: "closed", means: "signed off" } } },
+    });
+    const w = fixingIn("mode:afk", flow);
+    await w.norn("take", "40");
+
+    await w.norn("done", "40", "fixed");
+
+    expect(w.github.comments(40)).toEqual(["norn: fixing → closed (fixed)\n\nSkipped verifying, signing-off in mode:afk: they run in mode:hil only."]);
+  });
+
+  test("the skip note is not read back as the outcome's note", async () => {
+    const w = fixingIn("mode:afk");
+    await w.norn("take", "40");
+
+    await w.norn("done", "40", "fixed", "patched the parser");
+
+    expect(w.github.comments(40)).toEqual(["norn: fixing → closed (fixed)\n\nSkipped verifying in mode:afk: it runs in mode:hil only.\n\npatched the parser"]);
+    expect(parseTransitionComment(w.github.comments(40)[0])?.note).toBe("patched the parser");
+  });
 
   test("a when state without a valid pass-through outcome fails validation", async () => {
     const missing = fixingIn("mode:afk", verifiedFlow({ passThrough: undefined }));

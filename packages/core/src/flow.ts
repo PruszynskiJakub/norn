@@ -223,6 +223,33 @@ export function offerFlows(step: Step, flows: { name: string; flow: Flow }[]): S
   return { ...step, outcomes: { ...rest, ...offered, ...(reject ? { reject } : {}) } };
 }
 
+/** The issue's mode from its mode:afk or mode:hil label; null for none. */
+export function modeOf(issue: Issue): Mode | null {
+  return issue.labels.includes("mode:hil") ? "hil" : issue.labels.includes("mode:afk") ? "afk" : null;
+}
+
+/**
+ * The outcome as it lands: while it leads into a state for the other mode, norn follows that state's pass-through
+ * instead, so the issue goes straight to the first state that runs in its mode. An issue with no mode runs every state.
+ * `skipped` lists the states passed through, in order.
+ */
+export function passThrough(flow: Flow, issue: Issue, outcome: Outcome): { outcome: Outcome; skipped: string[]; mode: Mode | null } {
+  const mode = modeOf(issue);
+  const skipped: string[] = [];
+  let landed = outcome;
+  for (;;) {
+    const state = flow.states[landed.to];
+    // A loop of pass-throughs ends in the first state seen twice.
+    if (!mode || !state?.when || state.when === mode || skipped.includes(landed.to)) break;
+    skipped.push(landed.to);
+    const through = state.outcomes[state.passThrough!];
+    // The words and the note stay the outcome's; only where it leads and whom it notifies come from the pass-through.
+    const { notify: _, ...rest } = landed;
+    landed = { ...rest, to: through.to, ...(through.notify ? { notify: through.notify } : {}) };
+  }
+  return { outcome: landed, skipped, mode };
+}
+
 /** The state labels of the flow that the issue carries. More than one means a label change failed halfway. */
 export function flowStatesOf(issue: Issue, flow: Flow): string[] {
   return Object.keys(flow.states).filter((s) => issue.labels.includes(s));
