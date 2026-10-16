@@ -4,6 +4,10 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- The repository is renamed from `ai-engine` to `norn`. Install with `npm install -D github:PruszynskiJakub/norn#<tag>`; GitHub redirects the old name, so existing installs keep working, but update the URL in your `package.json` and run `git remote set-url origin git@github.com:PruszynskiJakub/norn.git` in a clone.
+
 ## [0.7.0] - 2026-10-16
 
 ### Changed
@@ -157,19 +161,19 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.7.0...HEAD
-[0.7.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.6.1...v0.7.0
-[0.6.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.6.0...v0.6.1
-[0.6.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.5.1...v0.6.0
-[0.5.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.5.0...v0.5.1
-[0.5.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.4.0...v0.5.0
-[0.4.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.3.0...v0.4.0
-[0.3.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.3...v0.3.0
-[0.2.3]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.2...v0.2.3
-[0.2.2]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.1...v0.2.2
-[0.2.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.0...v0.2.1
-[0.2.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.3...v0.2.0
-[0.1.3]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.2...v0.1.3
-[0.1.2]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.1...v0.1.2
-[0.1.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.1.0...v0.1.1
-[0.1.0]: https://github.com/PruszynskiJakub/ai-engine/releases/tag/v0.1.0
+[Unreleased]: https://github.com/PruszynskiJakub/norn/compare/v0.7.0...HEAD
+[0.7.0]: https://github.com/PruszynskiJakub/norn/compare/v0.6.1...v0.7.0
+[0.6.1]: https://github.com/PruszynskiJakub/norn/compare/v0.6.0...v0.6.1
+[0.6.0]: https://github.com/PruszynskiJakub/norn/compare/v0.5.1...v0.6.0
+[0.5.1]: https://github.com/PruszynskiJakub/norn/compare/v0.5.0...v0.5.1
+[0.5.0]: https://github.com/PruszynskiJakub/norn/compare/v0.4.0...v0.5.0
+[0.4.0]: https://github.com/PruszynskiJakub/norn/compare/v0.3.0...v0.4.0
+[0.3.0]: https://github.com/PruszynskiJakub/norn/compare/v0.2.3...v0.3.0
+[0.2.3]: https://github.com/PruszynskiJakub/norn/compare/v0.2.2...v0.2.3
+[0.2.2]: https://github.com/PruszynskiJakub/norn/compare/v0.2.1...v0.2.2
+[0.2.1]: https://github.com/PruszynskiJakub/norn/compare/v0.2.0...v0.2.1
+[0.2.0]: https://github.com/PruszynskiJakub/norn/compare/v0.1.3...v0.2.0
+[0.1.3]: https://github.com/PruszynskiJakub/norn/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/PruszynskiJakub/norn/compare/v0.1.1...v0.1.2
+[0.1.1]: https://github.com/PruszynskiJakub/norn/compare/v0.1.0...v0.1.1
+[0.1.0]: https://github.com/PruszynskiJakub/norn/releases/tag/v0.1.0

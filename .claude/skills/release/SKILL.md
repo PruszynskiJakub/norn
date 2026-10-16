@@ -5,7 +5,7 @@ disable-model-invocation: true
 argument-hint: "[version]"
 ---
 
-Release norn from `main`. `$ARGUMENTS` is the version, if given. norn is not on npm: projects install it from a git tag (`github:PruszynskiJakub/ai-engine#vX.Y.Z`), so the tag is what ships. npm builds nothing on install, so the tag points at a release commit that carries the built `dist/bin.js`; `main` never does.
+Release norn from `main`. `$ARGUMENTS` is the version, if given. norn is not on npm: projects install it from a git tag (`github:PruszynskiJakub/norn#vX.Y.Z`), so the tag is what ships. npm builds nothing on install, so the tag points at a release commit that carries the built `dist/bin.js`; `main` never does.
 
 The user merges every PR. Ask them to, give the link, and wait for "merged". PRs merge with merge commits.
 
@@ -23,4 +23,4 @@ The user merges every PR. Ask them to, give the link, and wait for "merged". PRs
 6. **PR.** Commit as `Release X.Y.Z` and push the branch. Open a PR titled `Release X.Y.Z`, with a body of one line naming the release's main changes and ending "See CHANGELOG." Ask the user to merge it.
 7. **Tag.** Fetch, and find the merge commit of the release PR on `origin/main` (`gh pr view <n> --json mergeCommit`). In the release worktree, check out that commit detached, run `npm ci` and `npm run build`, then `git add -f dist/bin.js` and commit it as `Build norn X.Y.Z`: the release commit, on no branch. Create the annotated tag `vX.Y.Z` with the message `norn X.Y.Z` on the release commit, then push the tag. Done when `git ls-tree -r vX.Y.Z --name-only` lists `dist/bin.js` and `origin/main` does not.
 8. **GitHub release.** `gh release create vX.Y.Z --verify-tag --title "norn X.Y.Z" --notes-file <file>`. The notes are the `## [X.Y.Z]` section of `CHANGELOG.md`, without its heading. Write them to a file in the scratchpad.
-9. **Verify.** `gh release list` shows `norn X.Y.Z` as Latest, and `git ls-remote --tags origin vX.Y.Z` returns the tag. Remove the release worktree. Report to the user: the version, the release link, the install line `npm install -D github:PruszynskiJakub/ai-engine#vX.Y.Z`, and that projects run `npx norn init` after upgrading to get the new skills.
+9. **Verify.** `gh release list` shows `norn X.Y.Z` as Latest, and `git ls-remote --tags origin vX.Y.Z` returns the tag. Remove the release worktree. Report to the user: the version, the release link, the install line `npm install -D github:PruszynskiJakub/norn#vX.Y.Z`, and that projects run `npx norn init` after upgrading to get the new skills.

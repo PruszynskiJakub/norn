@@ -7,8 +7,8 @@ Thanks for helping. This page covers setting up, the checks a change must pass, 
 You need Node 20+, git and `gh`.
 
 ```sh
-git clone https://github.com/PruszynskiJakub/ai-engine.git
-cd ai-engine
+git clone https://github.com/PruszynskiJakub/norn.git
+cd norn
 npm ci
 npm run check
 ```
@@ -62,4 +62,4 @@ norn is installed from release tags, which carry the built CLI; `dist/` is not c
    git push origin v<version>
    ```
 
-3. Check that `npm install -D github:PruszynskiJakub/ai-engine#v<version>` works in a throwaway project.
+3. Check that `npm install -D github:PruszynskiJakub/norn#v<version>` works in a throwaway project.
