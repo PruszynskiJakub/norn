@@ -14,6 +14,7 @@ norn answers in prose written as instructions to the agent, always in the same o
 | [`norn tidy`](#norn-tidy) | Remove what belongs to closed issues |
 | [`norn dashboard`](#norn-dashboard) | Watch your work in the browser |
 | [`norn doctor`](#norn-doctor) | Check the whole setup and say what to fix |
+| [`norn flows export <name>`](#norn-flows-export) | Copy a built-in flow into the repository to change it |
 | [`norn add-slice <story> "title"`](#norn-add-slice) | Create a slice (used by the `norn-slice` skill) |
 | [`norn escalate <issue> "reason"`](#norn-escalate) | Set `needs-human` and release the claim |
 | [`norn release <issue>`](#norn-release) | Give up the claim without a transition |
@@ -182,6 +183,21 @@ Checks the whole setup at once and lists every check, each with the exact comman
 Each check shows as `✓` ok, `!` warning, `✗` fail, or `-` skipped when a check it needs did not pass, e.g. `skipped, needs gh`. It exits 1 only when a check fails, so CI can run it without failing on a warning. `--json` gives `{ ok, checks: [{ id, level, message, fix }] }`.
 
 `doctor` changes nothing and never refuses: an invalid config, an incompatible version or a run outside a checkout are reported as checks.
+
+## norn flows export
+
+```sh
+npx norn flows export <name>
+```
+
+Writes norn's built-in flow `<name>`, `story` or `slice`, to `.agents/flows/<name>.json` as a starting copy for the team's own version. Once that file is merged into the base branch, it replaces the built-in flow of its name completely: norn takes nothing from the built-in one, for triage, `take`, `done`, `next` and `add-slice` alike. Unchanged, the copy runs exactly like the built-in flow. See [Repository flows](how-it-works.md#repository-flows) for the format.
+
+```text
+Wrote .agents/flows/story.json, a copy of the built-in story flow.
+Change it there and merge it into the base branch; from then on it runs in place of the built-in story flow, with nothing taken from it.
+```
+
+It refuses when the file exists, leaving it as it is, and names the built-in flows when `<name>` is not one of them. It works in the current directory and needs neither GitHub nor the team config. `--json` gives `{ ok, flow, file, message }`.
 
 ## norn add-slice
 

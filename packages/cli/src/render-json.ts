@@ -64,6 +64,8 @@ function data(a: Answer): Record<string, unknown> {
       return {};
     case "doctor":
       return { checks: a.checks };
+    case "flow-exported":
+      return { flow: a.flow, file: a.file };
     default:
       return unreachable(a);
   }
