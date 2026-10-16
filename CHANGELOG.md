@@ -4,6 +4,10 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- The README is rewritten for someone new to norn, and the reference moves to `docs/`: how norn works (principles, assumptions, labels, flows as Mermaid diagrams, claims and delivery), commands, configuration and a sandbox tutorial. `PRD.html` is folded into these pages and removed. `CONTRIBUTING.md` and `SECURITY.md` are new.
+
 ## [0.6.0] - 2026-10-16
 
 ### Changed

@@ -1,0 +1,81 @@
+# Try norn in a sandbox
+
+This walkthrough takes one small issue from triage to a merged story in a throwaway repository, so you can see the whole process without touching a real project.
+
+## Before you start
+
+You need Node 20+, git, [Claude Code](https://claude.com/claude-code), [`gh`](https://cli.github.com) logged in (`gh auth status`), and read access to the norn repository while it is private.
+
+## 1. Create a throwaway repository
+
+Create it with a first commit on `main`:
+
+```sh
+gh repo create norn-sandbox --private --clone --add-readme && cd norn-sandbox
+npm init -y && echo node_modules >> .gitignore
+```
+
+## 2. Install and set up norn
+
+```sh
+npm install -D github:PruszynskiJakub/ai-engine#v0.6.0
+npx norn init
+git add -A && git commit -m "Set up norn" && git push
+```
+
+`init` installs the skills into `skills/` (linked into `.claude/skills/`), writes the norn section into `AGENTS.md` and `CLAUDE.md`, creates `.agents/specs/` and `.agents/norn.config.json`, gitignores `.agents/worktrees/` and the local config, and creates the labels on the repository.
+
+## 3. Open an issue
+
+Pick something small:
+
+```sh
+gh issue create --title "Add a greet command" --body "Print Hello, <name>" --assignee @me
+```
+
+## 4. Shape the story with `drive`
+
+Start Claude Code in the sandbox and ask:
+
+```text
+drive <issue>
+```
+
+Triage, refine, clarify, plan and slice are attended: the agent prepares each decision and you make it. Each step ends with the `norn done <issue> <outcome>` the briefing gives (triage `accept`, refine `clear` or `questions`), and `drive` moves on to the next step. Slicing creates the slices as sub-issues and moves the story to implementation.
+
+## 5. Deliver it unattended
+
+When `drive` offers it, agree to start `deliver <story>`, or ask for it yourself. It implements, reviews, QAs and merges the slices into the story branch in fresh subagents, then reviews and QAs the story.
+
+It stops when the story reaches `needs-human-qa`, which is always yours, or when only items waiting for a person are left. `npx norn status <story>` shows them, and so does the dashboard:
+
+```sh
+npx norn dashboard
+```
+
+For a `needs-human` issue or an item in `needs-human-qa`, ask your agent `drive <issue>`.
+
+## 6. Merge the story
+
+After story QA passes, merge the story PR into `main` yourself:
+
+```sh
+gh pr merge <pr>
+```
+
+The next `npx norn tidy` removes the worktrees, branches and QA evidence.
+
+## Clean up
+
+Delete the repository:
+
+```sh
+gh repo delete norn-sandbox --yes
+```
+
+This needs the `delete_repo` scope once: `gh auth refresh -s delete_repo`.
+
+## Next steps
+
+- [How norn works](how-it-works.md): the process, labels, claims and delivery in detail.
+- [Commands](commands.md) and [configuration](configuration.md).

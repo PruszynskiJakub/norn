@@ -3,7 +3,7 @@ import { describe, expect, test } from "vitest";
 import { setup } from "@norn/testing";
 
 describe("take names the worktree", () => {
-  test("the PRD's briefing: a story worktree that does not exist yet, under Claude Code", async () => {
+  test("the documented briefing: a story worktree that does not exist yet, under Claude Code", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-refinement"] });
 

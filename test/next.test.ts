@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { setup } from "@norn/testing";
 
-/** The PRD's example: story #123 with 5 slices, 2 merged. */
+/** The documented example: story #123 with 5 slices, 2 merged. */
 function prdExample() {
   const w = setup();
   const gh = w.github;
@@ -21,7 +21,7 @@ function prdExample() {
 }
 
 describe("norn next", () => {
-  test("lists what can start now and what is waiting, as in the PRD", async () => {
+  test("lists what can start now and what is waiting, as in the docs", async () => {
     const w = prdExample();
 
     const res = await w.norn("next", "123");

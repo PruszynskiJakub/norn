@@ -1,6 +1,6 @@
 # norn
 
-norn runs a team's work through a spec-driven process on GitHub. A developer's agent asks norn what to do, does the work with a skill, and reports the result; norn records it in GitHub, the only state. This file is the canonical definition of the domain terms; [`PRD.html`](PRD.html) uses them for the vision and the way of working.
+norn runs a team's work through a spec-driven process on GitHub. A developer's agent asks norn what to do, does the work with a skill, and reports the result; norn records it in GitHub, the only state. This file is the canonical definition of the domain terms; [`docs/how-it-works.md`](docs/how-it-works.md) uses them for the principles and the way of working.
 
 ## Work items
 
@@ -17,7 +17,7 @@ _Avoid_: task, sub-task, child issue
 
 **Spec**:
 The one document of a story, built up through refinement, clarification and planning. Its Behaviour items are numbered user stories that slices, review and QA check against.
-_Avoid_: PRD (that is norn's own vision document), design doc
+_Avoid_: PRD, design doc
 
 **Slug**:
 The short name derived from a story's title the first time norn writes on it, then fixed. Branches, worktrees and the spec path are named from it.

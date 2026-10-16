@@ -18,7 +18,7 @@ function stuckStory() {
 }
 
 describe("norn next when nothing is left", () => {
-  test("says so explicitly, as in the PRD", async () => {
+  test("says so explicitly, as in the docs", async () => {
     const w = stuckStory();
 
     const res = await w.norn("next", "123");

@@ -1,81 +1,109 @@
-# ai-engine
+<p align="center">
+  <img src="docs/assets/norn.svg" alt="norn" width="96" height="96">
+</p>
 
-## Rules
+<h1 align="center">norn</h1>
 
-1. **The owner of an issue is responsible for it end to end.** The owner is the issue's GitHub assignee, and an issue has exactly one assignee. Responsibility covers all related issues and PRs, including slices.
+<p align="center">
+  <strong>Spec-driven development for coding agents, with GitHub as the only state.</strong>
+</p>
 
-## Supported agents
+<p align="center">
+  <a href="https://github.com/PruszynskiJakub/ai-engine/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/ai-engine/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://github.com/PruszynskiJakub/ai-engine/releases"><img src="https://img.shields.io/badge/release-v0.6.0-blue" alt="Release v0.6.0"></a>
+  <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen" alt="Node 20 or later">
+</p>
 
-norn is tested on Claude Code. Other agents are supported but not tested.
+> [!NOTE]
+> norn is pre-1.0: a minor version can break things, and [`CHANGELOG.md`](CHANGELOG.md) says how to upgrade. It is tested on Claude Code; other agents should work but are untested.
 
-## norn
+norn is a CLI that your coding agent calls to run work through a spec-driven process. A person shapes each story with their agent (triage, refine, clarify, plan, slice); then norn hands the slices to fresh agents that implement, review, QA and merge them, and stops when it needs a person. Every state lives in GitHub labels, sub-issues, comments and branches, so there is no server, no database and nothing to sync.
 
-CLI for the SDD process. The developer's LLM calls it to run work through the process; GitHub labels, native relations, comments and branches are the only state. See `PRD.html` for the vision and [`CONTEXT.md`](CONTEXT.md) for the terms.
+## Why norn
 
-norn is not on npm. Install it from this repository (you need read access to it) by a release tag, which carries the built CLI, so nothing is built on install:
+- **The agent is the operator, norn is the process.** The agent asks norn what to do next and which skill to use, does the work, and reports the outcome. norn decides the next state.
+- **GitHub is the source of truth.** Your team sees every story's state in GitHub, and norn keeps no state of its own.
+- **Your own `gh`, your own identity.** No separate auth: every label, comment, PR and merge is made as you.
+- **Agents can't step on each other.** Each issue is claimed with a git ref that only one session can hold, and only norn changes labels.
+- **People stay in the loop where it matters.** Shaping a story is attended, a person always QAs the story, and an issue that keeps failing review or QA is escalated instead of retried forever.
+
+## How it works
+
+```mermaid
+flowchart LR
+  issue([issue]) --> shape["shape with a person<br/>triage · refine · clarify · plan · slice"]
+  shape --> slices["each slice, unattended<br/>implement → review → agent QA → merge"]
+  slices --> story["the story<br/>review → agent QA → your QA"]
+  story --> merge([you merge the story PR])
+```
+
+You ask your agent `drive <issue>` to shape a story with you. Once it is sliced, `deliver <story>` runs the slices in parallel, each step in a fresh agent in its own git worktree, and merges them into the story branch. It stops when the story is ready for your QA, or when something needs a person, and notifies you. See [how norn works](docs/how-it-works.md) for the full process.
+
+## Requirements
+
+- Node 20 or later and git
+- [`gh`](https://cli.github.com), logged in (`gh auth status`) with write access to your repository
+- A coding agent: [Claude Code](https://claude.com/claude-code) is tested; others are supported but untested
+- A team that assigns each issue to exactly one owner (see the [assumptions](docs/how-it-works.md#assumptions))
+- Recommended: [herdr](https://herdr.dev), which gives every agent its own pane and session
+
+## Install
+
+norn is not on npm yet. While this repository is private, you need read access to it. Install a release tag, which carries the built CLI:
 
 ```sh
 npm install -D github:PruszynskiJakub/ai-engine#v0.6.0
 ```
 
-Only release tags can be installed: a branch or commit of the repository has no built CLI.
+Only release tags can be installed: a branch or commit has no built CLI.
+
+## Quick start
 
 ```sh
-npx norn init            # skills, agent instructions, .agents/specs/, team config, .gitignore, labels
-npx norn next 123        # what can be done on story #123 now
-npx norn take 131        # claim #131 and get its briefing
-npx norn done 131 [outcome] ["note"] [--evidence <dir>]
-npx norn tidy            # remove what belongs to closed issues (--dry-run to list)
-npx norn dashboard       # watch your work in the browser at http://127.0.0.1:4477
+npx norn init      # skills, agent instructions, .agents/, labels
 ```
 
-Run `norn` with no arguments for every command. Add `--json` for scripts.
+Commit what `init` wrote, then ask your agent:
 
-- Uses your own `gh` (any version with `gh api --paginate --jq`); every change is made as you.
-- Claims are git refs `refs/norn/claims/<issue>`. Running `norn take` again on an issue you hold re-briefs you and refreshes the claim; long steps do this to stay fresh. A stale claim (default 2h) is taken over by one session only, and its worktree is kept: check `git status` there before starting. To pick up your own session that stopped before its claim went stale, run `norn take <issue> --takeover`; `drive` asks you and does it. It never takes a teammate's claim.
-- Each story and slice works in its own worktree under `.agents/worktrees/<branch>`. The briefing gives its absolute path and, if it is missing, the command to create it for herdr, Claude Code or plain git: it fetches first, starts new branches from `origin/<base>`, and fast-forwards an existing branch from GitHub. If the branch is checked out elsewhere, norn says where instead.
-- `norn done` makes only the transition and releases the claim; the follow-ups (story branch, unblocking slices, story PR, needs-review) are best effort. `norn next` catches up on any that failed. It closes a story whose PR is merged if GitHub did not (PRs into a non-default `baseBranch`).
-- `norn tidy` removes what belongs to closed issues (QA evidence, worktrees, merged branches, claims), keeping anything unpushed. `deliver` and `drive` run it for you.
-- `norn dashboard [--port <n>] [--interval <duration>] [--no-open]` serves a read-only page on localhost over your norn work in this repository: what needs you (needs-human and needs-human-qa, each with its `drive` command), stale claims and items one fix round from the limit, and a feed of what happened with the agents' implement, review and QA remarks and links to their evidence. It reads GitHub as you every 2 minutes (30s at the least), with one GraphQL query plus `git ls-remote` per read, changes nothing and keeps no state. It runs until Ctrl-C. Port 4477 moves to the next free one when taken, unless you gave `--port`; a second launch for the same checkout prints the running one's URL. Set `dashboard.port` and `dashboard.interval` in your local config.
-- Branch, worktree and spec names come from a slug norn records once on the story (`norn: slug <slug>`), so renaming a story is safe. A story's slices are its `type:slice` sub-issues in this repository.
-- `norn next` counts your agents already running against `deliver.maxParallel` and offers only the free slots. An item for a person that a session holds is listed as held by it, with no hand-off, and norn does not notify about it.
-- Team settings: `.agents/norn.config.json` (`baseBranch`, `worktrees.provider`, `claims.staleAfter`, `deliver.maxParallel`, `deliver.maxFixRounds`). Each developer can override in the gitignored `.agents/norn.config.local.json`, which also picks `notifications` (`auto`, `herdr`, `os`, `none`), except `claims.staleAfter` and `deliver.maxFixRounds`, which bind the whole team and are read from the team file only: in the local file norn ignores them with a warning, and a team `staleAfter` below `10m` is raised to `10m` with a warning.
-- Once slicing is done, the `deliver` skill runs the story unattended until it needs a human. After `deliver.maxFixRounds` rounds of changes-requested or qa-failed, an issue gets needs-human instead of another round; once a person resolves it, it gets a fresh budget.
-- QA: an agent always goes first (`needs-qa`, `auto-qa`) and posts evidence on the issue; `mode:hil` slices and stories then get a person's QA (`needs-human-qa`, `qa`).
-- norn notifies you locally whenever it sets needs-human or an item reaches `needs-human-qa`, and when `norn next` finds nothing left to do.
-- The session holding a claim is `NORN_SESSION`, else `CLAUDE_CODE_SESSION_ID`, else the herdr pane (`HERDR_PANE_ID`), else host and repository root. Under the git provider, `norn next` gives each agent its own `NORN_SESSION` to start with. Known limit: Claude Code subagents share their parent's session id, so under the claude-code provider the deliver orchestrator and its subagents are one session; use herdr for per-agent isolation.
-- Skills carry the craft and know nothing of norn; the `take` briefing carries the process around them (what to read, where to commit and push, how to create slices and PRs, and which finish command each result maps to). `drive` and `deliver` are the exceptions: they run norn. `drive <issue>` takes an issue through the attended steps with you, from triage to slicing, then offers `deliver`; under herdr it hands the story to a new agent in the story's worktree, which drives it on from there, and an item you do yourself (QA by a person, or a `needs-human` resolve) to a new agent in that item's worktree; `deliver <story>` runs the rest unattended.
-- `norn init` writes a short norn section between `<!-- norn:start -->` and `<!-- norn:end -->` into `AGENTS.md` and `CLAUDE.md`, whichever exist (with neither, it creates `AGENTS.md` and a `CLAUDE.md` that imports it), so any agent in the project finds the process. Running `init` again refreshes that section.
-- `norn init` copies the skills bundled in `skills/`: one per step (triage, refine, clarify, plan, slice, implement, review, auto-qa, qa, merge, resolve), the process skills (drive, deliver) and the reference skills they use (`interview`, `codebase-design`, `tdd`). `codebase-design`, `tdd` and the step skills' approach are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). Set `NORN_SKILLS_SOURCE=<repo>` to install with `npx skills add <repo>` first. After upgrading norn, run `npx norn init` again: it replaces any bundled skill that differs from the new version and names them; `git diff skills/` shows the changes. With `NORN_SKILLS_SOURCE` set, the skills already in place are that source's and are kept.
-
-### Try it in a sandbox
-
-You need Node 20+, git, Claude Code, `gh` logged in (`gh auth status`) and read access to this repository.
-
-1. Create a throwaway repository with a first commit on `main`:
-   ```sh
-   gh repo create norn-sandbox --private --clone --add-readme && cd norn-sandbox
-   npm init -y && echo node_modules >> .gitignore
-   ```
-2. Install norn and set it up. `init` installs the skills into `skills/` (linked into `.claude/skills/`), writes the norn section into `AGENTS.md` and `CLAUDE.md`, creates `.agents/specs/` and `.agents/norn.config.json`, gitignores `.agents/worktrees/` and the local config, and creates the labels on the repository.
-   ```sh
-   npm install -D github:PruszynskiJakub/ai-engine#v0.6.0
-   npx norn init
-   git add -A && git commit -m "Set up norn" && git push
-   ```
-3. Open an issue for something small, for example `gh issue create --title "Add a greet command" --body "Print Hello, <name>"`.
-4. Start Claude Code in the sandbox and ask: `drive <issue>`. Triage, refine, clarify, plan and slice are attended: the agent prepares each call and you decide. Each step ends with the `norn done <issue> <outcome>` the briefing gives (triage `accept`, refine `clear` or `questions`), and drive moves on to the next step. Slicing creates the slices as sub-issues and moves the story to implementation.
-5. When drive offers it, agree to start `deliver <story>` (or ask for it yourself). It implements, reviews, QAs and merges the slices into the story branch in fresh subagents, then reviews and QAs the story. It stops when the story reaches `needs-human-qa`, which is always yours, or when only items waiting for a person are left; `norn status <story>` shows them. For a `needs-human` issue or an item in `needs-human-qa`, ask your agent `drive <issue>`.
-6. After story QA passes, merge the story PR into `main` yourself (`gh pr merge`). The next `norn tidy` removes the worktrees, branches and QA evidence.
-
-To start over, delete the repository: `gh repo delete norn-sandbox --yes` (needs `gh auth refresh -s delete_repo` once).
-
-### Develop
-
-```sh
-npm run check     # typecheck, Biome and the tests; CI runs it on every PR
-npm test          # vitest, against an in-memory GitHub and a scripted gh
-npm run build     # builds the dashboard UI and bundles it with the CLI into dist/bin.js
+```text
+drive <issue>
 ```
 
-The code is npm workspaces under `packages/`: `core` (the process, no I/O of its own), `github-gh` and `workspace-local` (the adapters), the front ends `cli` and `web` (the dashboard's server and its React UI in `web/ui`), and `testing` (fakes and the harness). [`CODING_STANDARDS.md`](CODING_STANDARDS.md) has the rules for the code and [`CONTEXT.md`](CONTEXT.md) defines the domain terms.
+For a guided first run in a throwaway repository, follow the [sandbox tutorial](docs/tutorial.md).
+
+## Commands
+
+| Command | What it does |
+| --- | --- |
+| `norn init` | Set up the project: skills, agent instructions, `.agents/`, labels |
+| `norn next <story>` | What can be done on the story now |
+| `norn take <issue>` | Claim the issue and get the briefing for its step |
+| `norn done <issue> [outcome] ["note"]` | Finish the step; norn makes the transition |
+| `norn status <story>` | Read-only overview of the story and its slices |
+| `norn tidy` | Remove what belongs to closed issues |
+| `norn dashboard` | Watch your work in the browser |
+
+Your agent runs most of these for you. Add `--json` for scripts. See [commands](docs/commands.md) for every command and flag.
+
+## Dashboard
+
+`npx norn dashboard` serves a read-only page on localhost: what needs you, with the command to pick it up, your stories and their slices, and a feed of what the agents did.
+
+![The norn dashboard: two items need you, the stories with their slices, and a feed of the agents' remarks](docs/assets/dashboard.png)
+
+## Documentation
+
+- [How norn works](docs/how-it-works.md): principles, assumptions, labels, flows, claims and delivery
+- [Commands](docs/commands.md): every command, flag and output
+- [Configuration](docs/configuration.md): team and local settings, providers, notifications
+- [Tutorial](docs/tutorial.md): try norn in a sandbox repository
+- [Glossary](CONTEXT.md): the domain terms
+- [Changelog](CHANGELOG.md)
+
+## Contributing
+
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setting up, the checks and how releases are cut. To report a vulnerability, see [`SECURITY.md`](SECURITY.md).
+
+## Acknowledgements
+
+The `codebase-design` and `tdd` skills and the approach of the step skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT).

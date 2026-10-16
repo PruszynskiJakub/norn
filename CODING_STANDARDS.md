@@ -44,5 +44,5 @@ Rules 2–5 are enforced by `test/boundaries.test.ts`.
 
 ## Documents
 
-24. `PRD.html` holds the vision and the way of working; `CONTEXT.md` holds the definitions. The PRD uses the terms and links to `CONTEXT.md` rather than redefining them, and a new concept in the PRD adds its entry to `CONTEXT.md` in the same change.
+24. `docs/` holds the principles and the way of working; `CONTEXT.md` holds the definitions. The docs use the terms and link to `CONTEXT.md` rather than redefining them, and a new concept in the docs adds its entry to `CONTEXT.md` in the same change. A change to the process or the commands updates the matching page in `docs/` in the same change.
 25. A user-visible change gets a `CHANGELOG.md` entry under `## [Unreleased]`.
