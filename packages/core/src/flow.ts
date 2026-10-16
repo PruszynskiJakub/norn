@@ -13,6 +13,8 @@ export interface Flow {
   /** Where the work happens: no branch, or its own branch with a PR into the base branch. */
   workspace: "none" | "own";
   states: Record<string, FlowState>;
+  /** Old state name to its new one: issues still in the old state move there when next touched. */
+  renamed?: Record<string, string>;
 }
 
 export interface FlowState {
@@ -43,6 +45,8 @@ export type FlowError =
   | { kind: "field-invalid"; path: string; expected: string }
   | { kind: "start-unknown"; start: string }
   | { kind: "target-unknown"; state: string; word: string; to: string }
+  /** `renamed` moves the old state `from` to `to`, which is not a state of the flow. */
+  | { kind: "renamed-unknown"; from: string; to: string }
   /** A state takes a name norn keeps for itself, e.g. closed. */
   | { kind: "state-reserved"; state: string };
 
@@ -116,6 +120,14 @@ export function validateFlow(data: unknown): FlowError[] {
     }
   }
   if (typeof data.start === "string" && !Object.hasOwn(states, data.start)) errors.push({ kind: "start-unknown", start: data.start });
+  if (data.renamed !== undefined) {
+    if (!isObject(data.renamed)) field("renamed", "an object");
+    else
+      for (const [from, to] of Object.entries(data.renamed)) {
+        if (typeof to !== "string") field(`renamed.${from}`, "a string");
+        else if (!Object.hasOwn(states, to)) errors.push({ kind: "renamed-unknown", from, to });
+      }
+  }
   return errors;
 }
 

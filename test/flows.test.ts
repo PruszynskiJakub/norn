@@ -303,3 +303,16 @@ describe("done in a repository flow", () => {
     expect(res.stdout).toContain("norn done 40 fixed");
   });
 });
+
+describe("a flow that changed under issues in progress", () => {
+  test("a renamed target that is not a state of the flow fails validation", async () => {
+    const w = bugAt("reproducing", bugFlow({ renamed: { verifying: "checking", repro: "reproducing" } }));
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("#40 runs the flow bug, which is broken");
+    expect(res.stdout).toContain("  renamed moves verifying to checking, which is not one of its states.");
+    expect(res.stdout).not.toContain("repro to");
+  });
+});
