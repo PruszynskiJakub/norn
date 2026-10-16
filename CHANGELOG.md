@@ -8,6 +8,10 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 - The README is rewritten for someone new to norn, and the reference moves to `docs/`: how norn works (principles, assumptions, labels, flows as Mermaid diagrams, claims and delivery), commands, configuration and a sandbox tutorial. `PRD.html` is folded into these pages and removed. `CONTRIBUTING.md` and `SECURITY.md` are new.
 
+### Fixed
+
+- `norn next` on a story in merge-queue says the owner merges the story PR into the configured `baseBranch`, instead of always saying `main`.
+
 ## [0.6.0] - 2026-10-16
 
 ### Changed

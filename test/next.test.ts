@@ -98,6 +98,16 @@ describe("norn next", () => {
     expect(res.stdout).toContain("#123 waits for its owner (@bob) to merge the story PR into main.");
   });
 
+  test("the owner merges the story PR into the configured baseBranch", async () => {
+    const w = setup();
+    w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ baseBranch: "develop" }));
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "merge-queue"], assignees: ["bob"] });
+
+    const res = await w.norn("next", "123");
+
+    expect(res.stdout).toContain("#123 waits for its owner (@bob) to merge the story PR into develop.");
+  });
+
   test("blocked labels are brought in line with native relations", async () => {
     const w = prdExample();
     w.github.issues.get(131)!.state = "closed";
