@@ -7,6 +7,11 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 ### Added
 
 - Repository flows: a repository can define a process of its own in `.agents/flows/<name>.json`, and an issue labelled `type:<name>` runs it through `norn take` and `norn done`. norn reads flows from the base branch on GitHub, briefs each state's skill and outcomes, gives the issue a branch and a PR into the base branch with `"workspace": "own"`, creates a missing state label on the first transition into it, and refuses a broken flow, with what is wrong, for the issues of its type only. Stories and slices keep the built-in process. See [Repository flows](docs/how-it-works.md#repository-flows).
+- Triage offers the repository's flows: next to `story` and `reject`, each flow is an outcome named after it, with its description. `norn done <issue> <flow>` adds `type:<flow>` and moves the issue to the flow's start. A flow with `"triage": false` is not offered.
+
+### Changed
+
+- **Breaking:** triage's outcome `accept` is now `story`: `norn done <issue> story` makes the issue a story in `needs-refinement`. `accept` is gone, with no alias, because triage now chooses the issue's type and `story` is one type among the flows.
 
 ## [0.8.0] - 2026-10-16
 

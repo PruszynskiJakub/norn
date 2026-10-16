@@ -1,7 +1,7 @@
 import { briefing, type Briefing, finishCommands } from "./briefing.js";
 import { acquire } from "./claims.js";
 import type { Event } from "./events.js";
-import { type Flow, flowNameOf, flowStatesOf, flowStep, repositoryFlow } from "./flow.js";
+import { type Flow, flowNameOf, flowStatesOf, flowStep, offerFlows, repositoryFlow, triageFlows } from "./flow.js";
 import type { Issue } from "./github.js";
 import { locate } from "./location.js";
 import { FIX_STATES, kindOf, slicesOf, stateOf, statesOf, type Step, stepFor, type State } from "./machine.js";
@@ -100,7 +100,12 @@ export const MAX_EVIDENCE_BYTES = 25 * 1024 * 1024;
 async function stepOf(ctx: Ctx, issue: Issue): Promise<{ ok: true; step: Step | null; flow: Flow | null } | Refused> {
   const name = flowNameOf(issue);
   const loaded = name === null ? null : await repositoryFlow(ctx, name);
-  if (!loaded) return { ok: true, step: stepFor(issue), flow: null };
+  if (!loaded) {
+    const step = stepFor(issue);
+    // Triage chooses the issue's type: a story, or one of the repository's flows.
+    if (step && kindOf(issue) === "new" && step.name === "triage") return { ok: true, step: offerFlows(step, await triageFlows(ctx)), flow: null };
+    return { ok: true, step, flow: null };
+  }
   if (!loaded.ok) return refuse({ kind: "flow-invalid", issue: issue.number, flow: loaded.name, errors: loaded.errors });
   return { ok: true, step: flowStep(issue, loaded.flow), flow: loaded.flow };
 }

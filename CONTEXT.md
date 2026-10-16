@@ -5,7 +5,7 @@ norn runs a team's work through a spec-driven process on GitHub. A developer's a
 ## Work items
 
 **Issue**:
-A GitHub issue norn works on. A new issue becomes a story at triage or is closed as not planned.
+A GitHub issue norn works on. At triage a new issue becomes a story, is given a repository flow, or is closed as not planned.
 
 **Story**:
 An issue that is one feature, from triage until its story PR is merged into the base branch. It has one spec, one story branch and, once sliced, its slices.

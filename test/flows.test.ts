@@ -303,3 +303,86 @@ describe("done in a repository flow", () => {
     expect(res.stdout).toContain("norn done 40 fixed");
   });
 });
+
+describe("triage offers the flows", () => {
+  function newIssue() {
+    const w = setup();
+    w.github.seedFlow("bug", bugFlow());
+    w.github.seedIssue({ number: 7, title: "Rate limiting" });
+    return w;
+  }
+
+  test("the briefing lists story, each flow with its description, and reject", async () => {
+    const w = newIssue();
+
+    const out = (await w.norn("take", "7")).stdout;
+
+    expect(out).toContain(
+      [
+        "  norn done 7 story             (a story: moves to refinement)",
+        "  norn done 7 bug               (A defect: reproduce it, fix it, close it.)",
+        '  norn done 7 reject "reason"   (closed as not planned; give the reason)',
+      ].join("\n"),
+    );
+  });
+
+  test("choosing a flow gives the issue its type and the flow's start, with a transition comment", async () => {
+    const w = newIssue();
+    await w.norn("take", "7");
+
+    const res = await w.norn("done", "7", "bug");
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("#7 is now in reproducing");
+    expect(w.github.labels(7).sort()).toEqual(["reproducing", "type:bug"]);
+    expect(w.github.issues.get(7)!.assignees).toEqual(["alice"]);
+    expect(w.github.comments(7)).toEqual(["norn: triage → reproducing (bug)"]);
+    expect(w.github.labelDefs.has("reproducing")).toBe(true);
+    expect(w.github.claim(7)).toBeNull();
+  });
+
+  test("the issue then runs the flow it was given", async () => {
+    const w = newIssue();
+    await w.norn("take", "7");
+    await w.norn("done", "7", "bug");
+
+    const out = (await w.norn("take", "7")).stdout;
+
+    expect(out).toContain("Invoke the skill: bug-repro\n");
+  });
+
+  test("a flow with its own workspace records the issue's slug on the first transition", async () => {
+    const w = setup();
+    w.github.seedFlow("bug", bugFlow({ workspace: "own" }));
+    w.github.seedIssue({ number: 7, title: "Rate limiting" });
+    await w.norn("take", "7");
+
+    await w.norn("done", "7", "bug");
+
+    expect(w.github.comments(7)).toEqual(["norn: triage → reproducing (bug)\n\nnorn: slug rate-limiting"]);
+  });
+
+  test("a flow with triage false is not offered, nor is a broken flow", async () => {
+    const w = newIssue();
+    w.github.seedFlow("chore", bugFlow({ description: "Housekeeping.", triage: false }));
+    w.github.seedFlow("spike", "{ not json");
+
+    const out = (await w.norn("take", "7")).stdout;
+    const res = await w.norn("done", "7", "chore");
+
+    expect(out).toContain("norn done 7 bug");
+    expect(out).not.toContain("chore");
+    expect(out).not.toContain("spike");
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain('"chore" is not an outcome of triage.');
+  });
+
+  test("without repository flows, triage offers story and reject only", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 7, title: "Rate limiting" });
+
+    const res = JSON.parse((await w.norn("take", "7", "--json")).stdout);
+
+    expect(res.outcomes).toEqual(["story", "reject"]);
+  });
+});

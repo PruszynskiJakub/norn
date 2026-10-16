@@ -16,12 +16,12 @@ describe("briefing carries the process", () => {
     return w;
   }
 
-  test("triage: read the issue, and post findings before accepting", async () => {
+  test("triage: read the issue, and post findings before choosing the type", async () => {
     const w = setup();
     w.github.seedIssue({ number: 7, title: "Something", labels: [] });
     const res = await w.norn("take", "7");
     expect(res.stdout).toContain("Read the issue: gh issue view 7 --comments");
-    expect(res.stdout).toContain("On accept, post what triage established on the issue first: gh issue comment 7");
+    expect(res.stdout).toContain("Unless you reject it, post what triage established on the issue first: gh issue comment 7");
   });
 
   test("plan: commit and push the spec on the story branch", async () => {

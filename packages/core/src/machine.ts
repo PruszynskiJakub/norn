@@ -32,6 +32,8 @@ export interface Outcome {
   needsHuman?: string;
   /** After the transition, a person does QA without the needs-human flag: for a story, or for a slice in mode:hil. */
   notify?: "story" | "mode:hil";
+  /** Triage gives the issue this repository flow: the label type:<flow>, and the flow's start as `to`. */
+  flow?: string;
 }
 
 export interface Step {
@@ -146,7 +148,7 @@ export function stepFor(issue: Issue): Step | null {
       skill: "norn-triage",
       attended: true,
       outcomes: {
-        accept: { to: "needs-refinement", means: "accepted, moves to refinement" },
+        story: { to: "needs-refinement", means: "a story: moves to refinement" },
         reject: { to: "not-planned", means: "closed as not planned; give the reason", note: "reason" },
       },
     };

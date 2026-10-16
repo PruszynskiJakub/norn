@@ -384,7 +384,7 @@ const scenarios: Scenario[] = [
       w.github.seedIssue({ number: 7, title: "New" });
       await w.norn("take", "7");
     },
-    argv: ["done", "7", "accept", "--evidence", "out"],
+    argv: ["done", "7", "story", "--evidence", "out"],
   },
   ...(["missing", "empty", "big"] as const).map(
     (kind): Scenario => ({
@@ -503,12 +503,12 @@ const scenarios: Scenario[] = [
     argv: ["done", "41"],
   },
   {
-    name: "done triage accept",
+    name: "done triage story",
     arrange: async (w) => {
       w.github.seedIssue({ number: 7, title: "New" });
       await w.norn("take", "7");
     },
-    argv: ["done", "7", "accept"],
+    argv: ["done", "7", "story"],
   },
   {
     name: "done triage reject",

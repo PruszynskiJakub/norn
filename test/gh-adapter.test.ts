@@ -236,6 +236,27 @@ describe("GhGitHub files at a ref", () => {
     const dir = scripted(() => ({ stdout: [{ type: "file", name: "bug.json" }] }));
     expect(await new GhGitHub(dir.exec).readFileAt(".agents/flows", "main")).toBeNull();
   });
+
+  test("listFilesAt names the files directly in a directory at a ref, not its subdirectories", async () => {
+    const { exec, calls } = scripted(() => ({
+      stdout: [
+        { type: "file", name: "bug.json" },
+        { type: "dir", name: "old" },
+        { type: "file", name: "chore.json" },
+      ],
+    }));
+
+    expect(await new GhGitHub(exec).listFilesAt(".agents/flows", "release/1")).toEqual(["bug.json", "chore.json"]);
+    expect(method(calls[0])).toBe("GET");
+    expect(path(calls[0])).toBe("repos/{owner}/{repo}/contents/.agents/flows?ref=release%2F1");
+  });
+
+  test("listFilesAt is empty for a missing directory or ref, and for a file", async () => {
+    const missing = scripted(() => ({ code: 1, stderr: "gh: Not Found (HTTP 404)" }));
+    expect(await new GhGitHub(missing.exec).listFilesAt(".agents/flows", "main")).toEqual([]);
+    const file = scripted(() => ({ stdout: { type: "file", name: "bug.json", content: "" } }));
+    expect(await new GhGitHub(file.exec).listFilesAt(".agents/flows/bug.json", "main")).toEqual([]);
+  });
 });
 
 describe("GhGitHub branches and evidence", () => {
