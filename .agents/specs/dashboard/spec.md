@@ -10,8 +10,12 @@ Once `drive` hands a story to `deliver`, agents work on the developer's behalf f
 
 `psdd dashboard` starts a small web server on localhost and opens the browser. The page is an observability layer over the developer's own psdd work in the current repository:
 
-- **Board** at the top: each of the developer's stories with its slices by step, who holds each and whether that claim is stale, fix rounds used out of `deliver.maxFixRounds`, and a "waiting for me" strip of needs-human and needs-human-qa items.
-- **Activity feed** in the centre: a reverse-chronological stream of what happened, in psdd's own words (step transitions, outcomes, fix rounds, needs-human, QA evidence, PRs, claims). Selecting a story or slice filters the feed to its history.
+- **Sidebar**: the developer's stories with their slices, each with a small dot for its state, and text only where it matters ("needs you", "your QA", "quiet").
+- **Overview** in the centre, read top to bottom:
+  - **What needs you**: a headline ("Three things need you") and one card per needs-human or needs-human-qa item, with its reason in plain words and its `drive <issue>` command.
+  - **Worth a look**: agents whose claim went stale, and items one fix round away from `deliver.maxFixRounds`.
+  - **What happened**: a reverse-chronological activity feed. Outcomes show the agent's remark (the implement, review or QA note) right under the event, cut short, with QA remarks linking to their evidence branch. Selecting a story or slice filters the feed to its history.
+- **Detail pane** on the right: the selected item in sentences: where it stands and who holds it, progress through build → review → QA → merge, fix rounds used, blockers, whether the developer will QA it, and its latest QA evidence. With nothing selected, a progress bar per story.
 
 It reads GitHub only, as the developer, with their own `gh`, the same way every psdd command does. It changes nothing, keeps no state of its own and costs almost nothing against the rate limit: each poll is one GraphQL query plus a `git ls-remote`. It runs in the foreground until Ctrl-C. The views and the core read model are built so that #69 can reuse them behind a server adapter.
 
@@ -72,6 +76,14 @@ It reads GitHub only, as the developer, with their own `gh`, the same way every 
 53. As a psdd maintainer, I want the built UI embedded in the bundled executable, so that there are no asset files to locate at runtime.
 54. As a psdd maintainer, I want the GitHub-to-feed translation tested against the fake GitHub, so that label and timeline edge cases are pinned without the network.
 55. As a psdd maintainer, I want the release smoke test to check that the bundle contains and serves the UI, so that a missing asset is caught before a user hits it.
+56. As a developer, I want to read the remark each implement, review and QA outcome left, right under its event in the feed, so that I can see what kind of remarks the agents raise.
+57. As a developer, I want long remarks cut short with a way to expand them, so that the feed stays scannable.
+58. As a developer, I want to switch the feed to remarks only and filter them by implement, review or QA, so that I can compare what the agents say across items.
+59. As a developer, I want a QA remark to link to its evidence branch (`psdd/qa/<issue>`), to the commit that QA run pushed, and to each evidence file, so that I can open the evidence of any run, not just the latest.
+60. As a developer, I want the page to open on what needs me, then what looks stuck, then what happened, so that my eye goes to the right place first.
+61. As a developer, I want colour used only for what needs attention, so that a calm page means nothing is wrong.
+62. As a developer, I want runs of routine events (claims, step changes, slices created or unblocked) folded into one quiet line I can expand, so that significant events stand out.
+63. As a developer, I want significant events worded as plain sentences ("Review asked for changes · round 1 of 3"), with psdd's terms kept for routine ones, so that I can read the feed at a glance.
 
 ## Implementation Decisions
 
@@ -96,13 +108,15 @@ It reads GitHub only, as the developer, with their own `gh`, the same way every 
   - **Feed**: `FeedEvent[]`, newest first.
 - `FeedEvent` is a discriminated union on `kind`. Every variant carries the issue, the time, the actor and a GitHub URL. Variants:
   - step transition (from, to)
-  - outcome (step, outcome, fix round and budget where relevant)
+  - outcome (step, outcome, fix round and budget where relevant, the outcome's `note` as markdown when one was given, and `evidence` when QA attached files). Implement's `psdd done` is an outcome too, so its optional note shows up as a remark.
   - needs-human raised or resolved
   - QA evidence posted
   - slice created or unblocked
   - PR opened or merged (story or slice)
   - claim taken, released or gone stale
   - `other-activity`, a fallback for anything unrecognised, carrying an opaque `detail`
+- `evidence` is `{ branch, sha, files }`, the same shape `psdd done --evidence` builds. The QA evidence event carries it as well.
+- Notes and evidence come from psdd's own transition comment: the `psdd: <from> → <to>` line, the note after it, and the `Evidence (<branch> at <sha>):` block (`evidenceLines`). Parsing it is pure core logic, next to the code that writes it, so the two can't drift apart. The port method returns the bodies of psdd's comments; other comments stay `other-activity` without their body.
 - Translating raw GitHub timeline items into feed events is pure core logic, kept next to the state machine and its label vocabulary.
 - Claim events come from comparing the current claim snapshot with the previous one. Before the first poll only current holders are known, and no earlier claim events are invented. Posting claim comments from `take` or `release` would change the process, so it's not done.
 
@@ -124,6 +138,12 @@ It reads GitHub only, as the developer, with their own `gh`, the same way every 
   - React, Tailwind and shadcn/ui components (cards, badges, tables, tabs, tooltips, scroll areas, a sheet for item detail), with light and dark mode from shadcn's tokens.
   - Built by Vite into one JS and one CSS asset and embedded as strings in the bundled executable. These libraries are dev or build dependencies only.
   - The browser polls `/api/state` and offers a refresh button and an "updated N ago" label.
+  - Layout and attention, as settled by the prototype (see Further Notes):
+    - Three panes: sidebar, a centre reading column about 720px wide, and a detail pane.
+    - Colour only where something needs attention: orange for escalated (needs-human), amber for the developer's QA, stuck claims and failed or sent-back outcomes. Everything else is neutral.
+    - Significant feed events are outcomes, needs-human, merged PRs and stale claims. They read as sentences, with the actor in small grey text. Consecutive routine events fold into one "N routine updates" line that expands on click.
+    - Remarks are shown inline, cut to a few lines with "Show the whole remark". A segmented control switches between "Everything" and "Remarks", and in "Remarks" between All, Implement, Review and QA.
+    - The initial load shows skeletons. A failed poll is a quiet amber line under the header, with the last good data dimmed below it.
 - The JSON contract of `/api/state` is the typed core read model serialised as-is. Its wording comes from a web-side renderer, in line with "only renderers produce wording".
 
 ### Command
@@ -142,6 +162,7 @@ It reads GitHub only, as the developer, with their own `gh`, the same way every 
 - A good test exercises external behaviour at the highest seam: what a front end gets from a core operation, what a browser gets from the server, what a user sees from the command. Tests don't reach into module internals.
 - **Seam 1: the core read operation called with a `Ctx` against `FakeGitHub` (the main seam).**
   - Board contents, ownership filtering (assigned to me or held by my session), stale flags, fix-round counts and blockers.
+  - Outcome notes and evidence parsed from comments written by the real `applyOutcome`, including outcomes without a note and without evidence.
   - The "waiting for me" strip.
   - Each `FeedEvent` variant from scripted timeline items, plus the `other-activity` fallback and actor attribution.
   - The 7-day closed-story window.
@@ -175,3 +196,8 @@ It reads GitHub only, as the developer, with their own `gh`, the same way every 
 - GraphQL is rate-limited by points, not requests. A poll here should cost a few points out of 5,000 per hour, and `ls-remote` costs nothing against the API limit, so even the 30-second floor stays negligible next to the agents' own usage (#44).
 - The release process gains the Vite UI build before bundling the CLI.
 - The read model and the UI are built to move to #69 unchanged: only the adapter (Octokit) and the server (hosted, with sign-in) differ.
+- The UI was settled with a throwaway prototype, kept next to this spec in `.agents/specs/dashboard/prototype.html` (open it in a browser; `?variant=B1` is the chosen one). Rounds:
+  1. Three layouts: board + feed, a three-pane inbox, and an ops table + log. The three-pane inbox won.
+  2. Where to show the agents' remarks: inline in the feed, a separate Remarks tab, or a round-by-round thread in the detail pane. Inline (B1) won. QA remarks link to the evidence branch.
+  3. "Too dense, nothing steers the eye." It became calm: what needs you first, colour only for attention, routine events folded, sentences instead of badges.
+- Implement's note is optional in `psdd done`, so implement remarks appear only when the agent leaves one. Asking the implement skill always to leave a short summary would make them reliable. That is a process change and is not part of this spec.
