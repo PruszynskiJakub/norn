@@ -46,7 +46,9 @@ export type FlowError =
   | { kind: "start-unknown"; start: string }
   | { kind: "target-unknown"; state: string; word: string; to: string }
   /** A state takes a name norn keeps for itself, e.g. closed. */
-  | { kind: "state-reserved"; state: string };
+  | { kind: "state-reserved"; state: string }
+  /** No path of outcomes leads from the state to closed or not-planned, so an issue there could never end. */
+  | { kind: "end-unreachable"; state: string };
 
 /** Ends every flow can lead to; no state may take these names. */
 export const RESERVED_TARGETS = ["closed", "not-planned"] as const;
@@ -119,7 +121,29 @@ export function validateFlow(data: unknown): FlowError[] {
     }
   }
   if (typeof data.start === "string" && !Object.hasOwn(states, data.start)) errors.push({ kind: "start-unknown", start: data.start });
+  for (const state of statesThatCannotEnd(states)) errors.push({ kind: "end-unreachable", state });
   return errors;
+}
+
+/** The states from which no path of outcomes reaches closed or not-planned, in file order. */
+function statesThatCannotEnd(states: Record<string, unknown>): string[] {
+  const targets = (state: unknown): string[] =>
+    isObject(state) && isObject(state.outcomes)
+      ? Object.values(state.outcomes).flatMap((o) => (isObject(o) && typeof o.to === "string" ? [o.to] : []))
+      : [];
+  // An unknown target is reported on its own, so it does not count against the states before it.
+  const ends = new Set<string>([...RESERVED_TARGETS, ...Object.values(states).flatMap(targets).filter((to) => !Object.hasOwn(states, to))]);
+  // Walk back from the ends: a state ends once one of its outcomes leads to a state that ends.
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const [name, state] of Object.entries(states)) {
+      if (!ends.has(name) && targets(state).some((to) => ends.has(to))) {
+        ends.add(name);
+        grew = true;
+      }
+    }
+  }
+  return Object.keys(states).filter((name) => !ends.has(name));
 }
 
 /** The flow named by the issue's `type:<name>` label, for any type but the built-in story and slice; null for none. */
