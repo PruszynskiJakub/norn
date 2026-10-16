@@ -99,8 +99,14 @@ export function doctorFailed(r: DoctorResult): boolean {
   return r.checks.some((c) => c.level === "fail");
 }
 
+/** A read that worked, or the gh-error fact of one that failed. */
+type Attempt<T> = { ok: true; value: T } | { ok: false; fact: CheckFact };
+
+/** What a check works on, or a check it needs that did not pass, so it is skipped; a read that failed instead carries its fact. */
+type Ready<T> = Attempt<T> | { ok: false; needs: CheckId };
+
 /** Runs a GitHub read, turning a failure into a gh-error fact so doctor itself never fails. */
-async function attempt<T>(read: () => Promise<T>): Promise<{ ok: true; value: T } | { ok: false; fact: CheckFact }> {
+async function attempt<T>(read: () => Promise<T>): Promise<Attempt<T>> {
   try {
     return { ok: true, value: await read() };
   } catch (e) {
@@ -160,12 +166,13 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
   const needsForGitHub: CheckId | null = !ghOk ? "gh" : !gitOk ? "git" : null;
 
   const loaded = inCheckout ? await loadConfig(d.workspace) : null;
-  const config: Config | null = loaded?.ok ? loaded.config : null;
-  const needsForConfig: CheckId | null = !inCheckout ? "git" : config ? null : "config";
+  // The checks on the configuration need it read; those on GitHub need gh and the checkout first.
+  const withConfig: Ready<Config> = loaded?.ok ? { ok: true, value: loaded.config } : { ok: false, needs: inCheckout ? "config" : "git" };
+  const withRepo: Ready<Config> = needsForGitHub ? { ok: false, needs: needsForGitHub } : withConfig;
 
-  if (needsForGitHub || needsForConfig) skip("base-branch", (needsForGitHub ?? needsForConfig) as CheckId);
+  if (!withRepo.ok) skip("base-branch", withRepo.needs);
   else {
-    const branch = (config as Config).baseBranch;
+    const branch = withRepo.value.baseBranch;
     const exists = await attempt(() => d.github.branchExists(branch));
     if (!exists.ok) add("base-branch", "fail", exists.fact);
     else {
@@ -182,25 +189,28 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
   }
 
   // The flows in effect, read from the base branch on GitHub, as norn commands read them.
-  const inEffect = needsForGitHub || needsForConfig ? null : await attempt(() => repositoryFlows({ github: d.github, config: config as Config }));
+  const inEffect: Ready<{ config: Config; flows: LoadedFlow[] }> = !withRepo.ok
+    ? withRepo
+    : await attempt(async () => ({ config: withRepo.value, flows: await repositoryFlows({ github: d.github, config: withRepo.value }) }));
 
-  if (needsForGitHub || needsForConfig) skip("labels", (needsForGitHub ?? needsForConfig) as CheckId);
+  if (!inEffect.ok && "needs" in inEffect) skip("labels", inEffect.needs);
   else {
     const names = await attempt(() => d.github.labelNames());
     if (!names.ok) add("labels", "fail", names.fact);
-    else if (!inEffect?.ok) add("labels", "fail", (inEffect as { fact: CheckFact }).fact);
+    else if (!inEffect.ok) add("labels", "fail", inEffect.fact);
     else {
-      const wanted = labelDefinitions(inEffect.value).map((l) => l.name);
+      const wanted = labelDefinitions(inEffect.value.flows).map((l) => l.name);
       const missing = wanted.filter((l) => !names.value.includes(l));
-      const unused = names.value.filter((l) => !wanted.includes(l) && looksLikeNorns(l, inEffect.value));
+      const unused = names.value.filter((l) => !wanted.includes(l) && looksLikeNorns(l, inEffect.value.flows));
       add("labels", missing.length ? "fail" : unused.length ? "warning" : "ok", { kind: "labels", total: wanted.length, missing, unused });
     }
   }
 
-  if (needsForGitHub || needsForConfig) skip("flows", (needsForGitHub ?? needsForConfig) as CheckId);
-  else if (!inEffect?.ok) add("flows", "fail", (inEffect as { fact: CheckFact }).fact);
+  if (!inEffect.ok && "needs" in inEffect) skip("flows", inEffect.needs);
+  else if (!inEffect.ok) add("flows", "fail", inEffect.fact);
   else {
-    const fact = await attempt(() => flows(d, config as Config, inEffect.value));
+    const { config, flows: loaded } = inEffect.value;
+    const fact = await attempt(() => flows(d, config, loaded));
     if (!fact.ok) add("flows", "fail", fact.fact);
     else add("flows", fact.value.invalid.length || fact.value.missingSkills.length ? "fail" : fact.value.orphans.length ? "warning" : "ok", fact.value);
   }
@@ -209,9 +219,9 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
   else if (!loaded.ok) add("config", "fail", { kind: "config", problems: loaded.refusal.problems, warnings: [] });
   else add("config", loaded.warnings.length ? "warning" : "ok", { kind: "config", problems: [], warnings: loaded.warnings });
 
-  if (needsForConfig) skip("version", needsForConfig);
+  if (!withConfig.ok) skip("version", withConfig.needs);
   else {
-    const repo = (config as Config).nornVersion;
+    const repo = withConfig.value.nornVersion;
     const match = repo === null ? null : versionMatch(d.version, repo);
     const level = match === null ? "warning" : match.kind === "same" || match.kind === "patch" ? "ok" : match.compatible ? "warning" : "fail";
     add("version", level, { kind: "version", running: d.version, repo, match });
@@ -229,9 +239,9 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
     add("agent-instructions", files.length ? "ok" : "fail", { kind: "agent-instructions", files });
   }
 
-  if (needsForConfig) skip("provider", needsForConfig);
+  if (!withConfig.ok) skip("provider", withConfig.needs);
   else {
-    const c = config as Config;
+    const c = withConfig.value;
     const mismatch = providerRefusal(c, d.workspace.env);
     add("provider", mismatch ? "fail" : "ok", { kind: "provider", provider: c.provider, unsetVariable: mismatch?.variable ?? null });
   }
