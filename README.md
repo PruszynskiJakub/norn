@@ -15,7 +15,7 @@ CLI for the SDD process. The developer's LLM calls it to run work through the pr
 psdd is not on npm. Install it from this repository (you need read access to it) by a release tag, which carries the built CLI, so nothing is built on install:
 
 ```sh
-npm install -D github:PruszynskiJakub/ai-engine#v0.4.0
+npm install -D github:PruszynskiJakub/ai-engine#v0.5.0
 ```
 
 Only release tags can be installed: a branch or commit of the repository has no built CLI.
@@ -59,7 +59,7 @@ You need Node 20+, git, Claude Code, `gh` logged in (`gh auth status`) and read 
    ```
 2. Install psdd and set it up. `init` installs the skills into `skills/` (linked into `.claude/skills/`), writes the psdd section into `AGENTS.md` and `CLAUDE.md`, creates `.agents/specs/` and `.agents/psdd.config.json`, gitignores `.agents/worktrees/` and the local config, and creates the labels on the repository.
    ```sh
-   npm install -D github:PruszynskiJakub/ai-engine#v0.4.0
+   npm install -D github:PruszynskiJakub/ai-engine#v0.5.0
    npx psdd init
    git add -A && git commit -m "Set up psdd" && git push
    ```
