@@ -162,7 +162,6 @@ export function App() {
               <Button onClick={toggleTheme} title={FEED.theme} aria-label={FEED.theme}>
                 ◐
               </Button>
-              <img src="/favicon.svg" alt="norn" width={28} height={28} className="ml-1.5 rounded-[7px]" />
             </div>
             {notice && (
               <p role="status" className="-mt-1 mb-5 text-[13px] text-warn">

@@ -54,9 +54,12 @@ export function Sidebar({ loading }: { loading: boolean }) {
   const waiting = state.waiting.length;
   return (
     <nav aria-label="Stories">
-      <div className="flex flex-col px-2.5 pb-[18px]">
-        <b className="text-[15px] tracking-[-0.01em]">norn</b>
-        <span className="truncate text-[12px] text-faint">{state.repoUrl?.replace(/^https?:\/\/(www\.)?github\.com\//, "") ?? ""}</span>
+      <div className="flex items-center gap-2.5 px-2.5 pb-[18px]">
+        <img src="/favicon.svg" alt="" width={64} height={64} className="flex-none rounded-[16px]" />
+        <div className="flex min-w-0 flex-col">
+          <b className="text-[15px] tracking-[-0.01em]">norn</b>
+          <span className="truncate text-[12px] text-faint">{state.repoUrl?.replace(/^https?:\/\/(www\.)?github\.com\//, "") ?? ""}</span>
+        </div>
       </div>
       <NavRow n={null} kind="top">
         <span className={title}>{SIDEBAR.overview}</span>
