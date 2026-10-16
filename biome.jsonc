@@ -2,7 +2,7 @@
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
   "vcs": { "enabled": true, "clientKind": "git", "useIgnoreFile": true },
   // skills/ and the specs are content for agents, not code.
-  "files": { "includes": ["**", "!skills", "!.agents", "!.claude", "!PRD.html"] },
+  "files": { "includes": ["**", "!skills", "!.agents", "!.claude"] },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 160 },
   // The dashboard UI's stylesheet uses Tailwind v4 directives (@theme, @custom-variant).
   "css": { "parser": { "tailwindDirectives": true } },

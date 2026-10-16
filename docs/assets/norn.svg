@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 280 280" role="img" aria-label="Norn">
+  <rect width="280" height="280" rx="64" fill="#14182E"/>
+  <path d="M 66 214 V 140 A 74 74 0 0 1 214 140 V 214" fill="none" stroke="#E8B44A" stroke-width="14" stroke-linecap="round"/>
+  <path d="M 88 214 V 140 A 52 52 0 0 1 192 140 V 214" fill="none" stroke="#F3DCA6" stroke-width="14" stroke-linecap="round"/>
+  <path d="M 110 214 V 140 A 30 30 0 0 1 170 140 V 214" fill="none" stroke="#C8862A" stroke-width="14" stroke-linecap="round"/>
+</svg>

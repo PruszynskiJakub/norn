@@ -178,8 +178,8 @@ describe("taking an issue this session already holds", () => {
   });
 });
 
-describe("the PRD's refusal", () => {
-  test("a slice held elsewhere is refused with the PRD's wording", async () => {
+describe("the documented refusal", () => {
+  test("a slice held elsewhere is refused with the documented wording", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
     w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
