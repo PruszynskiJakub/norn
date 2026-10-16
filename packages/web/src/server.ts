@@ -1,5 +1,5 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { byTime, type Ctx, type Observation, observe } from "@norn/core";
+import { byTime, type Ctx, DEFAULT_STATE_LABEL, type Observation, observe } from "@norn/core";
 import type { DashboardIdentity, DashboardState, PollFailure } from "./contract.js";
 import { ICON_SVG } from "./icon.js";
 import type { UiAssets } from "./ui-assets.js";
@@ -219,6 +219,7 @@ class Poller {
       board: last?.board ?? [],
       waiting: last?.waiting ?? [],
       flows: last?.flows ?? [],
+      stateLabelDefaults: DEFAULT_STATE_LABEL,
       feed: this.feed,
       lastUpdated: last?.at ?? null,
       lastError: this.lastError,

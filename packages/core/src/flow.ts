@@ -95,16 +95,24 @@ export interface LabelDefinition {
   description: string;
 }
 
-/** The colour and description of a state's label when the flow gives none, by the state's kind. */
-export const DEFAULT_STATE_LABEL = {
+/** A state's kind, for its label's defaults: a human gate, where a person checks the work, else attended or run by an agent. */
+export type StateKind = "gate" | "attended" | "agent";
+
+export function stateKindOf(s: FlowState): StateKind {
+  return Object.hasOwn(s.behaviours ?? {}, "humanGate") ? "gate" : s.attended ? "attended" : "agent";
+}
+
+/** The colour and description of a state's label when the flow gives none, by the state's kind; a gate takes the built-in human QA's colour. */
+export const DEFAULT_STATE_LABEL: Record<StateKind, { color: string; description: string }> = {
+  gate: { color: "e99695", description: "a person checks the work here" },
   attended: { color: "c5def5", description: "a person takes part in this step" },
   agent: { color: "bfd4f2", description: "an agent runs this step unattended" },
-} as const;
+};
 
 /** The label of a state of the flow: the state's colour and description, or the defaults of its kind. */
 export function stateLabel(flow: Flow, state: string): LabelDefinition {
   const s = flow.states[state];
-  const fallback = s.attended ? DEFAULT_STATE_LABEL.attended : DEFAULT_STATE_LABEL.agent;
+  const fallback = DEFAULT_STATE_LABEL[stateKindOf(s)];
   return { name: state, color: s.color ?? fallback.color, description: s.description ?? fallback.description };
 }
 

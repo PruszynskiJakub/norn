@@ -1,4 +1,5 @@
-import type { BoardItem, BoardStory, FeedEvent, Flow, FlowState, LoadedFlow } from "@norn/core";
+import type { BoardItem, BoardStory, FeedEvent, Flow, FlowState, LoadedFlow, StateKind } from "@norn/core";
+import type { DashboardState } from "../../src/contract.ts";
 
 /** A board item with the top-level issue it belongs to and the flow it runs. */
 export interface Item extends BoardItem {
@@ -82,25 +83,20 @@ export function countsFixRounds(x: Item): boolean {
   return Object.values(x.flowDef?.states ?? {}).some((s) => uses(s, "countsFixRounds"));
 }
 
-/** A state's kind, as norn colours its label when the flow names no colour: a human gate, attended, or run by an agent. */
-export type StateKind = "gate" | "attended" | "agent";
-
-export function kindOf(s: FlowState): StateKind {
+/** A state's kind, as norn's stateKindOf has it: a human gate, attended, or run by an agent. */
+function kindOf(s: FlowState): StateKind {
   return uses(s, "humanGate") ? "gate" : s.attended ? "attended" : "agent";
 }
 
-/** The default label colours by kind, as norn creates labels; a human gate takes the built-in human QA's. */
-const KIND_COLOR: Record<StateKind, string> = { gate: "e99695", attended: "c5def5", agent: "bfd4f2" };
-
 /** The colour of a state of the item's flow, as a CSS colour: its own, else its kind's. Null for a label that is no state of the flow. */
-export function stateColor(x: Item, label: string): string | null {
+export function stateColor(x: Item, label: string, defaults: DashboardState["stateLabelDefaults"]): string | null {
   const s = x.flowDef?.states[label];
-  return s ? colorOf(s) : null;
+  return s ? colorOf(s, defaults) : null;
 }
 
-/** A state's colour as a CSS colour: its own, else its kind's. */
-export function colorOf(s: FlowState): string {
-  return `#${s.color ?? KIND_COLOR[kindOf(s)]}`;
+/** A state's colour as a CSS colour: its own, else its kind's, from the defaults the server sends, as norn creates labels. */
+export function colorOf(s: FlowState, defaults: DashboardState["stateLabelDefaults"]): string {
+  return `#${s.color ?? defaults[kindOf(s)].color}`;
 }
 
 /** How much a feed event asks for the developer's eye. */

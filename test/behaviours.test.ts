@@ -234,6 +234,15 @@ describe("humanGate", () => {
     expect(w.notifications.map((n) => [n.title, n.body.split("\n")[0]])).toEqual([["norn: #40 needs you", "needs human QA (bug)"]]);
   });
 
+  test("a gate's label without a colour of its own gets the human gate's default, not the attended one", async () => {
+    const w = bugAt("reviewing");
+    await w.norn("take", "40");
+
+    await w.norn("done", "40", "approve");
+
+    expect(w.github.labelDefs.get("verifying")).toEqual({ color: "e99695", description: "a person checks the work here" });
+  });
+
   test("a gate for mode:afk only notifies with that mode, as one for mode:hil does", async () => {
     const flow = bugFlow();
     Object.assign(flow.states.verifying, { when: "afk", passThrough: "pass" });

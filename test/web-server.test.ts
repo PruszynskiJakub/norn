@@ -133,6 +133,19 @@ describe("the dashboard server", () => {
     ]);
   });
 
+  test("answers the label colour and description of each kind of state, as norn creates labels without a colour of their own", async () => {
+    const s = await started(await dashboard());
+    await s.idle();
+
+    const now = await state(s.url);
+
+    expect(now.stateLabelDefaults).toEqual({
+      gate: { color: "e99695", description: "a person checks the work here" },
+      attended: { color: "c5def5", description: "a person takes part in this step" },
+      agent: { color: "bfd4f2", description: "an agent runs this step unattended" },
+    });
+  });
+
   test("says where each flow comes from: built into norn, a built-in one the repository overrides, or the repository's own", async () => {
     const w = setup({ now: "2026-10-13T12:00:00Z" });
     w.github.seedFlow("slice", { description: "Broken.", start: "nowhere", workspace: "none", states: {} });

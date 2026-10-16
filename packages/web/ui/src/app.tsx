@@ -20,6 +20,8 @@ const POLL_MS = 10_000;
 /** How often "updated N ago" and the holders' durations are reworded. */
 const TICK_MS = 15_000;
 
+const UNKNOWN_LABEL = { color: "cccccc", description: "" };
+
 const EMPTY: DashboardState = {
   status: "loading",
   me: null,
@@ -27,6 +29,8 @@ const EMPTY: DashboardState = {
   board: [],
   waiting: [],
   flows: [],
+  // Never shown: no item or flow has a state to colour before the server's first answer, which brings norn's own.
+  stateLabelDefaults: { gate: UNKNOWN_LABEL, attended: UNKNOWN_LABEL, agent: UNKNOWN_LABEL },
   feed: [],
   lastUpdated: null,
   lastError: null,
