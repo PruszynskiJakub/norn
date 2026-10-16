@@ -316,6 +316,17 @@ export async function followRename(ctx: Ctx, issue: Issue, flow: Flow, name: str
   issue.labels = [...issue.labels.filter((l) => l !== from), to];
 }
 
+/** Hands an issue in a state its flow no longer has to a person, under the claim this session holds. */
+export async function handOverLeft(ctx: Ctx, issue: Issue, name: string, state: string): Promise<void> {
+  const n = issue.number;
+  const why = `the state ${state} is no longer in the flow ${name}`;
+  await ctx.github.addLabels(n, ["needs-human"]);
+  await ctx.github.comment(n, needsHumanLine(why));
+  // The old label goes, so the resolve step moves the issue into a state of the flow.
+  await ctx.github.removeLabels(n, [state, "in-progress"]);
+  await notifyNeedsHuman(ctx, n, why);
+}
+
 /**
  * Every state label on the issue except `keep`: of its repository flow, or of
  * the built-in process. A failed removal can leave two state labels; removing

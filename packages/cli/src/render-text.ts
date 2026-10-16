@@ -261,6 +261,11 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
         ...r.errors.map((e) => `  ${flowError(e)}`),
         `Fix .agents/flows/${r.flow}.json on the base branch, then run the command again. Issues of other types are not affected.`,
       ];
+    case "state-left":
+      return [
+        `#${r.issue} is in ${r.state}, which the flow ${r.flow} no longer has, so it now needs a human.`,
+        `Run norn take ${r.issue} to resolve it: a person moves it to a state of the flow.`,
+      ];
     case "held":
       return [
         `${heldWhat(r)} is already held by another session (since ${heldSince(r.since)}).`,

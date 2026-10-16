@@ -20,6 +20,7 @@ import {
   fixLimitReason,
   fixRounds,
   followRename,
+  handOverLeft,
   leftState,
   followUps,
   needsHumanLine,
@@ -160,9 +161,17 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
   if (resolved.ok && resolved.flow && !resolved.step) {
     const from = await leftState(ctx, issue, resolved.flow);
     const to = from === null ? undefined : resolved.flow.renamed?.[from];
+    const name = flowNameOf(issue)!;
     if (from !== null && to !== undefined) {
-      await followRename(ctx, issue, resolved.flow, flowNameOf(issue)!, from, to);
+      await followRename(ctx, issue, resolved.flow, name, from, to);
       resolved = await stepOf(ctx, issue);
+    } else if (from !== null) {
+      try {
+        await handOverLeft(ctx, issue, name, from);
+      } finally {
+        await github.deleteClaim(n);
+      }
+      return refuse({ kind: "state-left", issue: n, state: from, flow: name });
     }
   }
   if (!resolved.ok || !resolved.step) {

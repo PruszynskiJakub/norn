@@ -327,4 +327,28 @@ describe("a flow that changed under issues in progress", () => {
     expect(w.github.labels(40).sort()).toEqual(["in-progress", "reproducing", "type:bug"]);
     expect(w.github.comments(40)).toEqual(["norn: repro → reproducing (automatic)\n\nThe flow bug renamed the state repro to reproducing."]);
   });
+
+  /** A bug that norn moved into verifying, a state the bug flow has since dropped. */
+  async function leftInVerifying() {
+    const w = bugAt("verifying");
+    await w.github.comment(40, "norn: fixing → verifying (fixed)");
+    return w;
+  }
+
+  test("take hands an issue in a removed state to a person, naming the state and the flow", async () => {
+    const w = await leftInVerifying();
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toBe(
+      [
+        "#40 is in verifying, which the flow bug no longer has, so it now needs a human.",
+        "Run norn take 40 to resolve it: a person moves it to a state of the flow.",
+      ].join("\n"),
+    );
+    expect(w.github.labels(40).sort()).toEqual(["needs-human", "type:bug"]);
+    expect(w.github.comments(40).at(-1)).toBe("norn: needs-human — the state verifying is no longer in the flow bug");
+    expect(w.github.claim(40)).toBeNull();
+  });
 });
