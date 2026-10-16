@@ -179,7 +179,7 @@ describe("state labels on demand", () => {
 
     await w.norn("done", "131");
 
-    expect(w.github.labelDefs.get("needs-review")).toEqual({ color: "5319e7", description: "Code review of the slice PR or the story PR" });
+    expect(w.github.labelDefs.get("needs-review")).toEqual({ color: "5319e7", description: "Waiting for review" });
   });
 
   test("a transition into a state whose label is missing creates it from the state's colour and description", async () => {
