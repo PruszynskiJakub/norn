@@ -8,6 +8,7 @@ import {
   type EscalateResult,
   type Event,
   type FinishCommand,
+  type FlowError,
   type FollowUpTask,
   FOR_HUMAN,
   type Holder,
@@ -254,6 +255,12 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       return [`#${r.issue} is blocked by ${issues(r.blockers) || "other issues"}. Do not work on it yet.`, pick(r.story)];
     case "no-step":
       return [`#${r.issue} (${r.state ?? "no state"}) has no step norn can brief.`, pick(r.story)];
+    case "flow-invalid":
+      return [
+        `#${r.issue} runs the flow ${r.flow}, which is broken, so norn cannot run it:`,
+        ...r.errors.map((e) => `  ${flowError(e)}`),
+        `Fix .agents/flows/${r.flow}.json on the base branch, then run the command again. Issues of other types are not affected.`,
+      ];
     case "held":
       return [
         `${heldWhat(r)} is already held by another session (since ${heldSince(r.since)}).`,
@@ -326,6 +333,24 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       return [`#${r.issue} is not a story yet. Triage it first with: norn take ${r.issue}`];
     default:
       return unreachable(r);
+  }
+}
+
+/** One thing wrong with a flow file. */
+function flowError(e: FlowError): string {
+  switch (e.kind) {
+    case "not-json":
+      return `It is not valid JSON: ${e.detail}`;
+    case "field-invalid":
+      return `${e.path || "The file"} must be ${e.expected}.`;
+    case "start-unknown":
+      return `start names ${e.start}, which is not one of its states.`;
+    case "target-unknown":
+      return `The outcome ${e.word} of ${e.state} leads to ${e.to}, which is not one of its states, closed or not-planned.`;
+    case "state-reserved":
+      return `The state ${e.state} takes a name norn keeps for itself.`;
+    default:
+      return unreachable(e);
   }
 }
 

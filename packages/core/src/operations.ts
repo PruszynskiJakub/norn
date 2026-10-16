@@ -1,9 +1,10 @@
 import { briefing, type Briefing, finishCommands } from "./briefing.js";
 import { acquire } from "./claims.js";
 import type { Event } from "./events.js";
+import { type Flow, flowNameOf, flowStatesOf, flowStep, repositoryFlow } from "./flow.js";
 import type { Issue } from "./github.js";
 import { locate } from "./location.js";
-import { FIX_STATES, kindOf, slicesOf, stateOf, statesOf, stepFor, type State, type Target } from "./machine.js";
+import { FIX_STATES, kindOf, slicesOf, stateOf, statesOf, type Step, stepFor, type State } from "./machine.js";
 import { computeNext, type NextReport, notAStory, notifyWaiting } from "./next.js";
 import { notifyNeedsHuman } from "./notify.js";
 import { type Refusal, type Refused, refuse } from "./refusals.js";
@@ -13,6 +14,7 @@ import { specPath } from "./text.js";
 import {
   applyOutcome,
   type Ctx,
+  ensureStateLabel,
   type Evidence,
   ensureStoryBranch,
   fixLimitReason,
@@ -34,7 +36,7 @@ export interface TakeResult {
   kind: "taken";
   issue: number;
   /** The state after take, e.g. implementation for a slice that was ready-for-agent. */
-  state: State | null;
+  state: string | null;
   step: { name: string; skill: string; attended: boolean; outcomes: string[] };
   briefing: Briefing;
   /** This session already held the issue; its claim is refreshed. */
@@ -47,8 +49,9 @@ export interface DoneResult {
   ok: true;
   kind: "done";
   issue: number;
-  from: State | null;
-  to: Target;
+  from: string | null;
+  /** A state of the issue's flow, closed or not-planned. */
+  to: string;
   /** QA evidence pushed and embedded in the transition comment. */
   evidence?: Evidence;
   /** The fix-round limit the outcome reached, so the issue needs a human instead of another round; null when not reached. */
@@ -93,11 +96,30 @@ export interface NextResult {
 /** GitHub's API takes blobs up to 100 MB; evidence is screenshots, logs and output, far smaller. */
 export const MAX_EVIDENCE_BYTES = 25 * 1024 * 1024;
 
+/** The issue's step: from its repository flow when its type names one, else from the built-in process. */
+async function stepOf(ctx: Ctx, issue: Issue): Promise<{ ok: true; step: Step | null; flow: Flow | null } | Refused> {
+  const name = flowNameOf(issue);
+  const loaded = name === null ? null : await repositoryFlow(ctx, name);
+  if (!loaded) return { ok: true, step: stepFor(issue), flow: null };
+  if (!loaded.ok) return refuse({ kind: "flow-invalid", issue: issue.number, flow: loaded.name, errors: loaded.errors });
+  return { ok: true, step: flowStep(issue, loaded.flow), flow: loaded.flow };
+}
+
+/** The issue's state: in its repository flow, or in the built-in process. */
+function stateIn(issue: Issue, flow: Flow | null): string | null {
+  return flow ? (flowStatesOf(issue, flow)[0] ?? null) : stateOf(issue);
+}
+
 /** Why an issue has no step to take. */
-async function noStepRefusal(issue: Issue, ctx: Ctx): Promise<Refusal> {
+async function noStepRefusal(issue: Issue, ctx: Ctx, flow: Flow | null = null): Promise<Refusal> {
   const { github } = ctx;
   const n = issue.number;
   if (issue.state === "closed") return { kind: "closed", issue: n };
+  if (flow) {
+    const states = flowStatesOf(issue, flow);
+    if (states.length > 1) return { kind: "ambiguous-state", issue: n, states, story: null };
+    return { kind: "no-step", issue: n, state: states[0] ?? null, story: null };
+  }
   const state = stateOf(issue);
   const story = kindOf(issue) === "slice" ? await github.parentOf(n) : n;
   const states = statesOf(issue);
@@ -114,7 +136,9 @@ async function noStepRefusal(issue: Issue, ctx: Ctx): Promise<Refusal> {
 export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Promise<TakeResult | Refused> {
   const { github } = ctx;
   const before = await github.getIssue(n);
-  if (!stepFor(before) || before.state === "closed") return refuse(await noStepRefusal(before, ctx));
+  const first = await stepOf(ctx, before);
+  if (!first.ok) return first;
+  if (!first.step || before.state === "closed") return refuse(await noStepRefusal(before, ctx, first.flow));
 
   const user = await github.currentUser();
   const record = { holder: user, session: ctx.session, since: ctx.now().toISOString() };
@@ -128,25 +152,27 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
   }
   // Re-read under the claim: labels may have moved between the first read and the claim.
   const issue = await github.getIssue(n);
-  const step = stepFor(issue);
-  if (!step) {
+  const resolved = await stepOf(ctx, issue);
+  if (!resolved.ok || !resolved.step) {
     await github.deleteClaim(n);
-    return refuse(await noStepRefusal(issue, ctx));
+    return resolved.ok ? refuse(await noStepRefusal(issue, ctx, resolved.flow)) : resolved;
   }
-  const state = stateOf(issue);
+  const { step, flow } = resolved;
+  const state = stateIn(issue, flow);
   // The new state goes on before the old one comes off, so a failure in between never leaves the issue without a state.
   if (step.enterAs && step.enterAs !== state) {
-    const old = stateLabels(issue, step.enterAs);
+    const old = stateLabels(issue, step.enterAs, flow);
+    if (flow) await ensureStateLabel(ctx, flow, step.enterAs);
     await github.addLabels(n, [step.enterAs, "in-progress"]);
     await github.removeLabels(n, old);
-    issue.labels = [...issue.labels.filter((l) => !(old as string[]).includes(l)), step.enterAs];
+    issue.labels = [...issue.labels.filter((l) => !old.includes(l)), step.enterAs];
   } else {
     await github.addLabels(n, ["in-progress"]);
   }
   let tookOver: TakeResult["tookOver"] = null;
   if (claim.tookOver) {
     // The holder may only be slow, and its worktree holds its commits: keep it, never remove it here.
-    const loc = await locate(issue, ctx);
+    const loc = await locate(issue, ctx, flow);
     const kept = loc !== null && (await ctx.workspace.worktreeExists(loc.worktree));
     tookOver = { own: claim.ownTakeover ?? false, since: claim.tookOver.since, worktreeKept: kept };
   }
@@ -154,9 +180,9 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
     ok: true,
     kind: "taken",
     issue: n,
-    state: stateOf(issue),
+    state: stateIn(issue, flow),
     step: { name: step.name, skill: step.skill, attended: step.attended, outcomes: Object.keys(step.outcomes).filter(Boolean) },
-    briefing: await briefing(issue, step, ctx, state),
+    briefing: await briefing(issue, step, ctx, state, flow),
     reacquired: claim.reacquired ?? false,
     tookOver,
   };
@@ -176,8 +202,10 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   const notHeld = await checkHeld(ctx, n);
   if (notHeld) return notHeld;
   const issue = await github.getIssue(n);
-  const step = stepFor(issue);
-  if (!step) return refuse(await noStepRefusal(issue, ctx));
+  const resolved = await stepOf(ctx, issue);
+  if (!resolved.ok) return resolved;
+  const { step, flow } = resolved;
+  if (!step) return refuse(await noStepRefusal(issue, ctx, flow));
   const outcome = step.outcomes[word ?? ""];
   if (!outcome) {
     const finish = finishCommands(n, step);
@@ -188,7 +216,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   if (kindOf(issue) === "story" && stateOf(issue) === "needs-slicing" && (await slicesOf(github, n)).length === 0) {
     return refuse({ kind: "no-slices", issue: n });
   }
-  if (step.skill === "norn-merge") {
+  if (!flow && step.skill === "norn-merge") {
     const r = await sliceMergeRefusal(ctx, issue);
     if (r) return refuse(r);
   }
@@ -218,7 +246,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   let applied = outcome;
   let fixLimit: number | null = null;
   // A round starts when review or QA sends the issue back; resolving needs-human stays put and is no round.
-  if (FIX_STATES.includes(outcome.to as State) && stateOf(issue) !== outcome.to) {
+  if (!flow && FIX_STATES.includes(outcome.to as State) && stateOf(issue) !== outcome.to) {
     const rounds = fixRounds(await github.listComments(n)) + 1;
     if (rounds > ctx.config.maxFixRounds) {
       fixLimit = ctx.config.maxFixRounds;
@@ -226,7 +254,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     }
   }
   try {
-    await applyOutcome(ctx, issue, applied, word ?? "", note, evidence);
+    await applyOutcome(ctx, issue, applied, word ?? "", note, evidence, flow);
   } finally {
     await github.deleteClaim(n);
   }
@@ -234,7 +262,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     ok: true,
     kind: "done",
     issue: n,
-    from: stateOf(issue),
+    from: stateIn(issue, flow),
     to: outcome.to,
     ...(evidence ? { evidence } : {}),
     fixLimit,
