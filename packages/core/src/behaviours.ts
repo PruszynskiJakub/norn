@@ -88,6 +88,37 @@ const opensPR: Behaviour = {
   },
 };
 
+/** How QA evidence reaches the issue. */
+export const EVIDENCE_FILES =
+  "Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.";
+
+/** How a person QAs issue n with the user, running the app from `branch`, or where they are without one. */
+export function humanQaLines(n: number, branch: string | null): string[] {
+  return [
+    `Run the app${branch ? ` from ${branch}` : ""} on this machine and walk the user through what is left, plus anything in the evidence they question.`,
+    "Tie each remark the user brings to a criterion; a remark on a criterion fails it. For a remark outside the criteria, the user decides:",
+    `  follow up (the default): gh issue create --title "<remark>" --body "From QA of #${n}: <remark>" (it goes through triage)`,
+    "  pull it in: it fails this item, like a criterion",
+    "  drop it: say so in the note",
+    `Every failure needs a repro. ${EVIDENCE_FILES}`,
+  ];
+}
+
+const humanGate: Behaviour = {
+  /** At the gate, how a person QAs with the user and how remarks and evidence reach the issue. */
+  async briefing({ issue, flow, state, loc }) {
+    if (!uses(flow, state, "humanGate")) return [];
+    return [
+      `Start from the latest comments on #${issue.number}: the evidence, and what was left for a person.`,
+      ...humanQaLines(issue.number, loc?.branch ?? null),
+    ];
+  },
+  /** Reaching the gate puts the issue in a person's hands: they are notified, and the agent stops. */
+  async enter({ flowName }, applied) {
+    return applied.outcome.notify ? applied : { ...applied, outcome: { ...applied.outcome, notify: `type:${flowName}` } };
+  },
+};
+
 /** The states of the flow that count fix rounds. */
 function fixStatesOf(flow: Flow): string[] {
   return Object.keys(flow.states).filter((s) => uses(flow, s, "countsFixRounds"));
@@ -118,7 +149,7 @@ const countsFixRounds: Behaviour = {
 const REGISTRY: Record<BehaviourName, Behaviour> = {
   countsFixRounds,
   opensPR,
-  humanGate: {},
+  humanGate,
 };
 
 /** The behaviours a flow uses anywhere, in registry order. */

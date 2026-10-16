@@ -1,4 +1,4 @@
-import { behaviourLines } from "./behaviours.js";
+import { behaviourLines, EVIDENCE_FILES, humanQaLines } from "./behaviours.js";
 import { type Flow, flowStatesOf } from "./flow.js";
 import type { Issue } from "./github.js";
 import { locate, workIn, type Location, type WorkIn } from "./location.js";
@@ -140,8 +140,7 @@ async function flowLines(issue: Issue, step: Step, ctx: Ctx, from: string | null
 /** How QA's results reach the issue: the note, evidence files, and for a person, remarks. */
 function qaLines(issue: Issue, step: Step, loc: Location, readIssue: string): string[] {
   const n = issue.number;
-  const files =
-    "Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.";
+  const files = EVIDENCE_FILES;
   if (step.skill === "norn-auto-qa") {
     const lines = ["Your note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.", files];
     if (kindOf(issue) === "slice" && issue.labels.includes("mode:afk")) {
@@ -155,15 +154,7 @@ function qaLines(issue: Issue, step: Step, loc: Location, readIssue: string): st
     return lines;
   }
   if (step.skill === "norn-qa") {
-    return [
-      `Start from the agent's QA comment on #${n}: its evidence, and what it left for a person. ${readIssue}`,
-      `Run the app from ${loc.branch} on this machine and walk the user through what is left, plus anything in the evidence they question.`,
-      "Tie each remark the user brings to a criterion; a remark on a criterion fails it. For a remark outside the criteria, the user decides:",
-      `  follow up (the default): gh issue create --title "<remark>" --body "From QA of #${n}: <remark>" (it goes through triage)`,
-      "  pull it in: it fails this item, like a criterion",
-      "  drop it: say so in the note",
-      `Every failure needs a repro. ${files}`,
-    ];
+    return [`Start from the agent's QA comment on #${n}: its evidence, and what it left for a person. ${readIssue}`, ...humanQaLines(n, loc.branch)];
   }
   return [];
 }

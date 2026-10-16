@@ -164,3 +164,48 @@ describe("countsFixRounds", () => {
     expect(w.github.labels(40)).toContain("needs-human");
   });
 });
+
+describe("humanGate", () => {
+  test("the briefing carries the QA evidence and remarks wording", async () => {
+    const w = bugAt("verifying");
+
+    const out = (await w.norn("take", "40")).stdout;
+
+    expect(out).toContain(
+      "Run the app from 40-crash-on-empty-input on this machine and walk the user through what is left, plus anything in the evidence they question.",
+    );
+    expect(out).toContain("Tie each remark the user brings to a criterion; a remark on a criterion fails it.");
+    expect(out).toContain('  follow up (the default): gh issue create --title "<remark>" --body "From QA of #40: <remark>" (it goes through triage)');
+    expect(out).toContain("Every failure needs a repro. Keep screenshots, logs and command output in a directory outside the repository");
+    expect(out).toContain('norn done 40 fail "repro" [--evidence <dir>]');
+  });
+
+  test("without a workspace, the app runs where the person is", async () => {
+    const w = bugAt("verifying", bugFlow({ workspace: "none" }));
+
+    const out = (await w.norn("take", "40")).stdout;
+
+    expect(out).toContain("Run the app on this machine and walk the user through what is left");
+  });
+
+  test("evidence can be attached when the gate finishes", async () => {
+    const w = bugAt("verifying");
+    w.workspace.evidence.set("/tmp/qa", [{ path: "crash.png", content: Buffer.from("png") }]);
+    await w.norn("take", "40");
+
+    const res = await w.norn("done", "40", "pass", "--evidence", "/tmp/qa");
+
+    expect(res.exitCode).toBe(0);
+    expect(w.github.comments(40).at(-1)).toContain("Evidence (");
+  });
+
+  test("an outcome into the gate notifies a person and tells the agent to stop", async () => {
+    const w = bugAt("reviewing");
+    await w.norn("take", "40");
+
+    const res = await w.norn("done", "40", "approve");
+
+    expect(res.stdout).toContain("A person does the next step, so do not take #40 again. norn has notified the user.");
+    expect(w.notifications.map((n) => [n.title, n.body.split("\n")[0]])).toEqual([["norn: #40 needs you", "needs human QA (type:bug)"]]);
+  });
+});

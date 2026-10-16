@@ -53,7 +53,8 @@ export type WaitItem = { issue: number } & (
   | { reason: "blocked"; blockers: number[] }
   /** `why` is the reason norn recorded when it set needs-human, as written; null when none is found. */
   | ({ reason: "needs-human"; why: string | null } & HumanPlace)
-  | ({ reason: "human-qa"; of: "story" | "mode:hil" } & HumanPlace)
+  /** `of` says why a person QAs it, as Outcome.notify does. */
+  | ({ reason: "human-qa"; of: string } & HumanPlace)
   /** Held by one of the user's own sessions (`holder.mine`): an agent of theirs at work, using a parallel slot. */
   | { reason: "held"; holder: Holder }
   | { reason: "owner-merge"; owner: string | null; into: string }

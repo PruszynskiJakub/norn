@@ -222,6 +222,7 @@ export function flowStep(issue: Issue, flow: Flow): Step | null {
     attended: s.attended,
     ...(s.enterAs ? { enterAs: s.enterAs } : {}),
     outcomes: s.outcomes,
-    ...(s.evidence ? { evidence: true } : {}),
+    // A person at a human gate can attach QA evidence.
+    ...(s.evidence || s.behaviours?.includes("humanGate") ? { evidence: true } : {}),
   };
 }

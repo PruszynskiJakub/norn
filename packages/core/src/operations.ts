@@ -281,7 +281,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     storyBranchCreated,
     followUps: inFlow ? await behaviourFollowUps(inFlow, { outcome: applied, fixLimit }) : await followUps(ctx, issue, applied),
     deliverable: kindOf(issue) === "story" && outcome.to === "implementation",
-    personNext: !!outcome.notify && !applied.needsHuman,
+    personNext: !!applied.notify && !applied.needsHuman,
   };
 }
 
