@@ -164,12 +164,17 @@ Triage chooses the type. Its briefing offers `story`, then one outcome per flow 
 
 norn checks a flow strictly before it runs it:
 
-- the fields have the right types, the start state exists, and every target is a state, `closed` or `not-planned`;
+- the fields have the right types, the start state exists, every target is a state, `closed` or `not-planned`, and every `renamed` target is a state;
 - every state can reach `closed` or `not-planned` through its outcomes, so no issue can be stuck in a loop;
 - each state's `behaviours` are ones this norn knows, allowed together, and any flow they name exists. A flow written for a newer norn fails here, which is what the `nornVersion` pin protects against;
 - no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`), and no flow is named `reject`, triage's outcome.
 
 A broken flow stops only the issues of its own type. `norn take` and `norn done` refuse them with every problem found, triage stops offering the flow, and `norn next` shows them waiting for a person, blocked by the broken flow. Issues of other types keep working.
+
+Flows have no versions: an issue in progress follows the current flow from its next step. When `norn take` finds an issue in a state its flow no longer has (the state norn last moved it to, by its transition comments):
+
+- if the flow's optional `renamed` map, e.g. `"renamed": { "repro": "reproducing" }`, names the old state, norn moves the issue to the new state with a transition comment and takes it there;
+- otherwise norn sets `needs-human` with a comment naming the missing state and the flow, takes the old state's label off and refuses the take. Taking the issue again runs `norn-resolve`, whose outcomes are the flow's states: `norn done <issue> <state>` moves it there.
 
 ## Steps, skills and outcomes
 
