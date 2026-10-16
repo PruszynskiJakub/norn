@@ -537,10 +537,14 @@ export function renderCheck(c: DoctorCheck): { message: string; fix: string | nu
         ? { message: `you have ${role} access to the repository`, fix: null }
         : { message: `you have ${role} access to the repository; norn needs write or higher`, fix: "ask an admin of the repository for write access" };
     }
-    case "labels":
-      return f.missing.length
-        ? { message: `${f.missing.length} of norn's labels are missing: ${f.missing.join(", ")}`, fix: "norn init" }
-        : { message: `all ${f.total} of norn's labels exist`, fix: null };
+    case "labels": {
+      const unused = f.unused.length ? `; no flow uses ${f.unused.join(", ")}` : "";
+      if (f.missing.length) return { message: `${f.missing.length} of norn's labels are missing: ${f.missing.join(", ")}${unused}`, fix: "norn init" };
+      return {
+        message: `all ${f.total} of norn's labels exist${unused}`,
+        fix: f.unused.length ? "delete these labels on GitHub once no issue needs them; norn never deletes a label" : null,
+      };
+    }
     case "config":
       if (f.problems.length) return { message: f.problems.map(problem).join("; "), fix: "edit the config files as described, then run norn doctor again" };
       if (f.warnings.length) return { message: f.warnings.map(renderWarning).join("; "), fix: "edit the config files as described" };

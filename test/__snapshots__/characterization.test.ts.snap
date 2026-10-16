@@ -166,7 +166,7 @@ exports[`output of every command, text and --json > doctor with problems > json 
     {
       "id": "labels",
       "level": "fail",
-      "message": "19 of norn's labels are missing: needs-refinement, needs-clarification, needs-plan, needs-slicing, blocked, ready-for-agent, implementation, needs-review, changes-requested, needs-qa, needs-human-qa, qa-failed, merge-queue, type:story, type:slice, in-progress, needs-human, mode:afk, mode:hil",
+      "message": "19 of norn's labels are missing: needs-refinement, needs-clarification, needs-plan, needs-slicing, implementation, needs-review, changes-requested, needs-qa, needs-human-qa, qa-failed, merge-queue, blocked, ready-for-agent, type:story, type:slice, in-progress, needs-human, mode:afk, mode:hil",
       "fix": "norn init"
     },
     {
@@ -209,7 +209,7 @@ exports[`output of every command, text and --json > doctor with problems > text 
 ✓ git: origin is git@github.com:acme/app.git
 ✓ base-branch: main exists on GitHub
 ✓ permission: you have write access to the repository
-✗ labels: 19 of norn's labels are missing: needs-refinement, needs-clarification, needs-plan, needs-slicing, blocked, ready-for-agent, implementation, needs-review, changes-requested, needs-qa, needs-human-qa, qa-failed, merge-queue, type:story, type:slice, in-progress, needs-human, mode:afk, mode:hil
+✗ labels: 19 of norn's labels are missing: needs-refinement, needs-clarification, needs-plan, needs-slicing, implementation, needs-review, changes-requested, needs-qa, needs-human-qa, qa-failed, merge-queue, blocked, ready-for-agent, type:story, type:slice, in-progress, needs-human, mode:afk, mode:hil
   fix: norn init
 ✓ config: the team and local config are valid
 ! version: norn 1.4.2, repo has no nornVersion

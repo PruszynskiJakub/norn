@@ -2,6 +2,9 @@ import { existsSync } from "node:fs";
 import { join } from "node:path";
 import {
   type Config,
+  flowsInEffect,
+  type LoadedFlow,
+  STATES,
   type ConfigProblem,
   type ConfigWarning,
   type GhAuth,
@@ -35,7 +38,8 @@ export type CheckFact =
   | { kind: "origin"; origin: string; host: string | null; onGitHub: boolean }
   | { kind: "base-branch"; branch: string; exists: boolean; defaultBranch: string | null }
   | { kind: "permission"; permission: Permission }
-  | { kind: "labels"; total: number; missing: string[] }
+  /** `unused` are labels that look like norn's, a type or a state some flow had, that no flow in effect uses. */
+  | { kind: "labels"; total: number; missing: string[]; unused: string[] }
   | { kind: "config"; problems: ConfigProblem[]; warnings: ConfigWarning[] }
   | { kind: "version"; running: string; repo: string | null; match: VersionMatch | null }
   /** `drifted` is null when the skills come from NORN_SKILLS_SOURCE and are not compared. */
@@ -155,14 +159,19 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
     else add("permission", WRITE.includes(permission.value) ? "ok" : "fail", { kind: "permission", permission: permission.value });
   }
 
-  if (needsForGitHub) skip("labels", needsForGitHub);
+  // The flows in effect, read from the base branch on GitHub, as norn commands read them.
+  const inEffect = needsForGitHub || needsForConfig ? null : await attempt(() => flowsInEffect({ github: d.github, config: config as Config }));
+
+  if (needsForGitHub || needsForConfig) skip("labels", (needsForGitHub ?? needsForConfig) as CheckId);
   else {
     const names = await attempt(() => d.github.labelNames());
     if (!names.ok) add("labels", "fail", names.fact);
+    else if (!inEffect?.ok) add("labels", "fail", (inEffect as { fact: CheckFact }).fact);
     else {
-      const wanted = labelDefinitions().map((l) => l.name);
+      const wanted = labelDefinitions(inEffect.value).map((l) => l.name);
       const missing = wanted.filter((l) => !names.value.includes(l));
-      add("labels", missing.length ? "fail" : "ok", { kind: "labels", total: wanted.length, missing });
+      const unused = names.value.filter((l) => !wanted.includes(l) && looksLikeNorns(l, inEffect.value));
+      add("labels", missing.length ? "fail" : unused.length ? "warning" : "ok", { kind: "labels", total: wanted.length, missing, unused });
     }
   }
 
@@ -198,6 +207,12 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
   }
 
   return { ok: true, kind: "doctor", checks };
+}
+
+/** Whether a label is one norn may have made: a type, a state of a built-in flow, or a state a flow renamed. */
+function looksLikeNorns(label: string, flows: LoadedFlow[]): boolean {
+  if (label.startsWith("type:") || (STATES as readonly string[]).includes(label)) return true;
+  return flows.some((l) => l.ok && Object.hasOwn(l.flow.renamed ?? {}, label));
 }
 
 /** The skills norn briefings name: in skills/, linked from .claude/skills/, and the same as the bundled ones. */

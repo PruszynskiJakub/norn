@@ -358,22 +358,74 @@ async function checkFlowsNamed(ctx: Parameters<typeof repositoryFlow>[0], loaded
   return errors.length ? { ok: false, name: loaded.name, errors } : loaded;
 }
 
-/**
- * The flows triage offers: the built-in ones in their order, then the
- * repository's in name order, each valid and not setting triage to false. A
- * repository flow is read from the base branch, and its name must be a type; one
- * named like a built-in flow takes that flow's place.
- */
-export async function triageFlows(
-  ctx: Parameters<typeof repositoryFlow>[0] & { github: { listFilesAt(dir: string, ref: string): Promise<string[]> } },
-): Promise<{ name: string; flow: Flow }[]> {
-  const names = (await ctx.github.listFilesAt(FLOWS_DIR, ctx.config.baseBranch))
+/** A flow file's name is a type name. */
+const FLOW_NAME = /^[a-z0-9][a-z0-9_-]*$/;
+
+/** The flow names of the files in a list of a flows directory, sorted; files that cannot name a type are left out. */
+export function flowFileNames(files: string[]): string[] {
+  return files
     .filter((file) => file.endsWith(".json"))
     .map((file) => file.slice(0, -".json".length))
-    .filter((name) => /^[a-z0-9][a-z0-9_-]*$/.test(name) && !BUILT_IN_FLOWS.includes(name) && !RESERVED_FLOWS.includes(name))
+    .filter((name) => FLOW_NAME.test(name))
     .sort();
+}
+
+/**
+ * Every flow in effect, valid or not: the built-in ones in their order, then the repository's other flows in name
+ * order. Each is the repository's when it has one, read from the base branch, else the built-in one.
+ */
+export async function flowsInEffect(
+  ctx: Parameters<typeof repositoryFlow>[0] & { github: { listFilesAt(dir: string, ref: string): Promise<string[]> } },
+): Promise<LoadedFlow[]> {
+  const names = flowFileNames(await ctx.github.listFilesAt(FLOWS_DIR, ctx.config.baseBranch)).filter((name) => !BUILT_IN_FLOWS.includes(name));
   const loaded = await Promise.all([...BUILT_IN_FLOWS, ...names].map((name) => loadFlow(ctx, name)));
-  return loaded.flatMap((l) => (l?.ok && l.flow.triage !== false ? [{ name: l.name, flow: l.flow }] : []));
+  return loaded.flatMap((l) => (l ? [l] : []));
+}
+
+/**
+ * The flows triage offers: the flows in effect that are valid and do not set triage to false. reject is never one: it
+ * is triage's own outcome.
+ */
+export async function triageFlows(ctx: Parameters<typeof flowsInEffect>[0]): Promise<{ name: string; flow: Flow }[]> {
+  return (await flowsInEffect(ctx)).flatMap((l) =>
+    l.ok && !RESERVED_FLOWS.includes(l.name) && l.flow.triage !== false ? [{ name: l.name, flow: l.flow }] : [],
+  );
+}
+
+/** A GitHub label as norn creates it. */
+export interface LabelDefinition {
+  name: string;
+  /** Hex without the #. */
+  color: string;
+  description: string;
+}
+
+/** The colour and description of a state's label when the flow gives none, by the state's kind. */
+export const DEFAULT_STATE_LABEL = {
+  attended: { color: "c5def5", description: "a person takes part in this step" },
+  agent: { color: "bfd4f2", description: "an agent runs this step unattended" },
+} as const;
+
+/** The label of a state of the flow: the state's colour and description, or the defaults of its kind. */
+export function stateLabel(flow: Flow, state: string): LabelDefinition {
+  const s = flow.states[state];
+  const fallback = s.attended ? DEFAULT_STATE_LABEL.attended : DEFAULT_STATE_LABEL.agent;
+  return { name: state, color: s.color ?? fallback.color, description: s.description ?? fallback.description };
+}
+
+/** The label of the type that runs the flow. */
+export function typeLabel(name: string): LabelDefinition {
+  return { name: `type:${name}`, color: "ededed", description: `norn ${name} flow` };
+}
+
+/**
+ * The labels the flows need: every state, each once, as the first flow that has it defines it, then type:<flow> for
+ * each flow, in the flows' order.
+ */
+export function flowLabels(flows: { name: string; flow: Flow }[]): LabelDefinition[] {
+  const states = new Map<string, LabelDefinition>();
+  for (const { flow } of flows) for (const state of Object.keys(flow.states)) if (!states.has(state)) states.set(state, stateLabel(flow, state));
+  return [...states.values(), ...flows.map(({ name }) => typeLabel(name))];
 }
 
 /** The built-in flow the issue runs, read without GitHub, e.g. for the read model, which stays pure; null for none. */

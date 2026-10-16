@@ -34,6 +34,20 @@ async function healthy() {
   return { w, cwd, bundled, norn };
 }
 
+/** A bug flow: reproduce, fix, close. Its skills are the team's own, not norn's. */
+function bugFlow(over: Record<string, unknown> = {}) {
+  return {
+    description: "A defect: reproduce it, fix it, close it.",
+    start: "reproducing",
+    workspace: "none",
+    states: {
+      reproducing: { skill: "bug-repro", attended: true, outcomes: { reproduced: { to: "fixing", means: "reproduced" } } },
+      fixing: { skill: "bug-fix", attended: false, outcomes: { fixed: { to: "closed", means: "fixed" } } },
+    },
+    ...over,
+  };
+}
+
 /** The check lines and their fix lines, without the summary. */
 function lines(stdout: string) {
   return stdout.split("\n\n")[0].split("\n");
@@ -252,6 +266,42 @@ describe("norn doctor: the repository on GitHub", () => {
       message: "2 of norn's labels are missing: blocked, mode:hil",
       fix: "norn init",
     });
+  });
+});
+
+describe("norn doctor: labels from the flows", () => {
+  test("the labels of a repository flow on the base branch are norn's labels too", async () => {
+    const { w, norn } = await healthy();
+    w.github.seedFlow("bug", bugFlow());
+
+    expect(await check(norn, "labels")).toEqual({
+      id: "labels",
+      level: "fail",
+      message: "3 of norn's labels are missing: reproducing, fixing, type:bug",
+      fix: "norn init",
+    });
+  });
+
+  test("labels no flow uses warn, and stay on the repository", async () => {
+    const { w, norn } = await healthy();
+    w.github.seedFlow("slice", { ...bugFlow(), workspace: "parent", triage: false });
+    await w.github.ensureLabels(["reproducing", "fixing", "type:chore", "bug"].map((name) => ({ name, color: "ededed", description: "" })));
+
+    expect(await check(norn, "labels")).toEqual({
+      id: "labels",
+      level: "warning",
+      message: "all 19 of norn's labels exist; no flow uses blocked, ready-for-agent, type:chore",
+      fix: "delete these labels on GitHub once no issue needs them; norn never deletes a label",
+    });
+    expect(w.github.labelDefs.has("blocked")).toBe(true);
+  });
+
+  test("a label a flow renamed counts as one no flow uses", async () => {
+    const { w, norn } = await healthy();
+    w.github.seedFlow("bug", bugFlow({ renamed: { triaging: "reproducing" } }));
+    await w.github.ensureLabels(["reproducing", "fixing", "type:bug", "triaging"].map((name) => ({ name, color: "ededed", description: "" })));
+
+    expect(await check(norn, "labels")).toMatchObject({ level: "warning", message: "all 22 of norn's labels exist; no flow uses triaging" });
   });
 });
 
