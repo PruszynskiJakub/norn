@@ -350,11 +350,18 @@ export async function addSlice(ctx: Ctx, story: number, input: { title?: string;
   return { ok: true, kind: "slice-added", slice: slice.number, title, mode, blockedBy: open.map((b) => b.number) };
 }
 
-/** What can be done on a story now; when nothing is left, the user is notified of what waits for them. */
+/**
+ * What can be done on a story, or on an issue of a repository flow, now; when
+ * nothing is left, the user is notified of what waits for them.
+ */
 export async function next(ctx: Ctx, n: number): Promise<NextResult | Refused> {
-  const r = await notAStory(ctx.github, n);
+  const issue = await ctx.github.getIssue(n);
+  const name = flowNameOf(issue);
+  const loaded = name === null ? null : await repositoryFlow(ctx, name);
+  if (loaded && !loaded.ok) return refuse({ kind: "flow-invalid", issue: n, flow: loaded.name, errors: loaded.errors });
+  const r = loaded ? null : await notAStory(ctx.github, n);
   if (r) return refuse(r);
-  const report = await computeNext(ctx, n);
+  const report = await computeNext(ctx, n, loaded ? { name: loaded.name, flow: loaded.flow } : null);
   if (report.nothingLeft && !report.closed) await notifyWaiting(ctx, report);
   return { ok: true, kind: "next", report };
 }

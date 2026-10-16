@@ -209,3 +209,87 @@ describe("humanGate", () => {
     expect(w.notifications.map((n) => [n.title, n.body.split("\n")[0]])).toEqual([["norn: #40 needs you", "needs human QA (type:bug)"]]);
   });
 });
+
+describe("norn next on an issue of a flow", () => {
+  test("a state an agent runs is offered to an agent", async () => {
+    const w = bugAt("reviewing");
+
+    const res = await w.norn("next", "40");
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toBe(
+      [
+        'Issue #40 "Crash on empty input" is in reviewing.',
+        "",
+        "You can start 1 item now, in its own fresh subagent, told to work in the item's worktree:",
+        "",
+        '  - Issue #40 "Crash on empty input" is in reviewing: reviewing.',
+        "    Worktree: /repo/.agents/worktrees/40-crash-on-empty-input",
+        "    Start it with: norn take 40",
+        "",
+        "Each phase gets a new agent. When an item is done, run norn next 40 again.",
+      ].join("\n"),
+    );
+  });
+
+  test("an attended state is offered to do with the user", async () => {
+    const flow = bugFlow();
+    flow.states.reviewing = { ...flow.states.reviewing, attended: true };
+    const w = bugAt("reviewing", flow);
+
+    const out = (await w.norn("next", "40")).stdout;
+
+    expect(out).toContain("You can start 1 item now, with the user:");
+    expect(out).toContain('  - Issue #40 "Crash on empty input" is in reviewing: reviewing (attended: the user takes part).');
+  });
+
+  test("a human gate is listed for a person, not for an agent", async () => {
+    const w = bugAt("verifying");
+
+    const res = await w.norn("next", "40");
+
+    expect(res.stdout).toBe(
+      [
+        'Issue #40 "Crash on empty input": nothing left that you can do.',
+        "Waiting for a human:",
+        "  - #40 needs human QA (type:bug).",
+        "Stop here and report to the user. norn has already notified them.",
+      ].join("\n"),
+    );
+  });
+
+  test("an issue in a state its flow renamed is offered in the new state", async () => {
+    const w = bugAt("triaged", { ...bugFlow(), renamed: { triaged: "reviewing" } });
+
+    const out = (await w.norn("next", "40")).stdout;
+
+    expect(out).toContain('  - Issue #40 "Crash on empty input" is in reviewing: reviewing.');
+  });
+
+  test("an issue in a state its flow no longer has waits for a person", async () => {
+    const w = bugAt("testing");
+    w.github.commentsByIssue.set(40, ["norn: fixing → testing (fixed)"]);
+
+    const out = (await w.norn("next", "40")).stdout;
+
+    expect(out).toContain("  - #40 is in testing, which the flow bug no longer has; taking it hands it to a person.");
+  });
+
+  test("an issue of a broken flow is refused with what is wrong", async () => {
+    const w = bugAt("reviewing", "{ not json");
+
+    const res = await w.norn("next", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("#40 runs the flow bug, which is broken");
+  });
+
+  test("a closed issue has nothing left", async () => {
+    const w = bugAt("reviewing");
+    w.github.issues.get(40)!.state = "closed";
+
+    const out = (await w.norn("next", "40")).stdout;
+
+    expect(out).toBe('Issue #40 "Crash on empty input" is closed. Nothing left that you can do.');
+  });
+});

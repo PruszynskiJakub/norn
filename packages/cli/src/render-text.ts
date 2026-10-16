@@ -15,6 +15,7 @@ import {
   type Kept,
   LOCAL_CONFIG,
   type NextReport,
+  type StartItem,
   type NextResult,
   type Notification,
   type Refusal,
@@ -22,7 +23,6 @@ import {
   type Removal,
   type Row,
   sh,
-  type State,
   type StatusResult,
   type TakeResult,
   TEAM_CONFIG,
@@ -725,7 +725,7 @@ function renderTidy(r: TidyResult): string {
 
 // next
 
-const DESCRIBE: Partial<Record<State, string>> = {
+const DESCRIBE: Partial<Record<string, string>> = {
   "ready-for-agent": "is ready-for-agent",
   implementation: "is in implementation with no one holding it",
   "needs-review": "needs review",
@@ -758,6 +758,8 @@ export function waitDetail(w: WaitItem): string {
       return "has no state label; a person must set one";
     case "ambiguous-state":
       return `has more than one state label (${w.states.join(", ")}); a person must remove the stale one`;
+    case "state-left":
+      return `is in ${w.state}, which the flow ${w.flow} no longer has; taking it hands it to a person`;
     default:
       return unreachable(w);
   }
@@ -797,7 +799,7 @@ function waitLine(w: WaitItem) {
 function renderNothingLeft(r: NextReport): string {
   const human = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));
   const blocked = r.waiting.filter((w) => w.reason === "blocked");
-  const out = [...r.notes.flatMap(renderEvent), `Story #${r.story} "${r.title}": nothing left that you can do.`];
+  const out = [...r.notes.flatMap(renderEvent), `${subject(r)}: nothing left that you can do.`];
   if (human.length) out.push("Waiting for a human:", ...human.flatMap((w) => [`  - #${w.issue} ${humanDetail(w)}.`, ...humanHandOff(w)]));
   if (blocked.length) out.push("Blocked until then:", ...blocked.map(waitLine));
   out.push(`Stop here and report to the user.${r.notified ? " norn has already notified them." : ""}`);
@@ -809,15 +811,25 @@ function runningNote(r: NextReport) {
   return ` (${r.running} of your agents ${r.running === 1 ? "is" : "are"} running, the limit is ${r.maxParallel})`;
 }
 
+/** What next is about, e.g. `Story #123 "Rate limiting"`. */
+function subject(r: NextReport) {
+  return `${r.flow ? "Issue" : "Story"} #${r.story} "${r.title}"`;
+}
+
+/** An item to start, e.g. `Slice #131 "Per-key limits"`. */
+function itemWhat(s: StartItem) {
+  return `${{ story: "Story", slice: "Slice", issue: "Issue" }[s.kind]} #${s.issue} "${s.title}"`;
+}
+
 export function renderNext(r: NextReport): string {
   const notes = r.notes.flatMap(renderEvent);
   if (r.closed) {
-    return [...notes, `Story #${r.story} "${r.title}" is closed${r.notPlanned ? " as not planned" : ""}. Nothing left that you can do.`].join("\n");
+    return [...notes, `${subject(r)} is closed${r.notPlanned ? " as not planned" : ""}. Nothing left that you can do.`].join("\n");
   }
   if (r.nothingLeft) return renderNothingLeft(r);
   const out: string[] = [];
   if (notes.length) out.push(...notes, "");
-  let head = `Story #${r.story} "${r.title}" is in ${r.state ?? "no state"}.`;
+  let head = `${subject(r)} is in ${r.state ?? "no state"}.`;
   if (r.slices.total) head += ` ${r.slices.merged} of ${r.slices.total} slices are merged into ${r.branch}.`;
   out.push(wrap(head), "");
 
@@ -830,7 +842,7 @@ export function renderNext(r: NextReport): string {
         `${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run norn next ${r.story} again.`,
       ),
       "",
-      ...r.start.map((s) => `  - ${s.kind === "slice" ? "Slice" : "Story"} #${s.issue} "${s.title}" ${DESCRIBE[s.state] ?? `is in ${s.state}`}.`),
+      ...r.start.map((s) => `  - ${itemWhat(s)} ${s.kind !== "issue" && DESCRIBE[s.state] ? DESCRIBE[s.state] : `is in ${s.state}`}.`),
     );
   } else {
     // Attended steps are done with the user, not by a fresh agent of their own.
@@ -850,9 +862,10 @@ export function renderNext(r: NextReport): string {
       "",
     );
     for (const s of r.start) {
-      const what = `${s.kind === "slice" ? "Slice" : "Story"} #${s.issue} "${s.title}"`;
+      const what = itemWhat(s);
+      // An issue of a flow names its own states; DESCRIBE words the built-in ones.
       const desc =
-        s.kind === "story" && !DESCRIBE[s.state]
+        s.kind === "issue" || (s.kind === "story" && !DESCRIBE[s.state])
           ? `is in ${s.state}: ${s.step}${s.attended ? " (attended: the user takes part)" : ""}.`
           : `${DESCRIBE[s.state] ?? `is in ${s.state}`}${s.attended ? " (attended: the user takes part)" : ""}.`;
       out.push(`  - ${what} ${desc}`);
