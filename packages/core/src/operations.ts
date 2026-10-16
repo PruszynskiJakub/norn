@@ -30,6 +30,7 @@ import {
   type Ctx,
   ensureOwnBranch,
   ensureStateLabel,
+  ensureTypeLabel,
   type Evidence,
   leftState,
   needsHumanLine,
@@ -107,6 +108,8 @@ export interface AddSliceResult {
   slice: number;
   title: string;
   mode: "afk" | "hil";
+  /** The state the slice starts in: its flow's start, or the state it is held in while a blocker is open. */
+  state: string;
   /** The blockers still open; with any, the slice starts blocked. */
   blockedBy: number[];
 }
@@ -343,15 +346,19 @@ export async function addSlice(ctx: Ctx, story: number, input: { title?: string;
   // The slices run the flow of their type, starting held while a blocker is open.
   const flow = (await loadFlow(ctx, type))!;
   if (!flow.ok) return refuse({ kind: "flow-invalid", issue: story, flow: flow.name, errors: flow.errors });
+  const start = startState(flow.flow, open.length > 0);
+  // Labels GitHub would otherwise create grey and undescribed.
+  await ensureStateLabel(ctx, flow.flow, start);
+  await ensureTypeLabel(ctx, type);
   const slice = await github.createIssue({
     title,
     body: `Slice of #${story}. Spec: ${specPath(story, await storySlug(ctx, parent))}`,
-    labels: [`type:${type}`, `mode:${mode}`, startState(flow.flow, open.length > 0)],
+    labels: [`type:${type}`, `mode:${mode}`, start],
     assignees: parent.assignees,
   });
   await github.addSubIssue(story, slice.number);
   for (const b of blockers) await github.addBlockedBy(slice.number, b.number);
-  return { ok: true, kind: "slice-added", slice: slice.number, title, mode, blockedBy: open.map((b) => b.number) };
+  return { ok: true, kind: "slice-added", slice: slice.number, title, mode, state: start, blockedBy: open.map((b) => b.number) };
 }
 
 /**

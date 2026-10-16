@@ -490,7 +490,7 @@ export function renderEvent(e: Event): string[] {
     case "handed-over":
       return [`#${e.issue} was in ${e.state}, which the flow ${e.flow} no longer has, so it now needs a human.`];
     case "story-promoted":
-      return [`Every slice is merged. Story #${e.story} is now in needs-review.`];
+      return [`Every slice is merged. Story #${e.story} is now in ${e.to}.`];
     case "story-closed":
       return [`The story PR is merged. Closed story #${e.story}.`];
     case "follow-up-failed": {
@@ -520,7 +520,7 @@ export function renderAnswer(a: Answer): string[] {
     case "released":
       return [`Released #${a.issue}. Its state is unchanged. Do not work on it further.`];
     case "slice-added": {
-      const status = a.blockedBy.length ? `blocked by ${issues(a.blockedBy)}` : "ready-for-agent";
+      const status = a.blockedBy.length ? `blocked by ${issues(a.blockedBy)}` : a.state;
       return [`Created slice #${a.slice} "${a.title}" (mode:${a.mode}, ${status}).`];
     }
     case "next":

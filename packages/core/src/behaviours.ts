@@ -253,7 +253,7 @@ export async function moveOnFromSlices(ctx: Ctx, n: number): Promise<Event[]> {
       }));
     await setState(ctx, issue, wait.to, `Every slice is merged into ${loc.branch}. ${capitalised(loaded.name)} PR: #${pr.number}.`, flow);
   });
-  return moved ? [{ kind: "story-promoted", story: n }] : [];
+  return moved ? [{ kind: "story-promoted", story: n, to: wait.to }] : [];
 }
 
 const waitsForMerge: Behaviour = {

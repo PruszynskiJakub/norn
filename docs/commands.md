@@ -209,7 +209,7 @@ It refuses when the file exists, leaving it as it is, and names the built-in flo
 npx norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...
 ```
 
-Creates a slice as a sub-issue of the story, with its labels, the story's assignee, its native "blocked by" relations and its mode. The `norn-slice` skill calls it; you rarely need it by hand.
+Creates a slice as a sub-issue of the story, with its labels, the story's assignee, its native "blocked by" relations and its mode. The slice gets the type the story's flow names and starts in that type's start state, or held while a blocker is open; the answer names that state. A missing label for either is created first, with its colour and description. The `norn-slice` skill calls it; you rarely need it by hand.
 
 ## norn escalate
 

@@ -483,6 +483,15 @@ describe("triage offers the flows", () => {
     expect(w.github.claim(7)).toBeNull();
   });
 
+  test("choosing a flow creates its type label when the repository lacks it", async () => {
+    const w = newIssue();
+    await w.norn("take", "7");
+
+    await w.norn("done", "7", "bug");
+
+    expect(w.github.labelDefs.get("type:bug")).toEqual({ color: "ededed", description: "norn bug flow" });
+  });
+
   test("the issue then runs the flow it was given", async () => {
     const w = newIssue();
     await w.norn("take", "7");

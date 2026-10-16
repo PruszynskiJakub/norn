@@ -24,6 +24,8 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ### Changed
 
+- Labels a flow needs are created before norn first puts them on an issue: triage creates `type:<flow>` for the flow it gives an issue, and `norn add-slice` creates the slice's type and start state, each with its colour and description instead of GitHub's grey, undescribed default.
+- `norn add-slice` names the state the slice starts in, its flow's start (`ready-for-agent` for the built-in slice), and `norn next` names the state a story moves on to once every slice is merged, as its flow's `waitsForSlices` says, instead of always `needs-review`.
 - `norn init` creates the labels of every valid flow on the base branch: each state, with its colour and description or a default for its kind, and `type:<flow>` for each flow, described as `norn <flow> flow`.
 - **Breaking:** a flow file with a field the format does not have, a colour that is not hex, or a behaviour parameter the behaviour does not take is now invalid, as the JSON Schema says, instead of the field being ignored.
 - The built-in states' descriptions, and so their labels' descriptions as `norn init` creates them, are now the dashboard's wording, e.g. "Waiting for review" for `needs-review`: one description says what a state means wherever norn shows it.

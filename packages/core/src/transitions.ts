@@ -7,7 +7,7 @@ import { specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
-import { type Flow, flowStatesOf, hasSpec, type Mode, type NamedFlow, renamedTo, stateLabel } from "./flow.js";
+import { type Flow, flowStatesOf, hasSpec, type LabelDefinition, type Mode, type NamedFlow, renamedTo, stateLabel, typeLabel } from "./flow.js";
 import { type FlowCache, loadFlow, validFlow } from "./flow-loading.js";
 import { notifyHumanQa, notifyNeedsHuman, notifyStateLeft, type Notify } from "./notify.js";
 
@@ -219,6 +219,7 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, { w
     const add: string[] = [outcome.to];
     if (into) await ensureStateLabel(ctx, into, outcome.to);
     if (!flow && outcome.flow) {
+      await ensureTypeLabel(ctx, outcome.flow);
       add.push(`type:${outcome.flow}`);
       await github.assign(n, [await github.currentUser()]);
     }
@@ -369,8 +370,17 @@ export function stateLabels(issue: Issue, keep?: string, flow: Flow | null = nul
  * state, or a default by kind; a built-in flow's match what norn init makes.
  */
 export async function ensureStateLabel(ctx: Ctx, flow: Flow, state: string): Promise<void> {
-  if (!flow.states[state] || (await ctx.github.labelNames()).includes(state)) return;
-  await ctx.github.ensureLabels([stateLabel(flow, state)]);
+  if (flow.states[state]) await ensureLabel(ctx, stateLabel(flow, state));
+}
+
+/** Creates the label type:<name> of a flow when the repository lacks it, as norn init makes it. */
+export async function ensureTypeLabel(ctx: Ctx, name: string): Promise<void> {
+  await ensureLabel(ctx, typeLabel(name));
+}
+
+/** Creates a label when the repository lacks it; one it has is left as it is. */
+async function ensureLabel(ctx: Ctx, label: LabelDefinition): Promise<void> {
+  if (!(await ctx.github.labelNames()).includes(label.name)) await ctx.github.ensureLabels([label]);
 }
 
 /**

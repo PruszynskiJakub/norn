@@ -25,8 +25,8 @@ export type Event =
   | { kind: "state-renamed"; issue: number; from: string; to: string; flow: string }
   /** The issue was in `state`, which the flow `flow` no longer has, so norn handed it to a person through needs-human. */
   | { kind: "handed-over"; issue: number; state: string; flow: string }
-  /** Every slice is merged, so the story moved on to the state waitsForSlices names, with its PR open. */
-  | { kind: "story-promoted"; story: number }
+  /** Every slice is merged, so the story moved on to `to`, the state waitsForSlices names, with its PR open. */
+  | { kind: "story-promoted"; story: number; to: string }
   /** The story PR is merged, so norn closed the story. */
   | { kind: "story-closed"; story: number }
   /** `issue` is what the task was about; `retry` the story whose norn next retries it; `detail` the error. */
