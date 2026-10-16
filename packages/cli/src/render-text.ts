@@ -351,6 +351,14 @@ function flowError(e: FlowError): string {
       return `The state ${e.state} takes a name norn keeps for itself.`;
     case "end-unreachable":
       return `From ${e.state}, no outcome ever leads to closed or not-planned.`;
+    case "behaviour-unknown":
+      return `The state ${e.state} uses the behaviour ${e.behaviour}, which this norn does not know; a flow written for a newer norn needs the nornVersion pin raised.`;
+    case "behaviours-conflict":
+      return `The state ${e.state} has the behaviours ${e.behaviours[0]} and ${e.behaviours[1]}, which cannot go together.`;
+    case "flow-reserved":
+      return `The name ${e.flow} is norn's own: triage uses it to close an issue as not planned.`;
+    case "flow-unknown":
+      return `The behaviour ${e.behaviour} of ${e.state} names the flow ${e.flow}, which the repository does not have.`;
     default:
       return unreachable(e);
   }

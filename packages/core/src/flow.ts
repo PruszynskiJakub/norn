@@ -1,4 +1,5 @@
 import type { Issue } from "./github.js";
+import { BEHAVIOURS, type BehaviourParams } from "./behaviours.js";
 import type { Outcome, Step } from "./machine.js";
 
 /**
@@ -30,6 +31,8 @@ export interface FlowState {
   color?: string;
   /** The step can attach evidence files with norn done --evidence <dir>. */
   evidence?: boolean;
+  /** Built-in behaviours the state opts into, by name, with their parameters. */
+  behaviours?: Record<string, BehaviourParams>;
   /** Keyed by outcome word. */
   outcomes: Record<string, Outcome>;
 }
@@ -48,10 +51,24 @@ export type FlowError =
   /** A state takes a name norn keeps for itself, e.g. closed. */
   | { kind: "state-reserved"; state: string }
   /** No path of outcomes leads from the state to closed or not-planned, so an issue there could never end. */
-  | { kind: "end-unreachable"; state: string };
+  | { kind: "end-unreachable"; state: string }
+  /** A behaviour this norn does not have, e.g. one of a newer norn. */
+  | { kind: "behaviour-unknown"; state: string; behaviour: string }
+  /** Two behaviours of one state that cannot go together. */
+  | { kind: "behaviours-conflict"; state: string; behaviours: [string, string] }
+  /** A behaviour names a flow the repository does not have. */
+  | { kind: "flow-unknown"; state: string; behaviour: string; flow: string }
+  /** The flow's name is one norn keeps for itself, e.g. reject, triage's outcome. */
+  | { kind: "flow-reserved"; flow: string };
 
 /** Ends every flow can lead to; no state may take these names. */
 export const RESERVED_TARGETS = ["closed", "not-planned"] as const;
+
+/** Names no flow may take: triage's outcome that closes an issue as not planned. */
+const RESERVED_FLOWS = ["reject"];
+
+/** Flows norn ships, which exist in every repository. */
+const BUILT_IN_FLOWS = ["story", "slice"];
 
 /** Labels norn sets itself on every issue; no state may take these names either. */
 const ENGINE_LABELS = ["in-progress", "needs-human"];
@@ -64,7 +81,7 @@ export function parseFlow(name: string, text: string): LoadedFlow {
   } catch (e) {
     return { ok: false, name, errors: [{ kind: "not-json", detail: (e as Error).message }] };
   }
-  const errors = validateFlow(data);
+  const errors = [...(RESERVED_FLOWS.includes(name) ? [{ kind: "flow-reserved", flow: name } as const] : []), ...validateFlow(data)];
   return errors.length ? { ok: false, name, errors } : { ok: true, name, flow: data as Flow };
 }
 
@@ -98,6 +115,7 @@ export function validateFlow(data: unknown): FlowError[] {
     if (typeof state.attended !== "boolean") field(`${at}.attended`, "true or false");
     for (const key of ["name", "description", "color"]) if (state[key] !== undefined && typeof state[key] !== "string") field(`${at}.${key}`, "a string");
     if (state.evidence !== undefined && typeof state.evidence !== "boolean") field(`${at}.evidence`, "true or false");
+    if (state.behaviours !== undefined) checkBehaviours(name, state.behaviours, errors);
     if (state.enterAs !== undefined && (typeof state.enterAs !== "string" || !Object.hasOwn(states, state.enterAs))) {
       field(`${at}.enterAs`, "a state of the flow");
     }
@@ -125,14 +143,38 @@ export function validateFlow(data: unknown): FlowError[] {
   return errors;
 }
 
+/** Each behaviour must be known, with valid parameters, and allowed beside the state's others. */
+function checkBehaviours(state: string, behaviours: unknown, errors: FlowError[]) {
+  const at = `states.${state}.behaviours`;
+  if (!isObject(behaviours)) {
+    errors.push({ kind: "field-invalid", path: at, expected: "an object of behaviour names" });
+    return;
+  }
+  const names = Object.keys(behaviours);
+  for (const [behaviour, params] of Object.entries(behaviours)) {
+    const rule = Object.hasOwn(BEHAVIOURS, behaviour) ? BEHAVIOURS[behaviour] : undefined;
+    if (!rule) errors.push({ kind: "behaviour-unknown", state, behaviour });
+    else if (!isObject(params)) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}`, expected: "an object of parameters" });
+    else for (const p of rule.params?.(params) ?? []) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${p.param}`, expected: p.expected });
+  }
+  names.forEach((a, i) => {
+    for (const b of names.slice(i + 1)) {
+      if (BEHAVIOURS[a]?.excludes?.includes(b) || BEHAVIOURS[b]?.excludes?.includes(a)) errors.push({ kind: "behaviours-conflict", state, behaviours: [a, b] });
+    }
+  });
+}
+
 /** The states from which no path of outcomes reaches closed or not-planned, in file order. */
 function statesThatCannotEnd(states: Record<string, unknown>): string[] {
   const targets = (state: unknown): string[] =>
-    isObject(state) && isObject(state.outcomes)
-      ? Object.values(state.outcomes).flatMap((o) => (isObject(o) && typeof o.to === "string" ? [o.to] : []))
-      : [];
+    isObject(state) && isObject(state.outcomes) ? Object.values(state.outcomes).flatMap((o) => (isObject(o) && typeof o.to === "string" ? [o.to] : [])) : [];
   // An unknown target is reported on its own, so it does not count against the states before it.
-  const ends = new Set<string>([...RESERVED_TARGETS, ...Object.values(states).flatMap(targets).filter((to) => !Object.hasOwn(states, to))]);
+  const ends = new Set<string>([
+    ...RESERVED_TARGETS,
+    ...Object.values(states)
+      .flatMap(targets)
+      .filter((to) => !Object.hasOwn(states, to)),
+  ]);
   // Walk back from the ends: a state ends once one of its outcomes leads to a state that ends.
   for (let grew = true; grew; ) {
     grew = false;
@@ -173,10 +215,27 @@ export function repositoryFlow(
   ctx.flows ??= new Map();
   let flow = ctx.flows.get(name);
   if (!flow) {
-    flow = ctx.github.readFileAt(`${FLOWS_DIR}/${name}.json`, ctx.config.baseBranch).then((text) => (text === null ? null : parseFlow(name, text)));
+    flow = ctx.github
+      .readFileAt(`${FLOWS_DIR}/${name}.json`, ctx.config.baseBranch)
+      .then((text) => (text === null ? null : checkFlowsNamed(ctx, parseFlow(name, text))));
     ctx.flows.set(name, flow);
   }
   return flow;
+}
+
+/** A valid flow whose behaviours name flows the repository does not have is kept with those errors. */
+async function checkFlowsNamed(ctx: Parameters<typeof repositoryFlow>[0], loaded: LoadedFlow): Promise<LoadedFlow> {
+  if (!loaded.ok) return loaded;
+  const named = Object.entries(loaded.flow.states).flatMap(([state, s]) =>
+    Object.entries(s.behaviours ?? {}).flatMap(([behaviour, params]) =>
+      (BEHAVIOURS[behaviour].flowsNamed?.(params) ?? []).map((flow) => ({ state, behaviour, flow })),
+    ),
+  );
+  const exists = async (flow: string) =>
+    BUILT_IN_FLOWS.includes(flow) || (await ctx.github.readFileAt(`${FLOWS_DIR}/${flow}.json`, ctx.config.baseBranch)) !== null;
+  const errors: FlowError[] = [];
+  for (const n of named) if (!(await exists(n.flow))) errors.push({ kind: "flow-unknown", ...n });
+  return errors.length ? { ok: false, name: loaded.name, errors } : loaded;
 }
 
 /** Outcome words of triage that no flow can take: the built-in story and slice, and reject. */

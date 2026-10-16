@@ -229,7 +229,45 @@ describe("a broken flow", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain("#40 runs the flow bug, which is broken");
-    expect(res.stdout).toContain("  From waiting, no outcome ever leads to closed or not-planned.\n  From looping, no outcome ever leads to closed or not-planned.\n");
+    expect(res.stdout).toContain(
+      "  From waiting, no outcome ever leads to closed or not-planned.\n  From looping, no outcome ever leads to closed or not-planned.\n",
+    );
+  });
+
+  test("a behaviour norn does not know is refused, naming it", async () => {
+    const flow = bugFlow();
+    Object.assign(flow.states.fixing, { behaviours: { teleports: {} } });
+    const w = bugAt("reproducing", flow);
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain(
+      "  The state fixing uses the behaviour teleports, which this norn does not know; a flow written for a newer norn needs the nornVersion pin raised.\n",
+    );
+  });
+
+  test("behaviours must be an object of behaviour names", async () => {
+    const flow = bugFlow();
+    Object.assign(flow.states.fixing, { behaviours: ["opensPR"] });
+    const w = bugAt("reproducing", flow);
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("  states.fixing.behaviours must be an object of behaviour names.\n");
+  });
+
+  test("a flow cannot take the name of triage's reject", async () => {
+    const w = setup();
+    w.github.seedFlow("reject", bugFlow());
+    w.github.seedIssue({ number: 40, title: "Crash on empty input", labels: ["type:reject", "reproducing"] });
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("#40 runs the flow reject, which is broken");
+    expect(res.stdout).toContain("  The name reject is norn's own: triage uses it to close an issue as not planned.\n");
   });
 
   test("issues of other types are not affected", async () => {
