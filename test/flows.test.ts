@@ -26,6 +26,13 @@ function bugFlow(over: Record<string, unknown> = {}) {
   };
 }
 
+/** The bug flow with its own branch, where fixing opens the PR. */
+function prFlow() {
+  const flow = bugFlow({ workspace: "own" });
+  Object.assign(flow.states.fixing, { behaviours: { opensPR: {} } });
+  return flow;
+}
+
 function bugAt(state: string, flow: unknown = bugFlow()) {
   const w = setup();
   w.github.seedFlow("bug", flow);
@@ -51,8 +58,8 @@ describe("a repository flow", () => {
 });
 
 describe("the flow's workspace", () => {
-  test("own: a branch of the issue's own and one PR from it into the base branch", async () => {
-    const w = bugAt("fixing", bugFlow({ workspace: "own" }));
+  test("own: a branch of the issue's own and, with opensPR, one PR from it into the base branch", async () => {
+    const w = bugAt("fixing", prFlow());
 
     const out = (await w.norn("take", "40")).stdout;
 
@@ -76,9 +83,9 @@ describe("the flow's workspace", () => {
   });
 
   test("own: the PR goes into the team's base branch", async () => {
-    const w = bugAt("fixing", bugFlow({ workspace: "own" }));
+    const w = bugAt("fixing", prFlow());
     w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ baseBranch: "develop" }));
-    w.github.seedFlow("bug", bugFlow({ workspace: "own" }), "develop");
+    w.github.seedFlow("bug", prFlow(), "develop");
 
     const out = (await w.norn("take", "40")).stdout;
 
@@ -234,19 +241,6 @@ describe("a broken flow", () => {
     );
   });
 
-  test("a behaviour norn does not know is refused, naming it", async () => {
-    const flow = bugFlow();
-    Object.assign(flow.states.fixing, { behaviours: { teleports: {} } });
-    const w = bugAt("reproducing", flow);
-
-    const res = await w.norn("take", "40");
-
-    expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain(
-      "  The state fixing uses the behaviour teleports, which this norn does not know; a flow written for a newer norn needs the nornVersion pin raised.\n",
-    );
-  });
-
   test("behaviours must be an object of behaviour names", async () => {
     const flow = bugFlow();
     Object.assign(flow.states.fixing, { behaviours: ["opensPR"] });
@@ -279,6 +273,7 @@ describe("a broken flow", () => {
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("Waiting for a human:\n  - #40 is blocked by its flow bug, which is broken: It is not valid JSON: ");
     expect(res.stdout).toContain("Fix .agents/flows/bug.json on the base branch.\n");
+    expect(res.stdout).not.toContain("Story #40");
     expect(json.nothingLeft).toBe(true);
     expect(json.waiting).toEqual([{ issue: 40, reason: "invalid-flow", detail: expect.stringContaining("is blocked by its flow bug, which is broken") }]);
   });

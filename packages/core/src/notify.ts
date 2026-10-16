@@ -7,7 +7,8 @@ export type Channel = "herdr" | "os";
 export type Notification =
   /** `reason` is the needs-human reason norn recorded on the issue, as written there. */
   | { kind: "needs-human"; issue: number; reason: string; url: string }
-  | { kind: "needs-human-qa"; issue: number; of: "story" | "mode:hil"; url: string }
+  /** `of` says why a person QAs it, as Outcome.notify does. */
+  | { kind: "needs-human-qa"; issue: number; of: string; url: string }
   /** Delivery stopped: what waits for a person that no session holds; empty when nothing does. */
   | { kind: "story-waiting"; story: number; waiting: WaitItem[] };
 
@@ -30,6 +31,6 @@ export async function notifyNeedsHuman(ctx: Ctx, n: number, reason: string) {
 }
 
 /** An issue reached QA by a person. */
-export async function notifyHumanQa(ctx: Ctx, n: number, of: "story" | "mode:hil") {
+export async function notifyHumanQa(ctx: Ctx, n: number, of: string) {
   await send(ctx, { kind: "needs-human-qa", issue: n, of, url: `${await ctx.github.repoUrl()}/issues/${n}` });
 }

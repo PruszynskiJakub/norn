@@ -1,5 +1,5 @@
 import type { Issue } from "./github.js";
-import { BEHAVIOURS, type BehaviourParams } from "./behaviours.js";
+import { BEHAVIOURS, type Behaviour, type BehaviourName, type BehaviourParams } from "./behaviours.js";
 import type { Outcome, Step } from "./machine.js";
 
 /**
@@ -33,8 +33,8 @@ export interface FlowState {
   color?: string;
   /** The step can attach evidence files with norn done --evidence <dir>. */
   evidence?: boolean;
-  /** Built-in behaviours the state opts into, by name, with their parameters. */
-  behaviours?: Record<string, BehaviourParams>;
+  /** Built-in mechanics the state opts into, by name, with their parameters; see behaviours.ts. */
+  behaviours?: Partial<Record<BehaviourName, BehaviourParams>>;
   /** Keyed by outcome word. */
   outcomes: Record<string, Outcome>;
 }
@@ -62,6 +62,8 @@ export type FlowError =
   | { kind: "behaviours-conflict"; state: string; behaviours: [string, string] }
   /** A behaviour names a flow the repository does not have. */
   | { kind: "flow-unknown"; state: string; behaviour: string; flow: string }
+  /** A behaviour of the state needs the flow to be otherwise, e.g. opensPR a workspace of its own. */
+  | { kind: "behaviour-needs"; state: string; behaviour: string; field: string; expected: string }
   /** The flow's name is one norn keeps for itself, e.g. reject, triage's outcome. */
   | { kind: "flow-reserved"; flow: string };
 
@@ -119,7 +121,7 @@ export function validateFlow(data: unknown): FlowError[] {
     if (typeof state.attended !== "boolean") field(`${at}.attended`, "true or false");
     for (const key of ["name", "description", "color"]) if (state[key] !== undefined && typeof state[key] !== "string") field(`${at}.${key}`, "a string");
     if (state.evidence !== undefined && typeof state.evidence !== "boolean") field(`${at}.evidence`, "true or false");
-    if (state.behaviours !== undefined) checkBehaviours(name, state.behaviours, errors);
+    if (state.behaviours !== undefined) checkBehaviours(data, name, state.behaviours, errors);
     if (state.enterAs !== undefined && (typeof state.enterAs !== "string" || !Object.hasOwn(states, state.enterAs))) {
       field(`${at}.enterAs`, "a state of the flow");
     }
@@ -155,23 +157,32 @@ export function validateFlow(data: unknown): FlowError[] {
   return errors;
 }
 
+const isBehaviour = (name: string): name is BehaviourName => Object.hasOwn(BEHAVIOURS, name);
+
 /** Each behaviour must be known, with valid parameters, and allowed beside the state's others. */
-function checkBehaviours(state: string, behaviours: unknown, errors: FlowError[]) {
+function checkBehaviours(flow: Record<string, unknown>, state: string, behaviours: unknown, errors: FlowError[]) {
   const at = `states.${state}.behaviours`;
   if (!isObject(behaviours)) {
     errors.push({ kind: "field-invalid", path: at, expected: "an object of behaviour names" });
     return;
   }
-  const names = Object.keys(behaviours);
+  const known: BehaviourName[] = [];
   for (const [behaviour, params] of Object.entries(behaviours)) {
-    const rule = Object.hasOwn(BEHAVIOURS, behaviour) ? BEHAVIOURS[behaviour] : undefined;
-    if (!rule) errors.push({ kind: "behaviour-unknown", state, behaviour });
-    else if (!isObject(params)) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}`, expected: "an object of parameters" });
+    if (!isBehaviour(behaviour)) {
+      errors.push({ kind: "behaviour-unknown", state, behaviour });
+      continue;
+    }
+    known.push(behaviour);
+    const rule: Behaviour = BEHAVIOURS[behaviour];
+    if (!isObject(params)) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}`, expected: "an object of parameters, {} for none" });
     else for (const p of rule.params?.(params) ?? []) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${p.param}`, expected: p.expected });
+    const needs = rule.requires?.(flow);
+    if (needs) errors.push({ kind: "behaviour-needs", state, behaviour, ...needs });
   }
-  names.forEach((a, i) => {
-    for (const b of names.slice(i + 1)) {
-      if (BEHAVIOURS[a]?.excludes?.includes(b) || BEHAVIOURS[b]?.excludes?.includes(a)) errors.push({ kind: "behaviours-conflict", state, behaviours: [a, b] });
+  known.forEach((a, i) => {
+    for (const b of known.slice(i + 1)) {
+      const [ra, rb]: Behaviour[] = [BEHAVIOURS[a], BEHAVIOURS[b]];
+      if (ra.excludes?.includes(b) || rb.excludes?.includes(a)) errors.push({ kind: "behaviours-conflict", state, behaviours: [a, b] });
     }
   });
 }
@@ -239,9 +250,10 @@ export function repositoryFlow(
 async function checkFlowsNamed(ctx: Parameters<typeof repositoryFlow>[0], loaded: LoadedFlow): Promise<LoadedFlow> {
   if (!loaded.ok) return loaded;
   const named = Object.entries(loaded.flow.states).flatMap(([state, s]) =>
-    Object.entries(s.behaviours ?? {}).flatMap(([behaviour, params]) =>
-      (BEHAVIOURS[behaviour].flowsNamed?.(params) ?? []).map((flow) => ({ state, behaviour, flow })),
-    ),
+    Object.entries(s.behaviours ?? {}).flatMap(([behaviour, params]) => {
+      const rule: Behaviour = BEHAVIOURS[behaviour as BehaviourName];
+      return (rule.flowsNamed?.(params ?? {}) ?? []).map((flow) => ({ state, behaviour, flow }));
+    }),
   );
   const exists = async (flow: string) =>
     BUILT_IN_FLOWS.includes(flow) || (await ctx.github.readFileAt(`${FLOWS_DIR}/${flow}.json`, ctx.config.baseBranch)) !== null;
@@ -312,6 +324,7 @@ export function flowStep(issue: Issue, flow: Flow): Step | null {
     attended: s.attended,
     ...(s.enterAs ? { enterAs: s.enterAs } : {}),
     outcomes: s.outcomes,
-    ...(s.evidence ? { evidence: true } : {}),
+    // A person at a human gate can attach QA evidence.
+    ...(s.evidence || (s.behaviours && Object.hasOwn(s.behaviours, "humanGate")) ? { evidence: true } : {}),
   };
 }

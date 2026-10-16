@@ -30,8 +30,11 @@ export interface Outcome {
   note?: string;
   /** After the transition, set needs-human; this is who must do what, e.g. an escalation's reason. */
   needsHuman?: string;
-  /** After the transition, a person does QA without the needs-human flag: for a story, or for a slice in mode:hil. */
-  notify?: "story" | "mode:hil";
+  /**
+   * After the transition, a person does QA without the needs-human flag. This
+   * names why: story, mode:hil for a slice, or type:<flow> for a flow's human gate.
+   */
+  notify?: string;
   /** Triage gives the issue this repository flow: the label type:<flow>, and the flow's start as `to`. */
   flow?: string;
 }
