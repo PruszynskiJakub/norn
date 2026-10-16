@@ -5,7 +5,24 @@ import type { GitHub } from "./github.js";
 import { FLAGS, STATES } from "./machine.js";
 
 /** Skills psdd briefings name. */
-export const SKILLS = ["triage", "refine", "clarify", "plan", "slice", "implement", "review", "auto-qa", "qa", "merge", "resolve", "drive", "deliver", "tdd", "interview", "codebase-design"] as const;
+export const SKILLS = [
+  "triage",
+  "refine",
+  "clarify",
+  "plan",
+  "slice",
+  "implement",
+  "review",
+  "auto-qa",
+  "qa",
+  "merge",
+  "resolve",
+  "drive",
+  "deliver",
+  "tdd",
+  "interview",
+  "codebase-design",
+] as const;
 
 const DESCRIPTIONS: Record<string, [string, string]> = {
   "needs-refinement": ["c5def5", "Triaged; the spec is being refined"],
@@ -67,7 +84,7 @@ export async function init({ github, cwd, installSkills }: InitDeps): Promise<{ 
   const teamConfig = join(cwd, TEAM_CONFIG);
   if (!existsSync(teamConfig)) {
     const config = { ...DEFAULT_TEAM_CONFIG, baseBranch: await github.defaultBranch() };
-    writeFileSync(teamConfig, JSON.stringify(config, null, 2) + "\n");
+    writeFileSync(teamConfig, `${JSON.stringify(config, null, 2)}\n`);
   }
   ensureGitignored(cwd, [".agents/worktrees/", LOCAL_CONFIG]);
   const instructed = writeAgentInstructions(cwd);
@@ -107,7 +124,7 @@ function ensureGitignored(cwd: string, entries: string[]) {
   const missing = entries.filter((e) => !present.has(e));
   if (!missing.length) return;
   if (text && !text.endsWith("\n")) text += "\n";
-  writeFileSync(file, text + missing.map((e) => e + "\n").join(""));
+  writeFileSync(file, text + missing.map((e) => `${e}\n`).join(""));
 }
 
 const START = "<!-- psdd:start -->";
@@ -136,12 +153,15 @@ function writeAgentInstructions(cwd: string): string[] {
   const agents = join(cwd, "AGENTS.md");
   const claude = join(cwd, "CLAUDE.md");
   if (!existsSync(agents) && !existsSync(claude)) {
-    writeFileSync(agents, AGENT_INSTRUCTIONS + "\n");
+    writeFileSync(agents, `${AGENT_INSTRUCTIONS}\n`);
     writeFileSync(claude, "@AGENTS.md\n");
     return ["AGENTS.md", "CLAUDE.md"];
   }
   const written: string[] = [];
-  for (const [name, file] of [["AGENTS.md", agents], ["CLAUDE.md", claude]] as const) {
+  for (const [name, file] of [
+    ["AGENTS.md", agents],
+    ["CLAUDE.md", claude],
+  ] as const) {
     if (!existsSync(file)) continue;
     const text = readFileSync(file, "utf8");
     if (name === "CLAUDE.md" && existsSync(agents) && /^@AGENTS\.md\s*$/m.test(text)) continue;
@@ -150,7 +170,7 @@ function writeAgentInstructions(cwd: string): string[] {
     const next =
       start !== -1 && end !== -1
         ? text.slice(0, start) + AGENT_INSTRUCTIONS + text.slice(end + END.length)
-        : (text ? text.replace(/\n*$/, "\n\n") : "") + AGENT_INSTRUCTIONS + "\n";
+        : `${(text ? text.replace(/\n*$/, "\n\n") : "") + AGENT_INSTRUCTIONS}\n`;
     writeFileSync(file, next);
     written.push(name);
   }

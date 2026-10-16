@@ -143,7 +143,9 @@ describe("psdd tidy", () => {
     const res = await w.psdd("tidy");
 
     expect(w.workspace.removed).toEqual([]);
-    expect(res.stdout).toContain("/repo/.agents/worktrees/123-rate-limiting-127: psdd is running inside it. Run psdd tidy from another directory to remove it.");
+    expect(res.stdout).toContain(
+      "/repo/.agents/worktrees/123-rate-limiting-127: psdd is running inside it. Run psdd tidy from another directory to remove it.",
+    );
   });
 
   test("reports a removal that fails, and the rest still runs", async () => {

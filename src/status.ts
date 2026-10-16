@@ -35,14 +35,12 @@ export async function status(ctx: { github: GitHub; slugs: Slugs }, n: number, n
     if (r.heldSince) parts.push(`held since ${hhmm(r.heldSince)}${r.stale ? " (stale)" : ""}`);
     return parts.join(" · ");
   };
-  const lines = [
-    `Story #${n} "${story.title}": ${describe(head)} · owner ${data.story.owner ? `@${data.story.owner}` : "none"} · branch ${data.story.branch}`,
-  ];
+  const lines = [`Story #${n} "${story.title}": ${describe(head)} · owner ${data.story.owner ? `@${data.story.owner}` : "none"} · branch ${data.story.branch}`];
   if (rows.length) {
     lines.push(`Slices (${rows.filter((r) => r.state === "merged").length} of ${rows.length} merged):`);
     const names = rows.map((r) => `#${r.number} "${r.title}"`);
     const width = Math.max(...names.map((x) => x.length)) + 3;
-    rows.forEach((r, i) => lines.push(`  ${names[i].padEnd(width)}${describe(r)}`));
+    for (const [i, r] of rows.entries()) lines.push(`  ${names[i].padEnd(width)}${describe(r)}`);
   } else lines.push("No slices yet.");
   return { lines, data };
 }

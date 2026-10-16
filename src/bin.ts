@@ -20,14 +20,14 @@ try {
     cwd: root,
     installSkills,
   });
-  process.stdout.write(res.stdout + "\n");
+  process.stdout.write(`${res.stdout}\n`);
   process.exitCode = res.exitCode;
 } catch (e) {
   if (e instanceof GhError) {
-    process.stdout.write(ghFailureMessage(process.argv.slice(2), e.message) + "\n");
+    process.stdout.write(`${ghFailureMessage(process.argv.slice(2), e.message)}\n`);
     process.exitCode = 1;
   } else if (e instanceof RootError) {
-    process.stdout.write(e.message + "\n");
+    process.stdout.write(`${e.message}\n`);
     process.exitCode = 1;
   } else throw e;
 }

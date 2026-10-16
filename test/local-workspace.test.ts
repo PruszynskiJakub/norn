@@ -19,7 +19,8 @@ function scripted(handler: (cmd: string, args: string[]) => { code?: number; std
 describe("LocalWorkspace", () => {
   test("listWorktrees gives each worktree's path and branch, detached ones without", async () => {
     const { run } = scripted(() => ({
-      stdout: "worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo/.agents/worktrees/123-x\nHEAD def\nbranch refs/heads/123-x\n\nworktree /tmp/d\nHEAD 012\ndetached\n\n",
+      stdout:
+        "worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo/.agents/worktrees/123-x\nHEAD def\nbranch refs/heads/123-x\n\nworktree /tmp/d\nHEAD 012\ndetached\n\n",
     }));
     expect(await new LocalWorkspace("/repo", {}, run).listWorktrees()).toEqual([
       { path: "/repo", branch: "main" },
@@ -70,7 +71,8 @@ describe("LocalWorkspace", () => {
 
   test("branchCheckedOutAt finds the worktree whose entry has the branch", async () => {
     const { run } = scripted(() => ({
-      stdout: "worktree /repo\nHEAD abc\nbranch refs/heads/123-x\n\nworktree /repo/.agents/worktrees/124-y\nHEAD def\nbranch refs/heads/124-y\n\nworktree /tmp/d\nHEAD 012\ndetached\n",
+      stdout:
+        "worktree /repo\nHEAD abc\nbranch refs/heads/123-x\n\nworktree /repo/.agents/worktrees/124-y\nHEAD def\nbranch refs/heads/124-y\n\nworktree /tmp/d\nHEAD 012\ndetached\n",
     }));
     const ws = new LocalWorkspace("/repo", {}, run);
     expect(await ws.branchCheckedOutAt("123-x")).toBe("/repo");

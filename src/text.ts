@@ -21,7 +21,7 @@ export function specPath(n: number, slug: string) {
  * stay as they are; anything else, e.g. a path with a space, is single-quoted.
  */
 export function sh(word: string) {
-  return /^[A-Za-z0-9_\-.\/:=@%+,]+$/.test(word) ? word : `'${word.replace(/'/g, `'\\''`)}'`;
+  return /^[A-Za-z0-9_\-./:=@%+,]+$/.test(word) ? word : `'${word.replace(/'/g, `'\\''`)}'`;
 }
 
 /** Hard-wraps prose to the given width, keeping existing line breaks. */
@@ -32,10 +32,10 @@ export function wrap(text: string, width = 76) {
       const out: string[] = [];
       let cur = "";
       for (const word of line.split(" ")) {
-        if (cur && (cur + " " + word).length > width) {
+        if (cur && `${cur} ${word}`.length > width) {
           out.push(cur);
           cur = word;
-        } else cur = cur ? cur + " " + word : word;
+        } else cur = cur ? `${cur} ${word}` : word;
       }
       out.push(cur);
       return out.join("\n");

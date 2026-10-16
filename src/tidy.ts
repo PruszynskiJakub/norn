@@ -55,8 +55,12 @@ export async function tidy(ctx: Ctx, dryRun: boolean): Promise<TidyReport> {
   const issues = new Map<number, Promise<Issue | null>>();
   // A number with no issue behind it, e.g. a branch someone named by hand, is not psdd's.
   const issue = (n: number) => {
-    if (!issues.has(n)) issues.set(n, github.getIssue(n).catch(() => null));
-    return issues.get(n)!;
+    let found = issues.get(n);
+    if (!found) {
+      found = github.getIssue(n).catch(() => null);
+      issues.set(n, found);
+    }
+    return found;
   };
   const closed = async (n: number) => (await issue(n))?.state === "closed";
 
@@ -78,14 +82,13 @@ export async function tidy(ctx: Ctx, dryRun: boolean): Promise<TidyReport> {
   const slices = new Map<number, Promise<Issue[]>>();
   for (const branch of [...candidates].sort()) {
     const owned = await ownerOf(ctx, branch, issue, slices);
-    if (!owned || owned.issue.state !== "closed") continue;
+    if (owned?.issue.state !== "closed") continue;
     const pr = await github.findPullRequest(branch);
     const merged = pr?.state === "merged" && pr.base === owned.into;
     const n = owned.issue.number;
     const who = `${kindOf(owned.issue)} #${n}`;
     // Commits that are on no remote branch were never pushed, unless they are what the PR merged.
-    const unpushed = async () =>
-      local.has(branch) && (await workspace.hasUnpushedCommits(branch)) && !(await mergedHead(ctx, branch, pr));
+    const unpushed = async () => local.has(branch) && (await workspace.hasUnpushedCommits(branch)) && !(await mergedHead(ctx, branch, pr));
 
     const wtAbs = join(workspace.root, worktreePath(branch));
     const checkedOut = worktrees.find((w) => w.branch === branch);
@@ -133,12 +136,7 @@ async function mergedHead(ctx: Ctx, branch: string, pr: PullRequest | null) {
  * The story or slice a branch belongs to, from the story's recorded slug and
  * its slices. Anything else, e.g. a branch named by hand, is not psdd's.
  */
-async function ownerOf(
-  ctx: Ctx,
-  branch: string,
-  issue: (n: number) => Promise<Issue | null>,
-  slices: Map<number, Promise<Issue[]>>,
-): Promise<Owned | null> {
+async function ownerOf(ctx: Ctx, branch: string, issue: (n: number) => Promise<Issue | null>, slices: Map<number, Promise<Issue[]>>): Promise<Owned | null> {
   const m = /^(\d+)-/.exec(branch);
   if (!m) return null;
   const story = await issue(Number(m[1]));

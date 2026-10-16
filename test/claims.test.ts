@@ -34,7 +34,11 @@ describe("stale-claim takeover", () => {
     await gh.createClaim(132, { holder: "bob", session: "running", since: now.toISOString() });
 
     expect(await acquire(gh, 131, record("a"), now, twoHours)).toMatchObject({ ok: false });
-    expect(await acquire(gh, 131, record("a"), now, twoHours, { takeover: true })).toMatchObject({ ok: true, ownTakeover: true, tookOver: { session: "stopped" } });
+    expect(await acquire(gh, 131, record("a"), now, twoHours, { takeover: true })).toMatchObject({
+      ok: true,
+      ownTakeover: true,
+      tookOver: { session: "stopped" },
+    });
     expect(await acquire(gh, 132, record("a"), now, twoHours, { takeover: true })).toMatchObject({ ok: false, held: { holder: "bob" } });
     expect(gh.claim(132)?.session).toBe("running");
   });

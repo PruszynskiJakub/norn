@@ -25,7 +25,10 @@ describe("review", () => {
   });
 
   test.each([
-    [["type:slice", "mode:hil"], ["mode:hil", "needs-qa", "type:slice"]],
+    [
+      ["type:slice", "mode:hil"],
+      ["mode:hil", "needs-qa", "type:slice"],
+    ],
     [["type:story"], ["needs-qa", "type:story"]],
   ])("approving %j always goes to QA by an agent first, with no needs-human", async (labels, after) => {
     const w = issue([...labels, "needs-review"]);
@@ -183,19 +186,16 @@ describe("QA evidence", () => {
 });
 
 describe("story fixes", () => {
-  test.each(["changes-requested", "qa-failed"])(
-    "a story in %s is fixed on the story branch with implement, then goes back to needs-review",
-    async (state) => {
-      const w = issue(["type:story", state], 123);
-      w.github.issues.get(123)!.title = "Rate limiting";
-      const take = await w.psdd("take", "123");
-      expect(take.stdout).toContain("Invoke the skill: implement");
-      expect(take.stdout).toContain("123-rate-limiting");
-      expect(w.github.labels(123)).toContain(state);
+  test.each(["changes-requested", "qa-failed"])("a story in %s is fixed on the story branch with implement, then goes back to needs-review", async (state) => {
+    const w = issue(["type:story", state], 123);
+    w.github.issues.get(123)!.title = "Rate limiting";
+    const take = await w.psdd("take", "123");
+    expect(take.stdout).toContain("Invoke the skill: implement");
+    expect(take.stdout).toContain("123-rate-limiting");
+    expect(w.github.labels(123)).toContain(state);
 
-      await w.psdd("done", "123");
+    await w.psdd("done", "123");
 
-      expect(w.github.labels(123).sort()).toEqual(["needs-review", "type:story"]);
-    },
-  );
+    expect(w.github.labels(123).sort()).toEqual(["needs-review", "type:story"]);
+  });
 });
