@@ -160,7 +160,12 @@ A repository can run other kinds of work through processes of its own. A flow is
 - The first transition into a state whose label is missing creates the label, with the state's colour and description, or a default for an attended or an agent step.
 - `needs-human`, claims and `in-progress` work in every flow as they do for stories and slices.
 
-norn checks a flow before it runs it: the start state exists, every target is a state, `closed` or `not-planned`, and no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`). A broken flow is refused, with what is wrong, only for the issues of its own type.
+norn checks a flow before it runs it: the start state exists, every target is a state, `closed` or `not-planned`, every `renamed` target is a state, and no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`). A broken flow is refused, with what is wrong, only for the issues of its own type.
+
+Flows have no versions: an issue in progress follows the current flow from its next step. When `norn take` finds an issue in a state its flow no longer has (the state norn last moved it to, by its transition comments):
+
+- if the flow's optional `renamed` map, e.g. `"renamed": { "repro": "reproducing" }`, names the old state, norn moves the issue to the new state with a transition comment and takes it there;
+- otherwise norn sets `needs-human` with a comment naming the missing state and the flow, takes the old state's label off and refuses the take. Taking the issue again runs `norn-resolve`, whose outcomes are the flow's states: `norn done <issue> <state>` moves it there.
 
 ## Steps, skills and outcomes
 
