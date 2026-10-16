@@ -59,6 +59,7 @@
 <h1>psdd — CLI for the SDD process</h1>
 <p class="byline">2026-10-13 · Jakub Pruszyński</p>
 <p class="lead">psdd is a CLI that the developer's LLM calls to run work through the organisation's spec-driven process, with GitHub labels as the only source of truth.</p>
+<p>This document holds the vision and the way of working. The domain terms it uses (story, slice, step, claim, briefing, outcome, needs-human, fix round and the rest) are defined in <a href="CONTEXT.md"><code>CONTEXT.md</code></a>; a new concept here adds its entry there in the same change.</p>
 
 <h2 id="purpose-and-principles">Purpose and principles</h2>
 <ul>
@@ -156,21 +157,21 @@
   <li><strong>Slice worktree:</strong> implement, review, QA and merge run here, each as a new subagent.</li>
   <li><strong>The briefing carries the process; skills carry the craft.</strong> Skills know nothing of psdd, labels, branches or worktrees: each ends on a result (a spec, a verdict, a breakdown). The briefing says what to read, where the work is committed and pushed, which commands create slices and PRs, and which finish command each result maps to.</li>
   <li><strong>psdd says where to work.</strong> The <code>take</code> briefing names the worktree path and branch. If the worktree is missing, it gives the command to create it for the tool in use.</li>
-  <li><strong>Base branch:</strong> a slice worktree starts from the story branch. The story worktree starts from <code>main</code>. psdd makes the story branch on GitHub and slices merge there, so a new branch starts from <code>origin/&lt;base&gt;</code>, fetched first, without tracking it; a branch that exists only on GitHub is fetched and checked out with its commits; and a local branch that is also on GitHub is fast-forwarded inside the new worktree (<code>git merge --ff-only origin/&lt;branch&gt;</code>: local commits ahead of GitHub are kept, and a diverged branch gets its worktree with the failing merge as the signal). A branch already checked out in another checkout gets no create command; psdd names that checkout instead.</li>
-  <li><strong>Paths are absolute</strong> and git runs as <code>git -C &lt;main checkout&gt;</code>, so the commands work from any directory, including another worktree.</li>
+  <li><strong>Base branch:</strong> a slice worktree starts from the story branch, and the story worktree from <code>main</code>, as they are on GitHub. A branch that already exists keeps its commits and is brought up to date; one checked out in another checkout gets no create command, and psdd names that checkout instead.</li>
+  <li><strong>The commands work from any directory,</strong> including another worktree.</li>
 </ul>
 <div class="table-wrap"><table>
-  <thead><tr><th>Tool</th><th>Detected by (auto)</th><th>Create the worktree</th><th>New agent per phase</th></tr></thead>
+  <thead><tr><th>Tool</th><th>Picked in auto mode</th><th>New agent per phase</th></tr></thead>
   <tbody>
-    <tr><td>herdr</td><td><code>HERDR_ENV=1</code></td><td><code>git -C &lt;repo&gt; fetch origin &lt;base&gt; &amp;&amp; git -C &lt;repo&gt; branch --no-track &lt;branch&gt; origin/&lt;base&gt; &amp;&amp; herdr worktree create --cwd &lt;repo&gt; --branch &lt;branch&gt; --path &lt;worktree&gt; --no-focus</code> (herdr would otherwise track the base)</td><td>A new herdr agent in the worktree's pane: <code>herdr agent start &lt;name&gt; --kind claude --pane &lt;pane&gt;</code></td></tr>
-    <tr><td>Claude Code</td><td><code>CLAUDECODE=1</code></td><td><code>git -C &lt;repo&gt; fetch origin &lt;base&gt; &amp;&amp; git -C &lt;repo&gt; worktree add --no-track &lt;worktree&gt; -b &lt;branch&gt; origin/&lt;base&gt;</code></td><td>A new subagent told to work in the worktree path. Claude Code's built-in worktree isolation is not used</td></tr>
-    <tr><td>git</td><td>fallback</td><td><code>git -C &lt;repo&gt; fetch origin &lt;base&gt; &amp;&amp; git -C &lt;repo&gt; worktree add --no-track &lt;worktree&gt; -b &lt;branch&gt; origin/&lt;base&gt;</code></td><td>A new agent session started in the worktree, with <code>PSDD_SESSION=psdd-&lt;issue&gt;-&lt;random&gt;</code> set, as <code>psdd next</code> lists it</td></tr>
+    <tr><td>herdr</td><td>Inside herdr</td><td>A new herdr agent in the worktree's pane</td></tr>
+    <tr><td>Claude Code</td><td>Inside Claude Code</td><td>A new subagent told to work in the worktree. Claude Code's built-in worktree isolation is not used</td></tr>
+    <tr><td>git</td><td>Otherwise</td><td>A new agent session started in the worktree, as its own session, as <code>psdd next</code> lists it</td></tr>
   </tbody>
 </table></div>
 <ul>
   <li><code>psdd init</code> adds <code>.agents/worktrees/</code> to <code>.gitignore</code>.</li>
-  <li><a href="#housekeeping"><code>psdd tidy</code></a> removes worktrees of closed items with <code>herdr worktree remove</code> or <code>git worktree remove</code>, never the one it runs in.</li>
-  <li>GitHub closes a story through its PR's <code>Closes #&lt;story&gt;</code> only for PRs into the default branch. When the story PR is merged and the story is still open, <code>psdd next</code> closes it. It also removes state labels left on closed issues.</li>
+  <li><a href="#housekeeping"><code>psdd tidy</code></a> removes worktrees of closed items with the tool in use, never the one it runs in.</li>
+  <li>When the story PR is merged and GitHub has not closed the story, e.g. with a base branch other than the default, <code>psdd next</code> closes it. It also removes state labels left on closed issues.</li>
   <li>A worktree left behind by a session whose claim went stale is kept: the session may only be slow, and its commits are there. The next holder is told to check <code>git status</code> before starting.</li>
 </ul>
 
@@ -191,26 +192,21 @@
 { "worktrees": { "provider": "herdr" }, "notifications": "auto" }</code></pre>
 <ul>
   <li><strong>Provider</strong> is <code>auto</code>, <code>herdr</code>, <code>claude-code</code> or <code>git</code>. <code>auto</code> uses the detection in the Worktrees table, in order: herdr first, then Claude Code, then plain git.</li>
-  <li><strong>Environment variables are a safety check.</strong> If the provider is <code>herdr</code> but <code>HERDR_ENV</code> is not set, psdd refuses and tells the agent to start from a herdr pane or switch the provider in the local file.</li>
+  <li><strong>The environment is a safety check.</strong> If the provider is <code>herdr</code> but psdd is not running inside herdr, psdd refuses and tells the agent to start from a herdr pane or switch the provider in the local file.</li>
   <li><strong>Labels are fixed</strong> and not configurable, so every repo in the organisation works the same way.</li>
   <li><code>psdd init</code> creates the team file with defaults, taking <code>baseBranch</code> from the repository's default branch, and adds the local file to <code>.gitignore</code>.</li>
   <li><strong>The worktree location is fixed</strong> at <code>.agents/worktrees/</code>, like the labels.</li>
 </ul>
 
-<h2 id="concurrency-git-ref-claims">Concurrency: git-ref claims</h2>
-<p>A claim is a git ref created through the GitHub API, which either succeeds or fails atomically. Label changes and comments on an issue happen only while holding its claim.</p>
-<pre><code>claim:    gh api -X POST repos/:owner/:repo/git/refs \
-            -f ref=refs/psdd/claims/&lt;issue&gt; -f sha=&lt;claim commit&gt;
-          201 = claim held, go ahead
-          422 = someone else holds it, skip or retry
-release:  gh api -X DELETE repos/:owner/:repo/git/refs/psdd/claims/&lt;issue&gt;</code></pre>
+<h2 id="concurrency-git-ref-claims">Concurrency: claims</h2>
+<p>A <a href="CONTEXT.md">claim</a> is taken on GitHub in one step that either succeeds or fails, so only one session can hold it. Label changes and comments on an issue happen only while holding its claim.</p>
 <ul>
-  <li><strong>Only one agent can win.</strong> Two subagents can't take the same slice, because the second ref creation fails. Checking a label first cannot guarantee that.</li>
-  <li><strong>The <code>in-progress</code> label mirrors the ref.</strong> It shows the claim in GitHub. The ref is the real lock.</li>
+  <li><strong>Only one agent can win.</strong> Two subagents can't take the same slice: the second one is refused. Checking a label first cannot guarantee that.</li>
+  <li><strong>The <code>in-progress</code> label mirrors the claim,</strong> so it shows in GitHub. The claim is the real lock.</li>
   <li><strong>Claims are held for the whole step,</strong> e.g. all of implement on a slice, and released when handing over to the next state. A person's step is claimed too: <code>psdd next</code> lists an item waiting for a person that a session holds as "held by &lt;session&gt; (since hh:mm)", and offers no hand-off for it.</li>
-  <li><strong>Stale claims.</strong> The ref points at a small commit recording holder, session ID and timestamp. psdd treats a claim older than 2 hours as abandoned and lets another session take it over. The takeover is conditional: the new claim commit is a child of the stale one and the ref moves only if it still points at the stale commit, so two sessions taking over at once cannot both win.</li>
-  <li><strong>Taking over your own stopped session.</strong> <code>psdd take &lt;issue&gt; --takeover</code> takes over a claim of the same GitHub user at any age, e.g. a session closed partway through refinement, with the same conditional move and the same note to check <code>git status</code>. Without the flag, take refuses and names the command. It never takes another user's claim. Agents in <code>deliver</code> share their user, so the flag is for people, who know the other session has stopped.</li>
-  <li><strong>Refreshing a claim.</strong> <code>psdd take</code> on an issue the same session already holds briefs again and moves the claim's timestamp forward (the ref is force-updated to a new claim commit). Long steps re-run it, e.g. after each implement commit, so a slow session is not taken for crashed.</li>
+  <li><strong>Stale claims.</strong> A claim records its holder, session and time. psdd treats a claim older than 2 hours as abandoned and lets another session take it over; two sessions taking over at once cannot both win.</li>
+  <li><strong>Taking over your own stopped session.</strong> <code>psdd take &lt;issue&gt; --takeover</code> takes over a claim of the same GitHub user at any age, e.g. a session closed partway through refinement, with the same note to check <code>git status</code>. Without the flag, take refuses and names the command. It never takes another user's claim. Agents in <code>deliver</code> share their user, so the flag is for people, who know the other session has stopped.</li>
+  <li><strong>Refreshing a claim.</strong> <code>psdd take</code> on an issue the same session already holds briefs again and moves the claim's time forward. Long steps re-run it, e.g. after each implement commit, so a slow session is not taken for crashed.</li>
   <li><strong>Transition first, then follow-ups.</strong> <code>psdd done</code> checks its preconditions (a story leaving slicing gets its branch first), changes the labels and releases the claim. The automatic transitions after it, such as unblocking slices and opening the story PR, are best effort: a failure is reported, and <code>psdd next</code> repeats them.</li>
 </ul>
 
@@ -254,11 +250,11 @@ release:  gh api -X DELETE repos/:owner/:repo/git/refs/psdd/claims/&lt;issue&gt;
   <li>It starts a fresh subagent per item, in that item's worktree (under herdr, a new herdr agent in the worktree's pane). Unblocked slices run in parallel.</li>
   <li>Each subagent claims its issue, follows the skill, and asks psdd to make the transition. The next phase gets a new subagent.</li>
   <li>When a slice reaches <code>needs-human-qa</code>, psdd notifies the user and the session carries on with slices not blocked by it.</li>
-  <li>A person records their QA result through their agent, which calls psdd. Under herdr, that agent works in the item's worktree pane, like every other phase: with each item waiting for a person (<code>needs-human-qa</code> or <code>needs-human</code>), <code>psdd next</code> lists how to hand it to an agent there if the user does it now (<code>herdr agent start psdd-&lt;issue&gt;</code>, <code>herdr agent prompt psdd-&lt;issue&gt; "drive &lt;issue&gt;"</code>, <code>herdr agent focus psdd-&lt;issue&gt;</code>), or, inside that worktree, says to take it in the current session. Under the other providers the person's agent works from wherever it runs.</li>
+  <li>A person records their QA result through their agent, which calls psdd. Under herdr, that agent works in the item's worktree pane, like every other phase: with each item waiting for a person (<code>needs-human-qa</code> or <code>needs-human</code>), <code>psdd next</code> lists how to hand it to an agent there if the user does it now, or, inside that worktree, says to take it in the current session. Under the other providers the person's agent works from wherever it runs.</li>
 </ol>
 <p>The main agent never edits labels directly. It only calls psdd.</p>
-<p><strong>Which session holds a claim.</strong> psdd keeps no state, so the session comes from the environment, first match wins: <code>PSDD_SESSION</code>, then <code>CLAUDE_CODE_SESSION_ID</code>, then <code>herdr:&lt;HERDR_PANE_ID&gt;</code>, then <code>&lt;hostname&gt;:&lt;main checkout root&gt;</code>. It never depends on the current directory, because an agent moves between the main checkout and worktrees within one session. Under the plain git provider, <code>psdd next</code> names a <code>PSDD_SESSION=psdd-&lt;issue&gt;-&lt;random&gt;</code> to start each agent with, with a fresh random suffix each time it lists the item. Agents on one machine are separate sessions, and a new agent on an item whose claim went stale takes it over as a new session rather than passing for the old holder.</p>
-<p><strong>Known limit: claude-code provider.</strong> Claude Code subagents inherit their parent's <code>CLAUDE_CODE_SESSION_ID</code>; the session id, <code>CLAUDE_CODE_CHILD_SESSION</code> and <code>CLAUDE_PID</code> are the same in the parent and its subagents. So under the claude-code provider the deliver orchestrator and all its subagents are one psdd session, and psdd cannot stop one subagent finishing, releasing or escalating another's item. Isolation relies on <code>psdd next</code> listing held items as "held by this session", so the orchestrator never hands an item out twice. For per-agent isolation, use herdr: each herdr agent is its own Claude Code session.</p>
+<p><strong>Which session holds a claim.</strong> psdd keeps no state, so it tells sessions apart by their environment, never by the current directory: an agent moves between the main checkout and worktrees within one session. Under the plain git provider, <code>psdd next</code> gives each agent it lists a session of its own, fresh each time, so a new agent on an item whose claim went stale takes it over rather than passing for the old holder.</p>
+<p><strong>Known limit: claude-code provider.</strong> Claude Code subagents share their parent's session, so under the claude-code provider the deliver orchestrator and all its subagents are one psdd session, and psdd cannot stop one subagent finishing, releasing or escalating another's item. Isolation relies on <code>psdd next</code> listing held items as "held by this session", so the orchestrator never hands an item out twice. For per-agent isolation, use herdr: each herdr agent is its own session.</p>
 
 <h2 id="unattended-delivery">Unattended delivery: the deliver skill</h2>
 <p><code>deliver &lt;story id&gt;</code> runs a story unattended from <code>implementation</code> until it needs a human. The user starts it once slicing is done.</p>
@@ -304,14 +300,14 @@ Stop here and report to the user. psdd has already notified them.</code></pre>
   <thead><tr><th>Value</th><th>Delivery</th></tr></thead>
   <tbody>
     <tr><td><code>auto</code> (default)</td><td>herdr inside herdr, otherwise the operating system</td></tr>
-    <tr><td><code>herdr</code></td><td><code>herdr notification show "&lt;title&gt;" --body "&lt;reason&gt;" --sound request</code></td></tr>
-    <tr><td><code>os</code></td><td>macOS <code>osascript</code>, Linux <code>notify-send</code>, Windows toast (e.g. through <code>node-notifier</code>)</td></tr>
+    <tr><td><code>herdr</code></td><td>A herdr notification, with a sound</td></tr>
+    <tr><td><code>os</code></td><td>The operating system's notifications on macOS, Linux and Windows</td></tr>
     <tr><td><code>none</code></td><td>Off. The GitHub label and comment remain</td></tr>
   </tbody>
 </table></div>
 
 <h2 id="cli">CLI</h2>
-<p>psdd answers in prose written as instructions to the agent. The agent reports outcomes and psdd chooses the next state. It is written in Node/TypeScript and installed through <code>npx</code>.</p>
+<p>psdd answers in prose written as instructions to the agent. The agent reports outcomes and psdd chooses the next state. It is installed into the project and run through <code>npx</code>.</p>
 <ul>
   <li><strong>Outcomes, not states.</strong> The agent never names a label. It reports what happened (<code>approve</code>, <code>fail</code>), and psdd makes the transition.</li>
   <li><strong>Issue as an argument.</strong> Every command takes the story or issue number explicitly. There is no session state.</li>
@@ -405,7 +401,7 @@ Do not work on it. Run psdd next 123 and pick a different item.</code></pre>
 <h2 id="recommendations">Recommendations</h2>
 <p>psdd does not require these tools, but they make working with it faster.</p>
 <ul>
-  <li><strong><a href="https://herdr.dev/agent-guide.md">herdr</a>:</strong> the preferred worktree provider. Each phase runs as its own herdr agent in the worktree's pane, <code>deliver</code> waits on agents with <code>herdr agent wait</code>, and notifications show inside herdr. psdd detects it with <code>HERDR_ENV=1</code> and picks it first in <code>auto</code> mode.</li>
+  <li><strong><a href="https://herdr.dev/agent-guide.md">herdr</a>:</strong> the preferred worktree provider. Each phase runs as its own herdr agent in the worktree's pane, <code>deliver</code> waits on agents with <code>herdr agent wait</code>, and notifications show inside herdr. psdd picks it first in <code>auto</code> mode.</li>
   <li><strong><a href="https://ghostty.org">Ghostty</a>:</strong> the recommended terminal to run herdr and the agents in.</li>
 </ul>
 

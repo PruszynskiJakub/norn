@@ -1,0 +1,132 @@
+# psdd
+
+psdd runs a team's work through a spec-driven process on GitHub. A developer's agent asks psdd what to do, does the work with a skill, and reports the result; psdd records it in GitHub, the only state. This file is the canonical definition of the domain terms; [`PRD.html`](PRD.html) uses them for the vision and the way of working.
+
+## Work items
+
+**Issue**:
+A GitHub issue psdd works on. A new issue becomes a story at triage or is closed as not planned.
+
+**Story**:
+An issue that is one feature, from triage until its story PR is merged into the base branch. It has one spec, one story branch and, once sliced, its slices.
+_Avoid_: epic, feature issue
+
+**Slice**:
+A sub-issue of a story that is one independently mergeable part of it. It is implemented, reviewed, QA'd and merged into the story branch on its own.
+_Avoid_: task, sub-task, child issue
+
+**Spec**:
+The one document of a story, built up through refinement, clarification and planning. Its Behaviour items are numbered user stories that slices, review and QA check against.
+_Avoid_: PRD (that is psdd's own vision document), design doc
+
+**Slug**:
+The short name derived from a story's title the first time psdd writes on it, then fixed. Branches, worktrees and the spec path are named from it.
+
+**Story owner**:
+The person a story is assigned to. They own its slices too, and only they merge the story PR.
+
+## Process
+
+**State**:
+Where an issue is in its process, carried as exactly one state label, e.g. `needs-review`. Two state labels mean a label change failed halfway, and psdd acts on neither.
+
+**Flag**:
+A label beside the state that is not a state: the type, `in-progress`, `needs-human` or the mode.
+
+**Phase**:
+One of the two halves of a story's life. Phase 1, shaping it with a person present (triage to slicing); phase 2, delivering its slices and the story itself (implementation to merge).
+
+**Step**:
+The work an issue's state calls for, done with one skill, e.g. review in `needs-review`. Every step ends with an outcome.
+
+**Attended step**:
+A step done with the user taking part, such as triage, refinement and human QA. The agent does not decide on its own.
+_Avoid_: interactive step
+
+**Outcome**:
+How a step ended, reported by the agent in a word such as `approve` or `fail`. psdd picks the transition from it; the agent never names a state.
+_Avoid_: result, status
+
+**Transition**:
+A change of state psdd makes: from an outcome, or automatically, as when every slice is merged.
+
+**Follow-up**:
+An automatic transition after an outcome, such as unblocking slices or opening the story PR. Best effort: one that fails is reported and repeated by the next `psdd next`.
+
+**Refusal**:
+psdd's answer when it will not do what was asked: why, and what to do instead.
+
+**Mode**:
+Whether a slice is checked by an agent only (`afk`) or by an agent then a person (`hil`).
+
+**Agent QA**:
+QA by an agent that runs the app as a user would and collects evidence per criterion. Every slice and story gets it.
+
+**Human QA**:
+QA by a person with their agent, starting from the agent's evidence. Slices in mode `hil` and every story get it.
+
+**Evidence**:
+What agent or human QA records per criterion: the note on the issue, and files embedded in it from the QA evidence branch.
+
+**Needs-human**:
+The flag saying a person must act before the issue can go on: an escalation or a reached fix-round limit. Resolving it clears the flag and keeps the state.
+_Avoid_: blocked (a state of its own), stuck
+
+**Escalation**:
+An agent setting needs-human on an issue it holds, with the reason.
+
+**Fix round**:
+One trip back to implement after review asks for changes or QA fails. Past the fix-round limit the issue gets needs-human instead.
+
+## Working on an item
+
+**Claim**:
+The lock on an issue that lets one session work on it, taken for a whole step and released on handover. It goes stale after a while and can then be taken over.
+_Avoid_: lock, assignment
+
+**Session**:
+One running agent as psdd tells them apart, so claims know who holds them.
+
+**Takeover**:
+Taking a claim from another session: a stale one, or with `--takeover` a stopped session of one's own.
+
+**Briefing**:
+psdd's answer to taking an issue: where to work, which skill to invoke, the process around it, how to finish and what not to do.
+
+**Story branch**:
+The branch a story's slices merge into, and its PR into the base branch.
+
+**Slice branch**:
+The branch a slice is implemented on, merged into the story branch by its slice PR.
+
+**Worktree**:
+The checkout a story or slice is worked in for the life of its branch, one per branch.
+
+**Worktree provider**:
+The tool that makes worktrees and starts agents in them: herdr, Claude Code or plain git.
+
+## Skills and delivery
+
+**Skill**:
+The instructions an agent follows for a step's craft. A step skill knows nothing of psdd; the briefing carries the process around it.
+
+**Process skill**:
+A skill that runs psdd itself: drive, which takes one issue through its steps with the user, and deliver.
+
+**Delivery**:
+Running a sliced story unattended with the deliver skill, a fresh agent per step, until only a person can move it on.
+_Avoid_: autopilot
+
+**Parallel slot**:
+Room for one more of the user's agents on a story under the parallel limit. Agents already holding items use slots.
+
+**Housekeeping**:
+Removing what closed issues leave behind, done by `psdd tidy`: worktrees, merged branches, QA evidence and claims.
+
+## Relations
+
+- A story has one spec, one story branch and many slices; a slice belongs to one story.
+- A slice can be blocked by others; it becomes ready once they are closed.
+- An issue's state, with needs-human, calls for at most one step; each step has one skill and ends with one outcome.
+- A session holds at most one claim per issue; an issue has at most one claim.
+- A story's state follows its slices in implementation: when every slice is merged, the story moves on to review.
