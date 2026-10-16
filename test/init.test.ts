@@ -57,12 +57,12 @@ describe("norn init", () => {
         mkdirSync(join(dir, "skills", name), { recursive: true });
         writeFileSync(join(dir, "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
       }
-      return ["deliver", "drive"];
+      return ["norn-deliver", "norn-drive"];
     });
 
     const res = await norn("init");
 
-    expect(res.stdout).toContain("  - updated to this norn version: deliver, drive (git diff skills/ shows the changes)");
+    expect(res.stdout).toContain("  - updated to this norn version: norn-deliver, norn-drive (git diff skills/ shows the changes)");
   });
 
   test("reports skills the installer did not provide", async () => {
@@ -71,7 +71,7 @@ describe("norn init", () => {
     const norn = w.withProject(cwd, async () => []);
     const res = await norn("init");
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("Missing skills: triage");
+    expect(res.stdout).toContain("Missing skills: norn-triage");
   });
 });
 
@@ -121,7 +121,7 @@ describe("norn init: agent instructions", () => {
 
     expect(readFileSync(join(cwd, "AGENTS.md"), "utf8")).toBe(`${AGENT_INSTRUCTIONS}\n`);
     expect(readFileSync(join(cwd, "CLAUDE.md"), "utf8")).toBe("@AGENTS.md\n");
-    expect(res.stdout).toContain("drive <issue>");
+    expect(res.stdout).toContain("norn-drive <issue>");
   });
 
   test("appends the block to an existing CLAUDE.md and keeps what was there", async () => {

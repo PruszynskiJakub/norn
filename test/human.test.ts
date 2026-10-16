@@ -39,7 +39,7 @@ describe("resolving needs-human", () => {
     w.github.seedIssue({ number: 131, labels: ["type:slice", "mode:afk", "implementation", "needs-human"] });
 
     const take = await w.norn("take", "131");
-    expect(take.stdout).toContain("Invoke the skill: resolve");
+    expect(take.stdout).toContain("Invoke the skill: norn-resolve");
     expect(take.stdout.replace(/\s+/g, " ")).toContain("This step is attended");
     expect(w.github.labels(131)).toContain("implementation");
 

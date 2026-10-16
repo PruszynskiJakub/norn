@@ -10,7 +10,7 @@ describe("norn take", () => {
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain('You now hold issue #7 "Rate limiting"');
-    expect(res.stdout).toContain("Invoke the skill: triage");
+    expect(res.stdout).toContain("Invoke the skill: norn-triage");
     expect(res.stdout).toContain("norn done 7 accept");
     expect(res.stdout).toContain("norn done 7 reject");
     expect(res.stdout).toContain("If you have to stop, run: norn release 7");
@@ -74,7 +74,7 @@ describe("taking over a stopped session of your own", () => {
     expect(res.stdout).toContain(
       "You took #123 over from another session of yours (since 14:02); its worktree is kept with what it left. Check git status there before you start.",
     );
-    expect(res.stdout).toContain("Invoke the skill: refine");
+    expect(res.stdout).toContain("Invoke the skill: norn-refine");
     expect(w.github.claim(123)).toMatchObject({ holder: "alice", session: "session-1", since: "2026-10-13T14:30:00.000Z" });
   });
 

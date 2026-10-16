@@ -92,12 +92,12 @@ describe("finishing slicing", () => {
 });
 
 describe("after slicing", () => {
-  test("finishing slicing points the user to the deliver skill", async () => {
+  test("finishing slicing points the user to the norn-deliver skill", async () => {
     const w = await slicingStory();
     await w.norn("add-slice", "123", "Redis store", "--mode", "afk");
 
     const res = await w.norn("done", "123");
 
-    expect(res.stdout).toContain("To run the story unattended until it needs a human, the user can start the deliver skill: deliver 123");
+    expect(res.stdout).toContain("To run the story unattended until it needs a human, the user can start the norn-deliver skill: norn-deliver 123");
   });
 });

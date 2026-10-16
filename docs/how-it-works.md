@@ -65,7 +65,7 @@ Each issue carries exactly one state label from its type's set. Flags sit alongs
 | --- | --- |
 | `type:story`, `type:slice` | Which state machine applies |
 | `in-progress` | Someone holds the claim (it mirrors the git-ref claim) |
-| `needs-human` | Something went wrong or a person is needed; cleared with the `resolve` skill |
+| `needs-human` | Something went wrong or a person is needed; cleared with the `norn-resolve` skill |
 | `mode:afk`, `mode:hil` | Whether a slice also gets QA by a person |
 
 ## Story flow
@@ -101,7 +101,7 @@ flowchart LR
   end
 ```
 
-Triage either accepts an issue into `needs-refinement` or closes it as not planned, with the reason in a comment. Clarification only happens when refinement turns up questions. Once slice issues exist, the story's label follows its slices. When every slice PR is merged into the story branch, the story branch is reviewed and QA'd, by an agent and then by a person. Failed review or QA is fixed straight on the story branch with the `implement` skill and goes back to `needs-review`. Finally the owner merges the story PR, and GitHub closes the story through the PR link.
+Triage either accepts an issue into `needs-refinement` or closes it as not planned, with the reason in a comment. Clarification only happens when refinement turns up questions. Once slice issues exist, the story's label follows its slices. When every slice PR is merged into the story branch, the story branch is reviewed and QA'd, by an agent and then by a person. Failed review or QA is fixed straight on the story branch with the `norn-implement` skill and goes back to `needs-review`. Finally the owner merges the story PR, and GitHub closes the story through the PR link.
 
 ## Slice flow
 
@@ -130,19 +130,19 @@ Each state has a step, a skill that does its work, and the outcomes the agent re
 
 | State | Skill | Attended | `norn done` outcome → next state |
 | --- | --- | :-: | --- |
-| new issue | `triage` | ✓ | `accept` → needs-refinement · `reject` → closed as not planned |
-| needs-refinement | `refine` | ✓ | `clear` → needs-plan · `questions` → needs-clarification |
-| needs-clarification | `clarify` | ✓ | `answered` → needs-plan · `questions` → stays |
-| needs-plan | `plan` | ✓ | → needs-slicing |
-| needs-slicing | `slice` | ✓ | → implementation (also sets each slice's mode) |
-| implementation, changes-requested, qa-failed | `implement` | | → needs-review |
-| needs-review | `review` | | `approve` → needs-qa · `request-changes` → changes-requested |
-| needs-qa | `auto-qa` | | `pass` → merge-queue (`mode:afk` slice) or needs-human-qa (`mode:hil` slice, story) · `fail` → qa-failed |
-| needs-human-qa | `qa` | ✓ | `pass` → merge-queue · `fail` → qa-failed |
-| merge-queue (slice) | `merge` | | → closed; dependents recomputed |
-| needs-human (flag) | `resolve` | ✓ | → flag cleared, state kept |
+| new issue | `norn-triage` | ✓ | `accept` → needs-refinement · `reject` → closed as not planned |
+| needs-refinement | `norn-refine` | ✓ | `clear` → needs-plan · `questions` → needs-clarification |
+| needs-clarification | `norn-clarify` | ✓ | `answered` → needs-plan · `questions` → stays |
+| needs-plan | `norn-plan` | ✓ | → needs-slicing |
+| needs-slicing | `norn-slice` | ✓ | → implementation (also sets each slice's mode) |
+| implementation, changes-requested, qa-failed | `norn-implement` | | → needs-review |
+| needs-review | `norn-review` | | `approve` → needs-qa · `request-changes` → changes-requested |
+| needs-qa | `norn-auto-qa` | | `pass` → merge-queue (`mode:afk` slice) or needs-human-qa (`mode:hil` slice, story) · `fail` → qa-failed |
+| needs-human-qa | `norn-qa` | ✓ | `pass` → merge-queue · `fail` → qa-failed |
+| merge-queue (slice) | `norn-merge` | | → closed; dependents recomputed |
+| needs-human (flag) | `norn-resolve` | ✓ | → flag cleared, state kept |
 
-Two process skills sit above the step skills: `drive <issue>` takes an issue through the attended steps with you, and `deliver <story>` runs the rest unattended. The step skills lean on three reference skills that norn also installs: `interview` (refine, clarify, plan, resolve), `codebase-design` (plan) and `tdd` (implement).
+Two process skills sit above the step skills: `norn-drive <issue>` takes an issue through the attended steps with you, and `norn-deliver <story>` runs the rest unattended. The step skills lean on three reference skills that norn also installs: `norn-interview` (refine, clarify, plan, resolve), `norn-codebase-design` (plan) and `norn-tdd` (implement).
 
 **The briefing carries the process; skills carry the craft.** Skills know nothing of norn, labels, branches or worktrees: each ends on a result (a spec, a verdict, a breakdown). The `norn take` briefing says what to read, where to work, where to commit and push, which commands create slices and PRs, and which `norn done` each result maps to.
 
@@ -161,14 +161,14 @@ An agent always QAs first; a person follows when the item needs one.
 
 | State | Skill | Who | Runs for |
 | --- | --- | --- | --- |
-| `needs-qa` | `auto-qa` | An agent, unattended | Every slice and every story |
-| `needs-human-qa` | `qa` | A person with their agent | Slices in `mode:hil` and every story |
+| `needs-qa` | `norn-auto-qa` | An agent, unattended | Every slice and every story |
+| `needs-human-qa` | `norn-qa` | A person with their agent | Slices in `mode:hil` and every story |
 
 The agent collects the evidence; a person decides. Only a person passes a `mode:hil` slice or a story.
 
-- `auto-qa` runs the app as a user would and records, per criterion, what it ran, what it saw and the evidence. What only a person can check, it lists with whatever it could prepare.
+- `norn-auto-qa` runs the app as a user would and records, per criterion, what it ran, what it saw and the evidence. What only a person can check, it lists with whatever it could prepare.
 - Evidence is the `norn done` note on the issue, with the files from `--evidence <dir>` pushed to the `norn/qa/<issue>` branch and embedded at their commit.
-- `qa` starts from that note: the person's agent runs the app locally and walks them through what is left. A remark outside the criteria becomes a follow-up issue by default.
+- `norn-qa` starts from that note: the person's agent runs the app locally and walks them through what is left. A remark outside the criteria becomes a follow-up issue by default.
 
 ## Branches, PRs and worktrees
 
@@ -201,11 +201,11 @@ A claim is a git ref, `refs/norn/claims/<issue>`, created on GitHub in one step 
 
 **Which session holds a claim.** norn keeps no state, so it tells sessions apart by their environment: `NORN_SESSION`, else `CLAUDE_CODE_SESSION_ID`, else the herdr pane (`HERDR_PANE_ID`), else host and repository root. Under the git provider, `norn next` gives each agent its own `NORN_SESSION`.
 
-> **Known limit.** Claude Code subagents share their parent's session id, so under the `claude-code` provider the `deliver` orchestrator and all its subagents are one norn session. Isolation then relies on `norn next` listing held items as "held by this session". For per-agent isolation, use herdr.
+> **Known limit.** Claude Code subagents share their parent's session id, so under the `claude-code` provider the `norn-deliver` orchestrator and all its subagents are one norn session. Isolation then relies on `norn next` listing held items as "held by this session". For per-agent isolation, use herdr.
 
 ## Unattended delivery
 
-`deliver <story>` runs a story unattended from implementation until it needs a person. You start it once slicing is done (`drive` offers it).
+`norn-deliver <story>` runs a story unattended from implementation until it needs a person. You start it once slicing is done (`norn-drive` offers it).
 
 1. Run `norn tidy` once, then ask `norn next <story>` for work.
 2. Start a fresh subagent per actionable item, in its worktree, up to the free slots `norn next` gives.
@@ -248,4 +248,4 @@ The title says who must act on what (`norn: #131 needs you`); the body gives the
 
 ## Housekeeping
 
-All cleanup is `norn tidy`. It removes what belongs to closed issues: QA evidence branches, worktrees, merged slice and story branches, and claim refs. Anything with uncommitted or unpushed work is named, not removed. It is idempotent, and `--dry-run` only lists. `deliver` runs it when it starts and stops, `drive` when a story finishes. Nothing is cleaned up at merge: the owner merges the story on GitHub, where norn does not run.
+All cleanup is `norn tidy`. It removes what belongs to closed issues: QA evidence branches, worktrees, merged slice and story branches, and claim refs. Anything with uncommitted or unpushed work is named, not removed. It is idempotent, and `--dry-run` only lists. `norn-deliver` runs it when it starts and stops, `norn-drive` when a story finishes. Nothing is cleaned up at merge: the owner merges the story on GitHub, where norn does not run.

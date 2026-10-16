@@ -31,7 +31,7 @@ describe("story phase 1", () => {
   ])("%s is briefed with the %s skill and the spec", async (state, skill) => {
     const w = story(state);
     const res = await w.norn("take", "123");
-    expect(res.stdout).toContain(`Invoke the skill: ${skill}\n`);
+    expect(res.stdout).toContain(`Invoke the skill: norn-${skill}\n`);
     expect(res.stdout.replace(/\s+/g, " ")).toContain("This step is attended");
     expect(res.stdout).toContain("Spec to work on: .agents/specs/123-rate-limiting/spec.md");
   });

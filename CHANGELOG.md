@@ -4,6 +4,11 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- Every bundled skill is prefixed with `norn-`, so the skills are easy to tell apart from a project's own: `norn-drive <issue>`, `norn-deliver <story>`, and `norn-triage` through `norn-resolve` and `norn-tdd`. Briefings, `norn next`, the herdr hand-off prompts, the dashboard and the `AGENTS.md` section use the new names. After upgrading, run `npx norn init`, then delete the old unprefixed skill directories from `skills/` and their links from `.claude/skills/`.
+- `norn-drive` and `norn-deliver` carry an argument hint, so your agent shows what each takes as you type it: `norn-drive` takes any issue, story or slice; `norn-deliver` takes a story.
+
 ## [0.6.1] - 2026-10-16
 
 ### Changed

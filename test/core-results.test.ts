@@ -100,7 +100,7 @@ describe("take", () => {
       issue: 41,
       noun: "slice",
       title: "Only",
-      step: { name: "merge", skill: "merge", attended: false },
+      step: { name: "merge", skill: "norn-merge", attended: false },
       workIn: { path: "/repo/.agents/worktrees/40-last-41", branch: "40-last-41", worktree: { kind: "missing" } },
       finish: [{ issue: 41, word: "", evidence: false, means: "slice PR merged into the story branch" }],
     });

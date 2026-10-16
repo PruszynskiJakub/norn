@@ -84,7 +84,7 @@ export function stepFor(issue: Issue): Step | null {
   if (issue.labels.includes("needs-human") && state) {
     return {
       name: "resolving needs-human",
-      skill: "resolve",
+      skill: "norn-resolve",
       attended: true,
       outcomes: { "": { to: state, means: `clears needs-human, stays in ${state}` } },
     };
@@ -92,7 +92,7 @@ export function stepFor(issue: Issue): Step | null {
   if (kind !== "new" && state === "needs-review") {
     return {
       name: "review",
-      skill: "review",
+      skill: "norn-review",
       attended: false,
       outcomes: {
         approve: { to: "needs-qa", means: "no requests, moves on to QA by an agent" },
@@ -103,7 +103,7 @@ export function stepFor(issue: Issue): Step | null {
   if (kind !== "new" && state === "needs-qa") {
     return {
       name: "agent QA",
-      skill: "auto-qa",
+      skill: "norn-auto-qa",
       attended: false,
       evidence: true,
       outcomes: {
@@ -122,7 +122,7 @@ export function stepFor(issue: Issue): Step | null {
   if (kind !== "new" && state === "needs-human-qa") {
     return {
       name: "human QA",
-      skill: "qa",
+      skill: "norn-qa",
       attended: true,
       evidence: true,
       outcomes: {
@@ -134,7 +134,7 @@ export function stepFor(issue: Issue): Step | null {
   if (kind === "story" && (state === "changes-requested" || state === "qa-failed")) {
     return {
       name: "fixing",
-      skill: "implement",
+      skill: "norn-implement",
       attended: false,
       outcomes: { "": { to: "needs-review", means: "fixes committed on the story branch, back to review" } },
     };
@@ -142,7 +142,7 @@ export function stepFor(issue: Issue): Step | null {
   if (kind === "new") {
     return {
       name: "triage",
-      skill: "triage",
+      skill: "norn-triage",
       attended: true,
       outcomes: {
         accept: { to: "needs-refinement", means: "accepted, moves to refinement" },
@@ -154,7 +154,7 @@ export function stepFor(issue: Issue): Step | null {
     const phase1: Partial<Record<State, Step>> = {
       "needs-refinement": {
         name: "refinement",
-        skill: "refine",
+        skill: "norn-refine",
         attended: true,
         outcomes: {
           clear: { to: "needs-plan", means: "no open questions, moves on to planning" },
@@ -163,7 +163,7 @@ export function stepFor(issue: Issue): Step | null {
       },
       "needs-clarification": {
         name: "clarification",
-        skill: "clarify",
+        skill: "norn-clarify",
         attended: true,
         outcomes: {
           answered: { to: "needs-plan", means: "all questions answered, moves on to planning" },
@@ -172,13 +172,13 @@ export function stepFor(issue: Issue): Step | null {
       },
       "needs-plan": {
         name: "planning",
-        skill: "plan",
+        skill: "norn-plan",
         attended: true,
         outcomes: { "": { to: "needs-slicing", means: "plan is in the spec, moves on to slicing" } },
       },
       "needs-slicing": {
         name: "slicing",
-        skill: "slice",
+        skill: "norn-slice",
         attended: true,
         outcomes: { "": { to: "implementation", means: "slices created, moves on to implementation" } },
       },
@@ -188,7 +188,7 @@ export function stepFor(issue: Issue): Step | null {
   if (kind === "slice" && state === "merge-queue") {
     return {
       name: "merge",
-      skill: "merge",
+      skill: "norn-merge",
       attended: false,
       outcomes: { "": { to: "closed", means: "slice PR merged into the story branch" } },
     };
@@ -196,7 +196,7 @@ export function stepFor(issue: Issue): Step | null {
   if (kind === "slice" && (state === "ready-for-agent" || state === "implementation" || state === "changes-requested" || state === "qa-failed")) {
     return {
       name: "implementation",
-      skill: "implement",
+      skill: "norn-implement",
       attended: false,
       enterAs: "implementation",
       outcomes: { "": { to: "needs-review", means: "implementation done, PR open" } },

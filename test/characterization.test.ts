@@ -85,7 +85,7 @@ const scenarios: Scenario[] = [
           mkdirSync(join(dir, "skills", name), { recursive: true });
           writeFileSync(join(dir, "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
         }
-        return ["drive"];
+        return ["norn-drive"];
       });
     },
   },

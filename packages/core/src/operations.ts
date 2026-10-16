@@ -188,7 +188,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   if (kindOf(issue) === "story" && stateOf(issue) === "needs-slicing" && (await slicesOf(github, n)).length === 0) {
     return refuse({ kind: "no-slices", issue: n });
   }
-  if (step.skill === "merge") {
+  if (step.skill === "norn-merge") {
     const r = await sliceMergeRefusal(ctx, issue);
     if (r) return refuse(r);
   }

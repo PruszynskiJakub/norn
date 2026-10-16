@@ -323,7 +323,7 @@ exports[`output of every command, text and --json > done slicing creates the sto
   "issue": 50,
   "from": "needs-slicing",
   "to": "implementation",
-  "message": "#50 is now in implementation. The claim is released.\\nCreated the story branch 50-search.\\nTo run the story unattended until it needs a human, the user can start the deliver skill: deliver 50"
+  "message": "#50 is now in implementation. The claim is released.\\nCreated the story branch 50-search.\\nTo run the story unattended until it needs a human, the user can start the norn-deliver skill: norn-deliver 50"
 }"
 `;
 
@@ -331,7 +331,7 @@ exports[`output of every command, text and --json > done slicing creates the sto
 "exit 0
 #50 is now in implementation. The claim is released.
 Created the story branch 50-search.
-To run the story unattended until it needs a human, the user can start the deliver skill: deliver 50"
+To run the story unattended until it needs a human, the user can start the norn-deliver skill: norn-deliver 50"
 `;
 
 exports[`output of every command, text and --json > done slicing without slices > json 1`] = `
@@ -554,14 +554,14 @@ exports[`output of every command, text and --json > escalate > json 1`] = `
 "exit 0
 {
   "ok": true,
-  "message": "#50 now needs a human. The claim is released.\\nDo not work on it further. A person picks it up with the resolve skill."
+  "message": "#50 now needs a human. The claim is released.\\nDo not work on it further. A person picks it up with the norn-resolve skill."
 }"
 `;
 
 exports[`output of every command, text and --json > escalate > text 1`] = `
 "exit 0
 #50 now needs a human. The claim is released.
-Do not work on it further. A person picks it up with the resolve skill."
+Do not work on it further. A person picks it up with the norn-resolve skill."
 `;
 
 exports[`output of every command, text and --json > escalate without a reason > json 1`] = `
@@ -595,7 +595,7 @@ exports[`output of every command, text and --json > init > json 1`] = `
 "exit 0
 {
   "ok": true,
-  "message": "norn is set up in this project:\\n  - 16 skills in skills/, linked into .claude/skills/\\n  - updated to this norn version: drive (git diff skills/ shows the changes)\\n  - .agents/specs/ for story specs\\n  - .agents/norn.config.json with the team settings (each developer can override in .agents/norn.config.local.json)\\n  - .agents/worktrees/ and the local config in .gitignore\\n  - how to work with norn in AGENTS.md and CLAUDE.md\\n  - 19 labels on the repository\\n\\nCommit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: drive <issue>"
+  "message": "norn is set up in this project:\\n  - 16 skills in skills/, linked into .claude/skills/\\n  - updated to this norn version: norn-drive (git diff skills/ shows the changes)\\n  - .agents/specs/ for story specs\\n  - .agents/norn.config.json with the team settings (each developer can override in .agents/norn.config.local.json)\\n  - .agents/worktrees/ and the local config in .gitignore\\n  - how to work with norn in AGENTS.md and CLAUDE.md\\n  - 19 labels on the repository\\n\\nCommit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>"
 }"
 `;
 
@@ -603,27 +603,27 @@ exports[`output of every command, text and --json > init > text 1`] = `
 "exit 0
 norn is set up in this project:
   - 16 skills in skills/, linked into .claude/skills/
-  - updated to this norn version: drive (git diff skills/ shows the changes)
+  - updated to this norn version: norn-drive (git diff skills/ shows the changes)
   - .agents/specs/ for story specs
   - .agents/norn.config.json with the team settings (each developer can override in .agents/norn.config.local.json)
   - .agents/worktrees/ and the local config in .gitignore
   - how to work with norn in AGENTS.md and CLAUDE.md
   - 19 labels on the repository
 
-Commit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: drive <issue>"
+Commit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>"
 `;
 
 exports[`output of every command, text and --json > init with missing skills > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "Missing skills: triage, refine, clarify, plan, slice, implement, review, auto-qa, qa, merge, resolve, drive, deliver, tdd, interview, codebase-design. The skill install did not provide them into skills/.\\nFix the install and run norn init again."
+  "refusal": "Missing skills: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design. The skill install did not provide them into skills/.\\nFix the install and run norn init again."
 }"
 `;
 
 exports[`output of every command, text and --json > init with missing skills > text 1`] = `
 "exit 1
-Missing skills: triage, refine, clarify, plan, slice, implement, review, auto-qa, qa, merge, resolve, drive, deliver, tdd, interview, codebase-design. The skill install did not provide them into skills/.
+Missing skills: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design. The skill install did not provide them into skills/.
 Fix the install and run norn init again."
 `;
 
@@ -703,7 +703,7 @@ exports[`output of every command, text and --json > next creates the story branc
       "title": "All done",
       "state": "needs-review",
       "step": "review",
-      "skill": "review",
+      "skill": "norn-review",
       "attended": false,
       "command": "norn take 40"
     }
@@ -825,7 +825,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "title": "Redis store",
       "state": "merge-queue",
       "step": "merge",
-      "skill": "merge",
+      "skill": "norn-merge",
       "attended": false,
       "command": "norn take 127"
     },
@@ -841,7 +841,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "title": "Limit headers",
       "state": "needs-review",
       "step": "review",
-      "skill": "review",
+      "skill": "norn-review",
       "attended": false,
       "command": "norn take 128"
     },
@@ -857,7 +857,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "title": "Docs",
       "state": "ready-for-agent",
       "step": "implementation",
-      "skill": "implement",
+      "skill": "norn-implement",
       "attended": false,
       "command": "norn take 132"
     }
@@ -938,7 +938,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "title": "Redis store",
       "state": "merge-queue",
       "step": "merge",
-      "skill": "merge",
+      "skill": "norn-merge",
       "attended": false,
       "command": "norn take 127"
     },
@@ -954,7 +954,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "title": "Docs",
       "state": "ready-for-agent",
       "step": "implementation",
-      "skill": "implement",
+      "skill": "norn-implement",
       "attended": false,
       "command": "norn take 132"
     }
@@ -1043,7 +1043,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "title": "Redis store",
       "state": "merge-queue",
       "step": "merge",
-      "skill": "merge",
+      "skill": "norn-merge",
       "attended": false,
       "command": "norn take 127"
     },
@@ -1059,7 +1059,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "title": "Limit headers",
       "state": "needs-review",
       "step": "review",
-      "skill": "review",
+      "skill": "norn-review",
       "attended": false,
       "command": "norn take 128"
     },
@@ -1075,7 +1075,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "title": "Docs",
       "state": "ready-for-agent",
       "step": "implementation",
-      "skill": "implement",
+      "skill": "norn-implement",
       "attended": false,
       "command": "norn take 132"
     }
@@ -1104,7 +1104,7 @@ exports[`output of every command, text and --json > next on a story in implement
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each as a new herdr agent in the item's worktree pane:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n    Start an agent: herdr agent start norn-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>\\n    Then prompt it: herdr agent prompt norn-127 \\"Work in /repo/.agents/worktrees/123-rate-limiting-127. Run norn take 127, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 127\\n  - Slice #128 \\"Limit headers\\" needs review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus\\n    Start an agent: herdr agent start norn-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>\\n    Then prompt it: herdr agent prompt norn-128 \\"Work in /repo/.agents/worktrees/123-rate-limiting-128. Run norn take 128, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 128\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start an agent: herdr agent start norn-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>\\n    Then prompt it: herdr agent prompt norn-132 \\"Work in /repo/.agents/worktrees/123-rate-limiting-132. Run norn take 132, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus\\n      herdr agent start norn-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>\\n      herdr agent prompt norn-133 \\"drive 133\\"\\n      herdr agent focus norn-133\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
+  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each as a new herdr agent in the item's worktree pane:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n    Start an agent: herdr agent start norn-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>\\n    Then prompt it: herdr agent prompt norn-127 \\"Work in /repo/.agents/worktrees/123-rate-limiting-127. Run norn take 127, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 127\\n  - Slice #128 \\"Limit headers\\" needs review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus\\n    Start an agent: herdr agent start norn-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>\\n    Then prompt it: herdr agent prompt norn-128 \\"Work in /repo/.agents/worktrees/123-rate-limiting-128. Run norn take 128, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 128\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start an agent: herdr agent start norn-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>\\n    Then prompt it: herdr agent prompt norn-132 \\"Work in /repo/.agents/worktrees/123-rate-limiting-132. Run norn take 132, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus\\n      herdr agent start norn-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>\\n      herdr agent prompt norn-133 \\"norn-drive 133\\"\\n      herdr agent focus norn-133\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
 }"
 `;
 
@@ -1140,7 +1140,7 @@ Waiting, nothing to do for you:
     If the user does it now, hand it to an agent in its worktree:
       Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus
       herdr agent start norn-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>
-      herdr agent prompt norn-133 "drive 133"
+      herdr agent prompt norn-133 "norn-drive 133"
       herdr agent focus norn-133
 
 Each phase gets a new agent. When an item is done, run norn next 123 again."
@@ -1214,7 +1214,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
       "title": "Refine me",
       "state": "needs-refinement",
       "step": "refinement",
-      "skill": "refine",
+      "skill": "norn-refine",
       "attended": true,
       "command": "norn take 32"
     }
@@ -1269,7 +1269,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
       "title": "Refine me",
       "state": "needs-refinement",
       "step": "refinement",
-      "skill": "refine",
+      "skill": "norn-refine",
       "attended": true,
       "command": "norn take 32"
     }
@@ -1282,7 +1282,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #32 \\"Refine me\\" is in needs-refinement.\\n\\nYou can start 1 item now, with the user:\\n\\n  - Story #32 \\"Refine me\\" is in needs-refinement: refinement (attended: the user takes part).\\n    Worktree: /repo/.agents/worktrees/32-refine-me\\n    Create the worktree: git -C /repo fetch origin main && git -C /repo branch --no-track 32-refine-me origin/main && herdr worktree create --cwd /repo --branch 32-refine-me --path /repo/.agents/worktrees/32-refine-me --no-focus\\n    Hand the story to an agent in its worktree, which drives it on with the user:\\n      herdr agent start norn-32 --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>\\n      herdr agent prompt norn-32 \\"drive 32\\"\\n      herdr agent focus norn-32\\n    Start it with: norn take 32"
+  "message": "Story #32 \\"Refine me\\" is in needs-refinement.\\n\\nYou can start 1 item now, with the user:\\n\\n  - Story #32 \\"Refine me\\" is in needs-refinement: refinement (attended: the user takes part).\\n    Worktree: /repo/.agents/worktrees/32-refine-me\\n    Create the worktree: git -C /repo fetch origin main && git -C /repo branch --no-track 32-refine-me origin/main && herdr worktree create --cwd /repo --branch 32-refine-me --path /repo/.agents/worktrees/32-refine-me --no-focus\\n    Hand the story to an agent in its worktree, which drives it on with the user:\\n      herdr agent start norn-32 --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>\\n      herdr agent prompt norn-32 \\"norn-drive 32\\"\\n      herdr agent focus norn-32\\n    Start it with: norn take 32"
 }"
 `;
 
@@ -1297,7 +1297,7 @@ You can start 1 item now, with the user:
     Create the worktree: git -C /repo fetch origin main && git -C /repo branch --no-track 32-refine-me origin/main && herdr worktree create --cwd /repo --branch 32-refine-me --path /repo/.agents/worktrees/32-refine-me --no-focus
     Hand the story to an agent in its worktree, which drives it on with the user:
       herdr agent start norn-32 --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>
-      herdr agent prompt norn-32 "drive 32"
+      herdr agent prompt norn-32 "norn-drive 32"
       herdr agent focus norn-32
     Start it with: norn take 32"
 `;
@@ -1367,7 +1367,7 @@ exports[`output of every command, text and --json > next with every slot taken >
       "title": "Redis store",
       "state": "merge-queue",
       "step": "merge",
-      "skill": "merge",
+      "skill": "norn-merge",
       "attended": false,
       "command": "norn take 127"
     },
@@ -1383,7 +1383,7 @@ exports[`output of every command, text and --json > next with every slot taken >
       "title": "Docs",
       "state": "ready-for-agent",
       "step": "implementation",
-      "skill": "implement",
+      "skill": "norn-implement",
       "attended": false,
       "command": "norn take 132"
     }
@@ -1530,7 +1530,7 @@ exports[`output of every command, text and --json > next with nothing left under
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #20 \\"Waits\\": nothing left that you can do.\\nWaiting for a human:\\n  - #23 needs human QA (mode:hil).\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 20-waits && git -C /repo branch --no-track 20-waits-23 origin/20-waits && herdr worktree create --cwd /repo --branch 20-waits-23 --path /repo/.agents/worktrees/20-waits-23 --no-focus\\n      herdr agent start norn-23 --kind claude --pane <pane of /repo/.agents/worktrees/20-waits-23>\\n      herdr agent prompt norn-23 \\"drive 23\\"\\n      herdr agent focus norn-23\\n  - #24 needs human QA (mode:hil), held by another session (since 11:00).\\nStop here and report to the user. norn has already notified them."
+  "message": "Story #20 \\"Waits\\": nothing left that you can do.\\nWaiting for a human:\\n  - #23 needs human QA (mode:hil).\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 20-waits && git -C /repo branch --no-track 20-waits-23 origin/20-waits && herdr worktree create --cwd /repo --branch 20-waits-23 --path /repo/.agents/worktrees/20-waits-23 --no-focus\\n      herdr agent start norn-23 --kind claude --pane <pane of /repo/.agents/worktrees/20-waits-23>\\n      herdr agent prompt norn-23 \\"norn-drive 23\\"\\n      herdr agent focus norn-23\\n  - #24 needs human QA (mode:hil), held by another session (since 11:00).\\nStop here and report to the user. norn has already notified them."
 }"
 `;
 
@@ -1542,7 +1542,7 @@ Waiting for a human:
     If the user does it now, hand it to an agent in its worktree:
       Create the worktree: git -C /repo fetch origin 20-waits && git -C /repo branch --no-track 20-waits-23 origin/20-waits && herdr worktree create --cwd /repo --branch 20-waits-23 --path /repo/.agents/worktrees/20-waits-23 --no-focus
       herdr agent start norn-23 --kind claude --pane <pane of /repo/.agents/worktrees/20-waits-23>
-      herdr agent prompt norn-23 "drive 23"
+      herdr agent prompt norn-23 "norn-drive 23"
       herdr agent focus norn-23
   - #24 needs human QA (mode:hil), held by another session (since 11:00).
 Stop here and report to the user. norn has already notified them."
@@ -1772,13 +1772,13 @@ exports[`output of every command, text and --json > take a new issue > json 1`] 
   "issue": 7,
   "state": null,
   "step": "triage",
-  "skill": "triage",
+  "skill": "norn-triage",
   "attended": true,
   "outcomes": [
     "accept",
     "reject"
   ],
-  "message": "You now hold issue #7 \\"Rate limiting\\". Its step is triage. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nInvoke the skill: triage\\nRead the issue: gh issue view 7 --comments\\nOn accept, post what triage established on the issue first: gh issue comment 7\\n\\nWhen the user agrees triage is finished, run one of:\\n  norn done 7 accept            (accepted, moves to refinement)\\n  norn done 7 reject \\"reason\\"   (closed as not planned; give the reason)\\n\\nOn a long step, run norn take 7 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 7\\nIf something is wrong and a person is needed, run: norn escalate 7 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold issue #7 \\"Rate limiting\\". Its step is triage. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nInvoke the skill: norn-triage\\nRead the issue: gh issue view 7 --comments\\nOn accept, post what triage established on the issue first: gh issue comment 7\\n\\nWhen the user agrees triage is finished, run one of:\\n  norn done 7 accept            (accepted, moves to refinement)\\n  norn done 7 reject \\"reason\\"   (closed as not planned; give the reason)\\n\\nOn a long step, run norn take 7 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 7\\nIf something is wrong and a person is needed, run: norn escalate 7 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -1787,7 +1787,7 @@ exports[`output of every command, text and --json > take a new issue > text 1`] 
 You now hold issue #7 "Rate limiting". Its step is triage. This step is
 attended: the user takes part, and you do not decide on your own.
 
-Invoke the skill: triage
+Invoke the skill: norn-triage
 Read the issue: gh issue view 7 --comments
 On accept, post what triage established on the issue first: gh issue comment 7
 
@@ -1809,10 +1809,10 @@ exports[`output of every command, text and --json > take a ready slice > json 1`
   "issue": 132,
   "state": "implementation",
   "step": "implementation",
-  "skill": "implement",
+  "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting\\n\\nInvoke the skill: implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132\\n\\nOn a long step, run norn take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132\\n\\nOn a long step, run norn take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -1824,7 +1824,7 @@ Work in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting
 It does not exist yet. Create it first:
   git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting
 
-Invoke the skill: implement
+Invoke the skill: norn-implement
 Spec: .agents/specs/123-rate-limiting/spec.md (story #123)
 Read the issue: gh issue view 132 --comments
 Commit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:
@@ -1847,10 +1847,10 @@ exports[`output of every command, text and --json > take a slice checked out els
   "issue": 132,
   "state": "implementation",
   "step": "implementation",
-  "skill": "implement",
+  "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nBranch 123-rate-limiting-132 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n\\nInvoke the skill: implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132\\n\\nOn a long step, run norn take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nBranch 123-rate-limiting-132 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132\\n\\nOn a long step, run norn take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -1861,7 +1861,7 @@ You now hold slice #132 "Docs". Its step is implementation.
 Work in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)
 Branch 123-rate-limiting-132 is checked out at /elsewhere; work there or switch that checkout to another branch.
 
-Invoke the skill: implement
+Invoke the skill: norn-implement
 Spec: .agents/specs/123-rate-limiting/spec.md (story #123)
 Read the issue: gh issue view 132 --comments
 Commit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:
@@ -1884,13 +1884,13 @@ exports[`output of every command, text and --json > take a slice for agent QA (a
   "issue": 60,
   "state": "needs-qa",
   "step": "agent QA",
-  "skill": "auto-qa",
+  "skill": "norn-auto-qa",
   "attended": false,
   "outcomes": [
     "pass",
     "fail"
   ],
-  "message": "You now hold slice #60 \\"QA me\\". Its step is agent QA.\\n\\nInvoke the skill: auto-qa\\n\\nWhen agent QA is finished, run one of:\\n  norn done 60 pass \\"evidence\\" [--evidence <dir>]   (every criterion passed, moves to the merge queue)\\n  norn done 60 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run norn take 60 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 60\\nIf something is wrong and a person is needed, run: norn escalate 60 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #60 \\"QA me\\". Its step is agent QA.\\n\\nInvoke the skill: norn-auto-qa\\n\\nWhen agent QA is finished, run one of:\\n  norn done 60 pass \\"evidence\\" [--evidence <dir>]   (every criterion passed, moves to the merge queue)\\n  norn done 60 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run norn take 60 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 60\\nIf something is wrong and a person is needed, run: norn escalate 60 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -1898,7 +1898,7 @@ exports[`output of every command, text and --json > take a slice for agent QA (a
 "exit 0
 You now hold slice #60 "QA me". Its step is agent QA.
 
-Invoke the skill: auto-qa
+Invoke the skill: norn-auto-qa
 
 When agent QA is finished, run one of:
   norn done 60 pass "evidence" [--evidence <dir>]   (every criterion passed, moves to the merge queue)
@@ -1918,13 +1918,13 @@ exports[`output of every command, text and --json > take a slice for human QA > 
   "issue": 133,
   "state": "needs-human-qa",
   "step": "human QA",
-  "skill": "qa",
+  "skill": "norn-qa",
   "attended": true,
   "outcomes": [
     "pass",
     "fail"
   ],
-  "message": "You now hold slice #133 \\"Metrics\\". Its step is human QA. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-133 (branch 123-rate-limiting-133)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-133 -b 123-rate-limiting-133 origin/123-rate-limiting\\n\\nInvoke the skill: qa\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 133 --comments\\nSlice PR: 123-rate-limiting-133 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\nStart from the agent's QA comment on #133: its evidence, and what it left for a person. Read the issue: gh issue view 133 --comments\\nRun the app from 123-rate-limiting-133 on this machine and walk the user through what is left, plus anything in the evidence they question.\\nTie each remark the user brings to a criterion; a remark on a criterion fails it. For a remark outside the criteria, the user decides:\\n  follow up (the default): gh issue create --title \\"<remark>\\" --body \\"From QA of #133: <remark>\\" (it goes through triage)\\n  pull it in: it fails this item, like a criterion\\n  drop it: say so in the note\\nEvery failure needs a repro. Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.\\n\\nWhen the user agrees human QA is finished, run one of:\\n  norn done 133 pass [--evidence <dir>]              (the person passes QA, moves to the merge queue)\\n  norn done 133 fail \\"problems\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run norn take 133 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 133\\nIf something is wrong and a person is needed, run: norn escalate 133 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #133 \\"Metrics\\". Its step is human QA. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-133 (branch 123-rate-limiting-133)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-133 -b 123-rate-limiting-133 origin/123-rate-limiting\\n\\nInvoke the skill: norn-qa\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 133 --comments\\nSlice PR: 123-rate-limiting-133 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\nStart from the agent's QA comment on #133: its evidence, and what it left for a person. Read the issue: gh issue view 133 --comments\\nRun the app from 123-rate-limiting-133 on this machine and walk the user through what is left, plus anything in the evidence they question.\\nTie each remark the user brings to a criterion; a remark on a criterion fails it. For a remark outside the criteria, the user decides:\\n  follow up (the default): gh issue create --title \\"<remark>\\" --body \\"From QA of #133: <remark>\\" (it goes through triage)\\n  pull it in: it fails this item, like a criterion\\n  drop it: say so in the note\\nEvery failure needs a repro. Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.\\n\\nWhen the user agrees human QA is finished, run one of:\\n  norn done 133 pass [--evidence <dir>]              (the person passes QA, moves to the merge queue)\\n  norn done 133 fail \\"problems\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run norn take 133 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 133\\nIf something is wrong and a person is needed, run: norn escalate 133 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -1937,7 +1937,7 @@ Work in: /repo/.agents/worktrees/123-rate-limiting-133 (branch 123-rate-limiting
 It does not exist yet. Create it first:
   git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-133 -b 123-rate-limiting-133 origin/123-rate-limiting
 
-Invoke the skill: qa
+Invoke the skill: norn-qa
 Spec: .agents/specs/123-rate-limiting/spec.md (story #123)
 Read the issue: gh issue view 133 --comments
 Slice PR: 123-rate-limiting-133 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD
@@ -1967,10 +1967,10 @@ exports[`output of every command, text and --json > take a slice for merge > jso
   "issue": 127,
   "state": "merge-queue",
   "step": "merge",
-  "skill": "merge",
+  "skill": "norn-merge",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #127 \\"Redis store\\". Its step is merge.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-127 (branch 123-rate-limiting-127)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n\\nInvoke the skill: merge\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 127 --comments\\nMerge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.\\nThen merge the PR: gh pr merge 123-rate-limiting-127 --merge\\n\\nWhen merge is finished, run:\\n  norn done 127\\n\\nOn a long step, run norn take 127 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 127\\nIf something is wrong and a person is needed, run: norn escalate 127 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #127 \\"Redis store\\". Its step is merge.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-127 (branch 123-rate-limiting-127)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n\\nInvoke the skill: norn-merge\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 127 --comments\\nMerge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.\\nThen merge the PR: gh pr merge 123-rate-limiting-127 --merge\\n\\nWhen merge is finished, run:\\n  norn done 127\\n\\nOn a long step, run norn take 127 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 127\\nIf something is wrong and a person is needed, run: norn escalate 127 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -1982,7 +1982,7 @@ Work in: /repo/.agents/worktrees/123-rate-limiting-127 (branch 123-rate-limiting
 It does not exist yet. Create it first:
   git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting
 
-Invoke the skill: merge
+Invoke the skill: norn-merge
 Spec: .agents/specs/123-rate-limiting/spec.md (story #123)
 Read the issue: gh issue view 127 --comments
 Merge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.
@@ -2005,13 +2005,13 @@ exports[`output of every command, text and --json > take a slice for review > js
   "issue": 128,
   "state": "needs-review",
   "step": "review",
-  "skill": "review",
+  "skill": "norn-review",
   "attended": false,
   "outcomes": [
     "approve",
     "request-changes"
   ],
-  "message": "You now hold slice #128 \\"Limit headers\\". Its step is review.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-128 (branch 123-rate-limiting-128)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-128 -b 123-rate-limiting-128 origin/123-rate-limiting\\n\\nInvoke the skill: review\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 128 --comments\\nSlice PR: 123-rate-limiting-128 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\n\\nWhen review is finished, run one of:\\n  norn done 128 approve                      (no requests, moves on to QA by an agent)\\n  norn done 128 request-changes \\"requests\\"   (put the requests in the note)\\n\\nOn a long step, run norn take 128 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 128\\nIf something is wrong and a person is needed, run: norn escalate 128 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #128 \\"Limit headers\\". Its step is review.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-128 (branch 123-rate-limiting-128)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-128 -b 123-rate-limiting-128 origin/123-rate-limiting\\n\\nInvoke the skill: norn-review\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 128 --comments\\nSlice PR: 123-rate-limiting-128 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\n\\nWhen review is finished, run one of:\\n  norn done 128 approve                      (no requests, moves on to QA by an agent)\\n  norn done 128 request-changes \\"requests\\"   (put the requests in the note)\\n\\nOn a long step, run norn take 128 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 128\\nIf something is wrong and a person is needed, run: norn escalate 128 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2023,7 +2023,7 @@ Work in: /repo/.agents/worktrees/123-rate-limiting-128 (branch 123-rate-limiting
 It does not exist yet. Create it first:
   git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-128 -b 123-rate-limiting-128 origin/123-rate-limiting
 
-Invoke the skill: review
+Invoke the skill: norn-review
 Spec: .agents/specs/123-rate-limiting/spec.md (story #123)
 Read the issue: gh issue view 128 --comments
 Slice PR: 123-rate-limiting-128 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD
@@ -2060,10 +2060,10 @@ exports[`output of every command, text and --json > take a slice with a dirty wo
   "issue": 132,
   "state": "implementation",
   "step": "implementation",
-  "skill": "implement",
+  "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt has uncommitted changes, e.g. from an earlier session. Check git status there before you start.\\nBring it up to date first:\\n  git -C /repo/.agents/worktrees/123-rate-limiting-132 fetch origin 123-rate-limiting-132 && git -C /repo/.agents/worktrees/123-rate-limiting-132 merge --ff-only origin/123-rate-limiting-132\\n\\nInvoke the skill: implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132\\n\\nOn a long step, run norn take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt has uncommitted changes, e.g. from an earlier session. Check git status there before you start.\\nBring it up to date first:\\n  git -C /repo/.agents/worktrees/123-rate-limiting-132 fetch origin 123-rate-limiting-132 && git -C /repo/.agents/worktrees/123-rate-limiting-132 merge --ff-only origin/123-rate-limiting-132\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132\\n\\nOn a long step, run norn take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2076,7 +2076,7 @@ It has uncommitted changes, e.g. from an earlier session. Check git status there
 Bring it up to date first:
   git -C /repo/.agents/worktrees/123-rate-limiting-132 fetch origin 123-rate-limiting-132 && git -C /repo/.agents/worktrees/123-rate-limiting-132 merge --ff-only origin/123-rate-limiting-132
 
-Invoke the skill: implement
+Invoke the skill: norn-implement
 Spec: .agents/specs/123-rate-limiting/spec.md (story #123)
 Read the issue: gh issue view 132 --comments
 Commit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:
@@ -2099,13 +2099,13 @@ exports[`output of every command, text and --json > take a story for agent QA > 
   "issue": 61,
   "state": "needs-qa",
   "step": "agent QA",
-  "skill": "auto-qa",
+  "skill": "norn-auto-qa",
   "attended": false,
   "outcomes": [
     "pass",
     "fail"
   ],
-  "message": "You now hold story #61 \\"QA story\\". Its step is agent QA.\\n\\nWork in: /repo/.agents/worktrees/61-qa-story (branch 61-qa-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/61-qa-story -b 61-qa-story origin/main\\n\\nInvoke the skill: auto-qa\\nSpec to work on: .agents/specs/61-qa-story/spec.md\\nStory PR: 61-qa-story into main. Diff: git diff origin/main...HEAD\\nYour note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.\\nKeep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.\\nA person QAs this after you. For what only a person can check (the slice's verifier reason), list it in the note\\nwith what you could prepare: how to run it, a URL, screenshots up to where you had to stop. Then pass.\\n\\nWhen agent QA is finished, run one of:\\n  norn done 61 pass \\"evidence\\" [--evidence <dir>]   (every criterion you could check passed; moves on to QA by a person)\\n  norn done 61 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run norn take 61 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 61\\nIf something is wrong and a person is needed, run: norn escalate 61 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold story #61 \\"QA story\\". Its step is agent QA.\\n\\nWork in: /repo/.agents/worktrees/61-qa-story (branch 61-qa-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/61-qa-story -b 61-qa-story origin/main\\n\\nInvoke the skill: norn-auto-qa\\nSpec to work on: .agents/specs/61-qa-story/spec.md\\nStory PR: 61-qa-story into main. Diff: git diff origin/main...HEAD\\nYour note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.\\nKeep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.\\nA person QAs this after you. For what only a person can check (the slice's verifier reason), list it in the note\\nwith what you could prepare: how to run it, a URL, screenshots up to where you had to stop. Then pass.\\n\\nWhen agent QA is finished, run one of:\\n  norn done 61 pass \\"evidence\\" [--evidence <dir>]   (every criterion you could check passed; moves on to QA by a person)\\n  norn done 61 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run norn take 61 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 61\\nIf something is wrong and a person is needed, run: norn escalate 61 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2117,7 +2117,7 @@ Work in: /repo/.agents/worktrees/61-qa-story (branch 61-qa-story)
 It does not exist yet. Create it first:
   git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/61-qa-story -b 61-qa-story origin/main
 
-Invoke the skill: auto-qa
+Invoke the skill: norn-auto-qa
 Spec to work on: .agents/specs/61-qa-story/spec.md
 Story PR: 61-qa-story into main. Diff: git diff origin/main...HEAD
 Your note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.
@@ -2143,10 +2143,10 @@ exports[`output of every command, text and --json > take a story for planning un
   "issue": 63,
   "state": "needs-plan",
   "step": "planning",
-  "skill": "plan",
+  "skill": "norn-plan",
   "attended": true,
   "outcomes": [],
-  "message": "You now hold story #63 \\"Plan it\\". Its step is planning. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/63-plan-it (branch 63-plan-it)\\nIt does not exist yet. Create it first:\\n  git -C /repo worktree add /repo/.agents/worktrees/63-plan-it 63-plan-it\\n\\nInvoke the skill: plan\\nSpec to work on: .agents/specs/63-plan-it/spec.md\\nCommit the spec on 63-plan-it and push it, so the link norn posts resolves.\\n\\nWhen the user agrees planning is finished, run:\\n  norn done 63\\n\\nOn a long step, run norn take 63 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 63\\nIf something is wrong and a person is needed, run: norn escalate 63 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold story #63 \\"Plan it\\". Its step is planning. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/63-plan-it (branch 63-plan-it)\\nIt does not exist yet. Create it first:\\n  git -C /repo worktree add /repo/.agents/worktrees/63-plan-it 63-plan-it\\n\\nInvoke the skill: norn-plan\\nSpec to work on: .agents/specs/63-plan-it/spec.md\\nCommit the spec on 63-plan-it and push it, so the link norn posts resolves.\\n\\nWhen the user agrees planning is finished, run:\\n  norn done 63\\n\\nOn a long step, run norn take 63 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 63\\nIf something is wrong and a person is needed, run: norn escalate 63 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2159,7 +2159,7 @@ Work in: /repo/.agents/worktrees/63-plan-it (branch 63-plan-it)
 It does not exist yet. Create it first:
   git -C /repo worktree add /repo/.agents/worktrees/63-plan-it 63-plan-it
 
-Invoke the skill: plan
+Invoke the skill: norn-plan
 Spec to work on: .agents/specs/63-plan-it/spec.md
 Commit the spec on 63-plan-it and push it, so the link norn posts resolves.
 
@@ -2180,10 +2180,10 @@ exports[`output of every command, text and --json > take a story for slicing > j
   "issue": 50,
   "state": "needs-slicing",
   "step": "slicing",
-  "skill": "slice",
+  "skill": "norn-slice",
   "attended": true,
   "outcomes": [],
-  "message": "You now hold story #50 \\"Search\\". Its step is slicing. This step is attended:\\nthe user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/50-search (branch 50-search)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/50-search -b 50-search origin/main\\n\\nInvoke the skill: slice\\nSpec to work on: .agents/specs/50-search/spec.md\\nCreate the slices in dependency order, blockers first, one command per slice:\\n  norn add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <slice>]...\\n  --mode afk when an agent can verify every criterion, hil when a person must also look at it.\\nThen give each slice its body: gh issue edit <slice> --body-file <file>\\nPush 50-search once the slices exist, so slice PRs can target it.\\n\\nWhen the user agrees slicing is finished, run:\\n  norn done 50\\n\\nOn a long step, run norn take 50 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 50\\nIf something is wrong and a person is needed, run: norn escalate 50 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold story #50 \\"Search\\". Its step is slicing. This step is attended:\\nthe user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/50-search (branch 50-search)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/50-search -b 50-search origin/main\\n\\nInvoke the skill: norn-slice\\nSpec to work on: .agents/specs/50-search/spec.md\\nCreate the slices in dependency order, blockers first, one command per slice:\\n  norn add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <slice>]...\\n  --mode afk when an agent can verify every criterion, hil when a person must also look at it.\\nThen give each slice its body: gh issue edit <slice> --body-file <file>\\nPush 50-search once the slices exist, so slice PRs can target it.\\n\\nWhen the user agrees slicing is finished, run:\\n  norn done 50\\n\\nOn a long step, run norn take 50 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 50\\nIf something is wrong and a person is needed, run: norn escalate 50 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2196,7 +2196,7 @@ Work in: /repo/.agents/worktrees/50-search (branch 50-search)
 It does not exist yet. Create it first:
   git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/50-search -b 50-search origin/main
 
-Invoke the skill: slice
+Invoke the skill: norn-slice
 Spec to work on: .agents/specs/50-search/spec.md
 Create the slices in dependency order, blockers first, one command per slice:
   norn add-slice 50 "title" --mode afk|hil [--blocked-by <slice>]...
@@ -2249,10 +2249,10 @@ exports[`output of every command, text and --json > take a story in rework > jso
   "issue": 62,
   "state": "changes-requested",
   "step": "fixing",
-  "skill": "implement",
+  "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold story #62 \\"Fix story\\". Its step is fixing.\\n\\nWork in: /repo/.agents/worktrees/62-fix-story (branch 62-fix-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/62-fix-story -b 62-fix-story origin/main\\n\\nInvoke the skill: implement\\nSpec to work on: .agents/specs/62-fix-story/spec.md\\nThis is rework: the latest review or QA comment on #62 lists what to fix. Read the issue: gh issue view 62 --comments\\nCommit the fixes straight onto the story branch 62-fix-story and push them.\\n\\nWhen fixing is finished, run:\\n  norn done 62\\n\\nOn a long step, run norn take 62 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 62\\nIf something is wrong and a person is needed, run: norn escalate 62 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold story #62 \\"Fix story\\". Its step is fixing.\\n\\nWork in: /repo/.agents/worktrees/62-fix-story (branch 62-fix-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/62-fix-story -b 62-fix-story origin/main\\n\\nInvoke the skill: norn-implement\\nSpec to work on: .agents/specs/62-fix-story/spec.md\\nThis is rework: the latest review or QA comment on #62 lists what to fix. Read the issue: gh issue view 62 --comments\\nCommit the fixes straight onto the story branch 62-fix-story and push them.\\n\\nWhen fixing is finished, run:\\n  norn done 62\\n\\nOn a long step, run norn take 62 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 62\\nIf something is wrong and a person is needed, run: norn escalate 62 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2264,7 +2264,7 @@ Work in: /repo/.agents/worktrees/62-fix-story (branch 62-fix-story)
 It does not exist yet. Create it first:
   git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/62-fix-story -b 62-fix-story origin/main
 
-Invoke the skill: implement
+Invoke the skill: norn-implement
 Spec to work on: .agents/specs/62-fix-story/spec.md
 This is rework: the latest review or QA comment on #62 lists what to fix. Read the issue: gh issue view 62 --comments
 Commit the fixes straight onto the story branch 62-fix-story and push them.
@@ -2286,10 +2286,10 @@ exports[`output of every command, text and --json > take a story needing a human
   "issue": 64,
   "state": "needs-clarification",
   "step": "resolving needs-human",
-  "skill": "resolve",
+  "skill": "norn-resolve",
   "attended": true,
   "outcomes": [],
-  "message": "You now hold story #64 \\"Stuck\\". Its step is resolving needs-human. This step\\nis attended: the user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/64-stuck (branch 64-stuck)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/64-stuck -b 64-stuck origin/main\\n\\nInvoke the skill: resolve\\nThe latest needs-human comment gives the reason. Read the issue: gh issue view 64 --comments\\nRecord the outcome on the issue: gh issue comment 64\\nSpec changes go in .agents/specs/64-stuck/spec.md; commit and push them on 64-stuck.\\n\\nWhen the user agrees resolving needs-human is finished, run:\\n  norn done 64\\n\\nOn a long step, run norn take 64 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 64\\nIf something is wrong and a person is needed, run: norn escalate 64 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold story #64 \\"Stuck\\". Its step is resolving needs-human. This step\\nis attended: the user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/64-stuck (branch 64-stuck)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/64-stuck -b 64-stuck origin/main\\n\\nInvoke the skill: norn-resolve\\nThe latest needs-human comment gives the reason. Read the issue: gh issue view 64 --comments\\nRecord the outcome on the issue: gh issue comment 64\\nSpec changes go in .agents/specs/64-stuck/spec.md; commit and push them on 64-stuck.\\n\\nWhen the user agrees resolving needs-human is finished, run:\\n  norn done 64\\n\\nOn a long step, run norn take 64 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 64\\nIf something is wrong and a person is needed, run: norn escalate 64 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2302,7 +2302,7 @@ Work in: /repo/.agents/worktrees/64-stuck (branch 64-stuck)
 It does not exist yet. Create it first:
   git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/64-stuck -b 64-stuck origin/main
 
-Invoke the skill: resolve
+Invoke the skill: norn-resolve
 The latest needs-human comment gives the reason. Read the issue: gh issue view 64 --comments
 Record the outcome on the issue: gh issue comment 64
 Spec changes go in .agents/specs/64-stuck/spec.md; commit and push them on 64-stuck.
@@ -2324,10 +2324,10 @@ exports[`output of every command, text and --json > take again while holding > j
   "issue": 50,
   "state": "needs-slicing",
   "step": "slicing",
-  "skill": "slice",
+  "skill": "norn-slice",
   "attended": true,
   "outcomes": [],
-  "message": "You already held #50; the claim is refreshed. Here is its briefing again.\\n\\nYou now hold story #50 \\"Search\\". Its step is slicing. This step is attended:\\nthe user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/50-search (branch 50-search)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/50-search -b 50-search origin/main\\n\\nInvoke the skill: slice\\nSpec to work on: .agents/specs/50-search/spec.md\\nCreate the slices in dependency order, blockers first, one command per slice:\\n  norn add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <slice>]...\\n  --mode afk when an agent can verify every criterion, hil when a person must also look at it.\\nThen give each slice its body: gh issue edit <slice> --body-file <file>\\nPush 50-search once the slices exist, so slice PRs can target it.\\n\\nWhen the user agrees slicing is finished, run:\\n  norn done 50\\n\\nOn a long step, run norn take 50 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 50\\nIf something is wrong and a person is needed, run: norn escalate 50 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You already held #50; the claim is refreshed. Here is its briefing again.\\n\\nYou now hold story #50 \\"Search\\". Its step is slicing. This step is attended:\\nthe user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/50-search (branch 50-search)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/50-search -b 50-search origin/main\\n\\nInvoke the skill: norn-slice\\nSpec to work on: .agents/specs/50-search/spec.md\\nCreate the slices in dependency order, blockers first, one command per slice:\\n  norn add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <slice>]...\\n  --mode afk when an agent can verify every criterion, hil when a person must also look at it.\\nThen give each slice its body: gh issue edit <slice> --body-file <file>\\nPush 50-search once the slices exist, so slice PRs can target it.\\n\\nWhen the user agrees slicing is finished, run:\\n  norn done 50\\n\\nOn a long step, run norn take 50 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 50\\nIf something is wrong and a person is needed, run: norn escalate 50 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2342,7 +2342,7 @@ Work in: /repo/.agents/worktrees/50-search (branch 50-search)
 It does not exist yet. Create it first:
   git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/50-search -b 50-search origin/main
 
-Invoke the skill: slice
+Invoke the skill: norn-slice
 Spec to work on: .agents/specs/50-search/spec.md
 Create the slices in dependency order, blockers first, one command per slice:
   norn add-slice 50 "title" --mode afk|hil [--blocked-by <slice>]...
@@ -2396,10 +2396,10 @@ exports[`output of every command, text and --json > take over a stale claim > js
   "issue": 50,
   "state": "needs-slicing",
   "step": "slicing",
-  "skill": "slice",
+  "skill": "norn-slice",
   "attended": true,
   "outcomes": [],
-  "message": "You now hold story #50 \\"Search\\". Its step is slicing. This step is attended:\\nthe user takes part, and you do not decide on your own.\\n\\nThe previous holder's claim was stale (since 08:00); its worktree is kept with what it left. Check git status there before you start.\\n\\nWork in: /repo/.agents/worktrees/50-search (branch 50-search)\\n\\nInvoke the skill: slice\\nSpec to work on: .agents/specs/50-search/spec.md\\nCreate the slices in dependency order, blockers first, one command per slice:\\n  norn add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <slice>]...\\n  --mode afk when an agent can verify every criterion, hil when a person must also look at it.\\nThen give each slice its body: gh issue edit <slice> --body-file <file>\\nPush 50-search once the slices exist, so slice PRs can target it.\\n\\nWhen the user agrees slicing is finished, run:\\n  norn done 50\\n\\nOn a long step, run norn take 50 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 50\\nIf something is wrong and a person is needed, run: norn escalate 50 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold story #50 \\"Search\\". Its step is slicing. This step is attended:\\nthe user takes part, and you do not decide on your own.\\n\\nThe previous holder's claim was stale (since 08:00); its worktree is kept with what it left. Check git status there before you start.\\n\\nWork in: /repo/.agents/worktrees/50-search (branch 50-search)\\n\\nInvoke the skill: norn-slice\\nSpec to work on: .agents/specs/50-search/spec.md\\nCreate the slices in dependency order, blockers first, one command per slice:\\n  norn add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <slice>]...\\n  --mode afk when an agent can verify every criterion, hil when a person must also look at it.\\nThen give each slice its body: gh issue edit <slice> --body-file <file>\\nPush 50-search once the slices exist, so slice PRs can target it.\\n\\nWhen the user agrees slicing is finished, run:\\n  norn done 50\\n\\nOn a long step, run norn take 50 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 50\\nIf something is wrong and a person is needed, run: norn escalate 50 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2412,7 +2412,7 @@ The previous holder's claim was stale (since 08:00); its worktree is kept with w
 
 Work in: /repo/.agents/worktrees/50-search (branch 50-search)
 
-Invoke the skill: slice
+Invoke the skill: norn-slice
 Spec to work on: .agents/specs/50-search/spec.md
 Create the slices in dependency order, blockers first, one command per slice:
   norn add-slice 50 "title" --mode afk|hil [--blocked-by <slice>]...

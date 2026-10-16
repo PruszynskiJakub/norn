@@ -33,19 +33,19 @@ Pick something small:
 gh issue create --title "Add a greet command" --body "Print Hello, <name>" --assignee @me
 ```
 
-## 4. Shape the story with `drive`
+## 4. Shape the story with `norn-drive`
 
 Start Claude Code in the sandbox and ask:
 
 ```text
-drive <issue>
+norn-drive <issue>
 ```
 
-Triage, refine, clarify, plan and slice are attended: the agent prepares each decision and you make it. Each step ends with the `norn done <issue> <outcome>` the briefing gives (triage `accept`, refine `clear` or `questions`), and `drive` moves on to the next step. Slicing creates the slices as sub-issues and moves the story to implementation.
+Triage, refine, clarify, plan and slice are attended: the agent prepares each decision and you make it. Each step ends with the `norn done <issue> <outcome>` the briefing gives (triage `accept`, refine `clear` or `questions`), and `norn-drive` moves on to the next step. Slicing creates the slices as sub-issues and moves the story to implementation.
 
 ## 5. Deliver it unattended
 
-When `drive` offers it, agree to start `deliver <story>`, or ask for it yourself. It implements, reviews, QAs and merges the slices into the story branch in fresh subagents, then reviews and QAs the story.
+When `norn-drive` offers it, agree to start `norn-deliver <story>`, or ask for it yourself. It implements, reviews, QAs and merges the slices into the story branch in fresh subagents, then reviews and QAs the story.
 
 It stops when the story reaches `needs-human-qa`, which is always yours, or when only items waiting for a person are left. `npx norn status <story>` shows them, and so does the dashboard:
 
@@ -53,7 +53,7 @@ It stops when the story reaches `needs-human-qa`, which is always yours, or when
 npx norn dashboard
 ```
 
-For a `needs-human` issue or an item in `needs-human-qa`, ask your agent `drive <issue>`.
+For a `needs-human` issue or an item in `needs-human-qa`, ask your agent `norn-drive <issue>`.
 
 ## 6. Merge the story
 

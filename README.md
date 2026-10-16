@@ -37,7 +37,7 @@ flowchart LR
   story --> merge([you merge the story PR])
 ```
 
-You ask your agent `drive <issue>` to shape a story with you. Once it is sliced, `deliver <story>` runs the slices in parallel, each step in a fresh agent in its own git worktree, and merges them into the story branch. It stops when the story is ready for your QA, or when something needs a person, and notifies you. See [how norn works](docs/how-it-works.md) for the full process.
+You ask your agent `norn-drive <issue>` to shape a story with you. Once it is sliced, `norn-deliver <story>` runs the slices in parallel, each step in a fresh agent in its own git worktree, and merges them into the story branch. It stops when the story is ready for your QA, or when something needs a person, and notifies you. See [how norn works](docs/how-it-works.md) for the full process.
 
 ## Requirements
 
@@ -66,7 +66,7 @@ npx norn init      # skills, agent instructions, .agents/, labels
 Commit what `init` wrote, then ask your agent:
 
 ```text
-drive <issue>
+norn-drive <issue>
 ```
 
 For a guided first run in a throwaway repository, follow the [sandbox tutorial](docs/tutorial.md).
@@ -106,4 +106,4 @@ See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setting up, the checks and how rele
 
 ## Acknowledgements
 
-The `codebase-design` and `tdd` skills and the approach of the step skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT).
+The `norn-codebase-design` and `norn-tdd` skills and the approach of the step skills are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT).
