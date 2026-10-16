@@ -349,6 +349,8 @@ function flowError(e: FlowError): string {
       return `The outcome ${e.word} of ${e.state} leads to ${e.to}, which is not one of its states, closed or not-planned.`;
     case "state-reserved":
       return `The state ${e.state} takes a name norn keeps for itself.`;
+    case "behaviour-unknown":
+      return `The state ${e.state} uses the behaviour ${e.behaviour}, which norn does not know.`;
     default:
       return unreachable(e);
   }

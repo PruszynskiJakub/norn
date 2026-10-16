@@ -28,9 +28,15 @@ export interface FlowState {
   color?: string;
   /** The step can attach evidence files with norn done --evidence <dir>. */
   evidence?: boolean;
+  /** Built-in mechanics the state opts into; see behaviours.ts. */
+  behaviours?: BehaviourName[];
   /** Keyed by outcome word. */
   outcomes: Record<string, Outcome>;
 }
+
+/** The closed set of behaviours a state can opt into. A name outside it fails validation, e.g. one from a newer norn. */
+export const BEHAVIOURS = ["opensPR", "countsFixRounds", "humanGate"] as const;
+export type BehaviourName = (typeof BEHAVIOURS)[number];
 
 /** A flow read from its file: valid, or kept with what is wrong with it. */
 export type LoadedFlow = { ok: true; name: string; flow: Flow } | { ok: false; name: string; errors: FlowError[] };
@@ -44,7 +50,8 @@ export type FlowError =
   | { kind: "start-unknown"; start: string }
   | { kind: "target-unknown"; state: string; word: string; to: string }
   /** A state takes a name norn keeps for itself, e.g. closed. */
-  | { kind: "state-reserved"; state: string };
+  | { kind: "state-reserved"; state: string }
+  | { kind: "behaviour-unknown"; state: string; behaviour: string };
 
 /** Ends every flow can lead to; no state may take these names. */
 export const RESERVED_TARGETS = ["closed", "not-planned"] as const;
@@ -95,6 +102,15 @@ export function validateFlow(data: unknown): FlowError[] {
     if (state.evidence !== undefined && typeof state.evidence !== "boolean") field(`${at}.evidence`, "true or false");
     if (state.enterAs !== undefined && (typeof state.enterAs !== "string" || !Object.hasOwn(states, state.enterAs))) {
       field(`${at}.enterAs`, "a state of the flow");
+    }
+    if (state.behaviours !== undefined) {
+      if (!Array.isArray(state.behaviours)) field(`${at}.behaviours`, "a list of behaviour names");
+      else {
+        for (const [i, b] of state.behaviours.entries()) {
+          if (typeof b !== "string") field(`${at}.behaviours.${i}`, "a behaviour name");
+          else if (!(BEHAVIOURS as readonly string[]).includes(b)) errors.push({ kind: "behaviour-unknown", state: name, behaviour: b });
+        }
+      }
     }
     if (!isObject(state.outcomes)) {
       field(`${at}.outcomes`, "an object");

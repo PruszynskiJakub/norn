@@ -1,4 +1,5 @@
-import type { Flow } from "./flow.js";
+import { behaviourLines } from "./behaviours.js";
+import { type Flow, flowStatesOf } from "./flow.js";
 import type { Issue } from "./github.js";
 import { locate, workIn, type Location, type WorkIn } from "./location.js";
 import { FIX_STATES, kindOf, type State, type Step } from "./machine.js";
@@ -52,7 +53,7 @@ export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: string 
     title: issue.title,
     step: { name: step.name, skill: step.skill, attended: step.attended },
     workIn: loc ? await workIn(loc, ctx.workspace, ctx.github, ctx.config.provider) : null,
-    instructions: flow ? flowLines(issue, step, loc) : processLines(issue, step, loc, rework),
+    instructions: flow ? await flowLines(issue, step, ctx, from, flow, loc) : processLines(issue, step, loc, rework),
     finish: finishCommands(n, step),
   };
 }
@@ -126,20 +127,14 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
   return lines;
 }
 
-/** The process around a step of a repository flow: the issue, and with its own workspace, the branch and its PR into the base branch. */
-function flowLines(issue: Issue, step: Step, loc: Location | null): string[] {
+/** The process around a step of a repository flow: the issue, then what the behaviours of its flow add. */
+async function flowLines(issue: Issue, step: Step, ctx: Ctx, from: string | null, flow: Flow, loc: Location | null): Promise<string[]> {
   const n = issue.number;
   const readIssue = `Read the issue: gh issue view ${n} --comments`;
-  const resolve = [`The latest needs-human comment gives the reason. ${readIssue}`, `Record the outcome on the issue: gh issue comment ${n}`];
-  if (step.skill === "norn-resolve") return resolve;
-  if (!loc) return [readIssue];
-  return [
-    readIssue,
-    `Commit on ${loc.branch} and push. Open one PR from ${loc.branch} into ${loc.base} if there is none yet:`,
-    // The title is free text from GitHub: quoted, so a " or $(...) in it can neither break nor run anything.
-    `  gh pr create --base ${sh(loc.base)} --head ${sh(loc.branch)} --title ${sh(issue.title)} --body ${sh(`Closes #${n}.`)}`,
-    `Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`,
-  ];
+  if (step.skill === "norn-resolve")
+    return [`The latest needs-human comment gives the reason. ${readIssue}`, `Record the outcome on the issue: gh issue comment ${n}`];
+  const state = flowStatesOf(issue, flow)[0] ?? null;
+  return [readIssue, ...(await behaviourLines({ ctx, issue, flow, state, from, step, loc }))];
 }
 
 /** How QA's results reach the issue: the note, evidence files, and for a person, remarks. */
