@@ -9,19 +9,19 @@ import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
 import { notifyHumanQa, notifyNeedsHuman, type Notify } from "./notify.js";
 
-/** The marker psdd writes when it sets needs-human; psdd next reads the reason back from it. */
-export const NEEDS_HUMAN_MARK = "psdd: needs-human — ";
+/** The marker norn writes when it sets needs-human; norn next reads the reason back from it. */
+export const NEEDS_HUMAN_MARK = "norn: needs-human — ";
 
 export function needsHumanLine(reason: string) {
   return `${NEEDS_HUMAN_MARK}${oneLine(reason)}`;
 }
 
-/** Collapses a free-form note onto one line, so the marker line psdd reads back stays whole. */
+/** Collapses a free-form note onto one line, so the marker line norn reads back stays whole. */
 export function oneLine(text: string) {
   return text.replace(/\s+/g, " ").trim();
 }
 
-/** The reason psdd last gave for needs-human on an issue, read back from its comments. */
+/** The reason norn last gave for needs-human on an issue, read back from its comments. */
 export async function needsHumanReason(github: GitHub, n: number): Promise<string | null> {
   return lastNeedsHumanReason(await github.listComments(n));
 }
@@ -41,9 +41,9 @@ export function needsHumanIn(body: string): string | null {
   return line === undefined ? null : line.slice(NEEDS_HUMAN_MARK.length);
 }
 
-/** Every comment psdd writes starts so; anything else is a person's. */
-export function isPsddComment(body: string) {
-  return body.startsWith("psdd: ");
+/** Every comment norn writes starts so; anything else is a person's. */
+export function isNornComment(body: string) {
+  return body.startsWith("norn: ");
 }
 
 export function fixLimitReason(max: number) {
@@ -51,10 +51,10 @@ export function fixLimitReason(max: number) {
 }
 
 const FIX_LIMIT = new RegExp(`^${NEEDS_HUMAN_MARK}.*\\(\\d+ fix rounds reached\\)$`, "m");
-const TRANSITION = /^psdd: (\S+) → (\S+)/;
+const TRANSITION = /^norn: (\S+) → (\S+)/;
 
 /**
- * Fix rounds that count toward the limit, read from psdd's transition comments:
+ * Fix rounds that count toward the limit, read from norn's transition comments:
  * entries into a fix state from another state, since the last time the limit
  * escalated. A person resolving that escalation so starts a fresh budget.
  */
@@ -78,7 +78,7 @@ export interface Ctx {
   config: Config;
   now: () => Date;
   session: string;
-  /** A short random string, e.g. to make each agent's PSDD_SESSION unique. */
+  /** A short random string, e.g. to make each agent's NORN_SESSION unique. */
   nonce: () => string;
   /** Story slugs read during this command; see slug.ts. */
   slugs: Slugs;
@@ -97,7 +97,7 @@ const EVIDENCE_HEAD = /^Evidence \((\S+) at (\S+)\):$/;
 /** An evidence file line as evidenceLines writes it: an embedded image or a link, at its commit. */
 const EVIDENCE_FILE = /^(?:!\[(.*)\]\((\S+?)\?raw=true\)|- \[(.*)\]\((\S+)\))$/;
 
-/** A transition comment psdd wrote, read back: what applyOutcome, setState and closeMergedStory put in it. */
+/** A transition comment norn wrote, read back: what applyOutcome, setState and closeMergedStory put in it. */
 export interface TransitionComment {
   /** The state before; "triage" for a new issue. */
   from: string;
@@ -113,12 +113,12 @@ export interface TransitionComment {
 }
 
 /**
- * Reads back a comment psdd wrote on a transition; null for any other. The
+ * Reads back a comment norn wrote on a transition; null for any other. The
  * inverse of applyOutcome's comment, kept beside it so the two change together.
  */
 export function parseTransitionComment(body: string): TransitionComment | null {
   const lines = body.split("\n");
-  const head = /^psdd: (\S+) → (closed as not planned|\S+)(?: \((.+)\))?$/.exec(lines[0]);
+  const head = /^norn: (\S+) → (closed as not planned|\S+)(?: \((.+)\))?$/.exec(lines[0]);
   if (!head) return null;
   let rest = lines.slice(1);
   const needsHuman = needsHumanIn(body);
@@ -168,10 +168,10 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
   // The resolve step has no outcome word and keeps the state; say what it did.
   const resolved = !word && issue.labels.includes("needs-human") && !outcome.needsHuman;
   const why = word || (resolved ? "needs-human resolved" : "");
-  const comment = [`psdd: ${from} → ${outcome.to === "not-planned" ? "closed as not planned" : outcome.to}${why ? ` (${why})` : ""}`];
+  const comment = [`norn: ${from} → ${outcome.to === "not-planned" ? "closed as not planned" : outcome.to}${why ? ` (${why})` : ""}`];
   const spec = await specLink(ctx, issue);
   if (spec) comment.push("", `Spec: ${spec}`);
-  // A story records its slug the first time psdd writes on it, triage included.
+  // A story records its slug the first time norn writes on it, triage included.
   const becomesStory = kindOf(issue) === "story" || (kindOf(issue) === "new" && outcome.to !== "not-planned");
   const slug = becomesStory ? await slugLine(ctx, issue) : null;
   if (slug) comment.push("", slug);
@@ -179,7 +179,7 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
   if (evidence) comment.push("", ...evidenceLines(await github.repoUrl(), evidence));
 
   // The new state is written before the old labels go, so a failure in between
-  // leaves an issue psdd can still act on, never one with no state.
+  // leaves an issue norn can still act on, never one with no state.
   if (outcome.to === "not-planned" || outcome.to === "closed") {
     await github.comment(n, comment.join("\n"));
     await github.closeIssue(n, outcome.to === "closed" ? "completed" : "not_planned");
@@ -205,7 +205,7 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
 
 /**
  * The automatic transitions after an outcome, run once its claim is released.
- * Each is best effort: psdd next repeats them, so a failure is only reported.
+ * Each is best effort: norn next repeats them, so a failure is only reported.
  */
 export async function followUps(ctx: Ctx, issue: Issue, outcome: Outcome): Promise<Event[]> {
   if (kindOf(issue) !== "slice" || outcome.to !== "closed") return [];
@@ -219,7 +219,7 @@ export async function followUps(ctx: Ctx, issue: Issue, outcome: Outcome): Promi
   return events;
 }
 
-/** Runs fn; a failure becomes an event instead of an error. `retry` is the story whose psdd next retries it. */
+/** Runs fn; a failure becomes an event instead of an error. `retry` is the story whose norn next retries it. */
 export async function bestEffort(what: FollowUpTask, issue: number, retry: number, fn: () => Promise<Event[]>): Promise<Event[]> {
   try {
     return await fn();
@@ -271,7 +271,7 @@ async function setState(ctx: Ctx, issue: Issue, to: State, why: string) {
   // A story from before the slug marker records it here, under the short claim.
   const slug = kindOf(issue) === "story" ? await slugLine(ctx, issue) : null;
   await ctx.github.addLabels(issue.number, [to]);
-  await ctx.github.comment(issue.number, `psdd: ${from} → ${to} (automatic)\n\n${why}${slug ? `\n\n${slug}` : ""}`);
+  await ctx.github.comment(issue.number, `norn: ${from} → ${to} (automatic)\n\n${why}${slug ? `\n\n${slug}` : ""}`);
   await ctx.github.removeLabels(issue.number, stateLabels(issue, to));
 }
 
@@ -294,7 +294,7 @@ export async function closeMergedStory(ctx: Ctx, story: Issue): Promise<boolean>
   const pr = await ctx.github.findPullRequest(branch);
   if (pr?.state !== "merged") return false;
   return withShortClaim(ctx, story.number, async () => {
-    await ctx.github.comment(story.number, `psdd: merge-queue → closed (automatic)\n\nThe story PR #${pr.number} is merged into ${pr.base}.`);
+    await ctx.github.comment(story.number, `norn: merge-queue → closed (automatic)\n\nThe story PR #${pr.number} is merged into ${pr.base}.`);
     await ctx.github.closeIssue(story.number, "completed");
     await ctx.github.removeLabels(story.number, ["in-progress", ...stateLabels(story)]);
   });

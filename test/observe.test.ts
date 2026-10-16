@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { done, observe, take } from "@psdd/core";
-import { setup } from "@psdd/testing";
+import { done, observe, take } from "@norn/core";
+import { setup } from "@norn/testing";
 
 /** alice's story #10 in implementation: #11 ready, #12 blocked by #11 in mode:hil. */
 function story() {
@@ -18,12 +18,12 @@ function story() {
 describe("observe: the board", () => {
   test("shows my story with its slices: state, mode, blockers, holder and fix rounds", async () => {
     const w = story();
-    await w.psdd("take", "11");
-    await w.psdd("done", "11");
+    await w.norn("take", "11");
+    await w.norn("done", "11");
     await w.as("reviewer")("take", "11");
     await w.as("reviewer")("done", "11", "request-changes", "Add a test");
     w.setNow("2026-10-13T12:30:00Z");
-    await w.psdd("take", "11");
+    await w.norn("take", "11");
 
     const res = await observe(await w.ctx(), {});
 
@@ -74,7 +74,7 @@ describe("observe: whose work", () => {
     w.github.seedIssue({ number: 30, title: "Carol's", labels: ["type:story", "implementation"], assignees: ["carol"] });
     expect((await observe(await w.ctx(), {})).board.map((s) => s.number)).toEqual([10]);
 
-    await w.psdd("take", "21");
+    await w.norn("take", "21");
 
     expect((await observe(await w.ctx(), {})).board.map((s) => s.number)).toEqual([10, 20]);
   });
@@ -104,11 +104,11 @@ describe("observe: waiting for me", () => {
     w.github.seedIssue({ number: 13, title: "Docs", labels: ["type:slice", "mode:hil", "needs-qa"], assignees: ["alice"] });
     w.github.parents.set(13, 10);
     w.setNow("2026-10-13T12:05:00Z");
-    await w.psdd("take", "13");
-    await w.psdd("done", "13", "pass", "All criteria pass");
+    await w.norn("take", "13");
+    await w.norn("done", "13", "pass", "All criteria pass");
     w.setNow("2026-10-13T12:10:00Z");
-    await w.psdd("take", "11");
-    await w.psdd("escalate", "11", "Which store?");
+    await w.norn("take", "11");
+    await w.norn("escalate", "11", "Which store?");
     // A teammate's story I hold an item of: theirs to act on, not mine.
     w.github.seedIssue({ number: 20, title: "Bob's", labels: ["type:story", "needs-review", "needs-human"], assignees: ["bob"] });
     await w.as("other")("take", "20");
@@ -132,7 +132,7 @@ describe("observe: waiting for me", () => {
 });
 
 describe("observe: outcomes and their remarks", () => {
-  test("each outcome is an event with its note and evidence as psdd wrote them", async () => {
+  test("each outcome is an event with its note and evidence as norn wrote them", async () => {
     const w = story();
     const at = (t: string) => w.setNow(`2026-10-13T${t}:00Z`);
     const ctx = await w.ctx();
@@ -166,7 +166,7 @@ describe("observe: outcomes and their remarks", () => {
       ["12:02", "review", "request-changes", 1, "1. **Add a test**\n2. Rename `x`"],
       ["12:01", "implementation", "done", null, null],
     ]);
-    const evidence = { branch: "psdd/qa/11", sha: w.github.pushed[0].sha, files: ["shot.png", "logs/run.txt"] };
+    const evidence = { branch: "norn/qa/11", sha: w.github.pushed[0].sha, files: ["shot.png", "logs/run.txt"] };
     expect(outcomes[0]).toMatchObject({
       issue: 11,
       story: 10,
@@ -191,7 +191,7 @@ describe("observe: the feed", () => {
     const tick = () => w.setNow(new Date(Date.parse("2026-10-13T12:00:00Z") + ++minute * 60_000).toISOString());
     const step = async (...argv: string[]) => {
       tick();
-      const r = await w.psdd(...argv);
+      const r = await w.norn(...argv);
       if (r.exitCode !== 0) throw new Error(r.stdout);
     };
     await step("take", "10");
@@ -221,7 +221,7 @@ describe("observe: the feed", () => {
     return w;
   }
 
-  test("tells the story's history in psdd's terms, each event with who did it and where", async () => {
+  test("tells the story's history in norn's terms, each event with who did it and where", async () => {
     const w = await history();
 
     const res = await observe(await w.ctx(), {});
@@ -273,7 +273,7 @@ describe("observe: the feed", () => {
     expect(res.feed.map((e) => e.kind)).toEqual(["slice", "outcome", "pr"]);
   });
 
-  test("a label change psdd does not know is other activity, with its label", async () => {
+  test("a label change norn does not know is other activity, with its label", async () => {
     const w = story();
     w.github.user = "bob";
     await w.github.addLabels(10, ["priority:high"]);
@@ -298,13 +298,13 @@ describe("observe: the feed", () => {
 describe("observe: claims", () => {
   test("claims are seen taken, released and gone stale by comparing reads; before the first, none are made up", async () => {
     const w = story();
-    await w.psdd("take", "11");
+    await w.norn("take", "11");
     const first = await observe(await w.ctx(), {});
     expect(first.feed.filter((e) => e.kind === "claim")).toEqual([]);
     expect(first.claims).toEqual([{ issue: 11, sha: expect.any(String), login: "alice", session: "session-1", since: "2026-10-13T12:00:00.000Z" }]);
 
     w.setNow("2026-10-13T12:05:00Z");
-    await w.psdd("release", "11");
+    await w.norn("release", "11");
     await w.github.removeLabels(12, ["blocked"]);
     await w.github.addLabels(12, ["ready-for-agent"]);
     await w.as("s2")("take", "12");
@@ -334,8 +334,8 @@ describe("observe: the story PR", () => {
     w.github.parents.set(41, 40);
     w.github.branches.add("40-last");
     w.github.prs.push({ number: 70, head: "40-last-41", base: "40-last", state: "merged" });
-    await w.psdd("take", "41");
-    await w.psdd("done", "41");
+    await w.norn("take", "41");
+    await w.norn("done", "41");
     w.setNow("2026-10-13T13:00:00Z");
     w.github.mergePullRequest(1000);
     await w.github.closeIssue(40, "completed");
@@ -353,7 +353,7 @@ describe("observe: the story PR", () => {
 });
 
 describe("observe: review fixes", () => {
-  test("outcomes psdd wrote in the same words each get their own fix round", async () => {
+  test("outcomes norn wrote in the same words each get their own fix round", async () => {
     const w = story();
     const ctx = await w.ctx();
     for (const note of ["A", "B"]) {
@@ -373,7 +373,7 @@ describe("observe: review fixes", () => {
 
   test("a claim that went stale before the last read is no new event", async () => {
     const w = story();
-    await w.psdd("take", "11");
+    await w.norn("take", "11");
     w.setNow("2026-10-13T14:00:30Z");
     const first = await observe(await w.ctx(), {});
 

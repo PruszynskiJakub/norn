@@ -4,94 +4,95 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 /*
- * shadcn/ui tokens, plus the few the dashboard adds. Calm by default: colour
+ * shadcn/ui tokens, plus the few the dashboard adds, in the norn icon's navy and
+ * gold (#14182E; #E8B44A, #F3DCA6, #C8862A). Calm by default: colour
  * only where the developer is needed (bad: escalated) or something is stuck
  * (warn: their QA, a quiet agent, a failed or sent-back outcome).
  */
 :root {
-  --background: #fbfbfa;
-  --foreground: #18181b;
+  --background: #faf8f3;
+  --foreground: #14182e;
   --card: #ffffff;
-  --card-foreground: #18181b;
-  --primary: #18181b;
-  --primary-foreground: #fafafa;
-  --secondary: #f4f4f3;
-  --secondary-foreground: #18181b;
-  --muted: #f4f4f3;
-  --muted-foreground: #71717a;
-  --accent: #f4f4f3;
-  --accent-foreground: #18181b;
-  --border: #ececea;
-  --input: #ececea;
-  --ring: #a1a1aa;
+  --card-foreground: #14182e;
+  --primary: #14182e;
+  --primary-foreground: #f3dca6;
+  --secondary: #f2eee4;
+  --secondary-foreground: #14182e;
+  --muted: #f2eee4;
+  --muted-foreground: #5e6382;
+  --accent: #f2eee4;
+  --accent-foreground: #14182e;
+  --border: #e7e1d3;
+  --input: #e7e1d3;
+  --ring: #c8862a;
   --radius: 0.75rem;
-  --soft: #3f3f46;
-  --faint: #a1a1aa;
-  --live: #2563eb;
-  --live-bg: #eef3fe;
-  --ok: #15803d;
-  --warn: #b45309;
-  --warn-bg: #fdf6ea;
-  --bad: #c2410c;
-  --bad-bg: #fdf1ea;
+  --soft: #2e3350;
+  --faint: #9a9cb2;
+  --live: #a8730f;
+  --live-bg: #f8edd2;
+  --ok: #2f7a4f;
+  --warn: #c2571a;
+  --warn-bg: #fbeee3;
+  --bad: #b8322a;
+  --bad-bg: #fbeae7;
   color-scheme: light;
 }
 
 .dark {
-  --background: #0c0c0d;
-  --foreground: #f4f4f5;
-  --card: #141416;
-  --card-foreground: #f4f4f5;
-  --primary: #f4f4f5;
-  --primary-foreground: #18181b;
-  --secondary: #1b1b1e;
-  --secondary-foreground: #f4f4f5;
-  --muted: #1b1b1e;
-  --muted-foreground: #a1a1aa;
-  --accent: #1b1b1e;
-  --accent-foreground: #f4f4f5;
-  --border: #232327;
-  --input: #232327;
-  --ring: #63636b;
-  --soft: #d4d4d8;
-  --faint: #63636b;
-  --live: #7aa7ff;
-  --live-bg: #16213a;
-  --ok: #6ccf8e;
-  --warn: #f0b860;
-  --warn-bg: #2a2010;
-  --bad: #fb923c;
-  --bad-bg: #2b170c;
+  --background: #0e1122;
+  --foreground: #f1ede4;
+  --card: #14182e;
+  --card-foreground: #f1ede4;
+  --primary: #e8b44a;
+  --primary-foreground: #14182e;
+  --secondary: #1c2140;
+  --secondary-foreground: #f1ede4;
+  --muted: #1c2140;
+  --muted-foreground: #a3a7c2;
+  --accent: #1c2140;
+  --accent-foreground: #f1ede4;
+  --border: #262c4e;
+  --input: #262c4e;
+  --ring: #c8862a;
+  --soft: #ddd8cc;
+  --faint: #626a91;
+  --live: #e8b44a;
+  --live-bg: #33291a;
+  --ok: #7fcf9a;
+  --warn: #ef9257;
+  --warn-bg: #33221a;
+  --bad: #f26b5b;
+  --bad-bg: #361c1d;
   color-scheme: dark;
 }
 
 /* Before the script runs, and whenever nobody chose: follow the system. */
 @media (prefers-color-scheme: dark) {
   :root:not(.light) {
-    --background: #0c0c0d;
-    --foreground: #f4f4f5;
-    --card: #141416;
-    --card-foreground: #f4f4f5;
-    --primary: #f4f4f5;
-    --primary-foreground: #18181b;
-    --secondary: #1b1b1e;
-    --secondary-foreground: #f4f4f5;
-    --muted: #1b1b1e;
-    --muted-foreground: #a1a1aa;
-    --accent: #1b1b1e;
-    --accent-foreground: #f4f4f5;
-    --border: #232327;
-    --input: #232327;
-    --ring: #63636b;
-    --soft: #d4d4d8;
-    --faint: #63636b;
-    --live: #7aa7ff;
-    --live-bg: #16213a;
-    --ok: #6ccf8e;
-    --warn: #f0b860;
-    --warn-bg: #2a2010;
-    --bad: #fb923c;
-    --bad-bg: #2b170c;
+    --background: #0e1122;
+    --foreground: #f1ede4;
+    --card: #14182e;
+    --card-foreground: #f1ede4;
+    --primary: #e8b44a;
+    --primary-foreground: #14182e;
+    --secondary: #1c2140;
+    --secondary-foreground: #f1ede4;
+    --muted: #1c2140;
+    --muted-foreground: #a3a7c2;
+    --accent: #1c2140;
+    --accent-foreground: #f1ede4;
+    --border: #262c4e;
+    --input: #262c4e;
+    --ring: #c8862a;
+    --soft: #ddd8cc;
+    --faint: #626a91;
+    --live: #e8b44a;
+    --live-bg: #33291a;
+    --ok: #7fcf9a;
+    --warn: #ef9257;
+    --warn-bg: #33221a;
+    --bad: #f26b5b;
+    --bad-bg: #361c1d;
     color-scheme: dark;
   }
 }

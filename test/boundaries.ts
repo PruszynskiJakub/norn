@@ -3,7 +3,7 @@ import { join, posix, relative } from "node:path";
 import ts from "typescript";
 
 /**
- * The layering rules between psdd's packages, checked from the imports in
+ * The layering rules between norn's packages, checked from the imports in
  * their sources. Each package's package.json dependencies are the allowlist.
  */
 
@@ -15,11 +15,11 @@ export interface Pkg {
   files: { path: string; source: string }[];
 }
 
-const CORE = "@psdd/core";
-const TESTING = "@psdd/testing";
-const ADAPTERS = ["@psdd/github-gh", "@psdd/workspace-local"];
+const CORE = "@norn/core";
+const TESTING = "@norn/testing";
+const ADAPTERS = ["@norn/github-gh", "@norn/workspace-local"];
 /** Packages that wire adapters to the core: the CLI and the dashboard now, later the runner, dispatcher and MCP server. */
-const FRONT_ENDS = ["@psdd/cli", "@psdd/web"];
+const FRONT_ENDS = ["@norn/cli", "@norn/web"];
 
 const ROOT = join(import.meta.dirname, "..");
 
@@ -47,7 +47,7 @@ function importsOf(source: string): string[] {
   return out;
 }
 
-/** The package a specifier names, e.g. @psdd/core for @psdd/core/x; null for a relative one. */
+/** The package a specifier names, e.g. @norn/core for @norn/core/x; null for a relative one. */
 function packageOf(specifier: string): string | null {
   if (specifier.startsWith(".")) return null;
   const parts = specifier.split("/");
@@ -88,7 +88,7 @@ export function boundaryViolations(pkgs: Pkg[]): string[] {
       }
     }
     for (const dep of pkg.dependencies) {
-      if (dep.startsWith("@psdd/") && !used.has(dep)) out.push(`${pkg.dir}/package.json → ${dep}: declared but never imported`);
+      if (dep.startsWith("@norn/") && !used.has(dep)) out.push(`${pkg.dir}/package.json → ${dep}: declared but never imported`);
     }
   }
   return out;
@@ -100,7 +100,7 @@ function sources(dir: string): string[] {
   );
 }
 
-/** psdd's packages as they are on disk. */
+/** norn's packages as they are on disk. */
 export function readPackages(): Pkg[] {
   return readdirSync(join(ROOT, "packages")).map((name) => {
     const dir = join(ROOT, "packages", name);

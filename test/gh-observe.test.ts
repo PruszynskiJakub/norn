@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { type Exec, GhError, GhGitHub, ghFailure } from "@psdd/github-gh";
+import { type Exec, GhError, GhGitHub, ghFailure } from "@norn/github-gh";
 
 const SHA = "a".repeat(40);
 const OTHER = "b".repeat(40);
@@ -32,7 +32,7 @@ const comment = (at: string, body: string, login = "alice") => ({
 });
 
 /** Scripted gh and git: `gh` answers each GraphQL call by what its query asks for. */
-function scripted(answer: (query: string, vars: Record<string, string>) => unknown, lsRemote = `${SHA}\trefs/psdd/claims/11\n`) {
+function scripted(answer: (query: string, vars: Record<string, string>) => unknown, lsRemote = `${SHA}\trefs/norn/claims/11\n`) {
   const calls: { args: string[]; query: string; vars: Record<string, string> }[] = [];
   const gh: Exec = async (args) => {
     const vars: Record<string, string> = {};
@@ -62,12 +62,12 @@ const QUERY = { user: "alice", closedSince: "2026-10-06T12:00:00.000Z", since: n
 
 describe("GhGitHub.observeWork", () => {
   test("reads the stories, their slices and the claim records in one GraphQL query, and the claim refs with git ls-remote", async () => {
-    const psdd = "psdd: needs-review → changes-requested (request-changes)\n\nAdd a test";
+    const norn = "norn: needs-review → changes-requested (request-changes)\n\nAdd a test";
     const slice = item(11, {
       blockedBy: page([{ number: 12, state: "CLOSED" }]),
       timelineItems: page([
         { __typename: "LabeledEvent", createdAt: "2026-10-13T12:00:00Z", actor: { login: "alice" }, label: { name: "changes-requested" } },
-        comment("2026-10-13T12:00:01Z", psdd),
+        comment("2026-10-13T12:00:01Z", norn),
         comment("2026-10-13T12:05:00Z", "Looks odd to me", "bob"),
         {
           __typename: "CrossReferencedEvent",
@@ -95,7 +95,7 @@ describe("GhGitHub.observeWork", () => {
 
     const work = await github.observeWork(QUERY);
 
-    expect(gitCalls).toEqual([["ls-remote", "origin", "refs/psdd/claims/*"]]);
+    expect(gitCalls).toEqual([["ls-remote", "origin", "refs/norn/claims/*"]]);
     expect(calls).toHaveLength(1);
     expect(calls[0].args.slice(0, 6)).toEqual(["api", "graphql", "-F", "owner={owner}", "-F", "name={repo}"]);
     expect(calls[0].vars).toEqual({ owner: "{owner}", name: "{repo}", user: "alice", closedSince: "2026-10-06T12:00:00.000Z" });
@@ -112,7 +112,7 @@ describe("GhGitHub.observeWork", () => {
       url: "https://github.com/acme/app/issues/11",
       closedAt: null,
       blockedBy: [{ number: 12, state: "closed" }],
-      psddComments: [{ body: psdd, at: "2026-10-13T12:00:01Z", actor: "alice", url: "https://github.com/acme/app/issues/10#c-2026-10-13T12:00:01Z" }],
+      nornComments: [{ body: norn, at: "2026-10-13T12:00:01Z", actor: "alice", url: "https://github.com/acme/app/issues/10#c-2026-10-13T12:00:01Z" }],
       pullRequests: [
         {
           number: 70,
@@ -128,18 +128,18 @@ describe("GhGitHub.observeWork", () => {
       ],
       timeline: [
         { kind: "labeled", label: "changes-requested", at: "2026-10-13T12:00:00Z", actor: "alice" },
-        { kind: "comment", at: "2026-10-13T12:00:01Z", actor: "alice", url: "https://github.com/acme/app/issues/10#c-2026-10-13T12:00:01Z", body: psdd },
+        { kind: "comment", at: "2026-10-13T12:00:01Z", actor: "alice", url: "https://github.com/acme/app/issues/10#c-2026-10-13T12:00:01Z", body: norn },
         { kind: "comment", at: "2026-10-13T12:05:00Z", actor: "bob", url: "https://github.com/acme/app/issues/10#c-2026-10-13T12:05:00Z", body: null },
         { kind: "other", at: "2026-10-13T12:06:00Z", actor: null, url: null, detail: "RenamedTitleEvent" },
       ],
     });
   });
 
-  test("with since, the timeline holds only later items while psdd's comments stay whole", async () => {
+  test("with since, the timeline holds only later items while norn's comments stay whole", async () => {
     const story = item(10, {
       labels: page([{ name: "type:story" }]),
       timelineItems: page([
-        comment("2026-10-13T12:00:00Z", "psdd: slug x"),
+        comment("2026-10-13T12:00:00Z", "norn: slug x"),
         { __typename: "ClosedEvent", createdAt: "2026-10-13T13:00:00Z", actor: { login: "alice" } },
       ]),
       subIssues: page([]),
@@ -149,7 +149,7 @@ describe("GhGitHub.observeWork", () => {
     const [s] = (await github.observeWork({ ...QUERY, since: "2026-10-13T12:30:00Z" })).stories;
 
     expect(s.timeline).toEqual([{ kind: "closed", at: "2026-10-13T13:00:00Z", actor: "alice" }]);
-    expect(s.psddComments.map((c) => c.body)).toEqual(["psdd: slug x"]);
+    expect(s.nornComments.map((c) => c.body)).toEqual(["norn: slug x"]);
   });
 
   test("follows every page: stories, sub-issues and timelines", async () => {
@@ -175,7 +175,7 @@ describe("GhGitHub.observeWork", () => {
   });
 
   test("a claim of mine on an item outside my stories brings its story in", async () => {
-    const lines = `${SHA}\trefs/psdd/claims/31\n${OTHER}\trefs/psdd/claims/41\nffff\trefs/heads/main\n`;
+    const lines = `${SHA}\trefs/norn/claims/31\n${OTHER}\trefs/norn/claims/41\nffff\trefs/heads/main\n`;
     const bobs = item(30, { labels: page([{ name: "type:story" }]), assignees: page([{ login: "bob" }]), subIssues: page([item(31)]) });
     const { github, calls } = scripted((query) => {
       if (query.includes("x0: issue(number: 31)")) return { data: { repository: { x0: { ...item(31), parent: bobs } } } };

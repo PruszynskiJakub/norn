@@ -2,12 +2,12 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { SKILLS } from "@psdd/cli";
-import { setup } from "@psdd/testing";
+import { SKILLS } from "@norn/cli";
+import { setup } from "@norn/testing";
 
 /**
  * Pins the exact text and --json output of every command, refusals included,
- * so a change to how psdd builds its answers cannot change what it prints.
+ * so a change to how norn builds its answers cannot change what it prints.
  */
 
 type World = ReturnType<typeof setup>;
@@ -17,7 +17,7 @@ interface Scenario {
   arrange?: (w: World) => unknown;
   argv: string[];
   /** Runs the command somewhere other than the default harness, e.g. in a project directory for init. */
-  via?: (w: World) => (...argv: string[]) => ReturnType<World["psdd"]>;
+  via?: (w: World) => (...argv: string[]) => ReturnType<World["norn"]>;
 }
 
 /** Story #123 in implementation with slices in most states, and branches on GitHub. */
@@ -32,7 +32,7 @@ function story(w: World) {
   gh.seedIssue({ number: 134, title: "Old", state: "closed", stateReason: "completed", labels: ["type:slice", "mode:afk"] });
   for (const s of [127, 128, 131, 132, 133, 134]) gh.parents.set(s, 123);
   gh.blockers.set(131, [127]);
-  gh.commentsByIssue.set(123, ["psdd: needs-slicing → implementation\n\npsdd: slug rate-limiting"]);
+  gh.commentsByIssue.set(123, ["norn: needs-slicing → implementation\n\nnorn: slug rate-limiting"]);
   gh.branches.add("123-rate-limiting");
 }
 
@@ -50,12 +50,12 @@ const scenarios: Scenario[] = [
   { name: "unknown command", argv: ["frobnicate"] },
   { name: "missing issue number", argv: ["take"] },
   // Node words most JSON errors differently from version to version; this one reads the same on every Node from 20 on.
-  { name: "bad config", arrange: (w) => w.workspace.files.set(".agents/psdd.config.json", "nope"), argv: ["status", "1"] },
+  { name: "bad config", arrange: (w) => w.workspace.files.set(".agents/norn.config.json", "nope"), argv: ["status", "1"] },
   {
     name: "config problems",
     arrange: (w) => {
-      w.workspace.files.set(".agents/psdd.config.json", JSON.stringify({ foo: 1, notifications: "os", deliver: { maxParallel: 0 } }));
-      w.workspace.files.set(".agents/psdd.config.local.json", JSON.stringify({ worktrees: { provider: "tmux" } }));
+      w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ foo: 1, notifications: "os", deliver: { maxParallel: 0 } }));
+      w.workspace.files.set(".agents/norn.config.local.json", JSON.stringify({ worktrees: { provider: "tmux" } }));
     },
     argv: ["status", "1"],
   },
@@ -63,14 +63,14 @@ const scenarios: Scenario[] = [
     name: "config warnings before the answer",
     arrange: (w) => {
       w.github.seedIssue({ number: 1, title: "A story", labels: ["type:story", "needs-plan"] });
-      w.workspace.files.set(".agents/psdd.config.json", JSON.stringify({ claims: { staleAfter: "1m" } }));
-      w.workspace.files.set(".agents/psdd.config.local.json", JSON.stringify({ deliver: { maxFixRounds: 2 } }));
+      w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ claims: { staleAfter: "1m" } }));
+      w.workspace.files.set(".agents/norn.config.local.json", JSON.stringify({ deliver: { maxFixRounds: 2 } }));
     },
     argv: ["status", "1"],
   },
   {
     name: "provider refusal",
-    arrange: (w) => w.workspace.files.set(".agents/psdd.config.local.json", JSON.stringify({ worktrees: { provider: "herdr" } })),
+    arrange: (w) => w.workspace.files.set(".agents/norn.config.local.json", JSON.stringify({ worktrees: { provider: "herdr" } })),
     argv: ["next", "1"],
   },
 
@@ -79,7 +79,7 @@ const scenarios: Scenario[] = [
     name: "init",
     argv: ["init"],
     via: (w) => {
-      const cwd = mkdtempSync(join(tmpdir(), "psdd-char-"));
+      const cwd = mkdtempSync(join(tmpdir(), "norn-char-"));
       return w.withProject(cwd, async (dir) => {
         for (const name of SKILLS) {
           mkdirSync(join(dir, "skills", name), { recursive: true });
@@ -92,7 +92,7 @@ const scenarios: Scenario[] = [
   {
     name: "init with missing skills",
     argv: ["init"],
-    via: (w) => w.withProject(mkdtempSync(join(tmpdir(), "psdd-char-")), async () => []),
+    via: (w) => w.withProject(mkdtempSync(join(tmpdir(), "norn-char-")), async () => []),
   },
 
   // status
@@ -140,7 +140,7 @@ const scenarios: Scenario[] = [
     name: "next with every slot taken",
     arrange: (w) => {
       story(w);
-      w.workspace.files.set(".agents/psdd.config.json", JSON.stringify({ deliver: { maxParallel: 1 } }));
+      w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ deliver: { maxParallel: 1 } }));
       w.github.claims.set(128, { holder: "alice", session: "other", since: "2026-10-13T11:00:00Z" });
     },
     argv: ["next", "123"],
@@ -154,7 +154,7 @@ const scenarios: Scenario[] = [
       w.github.seedIssue({ number: 23, title: "Human QA", labels: ["type:slice", "mode:hil", "needs-human-qa"] });
       for (const s of [21, 22, 23]) w.github.parents.set(s, 20);
       w.github.blockers.set(22, [21]);
-      w.github.commentsByIssue.set(21, ['psdd: needs-review → needs-review\n\npsdd: needs-human — escalated: "flaky"']);
+      w.github.commentsByIssue.set(21, ['norn: needs-review → needs-review\n\nnorn: needs-human — escalated: "flaky"']);
       w.github.branches.add("20-waits");
     },
     argv: ["next", "20"],
@@ -278,7 +278,7 @@ const scenarios: Scenario[] = [
     name: "take again while holding",
     arrange: async (w) => {
       slicing(w);
-      await w.psdd("take", "50");
+      await w.norn("take", "50");
     },
     argv: ["take", "50"],
   },
@@ -349,7 +349,7 @@ const scenarios: Scenario[] = [
     name: "done without an outcome",
     arrange: async (w) => {
       w.github.seedIssue({ number: 7, title: "New" });
-      await w.psdd("take", "7");
+      await w.norn("take", "7");
     },
     argv: ["done", "7"],
   },
@@ -357,7 +357,7 @@ const scenarios: Scenario[] = [
     name: "done with an unknown outcome",
     arrange: async (w) => {
       w.github.seedIssue({ number: 60, title: "QA me", labels: ["type:slice", "mode:afk", "needs-qa"] });
-      await w.psdd("take", "60");
+      await w.norn("take", "60");
     },
     argv: ["done", "60", "maybe"],
   },
@@ -365,7 +365,7 @@ const scenarios: Scenario[] = [
     name: "done without the note",
     arrange: async (w) => {
       w.github.seedIssue({ number: 60, title: "QA me", labels: ["type:slice", "mode:afk", "needs-qa"] });
-      await w.psdd("take", "60");
+      await w.norn("take", "60");
     },
     argv: ["done", "60", "fail"],
   },
@@ -373,7 +373,7 @@ const scenarios: Scenario[] = [
     name: "done with evidence on a step that takes none",
     arrange: async (w) => {
       w.github.seedIssue({ number: 7, title: "New" });
-      await w.psdd("take", "7");
+      await w.norn("take", "7");
     },
     argv: ["done", "7", "accept", "--evidence", "out"],
   },
@@ -384,7 +384,7 @@ const scenarios: Scenario[] = [
         w.github.seedIssue({ number: 60, title: "QA me", labels: ["type:slice", "mode:afk", "needs-qa"] });
         if (kind === "empty") w.workspace.evidence.set("out", []);
         if (kind === "big") w.workspace.evidence.set("out", [{ path: "huge.log", content: Buffer.alloc(26 * 1024 * 1024) }]);
-        await w.psdd("take", "60");
+        await w.norn("take", "60");
       },
       argv: ["done", "60", "pass", "ok", "--evidence", "out"],
     }),
@@ -399,7 +399,7 @@ const scenarios: Scenario[] = [
         { path: "shot.png", content: Buffer.from("png") },
         { path: "run.log", content: Buffer.from("log") },
       ]);
-      await w.psdd("take", "60");
+      await w.norn("take", "60");
     },
     argv: ["done", "60", "pass", "all good", "--evidence", "out"],
   },
@@ -407,7 +407,7 @@ const scenarios: Scenario[] = [
     name: "done slicing without slices",
     arrange: async (w) => {
       slicing(w);
-      await w.psdd("take", "50");
+      await w.norn("take", "50");
     },
     argv: ["done", "50"],
   },
@@ -415,8 +415,8 @@ const scenarios: Scenario[] = [
     name: "done slicing creates the story branch",
     arrange: async (w) => {
       slicing(w);
-      await w.psdd("take", "50");
-      await w.psdd("add-slice", "50", "First", "--mode", "afk");
+      await w.norn("take", "50");
+      await w.norn("add-slice", "50", "First", "--mode", "afk");
     },
     argv: ["done", "50"],
   },
@@ -424,8 +424,8 @@ const scenarios: Scenario[] = [
     name: "done slicing without the base branch",
     arrange: async (w) => {
       slicing(w);
-      await w.psdd("take", "50");
-      await w.psdd("add-slice", "50", "First", "--mode", "afk");
+      await w.norn("take", "50");
+      await w.norn("add-slice", "50", "First", "--mode", "afk");
       w.github.branches.delete("main");
     },
     argv: ["done", "50"],
@@ -443,7 +443,7 @@ const scenarios: Scenario[] = [
       arrange: async (w) => {
         story(w);
         if (pr) w.github.prs.push({ number: 70, head: "123-rate-limiting-127", ...pr });
-        await w.psdd("take", "127");
+        await w.norn("take", "127");
       },
       argv: ["done", "127"],
     }),
@@ -452,7 +452,7 @@ const scenarios: Scenario[] = [
     name: "done merge of a slice outside a story",
     arrange: async (w) => {
       w.github.seedIssue({ number: 80, title: "Orphan", labels: ["type:slice", "mode:afk", "merge-queue"] });
-      await w.psdd("take", "80");
+      await w.norn("take", "80");
     },
     argv: ["done", "80"],
   },
@@ -462,7 +462,7 @@ const scenarios: Scenario[] = [
       story(w);
       w.github.prs.push({ number: 70, head: "123-rate-limiting-127", base: "123-rate-limiting", state: "merged" });
       w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting-127");
-      await w.psdd("take", "127");
+      await w.norn("take", "127");
     },
     argv: ["done", "127"],
   },
@@ -474,7 +474,7 @@ const scenarios: Scenario[] = [
       w.github.parents.set(41, 40);
       w.github.branches.add("40-last");
       w.github.prs.push({ number: 70, head: "40-last-41", base: "40-last", state: "merged" });
-      await w.psdd("take", "41");
+      await w.norn("take", "41");
     },
     argv: ["done", "41"],
   },
@@ -486,7 +486,7 @@ const scenarios: Scenario[] = [
       w.github.parents.set(41, 40);
       w.github.branches.add("40-last");
       w.github.prs.push({ number: 70, head: "40-last-41", base: "40-last", state: "merged" });
-      await w.psdd("take", "41");
+      await w.norn("take", "41");
       w.github.createPullRequest = async () => {
         throw new Error("HTTP 502");
       };
@@ -497,7 +497,7 @@ const scenarios: Scenario[] = [
     name: "done triage accept",
     arrange: async (w) => {
       w.github.seedIssue({ number: 7, title: "New" });
-      await w.psdd("take", "7");
+      await w.norn("take", "7");
     },
     argv: ["done", "7", "accept"],
   },
@@ -505,7 +505,7 @@ const scenarios: Scenario[] = [
     name: "done triage reject",
     arrange: async (w) => {
       w.github.seedIssue({ number: 7, title: "New" });
-      await w.psdd("take", "7");
+      await w.norn("take", "7");
     },
     argv: ["done", "7", "reject", "duplicate of #3"],
   },
@@ -515,7 +515,7 @@ const scenarios: Scenario[] = [
       story(w);
       w.github.seedIssue({ number: 65, title: "Hil", labels: ["type:slice", "mode:hil", "needs-qa"] });
       w.github.parents.set(65, 123);
-      await w.psdd("take", "65");
+      await w.norn("take", "65");
     },
     argv: ["done", "65", "pass", "checked"],
   },
@@ -524,11 +524,11 @@ const scenarios: Scenario[] = [
     arrange: async (w) => {
       story(w);
       w.github.commentsByIssue.set(128, [
-        "psdd: needs-review → changes-requested (request-changes)",
-        "psdd: needs-review → changes-requested (request-changes)",
-        "psdd: needs-review → changes-requested (request-changes)",
+        "norn: needs-review → changes-requested (request-changes)",
+        "norn: needs-review → changes-requested (request-changes)",
+        "norn: needs-review → changes-requested (request-changes)",
       ]);
-      await w.psdd("take", "128");
+      await w.norn("take", "128");
     },
     argv: ["done", "128", "request-changes", "still broken"],
   },
@@ -536,7 +536,7 @@ const scenarios: Scenario[] = [
     name: "done review requests changes",
     arrange: async (w) => {
       story(w);
-      await w.psdd("take", "128");
+      await w.norn("take", "128");
     },
     argv: ["done", "128", "request-changes", "fix the header"],
   },
@@ -544,7 +544,7 @@ const scenarios: Scenario[] = [
     name: "done resolving needs-human",
     arrange: async (w) => {
       w.github.seedIssue({ number: 64, title: "Stuck", labels: ["type:story", "needs-clarification", "needs-human"] });
-      await w.psdd("take", "64");
+      await w.norn("take", "64");
     },
     argv: ["done", "64"],
   },
@@ -556,7 +556,7 @@ const scenarios: Scenario[] = [
     name: "escalate",
     arrange: async (w) => {
       slicing(w);
-      await w.psdd("take", "50");
+      await w.norn("take", "50");
     },
     argv: ["escalate", "50", "the spec\ncontradicts itself"],
   },
@@ -567,7 +567,7 @@ const scenarios: Scenario[] = [
     name: "release",
     arrange: async (w) => {
       slicing(w);
-      await w.psdd("take", "50");
+      await w.norn("take", "50");
     },
     argv: ["release", "50"],
   },
@@ -579,7 +579,7 @@ const scenarios: Scenario[] = [
     name: "add-slice outside slicing",
     arrange: async (w) => {
       w.github.seedIssue({ number: 32, title: "Refine me", labels: ["type:story", "needs-refinement"] });
-      await w.psdd("take", "32");
+      await w.norn("take", "32");
     },
     argv: ["add-slice", "32", "Title", "--mode", "afk"],
   },
@@ -587,7 +587,7 @@ const scenarios: Scenario[] = [
     name: "add-slice",
     arrange: async (w) => {
       slicing(w);
-      await w.psdd("take", "50");
+      await w.norn("take", "50");
     },
     argv: ["add-slice", "50", "First", "--mode", "hil"],
   },
@@ -597,7 +597,7 @@ const scenarios: Scenario[] = [
       slicing(w);
       w.github.seedIssue({ number: 51, title: "Before" });
       w.github.seedIssue({ number: 52, title: "Done before", state: "closed" });
-      await w.psdd("take", "50");
+      await w.norn("take", "50");
     },
     argv: ["add-slice", "50", "Second", "--mode", "afk", "--blocked-by", "51", "--blocked-by", "52"],
   },
@@ -618,13 +618,13 @@ const scenarios: Scenario[] = [
         w.workspace.worktrees.add(`.agents/worktrees/${b}`);
       }
       w.workspace.dirty.add(".agents/worktrees/123-rate-limiting-128");
-      w.github.branches.add("psdd/qa/127");
+      w.github.branches.add("norn/qa/127");
       w.github.claims.set(127, { holder: "bob", session: "s", since: "2026-10-13T11:30:00Z" });
       w.workspace.fetchRemote = async () => {
         throw new Error("offline");
       };
       w.github.deleteBranch = async (b) => {
-        if (b === "psdd/qa/127") throw new Error("protected");
+        if (b === "norn/qa/127") throw new Error("protected");
         w.github.branches.delete(b);
       };
     },
@@ -647,8 +647,8 @@ describe("output of every command, text and --json", () => {
     for (const json of [false, true]) {
       const w = setup();
       await s.arrange?.(w);
-      const psdd = s.via ? s.via(w) : w.psdd;
-      const res = await psdd(...s.argv, ...(json ? ["--json"] : []));
+      const norn = s.via ? s.via(w) : w.norn;
+      const res = await norn(...s.argv, ...(json ? ["--json"] : []));
       expect(`exit ${res.exitCode}\n${res.stdout}`).toMatchSnapshot(json ? "json" : "text");
     }
   });

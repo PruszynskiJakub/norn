@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { makeNotifier, type Run } from "@psdd/workspace-local";
+import { makeNotifier, type Run } from "@norn/workspace-local";
 
 function recording(code = 0) {
   const calls: [string, string[]][] = [];
@@ -12,7 +12,7 @@ function recording(code = 0) {
   return { run, calls, envs };
 }
 
-const msg = { title: "psdd: #131 needs you", body: 'escalated: "it\'s \\"broken\\""\nhttps://x/131' };
+const msg = { title: "norn: #131 needs you", body: 'escalated: "it\'s \\"broken\\""\nhttps://x/131' };
 
 describe("local notifier", () => {
   test("herdr shows a notification with the request sound", async () => {
@@ -40,9 +40,9 @@ describe("local notifier", () => {
     expect(calls[0][0]).toBe("powershell");
     const script = calls[0][1].at(-1)!;
     expect(script).toContain("ToastNotificationManager");
-    expect(script).toContain("$env:PSDD_BODY");
+    expect(script).toContain("$env:NORN_BODY");
     for (const ch of ["\u2018", "\u2019", "\u201a", "\u201b", "it's", "Remove-Item"]) expect(script).not.toContain(ch);
-    expect(envs[0]).toEqual({ PSDD_TITLE: "it's", PSDD_BODY: body });
+    expect(envs[0]).toEqual({ NORN_TITLE: "it's", NORN_BODY: body });
   });
 
   test("a failing tool is an error for the caller to swallow", async () => {

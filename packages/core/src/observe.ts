@@ -22,7 +22,7 @@ export interface BoardItem {
   url: string;
   /** Closed issues: merged, or closed without merging. */
   status: "open" | "merged" | "closed";
-  /** The state labels of an open issue. More than one means psdd cannot tell which is real. */
+  /** The state labels of an open issue. More than one means norn cannot tell which is real. */
   states: State[];
   /** Every label on the issue, as GitHub has them, in its order. */
   labels: string[];
@@ -34,7 +34,7 @@ export interface BoardItem {
   fixRounds: number;
   maxFixRounds: number;
   needsHuman: boolean;
-  /** The reason psdd recorded for needs-human, opaque; null without one. */
+  /** The reason norn recorded for needs-human, opaque; null without one. */
   needsHumanReason: string | null;
   /** A person QAs it before it merges: every story, and a slice in mode:hil. */
   humanQa: boolean;
@@ -55,9 +55,9 @@ export interface WaitingItem {
   story: number;
   title: string;
   kind: "needs-human" | "needs-human-qa";
-  /** The reason psdd recorded for needs-human, opaque; null for needs-human-qa or a flag set by hand. */
+  /** The reason norn recorded for needs-human, opaque; null for needs-human-qa or a flag set by hand. */
   reason: string | null;
-  /** When it started waiting, as psdd's comments record it; null when unknown. */
+  /** When it started waiting, as norn's comments record it; null when unknown. */
   since: string | null;
   /** What to tell an agent, e.g. "drive 61". */
   command: string;
@@ -85,7 +85,7 @@ export interface Observation {
 const WEEK_MS = 7 * 86_400_000;
 
 /**
- * The developer's psdd work in this repository, read in one go: the board,
+ * The developer's norn work in this repository, read in one go: the board,
  * what waits for them and what happened. Makes no changes. With `since`, the
  * feed holds only what happened after it; with `previous`, the last read, it
  * also says which claims were taken, released or went stale.
@@ -103,7 +103,7 @@ export async function observe(ctx: Ctx, opts: { since?: string | null; previous?
   };
   const item = (i: ObservedIssue, story: boolean): BoardItem => {
     const closed = i.state === "closed";
-    const bodies = i.psddComments.map((c) => c.body);
+    const bodies = i.nornComments.map((c) => c.body);
     return {
       number: i.number,
       title: i.title,
@@ -132,7 +132,7 @@ export async function observe(ctx: Ctx, opts: { since?: string | null; previous?
     [s, ...s.subIssues].some((i) => claims.get(i.number)?.holder === me) ||
     (s.assignees.includes(me) && (s.state === "open" || (s.closedAt ?? "") >= closedSince));
   const board: BoardStory[] = work.stories.filter(mine).map((s) => {
-    const slug = recordedSlug(s.psddComments.map((c) => c.body)) ?? slugify(s.title);
+    const slug = recordedSlug(s.nornComments.map((c) => c.body)) ?? slugify(s.title);
     return {
       ...item(s, true),
       owner: s.assignees[0] ?? null,
@@ -146,8 +146,8 @@ export async function observe(ctx: Ctx, opts: { since?: string | null; previous?
       if (i.state !== "open") continue;
       const kind = i.labels.includes("needs-human") ? "needs-human" : stateOf(i) === "needs-human-qa" ? "needs-human-qa" : null;
       if (!kind) continue;
-      const bodies = i.psddComments.map((c) => c.body);
-      const entered = [...i.psddComments]
+      const bodies = i.nornComments.map((c) => c.body);
+      const entered = [...i.nornComments]
         .reverse()
         .find((c) => (kind === "needs-human" ? needsHumanIn(c.body) !== null : parseTransitionComment(c.body)?.to === "needs-human-qa"));
       waiting.push({

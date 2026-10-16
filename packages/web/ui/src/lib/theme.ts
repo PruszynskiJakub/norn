@@ -1,6 +1,6 @@
 export type Theme = "light" | "dark";
 
-const KEY = "psdd-dashboard-theme";
+const KEY = "norn-dashboard-theme";
 
 function systemTheme(): Theme {
   return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";

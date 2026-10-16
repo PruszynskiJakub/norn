@@ -1,5 +1,5 @@
 {
-  "name": "@psdd/web",
+  "name": "@norn/web",
   "version": "0.0.0",
   "private": true,
   "description": "The local dashboard: an HTTP server over the core read model, and its React UI.",
@@ -11,9 +11,9 @@
     "build:ui": "vite build --config ui/vite.config.ts"
   },
   "dependencies": {
-    "@psdd/core": "0.0.0",
-    "@psdd/github-gh": "0.0.0",
-    "@psdd/workspace-local": "0.0.0"
+    "@norn/core": "0.0.0",
+    "@norn/github-gh": "0.0.0",
+    "@norn/workspace-local": "0.0.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",

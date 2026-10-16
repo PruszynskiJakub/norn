@@ -1,4 +1,4 @@
-import type { BoardItem } from "@psdd/core";
+import type { BoardItem } from "@norn/core";
 import type { ReactNode } from "react";
 import { cn } from "../lib/utils.ts";
 import { type Dot, dotOf, isDone } from "../model.ts";
@@ -55,7 +55,7 @@ export function Sidebar({ loading }: { loading: boolean }) {
   return (
     <nav aria-label="Stories">
       <div className="flex flex-col px-2.5 pb-[18px]">
-        <b className="text-[15px] tracking-[-0.01em]">psdd</b>
+        <b className="text-[15px] tracking-[-0.01em]">norn</b>
         <span className="truncate text-[12px] text-faint">{state.repoUrl?.replace(/^https?:\/\/(www\.)?github\.com\//, "") ?? ""}</span>
       </div>
       <NavRow n={null} kind="top">

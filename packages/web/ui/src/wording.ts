@@ -1,6 +1,6 @@
 // The dashboard's renderer: every sentence the page shows is worded here, from
 // the typed read model, so the rest of the UI only lays words out.
-import type { BoardItem, ClaimHolder, FeedEvent, State, WaitingItem } from "@psdd/core";
+import type { BoardItem, ClaimHolder, FeedEvent, State, WaitingItem } from "@norn/core";
 import type { DashboardState, PollFailure } from "../../src/contract.ts";
 import { stateOf } from "./model.ts";
 
@@ -102,7 +102,7 @@ function otherActivity(e: Extract<FeedEvent, { kind: "other-activity" }>): strin
   return `other activity: ${e.detail}${e.label ? ` (${e.label})` : ""}`;
 }
 
-/** A routine event in psdd's own terms: "needs-qa → qa-failed", "claim taken". */
+/** A routine event in norn's own terms: "needs-qa → qa-failed", "claim taken". */
 export function routineText(e: FeedEvent): string {
   switch (e.kind) {
     case "step":
@@ -128,7 +128,7 @@ export function routineText(e: FeedEvent): string {
   }
 }
 
-/** A significant event as a plain sentence; anything else keeps psdd's terms. */
+/** A significant event as a plain sentence; anything else keeps norn's terms. */
 export function sentence(e: FeedEvent, me: string | null): string {
   switch (e.kind) {
     case "outcome":
@@ -155,7 +155,7 @@ export function roundNote(e: FeedEvent): string | null {
   return `round ${e.fixRound} of ${e.maxFixRounds}`;
 }
 
-/** The reason under an escalation, when psdd recorded one. */
+/** The reason under an escalation, when norn recorded one. */
 export function escalationReason(e: FeedEvent): string | null {
   return e.kind === "needs-human" && e.action === "raised" ? e.reason : null;
 }
@@ -210,7 +210,7 @@ export function stateSentence(x: BoardItem): string {
   const s = stateOf(x);
   if (s === "merged") return "Merged";
   if (s === "closed") return "Closed without merging";
-  if (s === null) return x.states.length ? `Its state labels disagree: ${x.states.join(" and ")}` : "Has no psdd state label";
+  if (s === null) return x.states.length ? `Its state labels disagree: ${x.states.join(" and ")}` : "Has no norn state label";
   return stateWords(s);
 }
 
@@ -322,7 +322,7 @@ const COUNTS = ["Nothing", "One thing", "Two things", "Three things", "Four thin
 
 export function heroTitle(n: number): string {
   const count = COUNTS[n] ?? `${n} things`;
-  return `${count} ${n === 1 ? "needs" : "need"} you${n ? "" : " right now"}`;
+  return `${count} ${n <= 1 ? "needs" : "need"} you${n ? "" : " right now"}`;
 }
 
 export function heroSub(working: number, quiet: number): string {
@@ -341,11 +341,11 @@ export function failureNotice(err: NonNullable<DashboardState["lastError"]>, las
 function failureWords(reason: PollFailure, detail: string): string {
   switch (reason) {
     case "auth":
-      return "GitHub didn't accept psdd's credentials: run gh auth login, then refresh.";
+      return "GitHub didn't accept norn's credentials: run gh auth login, then refresh.";
     case "rate-limit":
-      return "Hit GitHub's rate limit; psdd tries again at the next poll.";
+      return "Hit GitHub's rate limit; norn tries again at the next poll.";
     case "network":
-      return "Can't reach GitHub; psdd tries again at the next poll.";
+      return "Can't reach GitHub; norn tries again at the next poll.";
     case "other":
       return `Reading GitHub failed: ${detail}`;
     default:
@@ -353,14 +353,14 @@ function failureWords(reason: PollFailure, detail: string): string {
   }
 }
 
-export const SERVER_GONE = "Can't reach the dashboard server. Is psdd dashboard still running?";
+export const SERVER_GONE = "Can't reach the dashboard server. Is norn dashboard still running?";
 
 export function updatedLabel(lastUpdated: string | null, now: number): string {
   return lastUpdated ? `Updated ${ago(lastUpdated, now)}` : "Not updated yet";
 }
 
 export function pollHint(intervalMs: number): string {
-  return `psdd reads GitHub every ${duration(intervalMs)}; click to read now`;
+  return `norn reads GitHub every ${duration(intervalMs)}; click to read now`;
 }
 
 export function feedTitle(selected: boolean): string {

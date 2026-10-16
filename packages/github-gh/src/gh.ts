@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { ClaimRecord, FileToPush, GitHub, Issue, PullRequest, WorkQuery } from "@psdd/core";
+import type { ClaimRecord, FileToPush, GitHub, Issue, PullRequest, WorkQuery } from "@norn/core";
 import { observeWork } from "./observe-work.js";
 
 export type Exec = (args: string[], input?: string) => Promise<{ code: number; stdout: string; stderr: string }>;
@@ -283,7 +283,7 @@ export class GhGitHub implements GitHub {
     const sha = await this.claimCommit(record, [fromSha]);
     try {
       // Not forced: GitHub only moves the ref if the new commit descends from where it points now.
-      await this.api("PATCH", `${REPO}/git/refs/psdd/claims/${n}`, { sha, force: false });
+      await this.api("PATCH", `${REPO}/git/refs/norn/claims/${n}`, { sha, force: false });
       return true;
     } catch (e) {
       if (e instanceof GhError && e.status === 422) return false;
@@ -293,7 +293,7 @@ export class GhGitHub implements GitHub {
   async createClaim(n: number, record: ClaimRecord) {
     const sha = await this.claimCommit(record);
     try {
-      await this.api("POST", `${REPO}/git/refs`, { ref: `refs/psdd/claims/${n}`, sha });
+      await this.api("POST", `${REPO}/git/refs`, { ref: `refs/norn/claims/${n}`, sha });
       return true;
     } catch (e) {
       if (e instanceof GhError && e.status === 422) return false;
@@ -301,21 +301,21 @@ export class GhGitHub implements GitHub {
     }
   }
   async readClaim(n: number) {
-    const ref = await this.find<{ object: { sha: string } }>(`${REPO}/git/ref/psdd/claims/${n}`);
+    const ref = await this.find<{ object: { sha: string } }>(`${REPO}/git/ref/norn/claims/${n}`);
     if (!ref) return null;
     const commit = await this.api<{ message: string }>("GET", `${REPO}/git/commits/${ref.object.sha}`);
     return { ...(JSON.parse(commit.message) as ClaimRecord), sha: ref.object.sha };
   }
   async listClaims() {
-    const refs = await this.paginate<{ ref: string }>(`${REPO}/git/matching-refs/psdd/claims`);
+    const refs = await this.paginate<{ ref: string }>(`${REPO}/git/matching-refs/norn/claims`);
     return refs
-      .map((r) => /^refs\/psdd\/claims\/(\d+)$/.exec(r.ref))
+      .map((r) => /^refs\/norn\/claims\/(\d+)$/.exec(r.ref))
       .filter((m) => m !== null)
       .map((m) => Number(m[1]));
   }
   async deleteClaim(n: number) {
     try {
-      await this.api("DELETE", `${REPO}/git/refs/psdd/claims/${n}`);
+      await this.api("DELETE", `${REPO}/git/refs/norn/claims/${n}`);
     } catch (e) {
       if (!(e instanceof GhError && (e.status === 404 || e.status === 422))) throw e;
     }
@@ -330,7 +330,7 @@ export class GhGitHub implements GitHub {
     };
     const lsRemote = async () => {
       // Free against the API limit, unlike listing the refs through it.
-      const args = ["ls-remote", "origin", "refs/psdd/claims/*"];
+      const args = ["ls-remote", "origin", "refs/norn/claims/*"];
       const r = await this.git(args);
       if (r.code !== 0) throw new GhError(["(git)", ...args], r.stderr);
       return r.stdout;

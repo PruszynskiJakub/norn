@@ -1,4 +1,4 @@
-import type { Provider, Workspace } from "@psdd/core";
+import type { Provider, Workspace } from "@norn/core";
 
 export class FakeWorkspace implements Workspace {
   root = "/repo";
@@ -59,7 +59,7 @@ export class FakeWorkspace implements Workspace {
   async fetchRemote() {
     this.fetched++;
   }
-  /** Evidence directories by the path psdd is given. */
+  /** Evidence directories by the path norn is given. */
   evidence = new Map<string, { path: string; content: Buffer }[]>();
   async readEvidence(dir: string) {
     return this.evidence.get(dir) ?? null;

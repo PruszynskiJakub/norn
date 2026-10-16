@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
-import { byTime, type Ctx, type Observation, observe } from "@psdd/core";
+import { byTime, type Ctx, type Observation, observe } from "@norn/core";
 import type { DashboardIdentity, DashboardState, PollFailure } from "./contract.js";
+import { ICON_SVG } from "./icon.js";
 import type { UiAssets } from "./ui-assets.js";
 
 export interface DashboardDeps {
@@ -102,7 +103,7 @@ async function sameCheckout(url: string, root: string): Promise<boolean> {
   try {
     const res = await fetch(`${url}/api/identity`, { signal: AbortSignal.timeout(1500) });
     const id = (await res.json()) as Partial<DashboardIdentity>;
-    return id.app === "psdd-dashboard" && id.root === root;
+    return id.app === "norn-dashboard" && id.root === root;
   } catch {
     return false;
   }
@@ -119,8 +120,9 @@ async function handle(req: IncomingMessage, res: ServerResponse, deps: Dashboard
     await poller.refresh();
     return json(poller.state());
   }
-  if (get && path === "/api/identity") return json({ app: "psdd-dashboard", root: deps.root } satisfies DashboardIdentity);
+  if (get && path === "/api/identity") return json({ app: "norn-dashboard", root: deps.root } satisfies DashboardIdentity);
   if (get && path === "/") return res.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(page(deps.assets));
+  if (get && path === "/favicon.svg") return res.writeHead(200, { "content-type": "image/svg+xml" }).end(ICON_SVG);
   if (get && deps.assets && path === "/assets/app.js") {
     return res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" }).end(deps.assets.js);
   }
@@ -139,7 +141,8 @@ function page(assets: UiAssets | null) {
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>psdd dashboard</title>
+<title>norn dashboard</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 ${assets ? '<link rel="stylesheet" href="/assets/app.css">' : ""}
 </head>
 <body>
