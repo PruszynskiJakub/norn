@@ -1,11 +1,11 @@
-# psdd
+# norn
 
-psdd runs a team's work through a spec-driven process on GitHub. A developer's agent asks psdd what to do, does the work with a skill, and reports the result; psdd records it in GitHub, the only state. This file is the canonical definition of the domain terms; [`PRD.html`](PRD.html) uses them for the vision and the way of working.
+norn runs a team's work through a spec-driven process on GitHub. A developer's agent asks norn what to do, does the work with a skill, and reports the result; norn records it in GitHub, the only state. This file is the canonical definition of the domain terms; [`PRD.html`](PRD.html) uses them for the vision and the way of working.
 
 ## Work items
 
 **Issue**:
-A GitHub issue psdd works on. A new issue becomes a story at triage or is closed as not planned.
+A GitHub issue norn works on. A new issue becomes a story at triage or is closed as not planned.
 
 **Story**:
 An issue that is one feature, from triage until its story PR is merged into the base branch. It has one spec, one story branch and, once sliced, its slices.
@@ -17,10 +17,10 @@ _Avoid_: task, sub-task, child issue
 
 **Spec**:
 The one document of a story, built up through refinement, clarification and planning. Its Behaviour items are numbered user stories that slices, review and QA check against.
-_Avoid_: PRD (that is psdd's own vision document), design doc
+_Avoid_: PRD (that is norn's own vision document), design doc
 
 **Slug**:
-The short name derived from a story's title the first time psdd writes on it, then fixed. Branches, worktrees and the spec path are named from it.
+The short name derived from a story's title the first time norn writes on it, then fixed. Branches, worktrees and the spec path are named from it.
 
 **Story owner**:
 The person a story is assigned to. They own its slices too, and only they merge the story PR.
@@ -28,7 +28,7 @@ The person a story is assigned to. They own its slices too, and only they merge 
 ## Process
 
 **State**:
-Where an issue is in its process, carried as exactly one state label, e.g. `needs-review`. Two state labels mean a label change failed halfway, and psdd acts on neither.
+Where an issue is in its process, carried as exactly one state label, e.g. `needs-review`. Two state labels mean a label change failed halfway, and norn acts on neither.
 
 **Flag**:
 A label beside the state that is not a state: the type, `in-progress`, `needs-human` or the mode.
@@ -44,17 +44,17 @@ A step done with the user taking part, such as triage, refinement and human QA. 
 _Avoid_: interactive step
 
 **Outcome**:
-How a step ended, reported by the agent in a word such as `approve` or `fail`. psdd picks the transition from it; the agent never names a state.
+How a step ended, reported by the agent in a word such as `approve` or `fail`. norn picks the transition from it; the agent never names a state.
 _Avoid_: result, status
 
 **Transition**:
-A change of state psdd makes: from an outcome, or automatically, as when every slice is merged.
+A change of state norn makes: from an outcome, or automatically, as when every slice is merged.
 
 **Follow-up**:
-An automatic transition after an outcome, such as unblocking slices or opening the story PR. Best effort: one that fails is reported and repeated by the next `psdd next`.
+An automatic transition after an outcome, such as unblocking slices or opening the story PR. Best effort: one that fails is reported and repeated by the next `norn next`.
 
 **Refusal**:
-psdd's answer when it will not do what was asked: why, and what to do instead.
+norn's answer when it will not do what was asked: why, and what to do instead.
 
 **Mode**:
 Whether a slice is checked by an agent only (`afk`) or by an agent then a person (`hil`).
@@ -85,13 +85,13 @@ The lock on an issue that lets one session work on it, taken for a whole step an
 _Avoid_: lock, assignment
 
 **Session**:
-One running agent as psdd tells them apart, so claims know who holds them.
+One running agent as norn tells them apart, so claims know who holds them.
 
 **Takeover**:
 Taking a claim from another session: a stale one, or with `--takeover` a stopped session of one's own.
 
 **Briefing**:
-psdd's answer to taking an issue: where to work, which skill to invoke, the process around it, how to finish and what not to do.
+norn's answer to taking an issue: where to work, which skill to invoke, the process around it, how to finish and what not to do.
 
 **Story branch**:
 The branch a story's slices merge into, and its PR into the base branch.
@@ -108,10 +108,10 @@ The tool that makes worktrees and starts agents in them: herdr, Claude Code or p
 ## Skills and delivery
 
 **Skill**:
-The instructions an agent follows for a step's craft. A step skill knows nothing of psdd; the briefing carries the process around it.
+The instructions an agent follows for a step's craft. A step skill knows nothing of norn; the briefing carries the process around it.
 
 **Process skill**:
-A skill that runs psdd itself: drive, which takes one issue through its steps with the user, and deliver.
+A skill that runs norn itself: drive, which takes one issue through its steps with the user, and deliver.
 
 **Delivery**:
 Running a sliced story unattended with the deliver skill, a fresh agent per step, until only a person can move it on.
@@ -121,7 +121,7 @@ _Avoid_: autopilot
 Room for one more of the user's agents on a story under the parallel limit. Agents already holding items use slots.
 
 **Housekeeping**:
-Removing what closed issues leave behind, done by `psdd tidy`: worktrees, merged branches, QA evidence and claims.
+Removing what closed issues leave behind, done by `norn tidy`: worktrees, merged branches, QA evidence and claims.
 
 ## Relations
 

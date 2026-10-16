@@ -4,10 +4,10 @@ import { hostname } from "node:os";
 import { run } from "./cli.js";
 import { ghFailureMessage, renderNotification } from "./render-text.js";
 import { sessionId } from "./env.js";
-import { GhError, GhGitHub } from "@psdd/github-gh";
+import { GhError, GhGitHub } from "@norn/github-gh";
 import { installSkills } from "./install-skills.js";
-import { LocalWorkspace, makeNotifier, RootError, runCommand } from "@psdd/workspace-local";
-import { launchDashboard } from "@psdd/web";
+import { LocalWorkspace, makeNotifier, RootError, runCommand } from "@norn/workspace-local";
+import { launchDashboard } from "@norn/web";
 
 try {
   const root = await LocalWorkspace.findRoot(process.cwd());

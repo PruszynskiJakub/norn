@@ -1,8 +1,8 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
-import { type Ctx, loadConfig } from "@psdd/core";
-import { GhGitHub, ghFailure } from "@psdd/github-gh";
-import { LocalWorkspace, runCommand } from "@psdd/workspace-local";
+import { type Ctx, loadConfig } from "@norn/core";
+import { GhGitHub, ghFailure } from "@norn/github-gh";
+import { LocalWorkspace, runCommand } from "@norn/workspace-local";
 import { serveDashboard } from "./server.js";
 import { uiAssets } from "./ui-assets.js";
 
@@ -30,7 +30,7 @@ export async function launchDashboard(opts: DashboardOptions): Promise<Dashboard
   const workspace = new LocalWorkspace(opts.root, process.env, runCommand);
   const loaded = await loadConfig(workspace);
   // The CLI loaded the same files a moment ago and refused on a problem.
-  if (!loaded.ok) throw new Error("psdd's configuration does not load");
+  if (!loaded.ok) throw new Error("norn's configuration does not load");
   const ctx: Ctx = {
     github: new GhGitHub(),
     workspace,

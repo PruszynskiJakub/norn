@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { type Provider, samePath, type Workspace } from "@psdd/core";
+import { type Provider, samePath, type Workspace } from "@norn/core";
 
 /** Runs a command; `env` is added to this process's environment. */
 export type Run = (cmd: string, args: string[], env?: Record<string, string>) => Promise<{ code: number; stdout: string; stderr: string }>;
@@ -17,7 +17,7 @@ export const runCommand: Run = (cmd, args, env) =>
     child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
   });
 
-/** psdd cannot tell which checkout to work in. A refusal for the user, not a crash. */
+/** norn cannot tell which checkout to work in. A refusal for the user, not a crash. */
 export class RootError extends Error {}
 
 /** The developer's machine, via git and herdr. */
@@ -44,7 +44,7 @@ export class LocalWorkspace implements Workspace {
     const configured = await run("git", ["--git-dir", commonDir, "config", "--get", "core.worktree"]);
     if (configured.code === 0 && configured.stdout.trim()) return resolve(commonDir, configured.stdout.trim());
     if (basename(commonDir) === ".git") return dirname(commonDir);
-    throw new RootError(`Cannot find the main checkout of ${commonDir} from this worktree. Run psdd from the main checkout.`);
+    throw new RootError(`Cannot find the main checkout of ${commonDir} from this worktree. Run norn from the main checkout.`);
   }
 
   private async must(cmd: string, args: string[]) {

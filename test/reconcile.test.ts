@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "@psdd/testing";
+import { setup } from "@norn/testing";
 
 /** Story #123 in implementation whose last open slice #127 has its PR merged. */
 function lastSliceMerged() {
@@ -22,18 +22,18 @@ describe("done makes the transition; what follows is best effort", () => {
     w.github.createPullRequest = async () => {
       throw new Error("HTTP 502");
     };
-    await w.psdd("take", "127");
+    await w.norn("take", "127");
 
-    const res = await w.psdd("done", "127");
+    const res = await w.norn("done", "127");
 
     expect(res.exitCode).toBe(0);
     expect(w.github.issues.get(127)!.state).toBe("closed");
     expect(w.github.claim(127)).toBeNull();
     expect(w.github.labels(123)).toContain("implementation");
-    expect(res.stdout).toContain("Could not move the story on: HTTP 502. psdd next 123 will retry this.");
+    expect(res.stdout).toContain("Could not move the story on: HTTP 502. norn next 123 will retry this.");
 
     w.github.createPullRequest = create;
-    const next = await w.psdd("next", "123");
+    const next = await w.norn("next", "123");
 
     expect(w.github.labels(123)).toContain("needs-review");
     expect(w.github.prs.some((p) => p.head === "123-rate-limiting")).toBe(true);
@@ -45,9 +45,9 @@ describe("done makes the transition; what follows is best effort", () => {
     w.github.closeIssue = async () => {
       throw new Error("HTTP 500");
     };
-    await w.psdd("take", "127");
+    await w.norn("take", "127");
 
-    await expect(w.psdd("done", "127")).rejects.toThrow("HTTP 500");
+    await expect(w.norn("done", "127")).rejects.toThrow("HTTP 500");
     expect(w.github.claim(127)).toBeNull();
   });
 });
@@ -61,11 +61,11 @@ describe("the story branch is made before slicing ends", () => {
 
   test("a base branch missing on GitHub refuses, with nothing changed and the claim still held", async () => {
     const w = slicedStory();
-    w.workspace.files.set(".agents/psdd.config.json", JSON.stringify({ baseBranch: "master" }));
-    await w.psdd("take", "123");
-    await w.psdd("add-slice", "123", "Redis store", "--mode", "afk");
+    w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ baseBranch: "master" }));
+    await w.norn("take", "123");
+    await w.norn("add-slice", "123", "Redis store", "--mode", "afk");
 
-    const res = await w.psdd("done", "123");
+    const res = await w.norn("done", "123");
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain("master does not exist on GitHub");
@@ -77,7 +77,7 @@ describe("the story branch is made before slicing ends", () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"], assignees: ["alice"] });
 
-    const res = await w.psdd("next", "123");
+    const res = await w.norn("next", "123");
 
     expect(w.github.branches.has("123-rate-limiting")).toBe(true);
     expect(res.stdout).toContain("Created the story branch 123-rate-limiting.");
@@ -87,7 +87,7 @@ describe("the story branch is made before slicing ends", () => {
     const w = lastSliceMerged();
     w.github.issues.get(127)!.state = "closed";
 
-    await w.psdd("next", "123");
+    await w.norn("next", "123");
 
     expect(w.github.labels(123)).toContain("needs-review");
   });
@@ -98,7 +98,7 @@ describe("the story branch is made before slicing ends", () => {
     w.github.seedIssue({ number: 140, title: "Update docs", labels: [] });
     w.github.parents.set(140, 123);
 
-    const res = await w.psdd("next", "123", "--json");
+    const res = await w.norn("next", "123", "--json");
 
     expect(w.github.labels(123)).toContain("needs-review");
     expect(JSON.parse(res.stdout).slices).toEqual({ total: 2, merged: 2 });
@@ -108,11 +108,11 @@ describe("the story branch is made before slicing ends", () => {
 describe("a story whose PR does not close it", () => {
   test("with baseBranch develop, next closes the story once its PR is merged", async () => {
     const w = setup();
-    w.workspace.files.set(".agents/psdd.config.json", JSON.stringify({ baseBranch: "develop" }));
+    w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ baseBranch: "develop" }));
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "merge-queue"], assignees: ["alice"] });
     w.github.prs.push({ number: 60, head: "123-rate-limiting", base: "develop", state: "merged" });
 
-    const res = await w.psdd("next", "123", "--json");
+    const res = await w.norn("next", "123", "--json");
 
     expect(w.github.issues.get(123)!.state).toBe("closed");
     expect(w.github.issues.get(123)!.stateReason).toBe("completed");
@@ -127,7 +127,7 @@ describe("a story whose PR does not close it", () => {
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "merge-queue"], assignees: ["alice"] });
     w.github.prs.push({ number: 60, head: "123-rate-limiting", base: "main", state: "open" });
 
-    await w.psdd("next", "123");
+    await w.norn("next", "123");
 
     expect(w.github.issues.get(123)!.state).toBe("open");
   });

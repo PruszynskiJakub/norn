@@ -25,9 +25,9 @@ export interface StartItem {
   createWorktree: string | null;
   /** Under herdr, where the item's branch is checked out instead, so no worktree can be made for it. */
   checkedOutAt: string | null;
-  /** psdd runs inside the item's worktree, so this session can take it here. */
+  /** norn runs inside the item's worktree, so this session can take it here. */
   here: boolean;
-  /** Under plain git, the PSDD_SESSION to start the item's agent with, unique per listing, so each agent is its own session. */
+  /** Under plain git, the NORN_SESSION to start the item's agent with, unique per listing, so each agent is its own session. */
   session: string | null;
 }
 
@@ -51,7 +51,7 @@ export interface HumanPlace {
 
 export type WaitItem = { issue: number } & (
   | { reason: "blocked"; blockers: number[] }
-  /** `why` is the reason psdd recorded when it set needs-human, as written; null when none is found. */
+  /** `why` is the reason norn recorded when it set needs-human, as written; null when none is found. */
   | ({ reason: "needs-human"; why: string | null } & HumanPlace)
   | ({ reason: "human-qa"; of: "story" | "mode:hil" } & HumanPlace)
   /** Held by one of the user's own sessions (`holder.mine`): an agent of theirs at work, using a parallel slot. */
@@ -69,7 +69,7 @@ export interface NextReport {
   state: State | null;
   branch: string;
   slices: { total: number; merged: number };
-  /** Housekeeping psdd did, e.g. closing a merged story, or could not do. */
+  /** Housekeeping norn did, e.g. closing a merged story, or could not do. */
   notes: Event[];
   /** Nothing can start and nothing is running: only people can move the story on, or the story is closed. */
   nothingLeft: boolean;
@@ -89,7 +89,7 @@ export interface NextReport {
  * Catches the story up with what earlier commands left undone or could not do:
  * the story branch, moving on once every slice is merged, closing a merged
  * story and clearing state labels left on closed issues. Removing what closed
- * issues leave behind is psdd tidy's. Returns what changed or failed.
+ * issues leave behind is norn tidy's. Returns what changed or failed.
  */
 async function reconcile(ctx: Ctx, storyNumber: number): Promise<Event[]> {
   const { github } = ctx;
@@ -191,7 +191,7 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     return;
   }
   if (!state) {
-    // Not skipped silently: with no state psdd cannot brief it, and delivery must not report nothing left.
+    // Not skipped silently: with no state norn cannot brief it, and delivery must not report nothing left.
     report.waiting.push({ issue: n, reason: "no-state" });
     return;
   }
@@ -216,14 +216,14 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
     checkedOutAt,
     here,
     // Fresh for every agent: a new agent on an item whose claim went stale must not pass for the old holder.
-    session: ctx.config.provider === "git" ? `psdd-${n}-${ctx.nonce()}` : null,
+    session: ctx.config.provider === "git" ? `norn-${n}-${ctx.nonce()}` : null,
     kind: kindOf(issue) === "slice" ? "slice" : "story",
     title: issue.title,
     state,
     step: step.name,
     skill: step.skill,
     attended: step.attended,
-    command: `psdd take ${n}`,
+    command: `norn take ${n}`,
   });
 }
 

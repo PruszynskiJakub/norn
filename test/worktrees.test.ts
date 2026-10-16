@@ -1,13 +1,13 @@
 import { execFileSync } from "node:child_process";
 import { describe, expect, test } from "vitest";
-import { setup } from "@psdd/testing";
+import { setup } from "@norn/testing";
 
 describe("take names the worktree", () => {
   test("the PRD's briefing: a story worktree that does not exist yet, under Claude Code", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-refinement"] });
 
-    const res = await w.psdd("take", "123");
+    const res = await w.norn("take", "123");
 
     expect(res.stdout).toBe(
       [
@@ -21,17 +21,17 @@ describe("take names the worktree", () => {
         "Invoke the skill: refine",
         "Spec to work on: .agents/specs/123-rate-limiting/spec.md",
         "Read the issue: gh issue view 123 --comments",
-        "Commit the spec on 123-rate-limiting and push it, so the link psdd posts resolves.",
+        "Commit the spec on 123-rate-limiting and push it, so the link norn posts resolves.",
         "",
         "When the user agrees refinement is finished, run one of:",
-        "  psdd done 123 clear       (no open questions, moves on to planning)",
-        "  psdd done 123 questions   (open questions, moves to clarification)",
+        "  norn done 123 clear       (no open questions, moves on to planning)",
+        "  norn done 123 questions   (open questions, moves to clarification)",
         "",
-        "On a long step, run psdd take 123 again now and then: it keeps your claim fresh.",
-        "If you have to stop, run: psdd release 123",
-        'If something is wrong and a person is needed, run: psdd escalate 123 "reason"',
+        "On a long step, run norn take 123 again now and then: it keeps your claim fresh.",
+        "If you have to stop, run: norn release 123",
+        'If something is wrong and a person is needed, run: norn escalate 123 "reason"',
         "",
-        "Do not change labels yourself. Only psdd changes them.",
+        "Do not change labels yourself. Only norn changes them.",
       ].join("\n"),
     );
   });
@@ -41,7 +41,7 @@ describe("take names the worktree", () => {
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
     w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
 
-    const res = await w.psdd("take", "123");
+    const res = await w.norn("take", "123");
 
     expect(res.stdout).toContain("Work in: /repo/.agents/worktrees/123-rate-limiting (branch 123-rate-limiting)\n\nInvoke");
     expect(res.stdout).not.toContain("does not exist");
@@ -53,7 +53,7 @@ describe("take names the worktree", () => {
     w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
     w.github.parents.set(131, 123);
 
-    const res = await w.psdd("take", "131");
+    const res = await w.norn("take", "131");
 
     expect(res.stdout).toContain("Work in: /repo/.agents/worktrees/123-rate-limiting-131 (branch 123-rate-limiting-131)");
     expect(res.stdout).toContain(
@@ -72,7 +72,7 @@ describe("take names the worktree", () => {
     w.github.seedIssue({ number: 131, title, labels: ["type:slice", "mode:afk", "ready-for-agent"] });
     w.github.parents.set(131, 123);
 
-    const res = await w.psdd("take", "131");
+    const res = await w.norn("take", "131");
 
     const line = res.stdout
       .split("\n")
@@ -89,17 +89,17 @@ describe("take names the worktree", () => {
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
     w.workspace.localBranches.add("123-rate-limiting");
 
-    const res = await w.psdd("take", "123");
+    const res = await w.norn("take", "123");
 
     expect(res.stdout).toContain("  git -C /repo worktree add /repo/.agents/worktrees/123-rate-limiting 123-rate-limiting\n");
   });
 
-  test("a branch only on GitHub, like a story branch psdd made, is fetched and then checked out", async () => {
+  test("a branch only on GitHub, like a story branch norn made, is fetched and then checked out", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
     w.github.branches.add("123-rate-limiting");
 
-    const res = await w.psdd("take", "123");
+    const res = await w.norn("take", "123");
 
     expect(res.stdout).toContain(
       "  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add /repo/.agents/worktrees/123-rate-limiting 123-rate-limiting\n",
@@ -112,7 +112,7 @@ describe("take names the worktree", () => {
     w.workspace.localBranches.add("123-rate-limiting");
     w.workspace.checkedOut.set("123-rate-limiting", "/repo");
 
-    const res = await w.psdd("take", "123");
+    const res = await w.norn("take", "123");
 
     expect(res.stdout).toContain(
       "Work in: /repo/.agents/worktrees/123-rate-limiting (branch 123-rate-limiting)\nBranch 123-rate-limiting is checked out at /repo; work there or switch that checkout to another branch.\n",
@@ -127,7 +127,7 @@ describe("take names the worktree", () => {
     w.github.parents.set(131, 123);
     w.workspace.cwd = "/repo/.agents/worktrees/123-rate-limiting";
 
-    const res = await w.psdd("take", "131");
+    const res = await w.norn("take", "131");
 
     expect(res.stdout).toContain("Work in: /repo/.agents/worktrees/123-rate-limiting-131 (branch 123-rate-limiting-131)");
     expect(res.stdout).toContain("git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-131");
@@ -147,22 +147,22 @@ describe("worktrees of merged items", () => {
     return w;
   }
 
-  test("done on a merged slice leaves its worktree, and so does next: removing it is psdd tidy's", async () => {
+  test("done on a merged slice leaves its worktree, and so does next: removing it is norn tidy's", async () => {
     const w = mergingSlice();
-    await w.psdd("take", "127");
+    await w.norn("take", "127");
 
-    const res = await w.psdd("done", "127");
-    await w.psdd("next", "123");
+    const res = await w.norn("done", "127");
+    await w.norn("next", "123");
 
     expect(w.workspace.removed).toEqual([]);
-    expect(res.stdout).toContain("Its worktree .agents/worktrees/123-rate-limiting-127 is removed by the next psdd tidy.");
+    expect(res.stdout).toContain("Its worktree .agents/worktrees/123-rate-limiting-127 is removed by the next norn tidy.");
   });
 
   test("a slice with no local worktree merges without mentioning one", async () => {
     const w = mergingSlice();
     w.workspace.worktrees.clear();
-    await w.psdd("take", "127");
-    const res = await w.psdd("done", "127");
+    await w.norn("take", "127");
+    const res = await w.norn("done", "127");
     expect(res.stdout).not.toContain("worktree");
   });
 
@@ -172,7 +172,7 @@ describe("worktrees of merged items", () => {
     w.github.seedIssue({ number: 127, title: "Redis store", state: "closed", labels: ["type:slice", "mode:afk", "merge-queue"] });
     w.github.parents.set(127, 123);
 
-    const res = await w.psdd("next", "123", "--json");
+    const res = await w.norn("next", "123", "--json");
 
     expect(w.github.labels(123)).toEqual(["type:story"]);
     expect(w.github.labels(127)).toEqual(["type:slice", "mode:afk"]);
@@ -189,7 +189,7 @@ describe("worktrees of merged items", () => {
     w.workspace.localBranches.add("123-rate-limiting");
     w.setNow("2026-10-13T12:00:00Z");
 
-    const res = await w.psdd("take", "123");
+    const res = await w.norn("take", "123");
 
     expect(w.workspace.removed).toEqual([]);
     expect(res.stdout).toContain(
@@ -206,7 +206,7 @@ describe("a fix round's briefing", () => {
     w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "changes-requested"] });
     w.github.parents.set(131, 123);
 
-    const res = await w.psdd("take", "131");
+    const res = await w.norn("take", "131");
 
     expect(w.github.labels(131)).toContain("implementation");
     expect(res.stdout).toContain("This is rework: the latest review or QA comment on #131 lists what to fix.");
@@ -217,7 +217,7 @@ describe("a fix round's briefing", () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "qa-failed"] });
 
-    const res = await w.psdd("take", "123");
+    const res = await w.norn("take", "123");
 
     expect(res.stdout).toContain("This is rework: the latest review or QA comment on #123 lists what to fix.");
     expect(res.stdout).toContain("Commit the fixes straight onto the story branch 123-rate-limiting and push them.");
@@ -231,7 +231,7 @@ describe("an existing worktree", () => {
     w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
     w.github.branches.add("123-rate-limiting");
 
-    const res = await w.psdd("take", "123");
+    const res = await w.norn("take", "123");
 
     expect(res.stdout).toContain(
       [
@@ -247,7 +247,7 @@ describe("an existing worktree", () => {
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
     w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
 
-    const res = await w.psdd("take", "123");
+    const res = await w.norn("take", "123");
 
     expect(res.stdout).not.toContain("Bring it up to date");
   });

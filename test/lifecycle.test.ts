@@ -1,12 +1,12 @@
 import { expect, test } from "vitest";
-import { setup } from "@psdd/testing";
+import { setup } from "@norn/testing";
 
-test("a story runs from new issue to its story PR, driven only through psdd", async () => {
+test("a story runs from new issue to its story PR, driven only through norn", async () => {
   const w = setup();
   const gh = w.github;
   gh.seedIssue({ number: 123, title: "Rate limiting" });
   const step = async (...argv: string[]) => {
-    const r = await w.psdd(...argv);
+    const r = await w.norn(...argv);
     expect(r.exitCode, `${argv.join(" ")}\n${r.stdout}`).toBe(0);
     return r.stdout;
   };
@@ -29,7 +29,7 @@ test("a story runs from new issue to its story PR, driven only through psdd", as
   expect(gh.labels(123)).toContain("implementation");
 
   // Phase 2: only the unblocked slice can start.
-  expect(await step("next", "123")).toContain(`psdd take ${redis}`);
+  expect(await step("next", "123")).toContain(`norn take ${redis}`);
   expect(await step("next", "123")).toContain(`#${perKey} is blocked by #${redis}.`);
 
   const runSlice = async (n: number, _title: string, hil: boolean) => {

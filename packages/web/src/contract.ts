@@ -1,6 +1,6 @@
-import type { BoardStory, FeedEvent, WaitingItem } from "@psdd/core";
+import type { BoardStory, FeedEvent, WaitingItem } from "@norn/core";
 
-/** Why the last read of GitHub failed, as far as psdd can tell. */
+/** Why the last read of GitHub failed, as far as norn can tell. */
 export type PollFailure = "auth" | "rate-limit" | "network" | "other";
 
 /**
@@ -31,7 +31,7 @@ export interface DashboardState {
 
 /** What GET /api/identity answers, so a second launch can find a running dashboard of the same repository. */
 export interface DashboardIdentity {
-  app: "psdd-dashboard";
+  app: "norn-dashboard";
   /** The main checkout's root on this machine. */
   root: string;
 }

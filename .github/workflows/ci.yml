@@ -22,19 +22,19 @@ jobs:
           npm pack --pack-destination "$RUNNER_TEMP"
           mkdir "$RUNNER_TEMP/app" && cd "$RUNNER_TEMP/app"
           git init -q && npm init -y > /dev/null
-          npm install "$RUNNER_TEMP"/psdd-*.tgz
+          npm install "$RUNNER_TEMP"/norn-*.tgz
           set +e
-          out=$(npx psdd --help)
+          out=$(npx norn --help)
           code=$?
           set -e
           echo "$out"
           test "$code" -eq 2
-          echo "$out" | grep -q "psdd runs work through the SDD process"
+          echo "$out" | grep -q "norn runs work through the SDD process"
       - name: Serve the dashboard from the installed package
         working-directory: ${{ runner.temp }}/app
         run: |
           # GitHub reads fail in the throwaway project, but the page and its assets are served regardless.
-          npx psdd dashboard --no-open --port 4477 > dashboard.log 2>&1 &
+          npx norn dashboard --no-open --port 4477 > dashboard.log 2>&1 &
           pid=$!
           trap 'kill "$pid" 2>/dev/null || true; cat dashboard.log' EXIT
           for _ in $(seq 1 30); do

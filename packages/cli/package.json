@@ -1,16 +1,16 @@
 {
-  "name": "@psdd/cli",
+  "name": "@norn/cli",
   "version": "0.0.0",
   "private": true,
-  "description": "The psdd command line: argument parsing, init, the renderers and the executable.",
+  "description": "The norn command line: argument parsing, init, the renderers and the executable.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@psdd/core": "0.0.0",
-    "@psdd/github-gh": "0.0.0",
-    "@psdd/workspace-local": "0.0.0",
-    "@psdd/web": "0.0.0"
+    "@norn/core": "0.0.0",
+    "@norn/github-gh": "0.0.0",
+    "@norn/workspace-local": "0.0.0",
+    "@norn/web": "0.0.0"
   }
 }

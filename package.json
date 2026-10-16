@@ -1,10 +1,10 @@
 {
-  "name": "psdd",
+  "name": "norn",
   "version": "0.5.1",
   "description": "CLI for the SDD process: GitHub labels as the only source of truth",
   "type": "module",
   "bin": {
-    "psdd": "dist/bin.js"
+    "norn": "dist/bin.js"
   },
   "files": [
     "dist",
@@ -14,7 +14,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "npm run build:ui -w @psdd/web && node scripts/build.mjs",
+    "build": "npm run build:ui -w @norn/web && node scripts/build.mjs",
     "test": "vitest run",
     "typecheck": "tsc -b",
     "lint": "biome check --error-on-warnings .",

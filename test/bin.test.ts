@@ -5,11 +5,11 @@ import { join } from "node:path";
 import { promisify } from "node:util";
 import { afterAll, describe, expect, test } from "vitest";
 
-const dir = mkdtempSync(join(tmpdir(), "psdd-bin-"));
+const dir = mkdtempSync(join(tmpdir(), "norn-bin-"));
 afterAll(() => rmSync(dir, { recursive: true, force: true }));
 
 describe("bin", () => {
-  test("outside a checkout psdd prints why and exits 1, without a stack trace", async () => {
+  test("outside a checkout norn prints why and exits 1, without a stack trace", async () => {
     const bin = join(import.meta.dirname, "..", "packages", "cli", "src", "bin.ts");
     const runner = join(import.meta.dirname, "..", "node_modules", ".bin", "vite-node");
     const res = await promisify(execFile)(runner, [bin, "status", "1"], { cwd: dir }).catch((e) => e);

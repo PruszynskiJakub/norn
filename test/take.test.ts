@@ -1,25 +1,25 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "@psdd/testing";
+import { setup } from "@norn/testing";
 
-describe("psdd take", () => {
+describe("norn take", () => {
   test("a new unlabeled issue is claimed and briefed for triage", async () => {
     const w = setup();
     w.github.seedIssue({ number: 7, title: "Rate limiting" });
 
-    const res = await w.psdd("take", "7");
+    const res = await w.norn("take", "7");
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain('You now hold issue #7 "Rate limiting"');
     expect(res.stdout).toContain("Invoke the skill: triage");
-    expect(res.stdout).toContain("psdd done 7 accept");
-    expect(res.stdout).toContain("psdd done 7 reject");
-    expect(res.stdout).toContain("If you have to stop, run: psdd release 7");
+    expect(res.stdout).toContain("norn done 7 accept");
+    expect(res.stdout).toContain("norn done 7 reject");
+    expect(res.stdout).toContain("If you have to stop, run: norn release 7");
     expect(w.github.labels(7)).toContain("in-progress");
     expect(w.github.claim(7)).toMatchObject({ holder: "alice", session: "session-1" });
   });
 });
 
-describe("psdd take refusals", () => {
+describe("norn take refusals", () => {
   test("an issue held by another session is refused, with what to do instead", async () => {
     const w = setup();
     w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "ready-for-agent"] });
@@ -27,7 +27,7 @@ describe("psdd take refusals", () => {
     await w.asTeammate("bob", "other-session")("take", "131");
     w.setNow("2026-10-13T14:30:00Z");
 
-    const res = await w.psdd("take", "131");
+    const res = await w.norn("take", "131");
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain("#131 is already held by another session (since 14:02)");
@@ -49,13 +49,13 @@ describe("taking over a stopped session of your own", () => {
     await w.as("stopped-session")("take", "123");
     w.setNow("2026-10-13T14:30:00Z");
 
-    const res = await w.psdd("take", "123");
+    const res = await w.norn("take", "123");
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe(
       [
         "#123 is held by another session of yours (since 14:02).",
-        "If that session has stopped, take it over here: psdd take 123 --takeover",
+        "If that session has stopped, take it over here: norn take 123 --takeover",
         "If it is still running, do not work on it.",
       ].join("\n"),
     );
@@ -68,7 +68,7 @@ describe("taking over a stopped session of your own", () => {
     w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
     w.setNow("2026-10-13T14:30:00Z");
 
-    const res = await w.psdd("take", "123", "--takeover");
+    const res = await w.norn("take", "123", "--takeover");
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain(
@@ -82,7 +82,7 @@ describe("taking over a stopped session of your own", () => {
     const w = heldByMyOtherSession();
     await w.asTeammate("bob", "bobs-session")("take", "123");
 
-    const res = await w.psdd("take", "123", "--takeover");
+    const res = await w.norn("take", "123", "--takeover");
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe(
@@ -96,8 +96,8 @@ describe("taking over a stopped session of your own", () => {
   test("taken fresh after the earlier session released it, the briefing names its uncommitted work", async () => {
     const w = heldByMyOtherSession();
     await w.as("stopped-session")("take", "123");
-    await w.psdd("take", "123", "--takeover");
-    await w.psdd("release", "123");
+    await w.norn("take", "123", "--takeover");
+    await w.norn("release", "123");
     w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
     w.workspace.dirty.add(".agents/worktrees/123-rate-limiting");
 
@@ -115,7 +115,7 @@ describe("taking over a stopped session of your own", () => {
   test("--takeover on an unheld issue is an ordinary take", async () => {
     const w = heldByMyOtherSession();
 
-    const res = await w.psdd("take", "123", "--takeover");
+    const res = await w.norn("take", "123", "--takeover");
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).not.toContain("took #123 over");
@@ -130,7 +130,7 @@ describe("stale claims", () => {
     await w.as("crashed-session")("take", "7");
     w.setNow("2026-10-13T12:00:01Z");
 
-    const res = await w.psdd("take", "7");
+    const res = await w.norn("take", "7");
 
     expect(res.exitCode).toBe(0);
     expect(w.github.claim(7)).toMatchObject({ session: "session-1", since: "2026-10-13T12:00:01.000Z" });
@@ -143,7 +143,7 @@ describe("stale claims", () => {
     await w.as("busy-session")("take", "7");
     w.setNow("2026-10-13T11:59:59Z");
 
-    expect((await w.psdd("take", "7")).exitCode).toBe(1);
+    expect((await w.norn("take", "7")).exitCode).toBe(1);
   });
 });
 
@@ -152,10 +152,10 @@ describe("taking an issue this session already holds", () => {
     const w = setup();
     w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
     w.setNow("2026-10-13T10:00:00Z");
-    await w.psdd("take", "131");
+    await w.norn("take", "131");
     w.setNow("2026-10-13T11:30:00Z");
 
-    const res = await w.psdd("take", "131");
+    const res = await w.norn("take", "131");
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toMatch(/^You already held #131; the claim is refreshed\. Here is its briefing again\.\n\nYou now hold slice #131/);
@@ -171,7 +171,7 @@ describe("taking an issue this session already holds", () => {
     await w.as("slow-session")("take", "7");
     w.setNow("2026-10-13T12:30:00Z");
 
-    const res = await w.psdd("take", "7");
+    const res = await w.norn("take", "7");
 
     expect(res.exitCode).toBe(1);
     expect(w.github.claim(7)).toMatchObject({ session: "slow-session" });
@@ -187,10 +187,10 @@ describe("the PRD's refusal", () => {
     w.setNow("2026-10-13T14:02:00Z");
     await w.asTeammate("bob", "other")("take", "131");
 
-    const res = await w.psdd("take", "131");
+    const res = await w.norn("take", "131");
 
     expect(res.stdout).toBe(
-      ["Slice #131 is already held by another session (since 14:02).", "Do not work on it. Run psdd next 123 and pick a different item."].join("\n"),
+      ["Slice #131 is already held by another session (since 14:02).", "Do not work on it. Run norn next 123 and pick a different item."].join("\n"),
     );
   });
 });
@@ -202,10 +202,10 @@ describe("a claim that changes between reading and replacing it", () => {
     w.setNow("2026-10-13T10:00:00Z");
     await w.as("crashed-session")("take", "7");
     w.setNow("2026-10-13T12:00:01Z");
-    // The old holder releases just after psdd read its stale claim.
+    // The old holder releases just after norn read its stale claim.
     w.github.beforeReplace = (n) => w.github.claims.delete(n);
 
-    const res = await w.psdd("take", "7");
+    const res = await w.norn("take", "7");
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).not.toContain("already held");
@@ -216,7 +216,7 @@ describe("a claim that changes between reading and replacing it", () => {
     const w = setup();
     w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
     w.setNow("2026-10-13T10:00:00Z");
-    await w.psdd("take", "131");
+    await w.norn("take", "131");
     w.setNow("2026-10-13T12:30:00Z");
     // Another session takes over the (by now stale) claim just after this session read it as its own.
     w.github.beforeReplace = (n) => {
@@ -226,7 +226,7 @@ describe("a claim that changes between reading and replacing it", () => {
       void w.github.createClaim(n, { holder: "bob", session: "other-session", since: "2026-10-13T12:29:59.000Z" });
     };
 
-    const res = await w.psdd("take", "131");
+    const res = await w.norn("take", "131");
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain("#131 is already held by another session (since 12:29)");

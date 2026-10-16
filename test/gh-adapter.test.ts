@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { type Exec, GhGitHub } from "@psdd/github-gh";
+import { type Exec, GhGitHub } from "@norn/github-gh";
 
 interface Call {
   args: string[];
@@ -24,11 +24,11 @@ const path = (c: Call) => c.args.find((a) => a.startsWith("repos/")) ?? c.args[1
 const method = (c: Call) => c.args[c.args.indexOf("-X") + 1];
 
 describe("GhGitHub claims", () => {
-  test("a claim is a commit recording holder, session and time, behind refs/psdd/claims/<issue>", async () => {
+  test("a claim is a commit recording holder, session and time, behind refs/norn/claims/<issue>", async () => {
     const { exec, calls } = scripted((c) => {
       if (path(c).endsWith("/git/trees")) return { stdout: { sha: "tree1" } };
       if (path(c).endsWith("/git/commits")) return { stdout: { sha: "commit1" } };
-      if (path(c).endsWith("/git/refs")) return { stdout: { ref: "refs/psdd/claims/131" } };
+      if (path(c).endsWith("/git/refs")) return { stdout: { ref: "refs/norn/claims/131" } };
     });
     const gh = new GhGitHub(exec);
 
@@ -45,7 +45,7 @@ describe("GhGitHub claims", () => {
     const ref = calls.find((c) => path(c).endsWith("/git/refs"))!;
     expect(method(ref)).toBe("POST");
     expect(path(ref)).toBe("repos/{owner}/{repo}/git/refs");
-    expect(ref.input).toEqual({ ref: "refs/psdd/claims/131", sha: "commit1" });
+    expect(ref.input).toEqual({ ref: "refs/norn/claims/131", sha: "commit1" });
   });
 
   test("a 422 on ref creation means someone else holds the claim", async () => {
@@ -70,16 +70,16 @@ describe("GhGitHub claims", () => {
     const { exec } = scripted((c) => {
       if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t" } };
       if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c" } };
-      if (path(c).endsWith("/git/refs/psdd/claims/131")) return { code: 1, stderr: "gh: Reference does not exist (HTTP 422)" };
+      if (path(c).endsWith("/git/refs/norn/claims/131")) return { code: 1, stderr: "gh: Reference does not exist (HTTP 422)" };
     });
     expect(await new GhGitHub(exec).replaceClaim(131, "mine1", { holder: "a", session: "s", since: "x" })).toBe(false);
   });
 
   test("readClaim follows the ref to its commit; a missing ref is no claim", async () => {
     const { exec } = scripted((c) => {
-      if (path(c) === "repos/{owner}/{repo}/git/ref/psdd/claims/131") return { stdout: { object: { sha: "c1" } } };
+      if (path(c) === "repos/{owner}/{repo}/git/ref/norn/claims/131") return { stdout: { object: { sha: "c1" } } };
       if (path(c) === "repos/{owner}/{repo}/git/commits/c1") return { stdout: { message: JSON.stringify({ holder: "a", session: "s", since: "t" }) } };
-      if (path(c) === "repos/{owner}/{repo}/git/ref/psdd/claims/132") return { code: 1, stderr: "Not Found (HTTP 404)" };
+      if (path(c) === "repos/{owner}/{repo}/git/ref/norn/claims/132") return { code: 1, stderr: "Not Found (HTTP 404)" };
     });
     const gh = new GhGitHub(exec);
     expect(await gh.readClaim(131)).toEqual({ holder: "a", session: "s", since: "t", sha: "c1" });
@@ -90,13 +90,13 @@ describe("GhGitHub claims", () => {
     const { exec, calls } = scripted((c) => {
       if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t3" } };
       if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c3" } };
-      if (path(c).endsWith("/git/refs/psdd/claims/131")) return { stdout: { ref: "refs/psdd/claims/131" } };
+      if (path(c).endsWith("/git/refs/norn/claims/131")) return { stdout: { ref: "refs/norn/claims/131" } };
     });
 
     expect(await new GhGitHub(exec).replaceClaim(131, "stale1", { holder: "b", session: "s2", since: "x" })).toBe(true);
 
     expect(calls.find((c) => path(c).endsWith("/git/commits"))!.input).toMatchObject({ parents: ["stale1"] });
-    const ref = calls.find((c) => path(c).endsWith("/git/refs/psdd/claims/131"))!;
+    const ref = calls.find((c) => path(c).endsWith("/git/refs/norn/claims/131"))!;
     expect(method(ref)).toBe("PATCH");
     expect(ref.input).toEqual({ sha: "c3", force: false });
   });
@@ -105,7 +105,7 @@ describe("GhGitHub claims", () => {
     const { exec } = scripted((c) => {
       if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t" } };
       if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c" } };
-      if (path(c).endsWith("/git/refs/psdd/claims/131")) return { code: 1, stderr: "gh: Update is not a fast forward (HTTP 422)" };
+      if (path(c).endsWith("/git/refs/norn/claims/131")) return { code: 1, stderr: "gh: Update is not a fast forward (HTTP 422)" };
     });
     expect(await new GhGitHub(exec).replaceClaim(131, "stale1", { holder: "b", session: "s2", since: "x" })).toBe(false);
   });
@@ -218,12 +218,12 @@ describe("GhGitHub branches and evidence", () => {
     const { exec, calls } = scripted((c) => {
       if (path(c).endsWith("/git/blobs")) return { stdout: { sha: `blob${++blobs}` } };
       if (path(c).endsWith("/git/trees")) return { stdout: { sha: "tree1" } };
-      if (path(c).endsWith("/git/ref/heads/psdd/qa/131")) return { stdout: { object: { sha: "prev" } } };
+      if (path(c).endsWith("/git/ref/heads/norn/qa/131")) return { stdout: { object: { sha: "prev" } } };
       if (path(c).endsWith("/git/commits")) return { stdout: { sha: "commit2" } };
-      if (path(c).endsWith("/git/refs/heads/psdd/qa/131")) return { stdout: {} };
+      if (path(c).endsWith("/git/refs/heads/norn/qa/131")) return { stdout: {} };
     });
 
-    const sha = await new GhGitHub(exec).pushFiles("psdd/qa/131", [{ path: "a.png", content: Buffer.from("png") }], "QA evidence");
+    const sha = await new GhGitHub(exec).pushFiles("norn/qa/131", [{ path: "a.png", content: Buffer.from("png") }], "QA evidence");
 
     expect(sha).toBe("commit2");
     expect(calls.find((c) => path(c).endsWith("/git/blobs"))!.input).toEqual({ content: Buffer.from("png").toString("base64"), encoding: "base64" });
@@ -238,26 +238,26 @@ describe("GhGitHub branches and evidence", () => {
     const { exec, calls } = scripted((c) => {
       if (path(c).endsWith("/git/blobs")) return { stdout: { sha: "b" } };
       if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t" } };
-      if (path(c).endsWith("/git/ref/heads/psdd/qa/131")) return { code: 1, stderr: "Not Found (HTTP 404)" };
+      if (path(c).endsWith("/git/ref/heads/norn/qa/131")) return { code: 1, stderr: "Not Found (HTTP 404)" };
       if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c1" } };
       if (path(c).endsWith("/git/refs")) return { stdout: {} };
     });
-    await new GhGitHub(exec).pushFiles("psdd/qa/131", [{ path: "a.txt", content: Buffer.from("x") }], "m");
+    await new GhGitHub(exec).pushFiles("norn/qa/131", [{ path: "a.txt", content: Buffer.from("x") }], "m");
     expect(calls.find((c) => path(c).endsWith("/git/commits"))!.input).toMatchObject({ parents: [] });
-    expect(calls.at(-1)!.input).toEqual({ ref: "refs/heads/psdd/qa/131", sha: "c1" });
+    expect(calls.at(-1)!.input).toEqual({ ref: "refs/heads/norn/qa/131", sha: "c1" });
   });
 
   test("listBranches and listClaims read matching refs by prefix", async () => {
     const { exec, calls } = scripted((c) => {
-      if (c.args.includes("repos/{owner}/{repo}/git/matching-refs/heads/psdd/qa")) {
-        return { stdout: '{"ref":"refs/heads/psdd/qa/131"}\n{"ref":"refs/heads/psdd/qaother"}\n' };
+      if (c.args.includes("repos/{owner}/{repo}/git/matching-refs/heads/norn/qa")) {
+        return { stdout: '{"ref":"refs/heads/norn/qa/131"}\n{"ref":"refs/heads/norn/qaother"}\n' };
       }
-      if (c.args.includes("repos/{owner}/{repo}/git/matching-refs/psdd/claims")) {
-        return { stdout: '{"ref":"refs/psdd/claims/131"}\n{"ref":"refs/psdd/claims/7"}\n' };
+      if (c.args.includes("repos/{owner}/{repo}/git/matching-refs/norn/claims")) {
+        return { stdout: '{"ref":"refs/norn/claims/131"}\n{"ref":"refs/norn/claims/7"}\n' };
       }
     });
     const gh = new GhGitHub(exec);
-    expect(await gh.listBranches("psdd/qa/")).toEqual(["psdd/qa/131"]);
+    expect(await gh.listBranches("norn/qa/")).toEqual(["norn/qa/131"]);
     expect(await gh.listClaims()).toEqual([131, 7]);
     expect(calls[0].args.slice(0, 4)).toEqual(["api", "--paginate", "--jq", ".[]"]);
   });

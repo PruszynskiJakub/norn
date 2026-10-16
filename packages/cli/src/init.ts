@@ -1,8 +1,8 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
-import { DEFAULT_TEAM_CONFIG, FLAGS, type GitHub, LOCAL_CONFIG, STATES, TEAM_CONFIG } from "@psdd/core";
+import { DEFAULT_TEAM_CONFIG, FLAGS, type GitHub, LOCAL_CONFIG, STATES, TEAM_CONFIG } from "@norn/core";
 import { join } from "node:path";
 
-/** Skills psdd briefings name. */
+/** Skills norn briefings name. */
 export const SKILLS = [
   "triage",
   "refine",
@@ -36,8 +36,8 @@ const DESCRIPTIONS: Record<string, [string, string]> = {
   "needs-human-qa": ["e99695", "QA by a person, after the agent's"],
   "qa-failed": ["d93f0b", "QA found problems"],
   "merge-queue": ["0e8a16", "Implementation done, review has no requests, QA passed"],
-  "type:story": ["ededed", "psdd story state machine"],
-  "type:slice": ["ededed", "psdd slice state machine"],
+  "type:story": ["ededed", "norn story state machine"],
+  "type:slice": ["ededed", "norn slice state machine"],
   "in-progress": ["fef2c0", "Someone holds the claim (mirror of the git-ref claim)"],
   "needs-human": ["e11d21", "A person is needed; cleared with the resolve skill"],
   "mode:afk": ["bfdadc", "QA by an agent only"],
@@ -66,7 +66,7 @@ export interface InitResult {
   labels: number;
 }
 
-/** The skill install left out skills psdd briefings name. */
+/** The skill install left out skills norn briefings name. */
 export interface MissingSkills {
   kind: "missing-skills";
   missing: string[];
@@ -123,26 +123,26 @@ function ensureGitignored(cwd: string, entries: string[]) {
   writeFileSync(file, text + missing.map((e) => `${e}\n`).join(""));
 }
 
-const START = "<!-- psdd:start -->";
-const END = "<!-- psdd:end -->";
+const START = "<!-- norn:start -->";
+const END = "<!-- norn:end -->";
 
 /** What an agent in this project needs to know to find the process. */
 export const AGENT_INSTRUCTIONS = [
   START,
-  "## psdd",
+  "## norn",
   "",
-  "This repository runs its work through psdd. GitHub labels, relations, comments and branches hold the state, and only psdd changes them.",
+  "This repository runs its work through norn. GitHub labels, relations, comments and branches hold the state, and only norn changes them.",
   "",
   "- To work on an issue, use the drive skill: `drive <issue>`. It takes the issue through the attended steps with the user.",
   "- To run a sliced story unattended, use the deliver skill: `deliver <story>`.",
-  "- Without the skills: `psdd next <issue>` says what can be done now, and `psdd take <issue>` claims an item and gives the briefing to follow to the end. Use `npx psdd` if `psdd` is not on the PATH.",
-  "- Never change psdd's labels, claims or branches by hand.",
+  "- Without the skills: `norn next <issue>` says what can be done now, and `norn take <issue>` claims an item and gives the briefing to follow to the end. Use `npx norn` if `norn` is not on the PATH.",
+  "- Never change norn's labels, claims or branches by hand.",
   END,
 ].join("\n");
 
 /**
  * Writes AGENT_INSTRUCTIONS into each of AGENTS.md and CLAUDE.md that exists,
- * replacing an earlier psdd block; with neither, creates AGENTS.md and a CLAUDE.md
+ * replacing an earlier norn block; with neither, creates AGENTS.md and a CLAUDE.md
  * that imports it. A CLAUDE.md that imports AGENTS.md is left alone.
  */
 function writeAgentInstructions(cwd: string): string[] {
