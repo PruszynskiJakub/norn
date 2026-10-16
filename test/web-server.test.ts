@@ -63,6 +63,10 @@ describe("the dashboard server", () => {
     const html = await page.text();
     expect(html).toContain('<script type="module" src="/assets/app.js"></script>');
     expect(html).toContain('<link rel="stylesheet" href="/assets/app.css">');
+    expect(html).toContain('<link rel="icon" type="image/svg+xml" href="/favicon.svg">');
+    const icon = await fetch(`${d.url}/favicon.svg`);
+    expect(icon.headers.get("content-type")).toBe("image/svg+xml");
+    expect(await icon.text()).toContain('aria-label="Norn"');
     const js = await fetch(`${d.url}/assets/app.js`);
     expect(js.headers.get("content-type")).toContain("javascript");
     expect(await js.text()).toBe("console.log('ui')");

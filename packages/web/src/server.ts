@@ -1,6 +1,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
 import { byTime, type Ctx, type Observation, observe } from "@norn/core";
 import type { DashboardIdentity, DashboardState, PollFailure } from "./contract.js";
+import { ICON_SVG } from "./icon.js";
 import type { UiAssets } from "./ui-assets.js";
 
 export interface DashboardDeps {
@@ -121,6 +122,7 @@ async function handle(req: IncomingMessage, res: ServerResponse, deps: Dashboard
   }
   if (get && path === "/api/identity") return json({ app: "norn-dashboard", root: deps.root } satisfies DashboardIdentity);
   if (get && path === "/") return res.writeHead(200, { "content-type": "text/html; charset=utf-8" }).end(page(deps.assets));
+  if (get && path === "/favicon.svg") return res.writeHead(200, { "content-type": "image/svg+xml" }).end(ICON_SVG);
   if (get && deps.assets && path === "/assets/app.js") {
     return res.writeHead(200, { "content-type": "text/javascript; charset=utf-8" }).end(deps.assets.js);
   }
@@ -140,6 +142,7 @@ function page(assets: UiAssets | null) {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>norn dashboard</title>
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
 ${assets ? '<link rel="stylesheet" href="/assets/app.css">' : ""}
 </head>
 <body>

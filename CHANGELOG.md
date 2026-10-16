@@ -7,6 +7,7 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 ### Changed
 
 - psdd is renamed to norn. The command is `npx norn`, and everything it writes uses the new name: `norn:` comments on issues, `refs/norn/claims/<issue>`, the `norn/qa/<issue>` evidence branches, `.agents/norn.config.json` and `.agents/norn.config.local.json`, `NORN_SESSION` and `NORN_SKILLS_SOURCE`, and the `<!-- norn:start -->` section in `AGENTS.md` and `CLAUDE.md`. It is a clean break: norn reads none of the old names. Finish or restart stories that are in flight under psdd. After upgrading, rename the config files, run `npx norn init`, and delete the old `<!-- psdd:start -->` section from `AGENTS.md` and `CLAUDE.md`.
+- The dashboard shows the norn icon as its favicon.
 
 ## [0.5.1] - 2026-10-16
 
