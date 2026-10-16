@@ -32,11 +32,18 @@ export interface FlowState {
   color?: string;
   /** The step can attach evidence files with norn done --evidence <dir>. */
   evidence?: boolean;
+  /** The only mode the state runs in; in the other mode norn follows passThrough instead of entering it. */
+  when?: Mode;
+  /** With when: the outcome word norn follows on its own when the issue's mode skips the state. */
+  passThrough?: string;
   /** Built-in mechanics the state opts into; see behaviours.ts. */
   behaviours?: BehaviourName[];
   /** Keyed by outcome word. */
   outcomes: Record<string, Outcome>;
 }
+
+/** How an issue is worked, from its mode:afk or mode:hil label: unattended, or with a person in the loop. */
+export type Mode = "afk" | "hil";
 
 /** The closed set of behaviours a state can opt into. A name outside it fails validation, e.g. one from a newer norn. */
 export const BEHAVIOURS = ["opensPR", "countsFixRounds", "humanGate"] as const;
@@ -57,7 +64,9 @@ export type FlowError =
   | { kind: "renamed-unknown"; from: string; to: string }
   /** A state takes a name norn keeps for itself, e.g. closed. */
   | { kind: "state-reserved"; state: string }
-  | { kind: "behaviour-unknown"; state: string; behaviour: string };
+  | { kind: "behaviour-unknown"; state: string; behaviour: string }
+  /** A state with when has no passThrough (word null), or it names a word that is not one of the state's outcomes. */
+  | { kind: "pass-through-invalid"; state: string; word: string | null };
 
 /** Ends every flow can lead to; no state may take these names. */
 export const RESERVED_TARGETS = ["closed", "not-planned"] as const;
@@ -122,6 +131,11 @@ export function validateFlow(data: unknown): FlowError[] {
     if (!isObject(state.outcomes)) {
       field(`${at}.outcomes`, "an object");
       continue;
+    }
+    if (state.when !== undefined && state.when !== "afk" && state.when !== "hil") field(`${at}.when`, '"afk" or "hil"');
+    if (state.passThrough !== undefined && typeof state.passThrough !== "string") field(`${at}.passThrough`, "an outcome word");
+    else if (state.when !== undefined && (state.passThrough === undefined || !Object.hasOwn(state.outcomes, state.passThrough))) {
+      errors.push({ kind: "pass-through-invalid", state: name, word: state.passThrough ?? null });
     }
     for (const [word, outcome] of Object.entries(state.outcomes)) {
       const o = `${at}.outcomes.${word}`;

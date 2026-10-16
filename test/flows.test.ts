@@ -457,3 +457,46 @@ describe("a flow that changed under issues in progress", () => {
     expect(w.github.comments(40).at(-1)).toBe("norn: verifying → fixing (fixing)");
   });
 });
+
+describe("a state for one mode only (when)", () => {
+  /** The bug flow where a person verifies the fix, in mode:hil only; verified is the pass-through. */
+  function verifiedFlow(verifying: Record<string, unknown> = {}) {
+    const flow = bugFlow();
+    Object.assign(flow.states.fixing, { outcomes: { fixed: { to: "verifying", means: "the fix is in, a person verifies it" } } });
+    Object.assign(flow.states, {
+      verifying: {
+        skill: "bug-verify",
+        attended: true,
+        when: "hil",
+        passThrough: "verified",
+        outcomes: {
+          verified: { to: "closed", means: "the fix works" },
+          "still-broken": { to: "fixing", means: "back to the fix", note: "what still fails" },
+        },
+        ...verifying,
+      },
+    });
+    return flow;
+  }
+
+  function fixingIn(mode: string | null, flow: unknown = verifiedFlow()) {
+    const w = bugAt("fixing", flow);
+    w.github.seedIssue({ number: 40, title: "Crash on empty input", labels: ["type:bug", "fixing", ...(mode ? [mode] : [])], assignees: ["alice"] });
+    return w;
+  }
+
+  test("a when state without a valid pass-through outcome fails validation", async () => {
+    const missing = fixingIn("mode:afk", verifiedFlow({ passThrough: undefined }));
+    const unknown = fixingIn("mode:afk", verifiedFlow({ passThrough: "approved" }));
+    const badMode = fixingIn("mode:afk", verifiedFlow({ when: "sometimes" }));
+
+    const [a, b, c] = [await missing.norn("take", "40"), await unknown.norn("take", "40"), await badMode.norn("take", "40")];
+
+    expect(a.exitCode).toBe(1);
+    expect(a.stdout).toContain("  The state verifying runs in one mode only, so passThrough must name one of its outcomes.");
+    expect(b.exitCode).toBe(1);
+    expect(b.stdout).toContain("  The state verifying passes through approved, which is not one of its outcomes.");
+    expect(c.exitCode).toBe(1);
+    expect(c.stdout).toContain('  states.verifying.when must be "afk" or "hil".');
+  });
+});
