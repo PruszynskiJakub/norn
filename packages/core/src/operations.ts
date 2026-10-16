@@ -357,11 +357,11 @@ export async function addSlice(ctx: Ctx, story: number, input: { title?: string;
 export async function next(ctx: Ctx, n: number): Promise<NextResult | Refused> {
   const issue = await ctx.github.getIssue(n);
   const name = flowNameOf(issue);
+  // An issue of a broken flow is not refused: next shows it blocked by the flow.
   const loaded = name === null ? null : await repositoryFlow(ctx, name);
-  if (loaded && !loaded.ok) return refuse({ kind: "flow-invalid", issue: n, flow: loaded.name, errors: loaded.errors });
   const r = loaded ? null : await notAStory(ctx.github, n);
   if (r) return refuse(r);
-  const report = await computeNext(ctx, n, loaded ? { name: loaded.name, flow: loaded.flow } : null);
+  const report = await computeNext(ctx, n, loaded);
   if (report.nothingLeft && !report.closed) await notifyWaiting(ctx, report);
   return { ok: true, kind: "next", report };
 }

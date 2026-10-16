@@ -1,4 +1,4 @@
-import type { BehaviourName, Flow } from "./flow.js";
+import type { Flow } from "./flow.js";
 import type { Issue } from "./github.js";
 import type { Location } from "./location.js";
 import type { Event } from "./events.js";
@@ -12,8 +12,12 @@ import { type Ctx, fixLimitReason, fixRounds, oneLine } from "./transitions.js";
  * name. Each one contributes what it needs to the commands: its lines to the
  * briefing, its say on an outcome done applies, its checks before an issue
  * leaves the state, and its automatic follow-ups. The set is closed; a flow
- * only names them.
+ * only names them, as `"behaviours": { "opensPR": {} }`, each with its
+ * parameters. Each also says what validation asks of a flow that uses it.
  */
+
+/** A behaviour's parameters, as written in the flow; `{}` when it takes none. */
+export type BehaviourParams = Record<string, unknown>;
 
 /** What a behaviour sees of a step being briefed in a flow that uses it. */
 export interface BriefingInput {
@@ -50,6 +54,14 @@ export interface Applied {
 }
 
 export interface Behaviour {
+  /** What is wrong with its parameters: the parameter's name and what it must be. */
+  params?(params: BehaviourParams): { param: string; expected: string }[];
+  /** Behaviours the same state cannot also have. */
+  excludes?: readonly string[];
+  /** What the flow must be like for the behaviour to work, e.g. a workspace; the field and what it must be. */
+  requires?(flow: Record<string, unknown>): { field: string; expected: string } | null;
+  /** The flows its parameters name, e.g. the type slices get; each must exist. */
+  flowsNamed?(params: BehaviourParams): string[];
   /** Briefing lines, for a step in any state of a flow that uses the behaviour: the behaviour decides which states it speaks for. */
   briefing?(b: BriefingInput): Promise<string[]>;
   /** Checked by done before an issue leaves a state with the behaviour, before anything changes; a refusal stops done. */
@@ -62,7 +74,7 @@ export interface Behaviour {
 
 /** Whether the state of the flow opts into the behaviour. */
 export function uses(flow: Flow, state: string | null, name: BehaviourName): boolean {
-  return state !== null && (flow.states[state]?.behaviours ?? []).includes(name);
+  return state !== null && Object.hasOwn(flow.states[state]?.behaviours ?? {}, name);
 }
 
 /** Whether any state of the flow opts into the behaviour. */
@@ -71,6 +83,8 @@ export function usedIn(flow: Flow, name: BehaviourName): boolean {
 }
 
 const opensPR: Behaviour = {
+  /** The PR comes from the issue's own branch. */
+  requires: (flow) => (flow.workspace === "own" ? null : { field: "workspace", expected: '"own", for its PR' }),
   /** In its state, how to open or update the PR; in the others, once it exists, the PR and its diff. */
   async briefing({ ctx, issue, flow, state, loc }) {
     if (!loc) return [];
@@ -146,12 +160,16 @@ const countsFixRounds: Behaviour = {
   },
 };
 
-/** Every behaviour norn knows, in the order their briefing lines appear. */
-const REGISTRY: Record<BehaviourName, Behaviour> = {
+/** Every behaviour norn knows, by name, in the order their briefing lines appear. A name outside it fails validation, e.g. one from a newer norn. */
+export const BEHAVIOURS = {
   countsFixRounds,
   opensPR,
   humanGate,
-};
+} satisfies Record<string, Behaviour>;
+
+export type BehaviourName = keyof typeof BEHAVIOURS;
+
+const REGISTRY: Record<BehaviourName, Behaviour> = BEHAVIOURS;
 
 /** The behaviours a flow uses anywhere, in registry order. */
 function inFlow(flow: Flow): Behaviour[] {

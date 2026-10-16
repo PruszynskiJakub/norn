@@ -29,7 +29,7 @@ function bugFlow(over: Record<string, unknown> = {}) {
 /** The bug flow with its own branch, where fixing opens the PR. */
 function prFlow() {
   const flow = bugFlow({ workspace: "own" });
-  Object.assign(flow.states.fixing, { behaviours: ["opensPR"] });
+  Object.assign(flow.states.fixing, { behaviours: { opensPR: {} } });
   return flow;
 }
 
@@ -162,7 +162,11 @@ describe("where flows come from", () => {
   test("the flow is read from the team's base branch", async () => {
     const w = bugAt("reproducing");
     w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ baseBranch: "develop" }));
-    w.github.seedFlow("bug", bugFlow({ states: { reproducing: { skill: "develop-repro", attended: true, outcomes: {} } } }), "develop");
+    w.github.seedFlow(
+      "bug",
+      bugFlow({ states: { reproducing: { skill: "develop-repro", attended: true, outcomes: { fixed: { to: "closed", means: "fixed" } } } } }),
+      "develop",
+    );
 
     const out = (await w.norn("take", "40")).stdout;
 
@@ -218,6 +222,60 @@ describe("a broken flow", () => {
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain('  workspace must be "none" or "own".');
     expect(w.github.labels(40).sort()).toEqual(["in-progress", "reproducing", "type:bug"]);
+  });
+
+  test("a state from which the issue can never reach closed or not-planned is refused", async () => {
+    const flow = bugFlow();
+    Object.assign(flow.states, {
+      waiting: { skill: "bug-wait", attended: true, outcomes: { again: { to: "looping", means: "wait more" } } },
+      looping: { skill: "bug-loop", attended: true, outcomes: { again: { to: "waiting", means: "loop more" } } },
+    });
+    const w = bugAt("reproducing", flow);
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("#40 runs the flow bug, which is broken");
+    expect(res.stdout).toContain(
+      "  From waiting, no outcome ever leads to closed or not-planned.\n  From looping, no outcome ever leads to closed or not-planned.\n",
+    );
+  });
+
+  test("behaviours must be an object of behaviour names", async () => {
+    const flow = bugFlow();
+    Object.assign(flow.states.fixing, { behaviours: ["opensPR"] });
+    const w = bugAt("reproducing", flow);
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("  states.fixing.behaviours must be an object of behaviour names.\n");
+  });
+
+  test("a flow cannot take the name of triage's reject", async () => {
+    const w = setup();
+    w.github.seedFlow("reject", bugFlow());
+    w.github.seedIssue({ number: 40, title: "Crash on empty input", labels: ["type:reject", "reproducing"] });
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("#40 runs the flow reject, which is broken");
+    expect(res.stdout).toContain("  The name reject is norn's own: triage uses it to close an issue as not planned.\n");
+  });
+
+  test("norn next shows its issues as blocked by the flow, with the reason, for a person", async () => {
+    const w = bugAt("reproducing", "{ not json");
+
+    const res = await w.norn("next", "40");
+    const json = JSON.parse((await w.norn("next", "40", "--json")).stdout);
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("Waiting for a human:\n  - #40 is blocked by its flow bug, which is broken: It is not valid JSON: ");
+    expect(res.stdout).toContain("Fix .agents/flows/bug.json on the base branch.\n");
+    expect(res.stdout).not.toContain("Story #40");
+    expect(json.nothingLeft).toBe(true);
+    expect(json.waiting).toEqual([{ issue: 40, reason: "invalid-flow", detail: expect.stringContaining("is blocked by its flow bug, which is broken") }]);
   });
 
   test("issues of other types are not affected", async () => {
