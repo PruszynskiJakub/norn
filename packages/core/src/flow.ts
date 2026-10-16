@@ -15,6 +15,8 @@ export interface Flow {
   /** Whether triage offers the flow as an outcome; it does unless this is false. */
   triage?: boolean;
   states: Record<string, FlowState>;
+  /** Old state name to its new one: issues still in the old state move there when next touched. */
+  renamed?: Record<string, string>;
 }
 
 export interface FlowState {
@@ -45,6 +47,8 @@ export type FlowError =
   | { kind: "field-invalid"; path: string; expected: string }
   | { kind: "start-unknown"; start: string }
   | { kind: "target-unknown"; state: string; word: string; to: string }
+  /** `renamed` moves the old state `from` to `to`, which is not a state of the flow. */
+  | { kind: "renamed-unknown"; from: string; to: string }
   /** A state takes a name norn keeps for itself, e.g. closed. */
   | { kind: "state-reserved"; state: string };
 
@@ -119,6 +123,14 @@ export function validateFlow(data: unknown): FlowError[] {
     }
   }
   if (typeof data.start === "string" && !Object.hasOwn(states, data.start)) errors.push({ kind: "start-unknown", start: data.start });
+  if (data.renamed !== undefined) {
+    if (!isObject(data.renamed)) field("renamed", "an object");
+    else
+      for (const [from, to] of Object.entries(data.renamed)) {
+        if (typeof to !== "string") field(`renamed.${from}`, "a string");
+        else if (!Object.hasOwn(states, to)) errors.push({ kind: "renamed-unknown", from, to });
+      }
+  }
   return errors;
 }
 
@@ -186,9 +198,20 @@ export function flowStatesOf(issue: Issue, flow: Flow): string[] {
   return Object.keys(flow.states).filter((s) => issue.labels.includes(s));
 }
 
-/** The issue's step in its flow; null when it has no single state there. needs-human is resolved the same in every flow. */
+/**
+ * The issue's step in its flow; null when it has no single state there. needs-human is resolved the same in every flow;
+ * with no state of the flow, e.g. one the flow dropped, resolving moves the issue into the state a person picks.
+ */
 export function flowStep(issue: Issue, flow: Flow): Step | null {
   const states = flowStatesOf(issue, flow);
+  if (states.length === 0 && issue.labels.includes("needs-human")) {
+    return {
+      name: "resolving needs-human",
+      skill: "norn-resolve",
+      attended: true,
+      outcomes: Object.fromEntries(Object.keys(flow.states).map((s) => [s, { to: s, means: `moves it to ${s}, a state of the flow` }])),
+    };
+  }
   if (states.length !== 1) return null;
   const [state] = states;
   if (issue.labels.includes("needs-human")) {
