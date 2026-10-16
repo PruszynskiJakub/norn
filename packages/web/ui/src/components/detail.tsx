@@ -4,9 +4,13 @@ import { type Item, PIPELINE, isDone, latestEvidenceOf, mergedSlices, pipelinePo
 import { useView } from "../view.ts";
 import { DETAIL, fixRoundsUsed, holderSentence, progressCount, slicesMerged, stateSentence, waitingHeading, waitingReason } from "../wording.ts";
 import { CopyCommand } from "./copy-command.tsx";
+import { Badge } from "./ui/badge.tsx";
 import { EvidenceBlock } from "./evidence.tsx";
 
 const kickerClass = "text-[13px] text-faint";
+
+/** Colour only where a label asks for the developer: needs-human escalated, needs-human-qa theirs to QA. */
+const labelTone = (label: string) => (label === "needs-human" ? "bad" : label === "needs-human-qa" ? "warn" : "neutral");
 const inlineLink = "border-0 bg-transparent p-0 text-left text-inherit hover:underline hover:underline-offset-3";
 
 function FixPips({ used, max }: { used: number; max: number }) {
@@ -43,6 +47,15 @@ export function Detail({ x }: { x: Item }) {
         )}
       </div>
       <h3 className="mt-1 mb-1.5 font-semibold text-[18px] leading-[1.35] tracking-[-0.01em]">{x.title}</h3>
+      {x.labels.length > 0 && (
+        <div className="mb-2.5 flex flex-wrap gap-1" title={DETAIL.labels}>
+          {x.labels.map((l) => (
+            <Badge key={l} tone={labelTone(l)}>
+              {l}
+            </Badge>
+          ))}
+        </div>
+      )}
       <p className="mt-0 mb-[18px] text-soft">
         {stateSentence(x)}.{x.holder && !isDone(x) && ` ${holderSentence(x.holder, state.me, now)}`}
       </p>

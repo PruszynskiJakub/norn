@@ -259,6 +259,7 @@ export const DETAIL = {
   waitsFor: "Waits for",
   and: "and",
   humanQa: "You QA this one before it merges",
+  labels: "Labels on GitHub",
   latestEvidence: "Latest QA evidence",
   openOnGitHub: "Open on GitHub ↗",
   progress: "Progress",

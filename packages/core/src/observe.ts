@@ -24,6 +24,8 @@ export interface BoardItem {
   status: "open" | "merged" | "closed";
   /** The state labels of an open issue. More than one means psdd cannot tell which is real. */
   states: State[];
+  /** Every label on the issue, as GitHub has them, in its order. */
+  labels: string[];
   mode: "afk" | "hil" | null;
   /** Open blockers. */
   blockedBy: number[];
@@ -108,6 +110,7 @@ export async function observe(ctx: Ctx, opts: { since?: string | null; previous?
       url: i.url,
       status: closed ? (i.stateReason === "not_planned" ? "closed" : "merged") : "open",
       states: closed ? [] : statesOf(i),
+      labels: [...i.labels],
       mode: i.labels.includes("mode:hil") ? "hil" : i.labels.includes("mode:afk") ? "afk" : null,
       blockedBy: closed ? [] : i.blockedBy.filter((b) => b.state === "open").map((b) => b.number),
       holder: closed ? null : holder(i.number),

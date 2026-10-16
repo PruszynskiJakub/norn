@@ -48,6 +48,7 @@ describe("observe: the board", () => {
         url: "https://github.com/acme/app/issues/11",
         status: "open",
         states: ["implementation"],
+        labels: ["type:slice", "mode:afk", "implementation", "in-progress"],
         mode: "afk",
         blockedBy: [],
         holder: { login: "alice", session: "session-1", since: "2026-10-13T12:30:00.000Z", stale: false },
