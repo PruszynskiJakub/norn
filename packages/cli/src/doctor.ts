@@ -7,6 +7,7 @@ import {
   type FlowError,
   flowFileNames,
   flowStatesOf,
+  renamedTo,
   repositoryFlows,
   parseFlow,
   type LoadedFlow,
@@ -277,7 +278,7 @@ async function flows(d: DoctorDeps, config: Config, inEffect: LoadedFlow[]): Pro
     const before = inEffect.find((l) => l.name === after.name);
     if (!after.ok || !before?.ok) continue;
     // As take would: a state renamed is followed, any other state the flow dropped sends the issue to needs-human.
-    const kept = (state: string) => Object.hasOwn(after.flow.states, state) || Object.hasOwn(after.flow.renamed ?? {}, state);
+    const kept = (state: string) => Object.hasOwn(after.flow.states, state) || renamedTo(after.flow, state) !== null;
     const removed = Object.keys(before.flow.states).filter((state) => !kept(state));
     if (!removed.length) continue;
     for (const issue of await d.github.openIssues(`type:${after.name}`)) {

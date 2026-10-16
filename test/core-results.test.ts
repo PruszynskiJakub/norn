@@ -95,7 +95,7 @@ describe("take", () => {
 
     const res = await take(ctx, 41, { takeover: false });
 
-    if (!res.ok) throw new Error("refused");
+    if (!res.ok || res.kind !== "taken") throw new Error("not taken");
     expect(res.briefing).toMatchObject({
       issue: 41,
       noun: "slice",

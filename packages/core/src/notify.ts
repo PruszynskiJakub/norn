@@ -7,6 +7,8 @@ export type Channel = "herdr" | "os";
 export type Notification =
   /** `reason` is the needs-human reason norn recorded on the issue, as written there. */
   | { kind: "needs-human"; issue: number; reason: string; url: string }
+  /** The issue was in `state`, which the flow `flow` no longer has, so norn set needs-human on it. */
+  | { kind: "state-left"; issue: number; state: string; flow: string; url: string }
   /** `of` says why a person QAs it, as Outcome.notify does. */
   | { kind: "needs-human-qa"; issue: number; of: string; url: string }
   /** Delivery stopped: what waits for a person that no session holds; empty when nothing does. */
@@ -28,6 +30,11 @@ export async function send(ctx: Ctx, notification: Notification): Promise<void> 
 /** needs-human was set on an issue. */
 export async function notifyNeedsHuman(ctx: Ctx, n: number, reason: string) {
   await send(ctx, { kind: "needs-human", issue: n, reason, url: `${await ctx.github.repoUrl()}/issues/${n}` });
+}
+
+/** An issue in a state its flow no longer has was handed to a person. */
+export async function notifyStateLeft(ctx: Ctx, n: number, state: string, flow: string) {
+  await send(ctx, { kind: "state-left", issue: n, state, flow, url: `${await ctx.github.repoUrl()}/issues/${n}` });
 }
 
 /** An issue reached QA by a person. */

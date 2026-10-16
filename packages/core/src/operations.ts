@@ -31,11 +31,11 @@ import {
   ensureOwnBranch,
   ensureStateLabel,
   type Evidence,
-  followRename,
-  handOverLeft,
   leftState,
   needsHumanLine,
   oneLine,
+  type Settled,
+  settleLeftState,
   skipLine,
   stateLabels,
 } from "./transitions.js";
@@ -77,6 +77,16 @@ export interface DoneResult {
   deliverable: boolean;
   /** A person does the next step and has been notified. */
   personNext: boolean;
+}
+
+/** take found the issue in a state its flow no longer has and handed it to a person through needs-human; the claim is released. */
+export interface HandedOverResult {
+  ok: true;
+  kind: "handed-over";
+  issue: number;
+  /** The state the issue was in, which the flow no longer has. */
+  state: string;
+  flow: string;
 }
 
 export interface EscalateResult {
@@ -139,7 +149,7 @@ async function noStepRefusal(issue: Issue, ctx: Ctx, named: NamedFlow | null): P
   return { kind: "no-step", issue: n, state, story };
 }
 
-export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Promise<TakeResult | Refused> {
+export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Promise<TakeResult | HandedOverResult | Refused> {
   const { github } = ctx;
   const before = await github.getIssue(n);
   const first = await stepOf(ctx, before);
@@ -162,19 +172,17 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
   const issue = await github.getIssue(n);
   let resolved = await stepOf(ctx, issue);
   if (resolved.ok && resolved.flow && !resolved.step) {
-    const { name, flow } = resolved.flow;
-    const from = await leftState(ctx, issue, flow);
-    const to = from === null ? undefined : flow.renamed?.[from];
-    if (from !== null && to !== undefined) {
-      await followRename(ctx, issue, flow, name, from, to);
-      resolved = await stepOf(ctx, issue);
-    } else if (from !== null) {
-      try {
-        await handOverLeft(ctx, issue, name, from);
-      } finally {
-        await github.deleteClaim(n);
-      }
-      return refuse({ kind: "state-left", issue: n, state: from, flow: name });
+    let settled: Settled | null;
+    try {
+      settled = await settleLeftState(ctx, issue, resolved.flow);
+    } catch (e) {
+      await github.deleteClaim(n);
+      throw e;
+    }
+    if (settled?.kind === "state-renamed") resolved = await stepOf(ctx, issue);
+    else if (settled?.kind === "handed-over") {
+      await github.deleteClaim(n);
+      return { ok: true, kind: "handed-over", issue: n, state: settled.state, flow: settled.flow };
     }
   }
   if (!resolved.ok || !resolved.step) {

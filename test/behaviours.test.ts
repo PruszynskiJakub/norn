@@ -297,17 +297,35 @@ describe("norn next on an issue of a flow", () => {
     );
   });
 
-  test("an issue in a state its flow renamed is offered in the new state", async () => {
+  test("next moves an issue in a state its flow renamed to the new state, and offers it there", async () => {
     const w = bugAt("triaged", { ...bugFlow(), renamed: { triaged: "reviewing" } });
 
     const out = (await w.norn("next", "40")).stdout;
 
+    expect(out).toContain("#40 moved from triaged to reviewing: the flow bug renamed the state.");
     expect(out).toContain('  - Issue #40 "Crash on empty input" is in reviewing: reviewing.');
+    expect(w.github.labels(40).sort()).toEqual(["reviewing", "type:bug"]);
+    expect(w.github.comments(40)).toEqual(["norn: triaged → reviewing (automatic)\n\nThe flow bug renamed the state triaged to reviewing."]);
+    expect(w.github.claim(40)).toBeNull();
   });
 
-  test("an issue in a state its flow no longer has waits for a person", async () => {
+  test("next hands an issue in a state its flow no longer has to a person", async () => {
     const w = bugAt("testing");
     w.github.commentsByIssue.set(40, ["norn: fixing → testing (fixed)"]);
+
+    const out = (await w.norn("next", "40")).stdout;
+
+    expect(out).toContain("#40 was in testing, which the flow bug no longer has, so it now needs a human.");
+    expect(out).toContain("Waiting for a human:\n  - #40 the state testing is no longer in the flow bug.");
+    expect(w.github.labels(40).sort()).toEqual(["needs-human", "type:bug"]);
+    expect(w.github.comments(40).at(-1)).toBe("norn: needs-human — the state testing is no longer in the flow bug");
+    expect(w.github.claim(40)).toBeNull();
+  });
+
+  test("an issue in a state its flow no longer has that a session holds waits for a person", async () => {
+    const w = bugAt("testing");
+    w.github.commentsByIssue.set(40, ["norn: fixing → testing (fixed)"]);
+    w.github.claims.set(40, { holder: "bob", session: "bob-1", since: "2026-10-13T11:50:00Z" });
 
     const out = (await w.norn("next", "40")).stdout;
 

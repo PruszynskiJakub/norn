@@ -12,7 +12,17 @@ import { flowOf, validFlow } from "./flow-loading.js";
 import type { LoadedFlow } from "./flow-validation.js";
 import type { Holder, HumanPlace, WaitItem } from "./waiting.js";
 import type { Step } from "./machine.js";
-import { bestEffort, clearClosedState, ensureOwnBranch, leftState, needsHumanReason, type Ctx } from "./transitions.js";
+import {
+  bestEffort,
+  clearClosedState,
+  type Ctx,
+  ensureOwnBranch,
+  leftState,
+  needsHumanReason,
+  type Settled,
+  settleLeftState,
+  withShortClaim,
+} from "./transitions.js";
 
 export interface StartItem {
   issue: number;
@@ -183,21 +193,25 @@ async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, named:
     report.waiting.push({ issue: n, reason: "needs-human", why: await needsHumanReason(ctx.github, n), ...(await humanWork(ctx, issue, flow)) });
     return;
   }
-  let state = states[0];
+  const state = states[0];
   if (state === undefined) {
     const left = await leftState(ctx, issue, flow);
-    const to = left === null ? undefined : flow.renamed?.[left];
     if (left === null) {
       report.waiting.push({ issue: n, reason: "no-state" });
       return;
     }
-    if (to === undefined) {
+    // As take does: the rename is followed, or a person decides where the issue goes; then it is sorted where it landed.
+    let settled: Settled | null = null;
+    const claimed = await withShortClaim(ctx, n, async () => {
+      settled = await settleLeftState(ctx, issue, named);
+    });
+    if (!claimed) {
       report.waiting.push({ issue: n, reason: "state-left", state: left, flow: name });
       return;
     }
-    // take follows the rename first, so the issue is offered in its new state.
-    issue = { ...issue, labels: [...issue.labels.filter((l) => l !== left), to] };
-    state = to;
+    if (settled) report.notes.push(settled);
+    await classifyInFlow(ctx, issue, report, named, kind);
+    return;
   }
   if (uses(flow, state, "humanGate")) {
     report.waiting.push({ issue: n, reason: "human-qa", of: gateOf(flow, state, name), ...(await humanWork(ctx, issue, flow)) });

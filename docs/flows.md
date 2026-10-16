@@ -147,9 +147,11 @@ A broken flow stops only the issues of its own type. `norn take` and `norn done`
 
 ## Changing a flow under issues in progress
 
-Flows have no versions: an issue in progress follows the current flow from its next step. Adding a state or an outcome needs nothing more. Removing or renaming a state leaves the issues in it behind. When `norn take` finds an issue in a state its flow no longer has (the state norn last moved it to, by its transition comments):
+Flows have no versions: an issue in progress follows the current flow from its next step. Adding a state or an outcome needs nothing more. Removing or renaming a state leaves the issues in it behind. When `norn take` or `norn next` next touches an issue in a state its flow no longer has (the state norn last moved it to, by its transition comments):
 
-- if the flow's optional `renamed` map, e.g. `"renamed": { "repro": "reproducing" }`, names the old state, norn moves the issue to the new state with a transition comment and takes it there;
-- otherwise the issue is orphaned: norn sets `needs-human` with a comment naming the missing state and the flow, takes the old state's label off and refuses the take. Taking the issue again runs `norn-resolve`, whose outcomes are the flow's states: `norn done <issue> <state>` moves it there.
+- if the flow's optional `renamed` map, e.g. `"renamed": { "repro": "reproducing" }`, names the old state, norn moves the issue to the new state with a transition comment; `take` takes it there and `next` offers it there;
+- otherwise the issue is orphaned: norn sets `needs-human` with a comment naming the missing state and the flow, takes the old state's label off and notifies the user. `take` answers that it handed the issue over and releases the claim; `next` lists it as waiting for a person. Taking the issue again runs `norn-resolve`, whose outcomes are the flow's states: `norn done <issue> <state>` moves it there.
+
+`norn next` makes these changes as it makes its other housekeeping, under a short claim; an issue another session holds is only listed as in a state its flow no longer has.
 
 Before merging such a change, run `norn doctor` on the branch with the edit: its `flows` check lists the open issues the edit would orphan, with their states, so you can add the states to `renamed` or move those issues on first. The old state's label stays on the repository, and `doctor` lists it as one no flow uses.

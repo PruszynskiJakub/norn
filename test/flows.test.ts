@@ -560,21 +560,43 @@ describe("a flow that changed under issues in progress", () => {
     return w;
   }
 
-  test("take hands an issue in a removed state to a person, naming the state and the flow", async () => {
+  test("take hands an issue in a removed state to a person, naming the state and the flow, as what it did", async () => {
     const w = await leftInVerifying();
 
     const res = await w.norn("take", "40");
 
-    expect(res.exitCode).toBe(1);
+    expect(res.exitCode).toBe(0);
     expect(res.stdout).toBe(
       [
-        "#40 is in verifying, which the flow bug no longer has, so it now needs a human.",
-        "Run norn take 40 to resolve it: a person moves it to a state of the flow.",
+        "#40 was in verifying, which the flow bug no longer has, so it now needs a human. The claim is released.",
+        "Do not work on it further. A person picks it up with the norn-resolve skill and moves it to a state of the flow.",
       ].join("\n"),
     );
     expect(w.github.labels(40).sort()).toEqual(["needs-human", "type:bug"]);
     expect(w.github.comments(40).at(-1)).toBe("norn: needs-human — the state verifying is no longer in the flow bug");
     expect(w.github.claim(40)).toBeNull();
+  });
+
+  test("take's hand-over is a result in --json, with the state and the flow", async () => {
+    const w = await leftInVerifying();
+
+    const json = JSON.parse((await w.norn("take", "40", "--json")).stdout);
+
+    expect(json).toMatchObject({ ok: true, issue: 40, state: "verifying", flow: "bug" });
+  });
+
+  test("the hand-over notifies the user, naming the state and the flow", async () => {
+    const w = await leftInVerifying();
+
+    await w.norn("take", "40");
+
+    expect(w.notifications).toEqual([
+      {
+        channel: "os",
+        title: "norn: #40 needs you",
+        body: "#40 was in verifying, which the flow bug no longer has; move it to a state of the flow\nhttps://github.com/acme/app/issues/40",
+      },
+    ]);
   });
 
   test("resolving it moves the issue into the state of the flow a person picks", async () => {

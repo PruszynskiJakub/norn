@@ -67,6 +67,11 @@ export function flowNameOf(issue: Issue): string | null {
   return null;
 }
 
+/** The state the flow's `renamed` map moves an old state to; null when it names none for it. */
+export function renamedTo(flow: Flow, state: string): string | null {
+  return flow.renamed && Object.hasOwn(flow.renamed, state) ? flow.renamed[state] : null;
+}
+
 /** Whether the state of the flow opts into the behaviour. */
 export function uses(flow: Flow, state: string | null, name: BehaviourName): boolean {
   return state !== null && Object.hasOwn(flow.states[state]?.behaviours ?? {}, name);

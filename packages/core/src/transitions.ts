@@ -7,9 +7,9 @@ import { specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
-import { type Flow, flowStatesOf, hasSpec, type Mode, stateLabel } from "./flow.js";
+import { type Flow, flowStatesOf, hasSpec, type Mode, type NamedFlow, renamedTo, stateLabel } from "./flow.js";
 import { type FlowCache, loadFlow, validFlow } from "./flow-loading.js";
-import { notifyHumanQa, notifyNeedsHuman, type Notify } from "./notify.js";
+import { notifyHumanQa, notifyNeedsHuman, notifyStateLeft, type Notify } from "./notify.js";
 
 /** The marker norn writes when it sets needs-human; norn next reads the reason back from it. */
 export const NEEDS_HUMAN_MARK = "norn: needs-human — ";
@@ -312,8 +312,28 @@ export async function leftState(ctx: Ctx, issue: Issue, flow: Flow): Promise<str
   return null;
 }
 
+/** What norn did with an issue left in a state its flow no longer has. */
+export type Settled = Extract<Event, { kind: "state-renamed" | "handed-over" }>;
+
+/**
+ * For an issue in a state its flow no longer has: follows the flow's `renamed` to the state's new name, or hands the
+ * issue to a person through needs-human. Null, changing nothing, for an issue in a state of its flow. Runs under a
+ * claim this session holds; `issue` is changed to what it left.
+ */
+export async function settleLeftState(ctx: Ctx, issue: Issue, { name, flow }: NamedFlow): Promise<Settled | null> {
+  const from = await leftState(ctx, issue, flow);
+  if (from === null) return null;
+  const to = renamedTo(flow, from);
+  if (to !== null) {
+    await followRename(ctx, issue, flow, name, from, to);
+    return { kind: "state-renamed", issue: issue.number, from, to, flow: name };
+  }
+  await handOverLeft(ctx, issue, name, from);
+  return { kind: "handed-over", issue: issue.number, state: from, flow: name };
+}
+
 /** Moves an issue in a renamed state to its new name, under the claim this session holds. */
-export async function followRename(ctx: Ctx, issue: Issue, flow: Flow, name: string, from: string, to: string): Promise<void> {
+async function followRename(ctx: Ctx, issue: Issue, flow: Flow, name: string, from: string, to: string): Promise<void> {
   const n = issue.number;
   await ensureStateLabel(ctx, flow, to);
   await ctx.github.addLabels(n, [to]);
@@ -323,14 +343,14 @@ export async function followRename(ctx: Ctx, issue: Issue, flow: Flow, name: str
 }
 
 /** Hands an issue in a state its flow no longer has to a person, under the claim this session holds. */
-export async function handOverLeft(ctx: Ctx, issue: Issue, name: string, state: string): Promise<void> {
+async function handOverLeft(ctx: Ctx, issue: Issue, name: string, state: string): Promise<void> {
   const n = issue.number;
-  const why = `the state ${state} is no longer in the flow ${name}`;
   await ctx.github.addLabels(n, ["needs-human"]);
-  await ctx.github.comment(n, needsHumanLine(why));
+  await ctx.github.comment(n, needsHumanLine(`the state ${state} is no longer in the flow ${name}`));
   // The old label goes, so the resolve step moves the issue into a state of the flow.
   await ctx.github.removeLabels(n, [state, "in-progress"]);
-  await notifyNeedsHuman(ctx, n, why);
+  issue.labels = [...issue.labels.filter((l) => l !== state && l !== "in-progress"), "needs-human"];
+  await notifyStateLeft(ctx, n, state, name);
 }
 
 /**

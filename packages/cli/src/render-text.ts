@@ -12,6 +12,7 @@ import {
   type FinishCommand,
   FLOWS_DIR,
   type FlowError,
+  type HandedOverResult,
   type FollowUpTask,
   FOR_HUMAN,
   type Holder,
@@ -45,6 +46,7 @@ import type { InitResult, InitWouldDowngrade, MissingSkills } from "./init.js";
 /** What a command can answer with. */
 export type Answer =
   | TakeResult
+  | HandedOverResult
   | DoneResult
   | EscalateResult
   | ReleaseResult
@@ -273,11 +275,6 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
         ...r.errors.map((e) => `  ${flowError(e)}`),
         `Fix .agents/flows/${r.flow}.json on the base branch, then run the command again. Issues of other types are not affected.`,
       ];
-    case "state-left":
-      return [
-        `#${r.issue} is in ${r.state}, which the flow ${r.flow} no longer has, so it now needs a human.`,
-        `Run norn take ${r.issue} to resolve it: a person moves it to a state of the flow.`,
-      ];
     case "held":
       return [
         `${heldWhat(r)} is already held by another session (since ${heldSince(r.since)}).`,
@@ -487,6 +484,10 @@ export function renderEvent(e: Event): string[] {
       return [`Its worktree ${e.worktree} is removed by the next norn tidy.`];
     case "slice-state-changed":
       return [`#${e.issue} is now ${e.state}.`];
+    case "state-renamed":
+      return [`#${e.issue} moved from ${e.from} to ${e.to}: the flow ${e.flow} renamed the state.`];
+    case "handed-over":
+      return [`#${e.issue} was in ${e.state}, which the flow ${e.flow} no longer has, so it now needs a human.`];
     case "story-promoted":
       return [`Every slice is merged. Story #${e.story} is now in needs-review.`];
     case "story-closed":
@@ -508,6 +509,11 @@ export function renderAnswer(a: Answer): string[] {
       return renderTake(a);
     case "done":
       return renderDone(a);
+    case "handed-over":
+      return [
+        `#${a.issue} was in ${a.state}, which the flow ${a.flow} no longer has, so it now needs a human. The claim is released.`,
+        "Do not work on it further. A person picks it up with the norn-resolve skill and moves it to a state of the flow.",
+      ];
     case "escalated":
       return [`#${a.issue} now needs a human. The claim is released.`, "Do not work on it further. A person picks it up with the norn-resolve skill."];
     case "released":
@@ -1023,6 +1029,11 @@ export function renderNotification(n: Notification): { title: string; body: stri
       return { title: `norn: #${n.issue} needs you`, body: `${n.reason}\n${n.url}` };
     case "needs-human-qa":
       return { title: `norn: #${n.issue} needs you`, body: `needs human QA (${n.of})\n${n.url}` };
+    case "state-left":
+      return {
+        title: `norn: #${n.issue} needs you`,
+        body: `#${n.issue} was in ${n.state}, which the flow ${n.flow} no longer has; move it to a state of the flow\n${n.url}`,
+      };
     case "story-waiting":
       return {
         title: `norn: story #${n.story} is waiting for you`,

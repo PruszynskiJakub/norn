@@ -27,8 +27,6 @@ export type Refusal =
   | { kind: "no-step"; issue: number; state: string | null; story: number | null }
   /** The issue's type names a repository flow that is broken; issues of other types are unaffected. */
   | { kind: "flow-invalid"; issue: number; flow: string; errors: FlowError[] }
-  /** The issue was in `state`, which its flow no longer has; norn set needs-human on it. */
-  | { kind: "state-left"; issue: number; state: string; flow: string }
   // Claims
   | { kind: "held"; issue: number; slice: boolean; since: string | null; story: number | null }
   /** Held by another session of the same user, who may take it over. */
