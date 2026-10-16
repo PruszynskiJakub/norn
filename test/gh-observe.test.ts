@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { type Exec, GhGitHub } from "@psdd/github-gh";
+import { type Exec, GhError, GhGitHub, ghFailure } from "@psdd/github-gh";
 
 const SHA = "a".repeat(40);
 const OTHER = "b".repeat(40);
@@ -193,5 +193,15 @@ describe("GhGitHub.observeWork", () => {
     ]);
     expect(calls).toHaveLength(2);
     expect(work.stories.map((s) => [s.number, s.assignees, s.subIssues.map((i) => i.number)])).toEqual([[30, ["bob"], [31]]]);
+  });
+});
+
+describe("ghFailure", () => {
+  test("sorts a failed read by what the user can do about it", () => {
+    expect(ghFailure(new GhError(["api"], "gh: Bad credentials (HTTP 401)"))).toBe("auth");
+    expect(ghFailure(new GhError(["api"], "To get started with GitHub CLI, please run:  gh auth login"))).toBe("auth");
+    expect(ghFailure(new GhError(["api"], "GraphQL: API rate limit exceeded for user ID 1"))).toBe("rate-limit");
+    expect(ghFailure(new GhError(["api"], "error connecting to api.github.com\ncheck your internet connection"))).toBe("network");
+    expect(ghFailure(new GhError(["api"], "GraphQL: Something went wrong"))).toBe("other");
   });
 });

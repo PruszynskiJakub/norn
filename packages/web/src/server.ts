@@ -190,7 +190,7 @@ class Poller {
     try {
       const prev = this.last;
       const since = prev ? new Date(Date.parse(prev.at) - OVERLAP_MS).toISOString() : null;
-      const now = await observe(ctx, { since, previous: prev?.claims ?? null });
+      const now = await observe(ctx, { since, previous: prev });
       const items = new Set(now.board.flatMap((s) => [s.number, ...s.slices.map((i) => i.number)]));
       const seen = new Set(now.feed.map((e) => e.id));
       // Events of items that left the board go with them.

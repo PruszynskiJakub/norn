@@ -308,7 +308,7 @@ describe("observe: claims", () => {
     await w.github.addLabels(12, ["ready-for-agent"]);
     await w.as("s2")("take", "12");
     w.setNow("2026-10-13T12:06:00Z");
-    const second = await observe(await w.ctx(), { since: first.at, previous: first.claims });
+    const second = await observe(await w.ctx(), { since: first.at, previous: first });
 
     const claims = (o: typeof second) =>
       o.feed.filter((e) => e.kind === "claim").map((e) => e.kind === "claim" && [e.action, e.issue, e.session, e.at, e.actor]);
@@ -318,7 +318,7 @@ describe("observe: claims", () => {
     ]);
 
     w.setNow("2026-10-13T14:10:00Z");
-    const third = await observe(await w.ctx(), { since: second.at, previous: second.claims });
+    const third = await observe(await w.ctx(), { since: second.at, previous: second });
 
     expect(claims(third)).toEqual([["stale", 12, "s2", "2026-10-13T14:05:00.000Z", "alice"]]);
     expect(third.board[0].slices[1].holder).toMatchObject({ session: "s2", stale: true });
@@ -348,5 +348,37 @@ describe("observe: the story PR", () => {
       ["pr", "opened", "12:00"],
     ]);
     expect(res.feed.find((e) => e.kind === "pr")).toMatchObject({ target: "story", pr: 1000 });
+  });
+});
+
+describe("observe: review fixes", () => {
+  test("outcomes psdd wrote in the same words each get their own fix round", async () => {
+    const w = story();
+    const ctx = await w.ctx();
+    for (const note of ["A", "B"]) {
+      await take(ctx, 11, { takeover: false });
+      await done(ctx, 11, {});
+      await take(ctx, 11, { takeover: false });
+      await done(ctx, 11, { word: "request-changes", note });
+    }
+    await take(ctx, 11, { takeover: false });
+    await done(ctx, 11, {});
+
+    const res = await observe(await w.ctx(), {});
+
+    const implemented = res.feed.filter((e) => e.kind === "outcome" && e.step === "implementation");
+    expect(implemented.map((e) => e.kind === "outcome" && e.fixRound)).toEqual([2, 1, null]);
+  });
+
+  test("a claim that went stale before the last read is no new event", async () => {
+    const w = story();
+    await w.psdd("take", "11");
+    w.setNow("2026-10-13T14:00:30Z");
+    const first = await observe(await w.ctx(), {});
+
+    w.setNow("2026-10-13T14:02:00Z");
+    const second = await observe(await w.ctx(), { since: "2026-10-13T13:59:30.000Z", previous: first });
+
+    expect(second.feed.filter((e) => e.kind === "claim")).toEqual([]);
   });
 });

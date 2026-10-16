@@ -85,11 +85,11 @@ const WEEK_MS = 7 * 86_400_000;
 /**
  * The developer's psdd work in this repository, read in one go: the board,
  * what waits for them and what happened. Makes no changes. With `since`, the
- * feed holds only what happened after it; with `previous`, the claims of the
- * last read, it also says which claims were taken, released or went stale.
+ * feed holds only what happened after it; with `previous`, the last read, it
+ * also says which claims were taken, released or went stale.
  * Without one, claim history is unknown and no claim event is made up.
  */
-export async function observe(ctx: Ctx, opts: { since?: string | null; previous?: ClaimSnapshot | null }): Promise<Observation> {
+export async function observe(ctx: Ctx, opts: { since?: string | null; previous?: Pick<Observation, "at" | "claims"> | null }): Promise<Observation> {
   const now = ctx.now();
   const me = await ctx.github.currentUser();
   const closedSince = new Date(now.getTime() - WEEK_MS).toISOString();
@@ -163,7 +163,7 @@ export async function observe(ctx: Ctx, opts: { since?: string | null; previous?
 
   const snapshot: ClaimSnapshot = [...claims].map(([issue, c]) => ({ issue, sha: c.sha, login: c.holder, session: c.session, since: c.since }));
   const feed = board.length ? work.stories.filter(mine).flatMap((s) => feedOf(s, { maxFixRounds: ctx.config.maxFixRounds, since: opts.since ?? null })) : [];
-  if (opts.previous) feed.push(...claimEvents(board, opts.previous, snapshot, now, ctx.config.staleAfterMs, opts.since ?? null));
+  if (opts.previous) feed.push(...claimEvents(board, opts.previous, snapshot, now, ctx.config.staleAfterMs));
 
   return {
     ok: true,
@@ -183,7 +183,8 @@ export async function observe(ctx: Ctx, opts: { since?: string | null; previous?
  * claim is taken when its ref is new or points at a new commit, released when
  * its ref is gone, and stale once it outlives staleAfter after the last read.
  */
-function claimEvents(board: BoardStory[], previous: ClaimSnapshot, current: ClaimSnapshot, now: Date, staleAfterMs: number, since: string | null): FeedEvent[] {
+function claimEvents(board: BoardStory[], last: Pick<Observation, "at" | "claims">, current: ClaimSnapshot, now: Date, staleAfterMs: number): FeedEvent[] {
+  const previous = last.claims;
   const items = new Map(board.flatMap((s) => [s, ...s.slices].map((i) => [i.number, { story: s.number, url: i.url }] as const)));
   const before = new Map(previous.map((c) => [c.issue, c]));
   const after = new Map(current.map((c) => [c.issue, c]));
@@ -198,7 +199,8 @@ function claimEvents(board: BoardStory[], previous: ClaimSnapshot, current: Clai
   for (const c of current) {
     if (before.get(c.issue)?.sha !== c.sha) event(c, "taken", c.since);
     const staleAt = new Date(Date.parse(c.since) + staleAfterMs).toISOString();
-    if (staleAt <= now.toISOString() && (since === null || staleAt > since)) event(c, "stale", staleAt);
+    // Stale since the last read, not since the feed's `since`: that reaches back before it, and the claim was stale then already.
+    if (staleAt <= now.toISOString() && staleAt > last.at) event(c, "stale", staleAt);
   }
   return events;
 }

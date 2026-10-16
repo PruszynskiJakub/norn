@@ -113,7 +113,8 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
           continue;
         }
         // Rounds counted up to this comment, as done counted them when it wrote it.
-        const upTo = bodies.slice(0, bodies.indexOf(t.body) + 1);
+        // By the comment's URL: psdd writes the same words for, say, every implement done without a note.
+        const upTo = bodies.slice(0, issue.psddComments.findIndex((pc) => pc.url === t.url) + 1);
         const step = stepAt(issue, from);
         // Review or QA sending the issue back starts a round; the implement after it finishes that round.
         const entersFix = FIX_STATES.includes(to as State) && from !== to;
