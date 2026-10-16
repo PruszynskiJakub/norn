@@ -11,8 +11,8 @@ export interface Flow {
   description: string;
   /** The state an issue enters the flow in. */
   start: string;
-  /** Where the work happens: no branch, or its own branch with a PR into the base branch. */
-  workspace: "none" | "own";
+  /** Where the work happens: no branch, its own branch with a PR into the base branch, or one with a PR into its parent issue's branch. */
+  workspace: "none" | "own" | "parent";
   /** Whether triage offers the flow as an outcome; it does unless this is false. */
   triage?: boolean;
   states: Record<string, FlowState>;
@@ -115,7 +115,7 @@ export function validateFlow(data: unknown): FlowError[] {
   }
   if (typeof data.description !== "string") field("description", "a string");
   if (typeof data.start !== "string") field("start", "a string");
-  if (data.workspace !== "none" && data.workspace !== "own") field("workspace", '"none" or "own"');
+  if (data.workspace !== "none" && data.workspace !== "own" && data.workspace !== "parent") field("workspace", '"none", "own" or "parent"');
   if (data.triage !== undefined && typeof data.triage !== "boolean") field("triage", "true or false");
   if (!isObject(data.states)) {
     field("states", "an object");

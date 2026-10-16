@@ -193,7 +193,7 @@ export async function applyOutcome(
   const resolved = !word && issue.labels.includes("needs-human") && !outcome.needsHuman;
   const why = word || (resolved ? "needs-human resolved" : "");
   const comment = [`norn: ${from} → ${outcome.to === "not-planned" ? "closed as not planned" : outcome.to}${why ? ` (${why})` : ""}`];
-  const spec = flow ? null : await specLink(ctx, issue);
+  const spec = await specLink(ctx, issue, flow);
   if (spec) comment.push("", `Spec: ${spec}`);
   // Triage may give the issue a repository flow, which it enters here.
   const given = outcome.flow ? await repositoryFlow(ctx, outcome.flow) : null;
@@ -269,9 +269,10 @@ export async function ensureStoryBranch(ctx: Ctx, story: Issue): Promise<Ensured
   return { ok: true, created: true, branch };
 }
 
-async function specLink(ctx: Ctx, issue: Issue): Promise<string | null> {
-  let story = kindOf(issue) === "story" ? issue : null;
-  if (kindOf(issue) === "slice") {
+/** The spec a transition comment links: a story's own, or the parent's for an issue that works in its parent's branch. */
+async function specLink(ctx: Ctx, issue: Issue, flow: Flow | null): Promise<string | null> {
+  let story = !flow && kindOf(issue) === "story" ? issue : null;
+  if (flow?.workspace === "parent" || (!flow && kindOf(issue) === "slice")) {
     const p = await ctx.github.parentOf(issue.number);
     if (p) story = await ctx.github.getIssue(p);
   }

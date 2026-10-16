@@ -24,6 +24,8 @@ export interface BriefingInput {
   ctx: Ctx;
   issue: Issue;
   flow: Flow;
+  /** The flow's name, the issue's type. */
+  flowName: string;
   /** The issue's state after take, e.g. fixing. */
   state: string | null;
   /** The state the issue was in before take moved it, e.g. changes-requested. */
@@ -82,21 +84,30 @@ export function usedIn(flow: Flow, name: BehaviourName): boolean {
   return Object.keys(flow.states).some((s) => uses(flow, s, name));
 }
 
+/** The flow's name as a word that starts a sentence, e.g. Slice. */
+const named = (flowName: string) => flowName.charAt(0).toUpperCase() + flowName.slice(1);
+
 const opensPR: Behaviour = {
-  /** The PR comes from the issue's own branch. */
-  requires: (flow) => (flow.workspace === "own" ? null : { field: "workspace", expected: '"own", for its PR' }),
-  /** In its state, how to open or update the PR; in the others, once it exists, the PR and its diff. */
-  async briefing({ ctx, issue, flow, state, loc }) {
+  /** The PR comes from the issue's own branch, into the base branch or the parent's. */
+  requires: (flow) => (flow.workspace === "own" || flow.workspace === "parent" ? null : { field: "workspace", expected: '"own" or "parent", for its PR' }),
+  /**
+   * In its state, how to open or update the PR; in the others, the PR and its diff: a PR into the base branch once it
+   * exists, one into the parent's branch always, as its branch and base are known.
+   */
+  async briefing({ ctx, issue, flow, flowName, state, loc }) {
     if (!loc) return [];
     const diff = `Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`;
+    const parent = flow.workspace === "parent";
     if (uses(flow, state, "opensPR")) {
+      const body = parent ? `Part of #${loc.story.number}. ${named(flowName)} #${issue.number}.` : `Closes #${issue.number}.`;
       return [
         `Commit on ${loc.branch} and push. Open one PR from ${loc.branch} into ${loc.base} if there is none yet:`,
         // The title is free text from GitHub: quoted, so a " or $(...) in it can neither break nor run anything.
-        `  gh pr create --base ${sh(loc.base)} --head ${sh(loc.branch)} --title ${sh(issue.title)} --body ${sh(`Closes #${issue.number}.`)}`,
-        diff,
+        `  gh pr create --base ${sh(loc.base)} --head ${sh(loc.branch)} --title ${sh(issue.title)} --body ${sh(body)}`,
+        ...(parent ? [] : [diff]),
       ];
     }
+    if (parent) return [`${named(flowName)} PR: ${loc.branch} into ${loc.base}. ${diff}`];
     const pr = await ctx.github.findPullRequest(loc.branch);
     return pr ? [`PR #${pr.number}: ${loc.branch} into ${pr.base}. ${diff}`] : [];
   },

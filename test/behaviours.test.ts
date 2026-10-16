@@ -61,7 +61,7 @@ describe("behaviours in a flow", () => {
     const res = await w.norn("take", "40");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain('  The state fixing uses the behaviour opensPR, which needs workspace to be "own", for its PR.\n');
+    expect(res.stdout).toContain('  The state fixing uses the behaviour opensPR, which needs workspace to be "own" or "parent", for its PR.\n');
   });
 
   test("a behaviour's parameters are an object, {} for none", async () => {

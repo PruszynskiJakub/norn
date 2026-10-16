@@ -1,5 +1,5 @@
 import { behaviourLines, EVIDENCE_FILES, humanQaLines } from "./behaviours.js";
-import { type Flow, flowStatesOf } from "./flow.js";
+import { type Flow, flowNameOf, flowStatesOf } from "./flow.js";
 import type { Issue } from "./github.js";
 import { locate, workIn, type Location, type WorkIn } from "./location.js";
 import { FIX_STATES, kindOf, type State, type Step } from "./machine.js";
@@ -134,7 +134,10 @@ async function flowLines(issue: Issue, step: Step, ctx: Ctx, from: string | null
   if (step.skill === "norn-resolve")
     return [`The latest needs-human comment gives the reason. ${readIssue}`, `Record the outcome on the issue: gh issue comment ${n}`];
   const state = flowStatesOf(issue, flow)[0] ?? null;
-  return [readIssue, ...(await behaviourLines({ ctx, issue, flow, state, from, step, loc }))];
+  // Work in the parent's branch follows the parent's spec.
+  const spec = loc && flow.workspace === "parent" ? [`Spec: ${specPath(loc.story.number, loc.slug)} (${noun(loc.story)} #${loc.story.number})`] : [];
+  const flowName = flowNameOf(issue) ?? "";
+  return [...spec, readIssue, ...(await behaviourLines({ ctx, issue, flow, flowName, state, from, step, loc }))];
 }
 
 /** How QA's results reach the issue: the note, evidence files, and for a person, remarks. */
