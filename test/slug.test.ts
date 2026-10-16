@@ -10,7 +10,7 @@ describe("a story's names come from the slug norn recorded, not its live title",
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting" });
     await w.norn("take", "123");
-    await w.norn("done", "123", "accept");
+    await w.norn("done", "123", "story");
 
     expect(w.github.comments(123).at(-1)).toContain("\nnorn: slug rate-limiting");
   });
@@ -19,7 +19,7 @@ describe("a story's names come from the slug norn recorded, not its live title",
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting" });
     await w.norn("take", "123");
-    await w.norn("done", "123", "accept");
+    await w.norn("done", "123", "story");
     rename(w, 123, "Per-client rate limits");
 
     const res = await w.norn("take", "123");
@@ -31,7 +31,7 @@ describe("a story's names come from the slug norn recorded, not its live title",
   test("renaming after slicing creates no second story branch, and slices keep their PR head", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-slicing"] });
-    w.github.commentsByIssue.set(123, ["norn: triage → needs-refinement (accept)\n\nnorn: slug rate-limiting"]);
+    w.github.commentsByIssue.set(123, ["norn: triage → needs-refinement (story)\n\nnorn: slug rate-limiting"]);
     w.github.seedIssue({ number: 127, title: "Redis store", labels: ["type:slice", "mode:afk", "merge-queue"] });
     w.github.parents.set(127, 123);
     await w.norn("take", "123");
@@ -83,7 +83,7 @@ describe("a story's names come from the slug norn recorded, not its live title",
     const w = setup();
     w.github.seedIssue({ number: 123, title: "日本語 — ✨" });
     await w.norn("take", "123");
-    await w.norn("done", "123", "accept");
+    await w.norn("done", "123", "story");
     await w.norn("take", "123");
     await w.norn("done", "123", "clear");
 
@@ -94,7 +94,7 @@ describe("a story's names come from the slug norn recorded, not its live title",
   test("a slug marker whose trailing space GitHub dropped still counts as recorded", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "✨", labels: ["type:story", "needs-refinement"] });
-    w.github.commentsByIssue.set(123, ["norn: triage → needs-refinement (accept)\n\nnorn: slug"]);
+    w.github.commentsByIssue.set(123, ["norn: triage → needs-refinement (story)\n\nnorn: slug"]);
     await w.norn("take", "123");
     await w.norn("done", "123", "clear");
 

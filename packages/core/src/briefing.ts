@@ -20,7 +20,7 @@ export interface FinishCommand {
   note?: string;
   /** The step can attach evidence files. */
   evidence: boolean;
-  /** What the outcome means, e.g. "accepted, moves to refinement". */
+  /** What the outcome means, e.g. "a story: moves to refinement". */
   means: string;
 }
 
@@ -76,7 +76,7 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
   const n = issue.number;
   const readIssue = `Read the issue: gh issue view ${n} --comments`;
   if (step.skill === "norn-triage") {
-    return [readIssue, `On accept, post what triage established on the issue first: gh issue comment ${n}`];
+    return [readIssue, `Unless you reject it, post what triage established on the issue first: gh issue comment ${n}`];
   }
   if (!loc) return [];
   const story = loc.story;

@@ -74,7 +74,7 @@ A story is shaped with a person present (phase 1), then follows its slices to th
 
 ```mermaid
 flowchart LR
-  new([new issue]) -->|triage: accept| refine[needs-refinement]
+  new([new issue]) -->|triage: story| refine[needs-refinement]
   new -->|triage: reject| np([closed as not planned])
   refine -->|clear| plan[needs-plan]
   refine -->|questions| clarify[needs-clarification]
@@ -101,7 +101,7 @@ flowchart LR
   end
 ```
 
-Triage either accepts an issue into `needs-refinement` or closes it as not planned, with the reason in a comment. Clarification only happens when refinement turns up questions. Once slice issues exist, the story's label follows its slices. When every slice PR is merged into the story branch, the story branch is reviewed and QA'd, by an agent and then by a person. Failed review or QA is fixed straight on the story branch with the `norn-implement` skill and goes back to `needs-review`. Finally the owner merges the story PR, and GitHub closes the story through the PR link.
+Triage either makes an issue a story in `needs-refinement`, gives it one of the [repository flows](#repository-flows), or closes it as not planned, with the reason in a comment. Clarification only happens when refinement turns up questions. Once slice issues exist, the story's label follows its slices. When every slice PR is merged into the story branch, the story branch is reviewed and QA'd, by an agent and then by a person. Failed review or QA is fixed straight on the story branch with the `norn-implement` skill and goes back to `needs-review`. Finally the owner merges the story PR, and GitHub closes the story through the PR link.
 
 ## Slice flow
 
@@ -160,6 +160,8 @@ A repository can run other kinds of work through processes of its own. A flow is
 - The first transition into a state whose label is missing creates the label, with the state's colour and description, or a default for an attended or an agent step.
 - `needs-human`, claims and `in-progress` work in every flow as they do for stories and slices.
 
+Triage chooses the type. Its briefing offers `story`, then one outcome per flow named after the flow, with the flow's `description` as what it means, then `reject`. `norn done <issue> bug` adds `type:bug`, moves the issue to the flow's `start` and assigns it to you, with a transition comment. A flow with `"triage": false` is not offered, and neither is a broken one.
+
 norn checks a flow before it runs it: the start state exists, every target is a state, `closed` or `not-planned`, and no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`). A broken flow is refused, with what is wrong, only for the issues of its own type.
 
 ## Steps, skills and outcomes
@@ -168,7 +170,7 @@ Each state has a step, a skill that does its work, and the outcomes the agent re
 
 | State | Skill | Attended | `norn done` outcome → next state |
 | --- | --- | :-: | --- |
-| new issue | `norn-triage` | ✓ | `accept` → needs-refinement · `reject` → closed as not planned |
+| new issue | `norn-triage` | ✓ | `story` → needs-refinement · `<flow>` → the flow's start · `reject` → closed as not planned |
 | needs-refinement | `norn-refine` | ✓ | `clear` → needs-plan · `questions` → needs-clarification |
 | needs-clarification | `norn-clarify` | ✓ | `answered` → needs-plan · `questions` → stays |
 | needs-plan | `norn-plan` | ✓ | → needs-slicing |

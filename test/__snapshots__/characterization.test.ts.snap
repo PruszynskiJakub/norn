@@ -540,22 +540,6 @@ The story branch 50-search would start from main, but main does not exist on Git
 Set baseBranch in .agents/norn.config.json to the repository's default branch and run the command again."
 `;
 
-exports[`output of every command, text and --json > done triage accept > json 1`] = `
-"exit 0
-{
-  "ok": true,
-  "issue": 7,
-  "from": null,
-  "to": "needs-refinement",
-  "message": "#7 is now in needs-refinement. The claim is released."
-}"
-`;
-
-exports[`output of every command, text and --json > done triage accept > text 1`] = `
-"exit 0
-#7 is now in needs-refinement. The claim is released."
-`;
-
 exports[`output of every command, text and --json > done triage reject > json 1`] = `
 "exit 0
 {
@@ -570,6 +554,22 @@ exports[`output of every command, text and --json > done triage reject > json 1`
 exports[`output of every command, text and --json > done triage reject > text 1`] = `
 "exit 0
 #7 is now closed as not planned. The claim is released."
+`;
+
+exports[`output of every command, text and --json > done triage story > json 1`] = `
+"exit 0
+{
+  "ok": true,
+  "issue": 7,
+  "from": null,
+  "to": "needs-refinement",
+  "message": "#7 is now in needs-refinement. The claim is released."
+}"
+`;
+
+exports[`output of every command, text and --json > done triage story > text 1`] = `
+"exit 0
+#7 is now in needs-refinement. The claim is released."
 `;
 
 exports[`output of every command, text and --json > done when a follow-up fails > json 1`] = `
@@ -634,14 +634,14 @@ exports[`output of every command, text and --json > done with evidence on a step
 "exit 1
 {
   "ok": false,
-  "refusal": "--evidence is for QA steps; triage takes none. Finish without it:\\n  norn done 7 accept            (accepted, moves to refinement)\\n  norn done 7 reject \\"reason\\"   (closed as not planned; give the reason)"
+  "refusal": "--evidence is for QA steps; triage takes none. Finish without it:\\n  norn done 7 story             (a story: moves to refinement)\\n  norn done 7 reject \\"reason\\"   (closed as not planned; give the reason)"
 }"
 `;
 
 exports[`output of every command, text and --json > done with evidence on a step that takes none > text 1`] = `
 "exit 1
 --evidence is for QA steps; triage takes none. Finish without it:
-  norn done 7 accept            (accepted, moves to refinement)
+  norn done 7 story             (a story: moves to refinement)
   norn done 7 reject "reason"   (closed as not planned; give the reason)"
 `;
 
@@ -689,7 +689,7 @@ exports[`output of every command, text and --json > done without an outcome > js
 "exit 1
 {
   "ok": false,
-  "refusal": "triage can end more than one way. Say which.\\nFinish with one of:\\n  norn done 7 accept            (accepted, moves to refinement)\\n  norn done 7 reject \\"reason\\"   (closed as not planned; give the reason)"
+  "refusal": "triage can end more than one way. Say which.\\nFinish with one of:\\n  norn done 7 story             (a story: moves to refinement)\\n  norn done 7 reject \\"reason\\"   (closed as not planned; give the reason)"
 }"
 `;
 
@@ -697,7 +697,7 @@ exports[`output of every command, text and --json > done without an outcome > te
 "exit 1
 triage can end more than one way. Say which.
 Finish with one of:
-  norn done 7 accept            (accepted, moves to refinement)
+  norn done 7 story             (a story: moves to refinement)
   norn done 7 reject "reason"   (closed as not planned; give the reason)"
 `;
 
@@ -1970,10 +1970,10 @@ exports[`output of every command, text and --json > take a new issue > json 1`] 
   "skill": "norn-triage",
   "attended": true,
   "outcomes": [
-    "accept",
+    "story",
     "reject"
   ],
-  "message": "You now hold issue #7 \\"Rate limiting\\". Its step is triage. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nInvoke the skill: norn-triage\\nRead the issue: gh issue view 7 --comments\\nOn accept, post what triage established on the issue first: gh issue comment 7\\n\\nWhen the user agrees triage is finished, run one of:\\n  norn done 7 accept            (accepted, moves to refinement)\\n  norn done 7 reject \\"reason\\"   (closed as not planned; give the reason)\\n\\nOn a long step, run norn take 7 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 7\\nIf something is wrong and a person is needed, run: norn escalate 7 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold issue #7 \\"Rate limiting\\". Its step is triage. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nInvoke the skill: norn-triage\\nRead the issue: gh issue view 7 --comments\\nUnless you reject it, post what triage established on the issue first: gh issue comment 7\\n\\nWhen the user agrees triage is finished, run one of:\\n  norn done 7 story             (a story: moves to refinement)\\n  norn done 7 reject \\"reason\\"   (closed as not planned; give the reason)\\n\\nOn a long step, run norn take 7 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 7\\nIf something is wrong and a person is needed, run: norn escalate 7 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -1984,10 +1984,10 @@ attended: the user takes part, and you do not decide on your own.
 
 Invoke the skill: norn-triage
 Read the issue: gh issue view 7 --comments
-On accept, post what triage established on the issue first: gh issue comment 7
+Unless you reject it, post what triage established on the issue first: gh issue comment 7
 
 When the user agrees triage is finished, run one of:
-  norn done 7 accept            (accepted, moves to refinement)
+  norn done 7 story             (a story: moves to refinement)
   norn done 7 reject "reason"   (closed as not planned; give the reason)
 
 On a long step, run norn take 7 again now and then: it keeps your claim fresh.

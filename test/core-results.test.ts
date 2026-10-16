@@ -84,7 +84,7 @@ describe("done", () => {
     await take(ctx, 7, { takeover: false });
     const res = await done(ctx, 7, { word: "maybe" });
     expect(res).toMatchObject({ ok: false, refusal: { kind: "outcome-unknown", issue: 7, word: "maybe", step: "triage" } });
-    expect(!res.ok && res.refusal.kind === "outcome-unknown" && res.refusal.finish.map((f) => f.word)).toEqual(["accept", "reject"]);
+    expect(!res.ok && res.refusal.kind === "outcome-unknown" && res.refusal.finish.map((f) => f.word)).toEqual(["story", "reject"]);
   });
 });
 

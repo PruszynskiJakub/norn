@@ -12,6 +12,8 @@ export interface Flow {
   start: string;
   /** Where the work happens: no branch, or its own branch with a PR into the base branch. */
   workspace: "none" | "own";
+  /** Whether triage offers the flow as an outcome; it does unless this is false. */
+  triage?: boolean;
   states: Record<string, FlowState>;
 }
 
@@ -84,6 +86,7 @@ export function validateFlow(data: unknown): FlowError[] {
   if (typeof data.description !== "string") field("description", "a string");
   if (typeof data.start !== "string") field("start", "a string");
   if (data.workspace !== "none" && data.workspace !== "own") field("workspace", '"none" or "own"');
+  if (data.triage !== undefined && typeof data.triage !== "boolean") field("triage", "true or false");
   if (!isObject(data.states)) {
     field("states", "an object");
     return errors;
@@ -166,6 +169,32 @@ export function repositoryFlow(
     ctx.flows.set(name, flow);
   }
   return flow;
+}
+
+/** Outcome words of triage that no flow can take: the built-in story and slice, and reject. */
+const NOT_A_FLOW_WORD = ["story", "slice", "reject"];
+
+/**
+ * The repository's flows triage offers, in name order: every valid flow on the
+ * base branch whose name can be a type and that does not set triage to false.
+ */
+export async function triageFlows(
+  ctx: Parameters<typeof repositoryFlow>[0] & { github: { listFilesAt(dir: string, ref: string): Promise<string[]> } },
+): Promise<{ name: string; flow: Flow }[]> {
+  const names = (await ctx.github.listFilesAt(FLOWS_DIR, ctx.config.baseBranch))
+    .filter((file) => file.endsWith(".json"))
+    .map((file) => file.slice(0, -".json".length))
+    .filter((name) => /^[a-z0-9][a-z0-9_-]*$/.test(name) && !NOT_A_FLOW_WORD.includes(name))
+    .sort();
+  const loaded = await Promise.all(names.map((name) => repositoryFlow(ctx, name)));
+  return loaded.flatMap((l) => (l?.ok && l.flow.triage !== false ? [{ name: l.name, flow: l.flow }] : []));
+}
+
+/** Triage's step with an outcome for each offered flow, after story and before reject. */
+export function offerFlows(step: Step, flows: { name: string; flow: Flow }[]): Step {
+  const { reject, ...rest } = step.outcomes;
+  const offered: Record<string, Outcome> = Object.fromEntries(flows.map(({ name, flow }) => [name, { to: flow.start, means: flow.description, flow: name }]));
+  return { ...step, outcomes: { ...rest, ...offered, ...(reject ? { reject } : {}) } };
 }
 
 /** The state labels of the flow that the issue carries. More than one means a label change failed halfway. */

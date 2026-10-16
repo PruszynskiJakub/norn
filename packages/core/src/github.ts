@@ -79,6 +79,8 @@ export interface GitHub {
 
   /** The text of a file at a ref (branch, tag or commit), e.g. .agents/flows/bug.json on main; null when it is not there. Read-only. */
   readFileAt(path: string, ref: string): Promise<string | null>;
+  /** The names of the files directly in a directory at a ref, e.g. ["bug.json"]; [] when the directory is not there. Read-only. */
+  listFilesAt(dir: string, ref: string): Promise<string[]>;
 
   /** Whether gh is installed and logged in to `host`, e.g. github.com. Read-only, for norn doctor. */
   ghAuth(host: string): Promise<GhAuth>;

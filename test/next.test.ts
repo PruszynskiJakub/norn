@@ -149,9 +149,9 @@ describe("--json", () => {
 
     const take = JSON.parse((await w.norn("take", "7", "--json")).stdout);
     expect(take).toMatchObject({ ok: true, issue: 7, step: "triage", skill: "norn-triage", attended: true });
-    expect(take.outcomes).toEqual(["accept", "reject"]);
+    expect(take.outcomes).toEqual(["story", "reject"]);
 
-    const done = JSON.parse((await w.norn("done", "7", "accept", "--json")).stdout);
+    const done = JSON.parse((await w.norn("done", "7", "story", "--json")).stdout);
     expect(done).toMatchObject({ ok: true, issue: 7, to: "needs-refinement" });
   });
 

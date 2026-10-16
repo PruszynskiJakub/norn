@@ -7,7 +7,7 @@ import { sliceBranch, specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
-import { type Flow, type FlowCache, flowStatesOf } from "./flow.js";
+import { type Flow, type FlowCache, flowStatesOf, repositoryFlow } from "./flow.js";
 import { notifyHumanQa, notifyNeedsHuman, type Notify } from "./notify.js";
 
 /** The marker norn writes when it sets needs-human; norn next reads the reason back from it. */
@@ -184,9 +184,12 @@ export async function applyOutcome(
   const comment = [`norn: ${from} → ${outcome.to === "not-planned" ? "closed as not planned" : outcome.to}${why ? ` (${why})` : ""}`];
   const spec = flow ? null : await specLink(ctx, issue);
   if (spec) comment.push("", `Spec: ${spec}`);
+  // Triage may give the issue a repository flow, which it enters here.
+  const given = outcome.flow ? await repositoryFlow(ctx, outcome.flow) : null;
+  const into = flow ?? (given?.ok ? given.flow : null);
   // A story records its slug the first time norn writes on it, triage included; so does an issue whose flow gives it a branch.
-  const becomesStory = !flow && (kindOf(issue) === "story" || (kindOf(issue) === "new" && outcome.to !== "not-planned"));
-  const slug = becomesStory || flow?.workspace === "own" ? await slugLine(ctx, issue) : null;
+  const becomesStory = !flow && (kindOf(issue) === "story" || (kindOf(issue) === "new" && !outcome.flow && outcome.to !== "not-planned"));
+  const slug = becomesStory || into?.workspace === "own" ? await slugLine(ctx, issue) : null;
   if (slug) comment.push("", slug);
   if (note) comment.push("", note);
   if (evidence) comment.push("", ...evidenceLines(await github.repoUrl(), evidence));
@@ -199,9 +202,9 @@ export async function applyOutcome(
     await github.removeLabels(n, ["in-progress", "needs-human", ...stateLabels(issue, undefined, flow)]);
   } else {
     const add: string[] = [outcome.to];
-    if (flow) await ensureStateLabel(ctx, flow, outcome.to);
-    else if (kindOf(issue) === "new") {
-      add.push("type:story");
+    if (into) await ensureStateLabel(ctx, into, outcome.to);
+    if (!flow && kindOf(issue) === "new") {
+      add.push(`type:${outcome.flow ?? "story"}`);
       await github.assign(n, [await github.currentUser()]);
     }
     if (outcome.needsHuman) {
