@@ -1,6 +1,6 @@
 // The dashboard's renderer: every sentence the page shows is worded here, from
 // the typed read model, so the rest of the UI only lays words out.
-import type { ClaimHolder, FeedEvent, Flow, FlowError, FlowSource, WaitingItem } from "@norn/core";
+import type { ClaimHolder, Expected, FeedEvent, Flow, FlowError, FlowSource, WaitingItem } from "@norn/core";
 import type { DashboardState, PollFailure } from "../../src/contract.ts";
 import { atGate, type Item, isSliced, stateOf } from "./model.ts";
 
@@ -406,13 +406,41 @@ export function behaviourParams(params: Record<string, unknown> | undefined): st
     .join(", ");
 }
 
+/** What a field of a flow must be. */
+function expectedText(e: Expected): string {
+  switch (e.kind) {
+    case "string":
+      return "text";
+    case "boolean":
+      return "true or false";
+    case "object":
+      return "an object";
+    case "hex-colour":
+      return "a hex colour like 1d76db";
+    case "state":
+      return "a state of the flow";
+    case "outcome-word":
+      return "one of the state's outcomes";
+    case "flow-name":
+      return "a flow's name";
+    case "behaviours":
+      return "an object of behaviours";
+    case "params":
+      return "an object of parameters, {} for none";
+    case "one-of":
+      return e.values.map((v) => `"${v}"`).join(" or ");
+    default:
+      return unreachable(e);
+  }
+}
+
 /** What is wrong with a flow, as a sentence. */
 export function flowErrorText(e: FlowError): string {
   switch (e.kind) {
     case "not-json":
       return `The file isn't JSON: ${e.detail}`;
     case "field-invalid":
-      return e.path ? `${e.path} must be ${e.expected}.` : `The flow must be ${e.expected}.`;
+      return e.path ? `${e.path} must be ${expectedText(e.expected)}.` : `The flow must be ${expectedText(e.expected)}.`;
     case "field-unknown":
       return `${e.path} is no field of the flow format.`;
     case "start-unknown":
@@ -436,7 +464,7 @@ export function flowErrorText(e: FlowError): string {
     case "flow-unknown":
       return `${e.behaviour} of ${e.state} names the flow ${e.flow}, which the repository doesn't have.`;
     case "behaviour-needs":
-      return `${e.behaviour} of ${e.state} needs ${e.field} to be ${e.expected}.`;
+      return `${e.behaviour} of ${e.state} needs workspace to be ${e.workspace.map((w) => `"${w}"`).join(" or ")}.`;
     case "flow-reserved":
       return `The name ${e.flow} is one norn keeps for itself.`;
     default:

@@ -3,10 +3,12 @@ import {
   type AddSliceResult,
   type Briefing,
   type ConfigProblem,
+  type BehaviourName,
   type ConfigWarning,
   type DoneResult,
   type EscalateResult,
   type Event,
+  type Expected,
   type FinishCommand,
   FLOWS_DIR,
   type FlowError,
@@ -379,13 +381,56 @@ function flowsCheck(f: FlowsFact): { message: string; fix: string | null } {
   return { message: messages.join("; "), fix: fixes.join("; ") };
 }
 
+/** Values as a choice, e.g. "own" or "parent". */
+const oneOf = (values: readonly string[]) => {
+  const quoted = values.map((v) => JSON.stringify(v));
+  return quoted.length > 1 ? `${quoted.slice(0, -1).join(", ")} or ${quoted.at(-1)}` : (quoted[0] ?? "");
+};
+
+/** What a field of a flow must be. */
+function expectedText(e: Expected): string {
+  switch (e.kind) {
+    case "string":
+      return "a string";
+    case "boolean":
+      return "true or false";
+    case "object":
+      return "an object";
+    case "hex-colour":
+      return "a hex colour without the #, e.g. 1d76db";
+    case "state":
+      return "a state of the flow";
+    case "outcome-word":
+      return "an outcome word";
+    case "flow-name":
+      return "a flow's name";
+    case "behaviours":
+      return "an object of behaviour names";
+    case "params":
+      return "an object of parameters, {} for none";
+    case "one-of":
+      return oneOf(e.values);
+    default:
+      return unreachable(e);
+  }
+}
+
+/** What a behaviour that works in some workspaces only needs its workspace for. */
+const WORKSPACE_FOR: Partial<Record<BehaviourName, string>> = {
+  writesSpec: "for the spec's branch",
+  opensPR: "for its PR",
+  waitsForSlices: "for the branch its slices merge into",
+  mergesSlice: "for the PR into the parent's branch",
+  waitsForMerge: "for the PR its owner merges",
+};
+
 /** One thing wrong with a flow file. */
 function flowError(e: FlowError): string {
   switch (e.kind) {
     case "not-json":
       return `It is not valid JSON: ${e.detail}`;
     case "field-invalid":
-      return `${e.path || "The file"} must be ${e.expected}.`;
+      return `${e.path || "The file"} must be ${expectedText(e.expected)}.`;
     case "field-unknown":
       return `${e.path} is not a field of a flow; check its spelling.`;
     case "start-unknown":
@@ -411,7 +456,7 @@ function flowError(e: FlowError): string {
     case "flow-reserved":
       return `The name ${e.flow} is norn's own: triage uses it to close an issue as not planned.`;
     case "behaviour-needs":
-      return `The state ${e.state} uses the behaviour ${e.behaviour}, which needs ${e.field} to be ${e.expected}.`;
+      return `The state ${e.state} uses the behaviour ${e.behaviour}, which needs workspace to be ${oneOf(e.workspace)}${WORKSPACE_FOR[e.behaviour] ? `, ${WORKSPACE_FOR[e.behaviour]}` : ""}.`;
     case "flow-unknown":
       return `The behaviour ${e.behaviour} of ${e.state} names the flow ${e.flow}, which the repository does not have.`;
     default:

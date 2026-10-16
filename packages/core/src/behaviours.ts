@@ -1,4 +1,5 @@
-import { type Flow, flowStatesOf, hasSpec, type NamedFlow, usedIn, uses } from "./flow.js";
+import { type Flow, flowStatesOf, hasSpec, type NamedFlow, usedIn, uses, type WorkspaceMode } from "./flow.js";
+import type { Expected } from "./flow-validation.js";
 import { flowOf, validFlow } from "./flow-loading.js";
 import type { GitHub, Issue } from "./github.js";
 import { locate, type Location } from "./location.js";
@@ -70,8 +71,8 @@ export interface Applied {
 export interface BehaviourParam {
   type: "string" | "boolean";
   required: boolean;
-  /** What it must be, e.g. "a state of the flow". */
-  expected: string;
+  /** What it must be, e.g. a state of the flow. */
+  expected: Expected;
 }
 
 export interface Behaviour {
@@ -79,8 +80,8 @@ export interface Behaviour {
   params?: Record<string, BehaviourParam>;
   /** Behaviours the same state cannot also have. */
   excludes?: readonly string[];
-  /** What the flow must be like for the behaviour to work, e.g. a workspace; the field and what it must be. */
-  requires?(flow: Record<string, unknown>): { field: string; expected: string } | null;
+  /** The workspaces the behaviour works in, e.g. own for a PR into the base branch; any when missing. */
+  workspaces?: readonly WorkspaceMode[];
   /** The flows its parameters name, e.g. the type slices get; each must exist. */
   flowsNamed?(params: BehaviourParams): string[];
   /** The states its parameters name, which it moves an issue to on its own: each must be a state, and counts as a way on. */
@@ -114,9 +115,9 @@ function paramsOf(flow: Flow, state: string | null, name: BehaviourName): Behavi
 }
 
 const writesSpec: Behaviour = {
-  params: { readsIssue: { type: "boolean", required: false, expected: "true or false" } },
+  params: { readsIssue: { type: "boolean", required: false, expected: { kind: "boolean" } } },
   /** The spec lives on the issue's own branch. */
-  requires: (flow) => (flow.workspace === "own" ? null : { field: "workspace", expected: '"own", for the spec\'s branch' }),
+  workspaces: ["own"],
   /** Every step works on the spec; in its state, the step writes it, from the issue's discussion when readsIssue says so, and pushes it. */
   async briefing({ issue, flow, state, loc }) {
     if (!loc) return [];
@@ -156,7 +157,7 @@ export async function slicesOf(github: Pick<GitHub, "subIssues">, parent: number
 }
 
 const slices: Behaviour = {
-  params: { type: { type: "string", required: true, expected: "a flow's name" } },
+  params: { type: { type: "string", required: true, expected: { kind: "flow-name" } } },
   /** The slices get the type it names, which must be a flow. */
   flowsNamed: (p) => (typeof p.type === "string" ? [p.type] : []),
   /** In its state, how to create the slices with norn add-slice and give them bodies. */
@@ -198,10 +199,10 @@ function waitState(flow: Flow): { held: string; to: string } | null {
 }
 
 const waitsForSlices: Behaviour = {
-  params: { to: { type: "string", required: true, expected: "a state of the flow" } },
+  params: { to: { type: "string", required: true, expected: { kind: "state" } } },
   leadsTo: (p) => (typeof p.to === "string" ? [{ param: "to", to: p.to }] : []),
   /** The slices' PRs go into the issue's own branch, and its own PR into the base branch. */
-  requires: (flow) => (flow.workspace === "own" ? null : { field: "workspace", expected: '"own", for the branch its slices merge into' }),
+  workspaces: ["own"],
   holds: true,
   needsBranch: true,
   async held({ issue, state }) {
@@ -255,7 +256,7 @@ const waitsForMerge: Behaviour = {
   /** It ends the issue on its own, once its PR is merged. */
   leadsTo: () => [{ param: "", to: "closed" }],
   /** The PR comes from the issue's own branch into the base branch. */
-  requires: (flow) => (flow.workspace === "own" ? null : { field: "workspace", expected: '"own", for the PR its owner merges' }),
+  workspaces: ["own"],
   holds: true,
   async held({ issue, state }) {
     return { kind: "story-in-merge-queue", issue: issue.number, owner: issue.assignees[0] ?? null, state };
@@ -292,7 +293,7 @@ async function closeMerged({ ctx, issue, flow, flowName, state }: HeldInput): Pr
 
 const opensPR: Behaviour = {
   /** The PR comes from the issue's own branch, into the base branch or the parent's. */
-  requires: (flow) => (flow.workspace === "own" || flow.workspace === "parent" ? null : { field: "workspace", expected: '"own" or "parent", for its PR' }),
+  workspaces: ["own", "parent"],
   /**
    * In its state, how to open or update the PR; in the others, the PR and its diff: a PR into the base branch once it
    * exists, one into the parent's branch always, as its branch and base are known.
@@ -395,7 +396,7 @@ const countsFixRounds: Behaviour = {
 
 const mergesSlice: Behaviour = {
   /** The PR it merges goes into the parent's branch. */
-  requires: (flow) => (flow.workspace === "parent" ? null : { field: "workspace", expected: '"parent", for the PR into the parent\'s branch' }),
+  workspaces: ["parent"],
   /** In its state, how to bring the branch up to date and merge its PR. */
   async briefing({ flow, state, loc }) {
     if (!loc || !uses(flow, state, "mergesSlice")) return [];
@@ -426,7 +427,7 @@ const mergesSlice: Behaviour = {
 };
 
 const syncsBlocked: Behaviour = {
-  params: { to: { type: "string", required: true, expected: "a state of the flow" } },
+  params: { to: { type: "string", required: true, expected: { kind: "state" } } },
   leadsTo: (p) => (typeof p.to === "string" ? [{ param: "to", to: p.to }] : []),
   holds: true,
   async held({ ctx, issue }, story) {

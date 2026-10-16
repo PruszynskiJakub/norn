@@ -12,7 +12,7 @@ export interface Flow {
   /** The state an issue enters the flow in. */
   start: string;
   /** Where the work happens: no branch, its own branch with a PR into the base branch, or one with a PR into its parent issue's branch. */
-  workspace: "none" | "own" | "parent";
+  workspace: WorkspaceMode;
   /** Whether triage offers the flow as an outcome; it does unless this is false. */
   triage?: boolean;
   states: Record<string, FlowState>;
@@ -42,6 +42,12 @@ export interface FlowState {
   /** Keyed by outcome word. */
   outcomes: Record<string, Outcome>;
 }
+
+/** Where an issue's work happens: no branch, its own branch with a PR into the base branch, or one with a PR into its parent's branch. */
+export type WorkspaceMode = "none" | "own" | "parent";
+
+/** Every workspace mode, in the order the format lists them. */
+export const WORKSPACE_MODES: readonly WorkspaceMode[] = ["none", "own", "parent"];
 
 /** How an issue is worked, from its mode:afk or mode:hil label: unattended, or with a person in the loop. */
 export type Mode = "afk" | "hil";
