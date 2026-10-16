@@ -5,6 +5,7 @@ import type { GitHub, Issue } from "./github.js";
 import { locate, type Location } from "./location.js";
 import type { Event } from "./events.js";
 import type { Outcome, Step } from "./machine.js";
+import type { Gate } from "./notify.js";
 import type { Refusal } from "./refusals.js";
 import type { WaitItem } from "./waiting.js";
 import { sh, specPath } from "./text.js";
@@ -84,8 +85,11 @@ export interface Behaviour {
   workspaces?: readonly WorkspaceMode[];
   /** The flows its parameters name, e.g. the type slices get; each must exist. */
   flowsNamed?(params: BehaviourParams): string[];
-  /** The states its parameters name, which it moves an issue to on its own: each must be a state, and counts as a way on. */
-  leadsTo?(params: BehaviourParams): { param: string; to: string }[];
+  /**
+   * Where it moves an issue on its own, which counts as a way on: a state a parameter names, which must be a state, or an
+   * end it always leads to, with no parameter.
+   */
+  leadsTo?(params: BehaviourParams): { param: string | null; to: string }[];
   /** An issue in the state has no step to take: the behaviour moves it on by itself. */
   holds?: boolean;
   /** Why take and done refuse an issue the behaviour holds; `story` is the issue to run norn next on, if any. */
@@ -254,7 +258,7 @@ export async function moveOnFromSlices(ctx: Ctx, n: number): Promise<Event[]> {
 
 const waitsForMerge: Behaviour = {
   /** It ends the issue on its own, once its PR is merged. */
-  leadsTo: () => [{ param: "", to: "closed" }],
+  leadsTo: () => [{ param: null, to: "closed" }],
   /** The PR comes from the issue's own branch into the base branch. */
   workspaces: ["own"],
   holds: true,
@@ -340,15 +344,9 @@ export function humanQaLines(n: number, branch: string | null): string[] {
   ];
 }
 
-/**
- * Why a person QAs an issue at the gate `state` of the flow `name`: what the outcomes into it notify, when they say;
- * else its mode, for a gate that runs in one mode only; else its type.
- */
-export function gateOf(flow: Flow, state: string, name: string): string {
-  const said = Object.values(flow.states).flatMap((s) => Object.values(s.outcomes).filter((o) => o.to === state && o.notify));
-  if (said.length) return said[0].notify!;
-  const when = flow.states[state]?.when;
-  return when ? `mode:${when}` : `type:${name}`;
+/** Where a person QAs an issue: the state `state` of the flow `name`, and the mode it runs in only, if it runs in one. */
+export function gateOf({ name, flow }: NamedFlow, state: string): Gate {
+  return { flow: name, mode: flow.states[state]?.when ?? null };
 }
 
 const humanGate: Behaviour = {
@@ -361,10 +359,10 @@ const humanGate: Behaviour = {
     ];
   },
   /** Reaching the gate puts the issue in a person's hands: they are notified, and the agent stops. */
-  async enter({ flow, flowName, from, outcome }, applied) {
+  async enter({ from, outcome }, applied) {
     // Staying at the gate, e.g. needs-human resolved there, is no new hand-over.
-    if (from === outcome.to || applied.outcome.notify) return applied;
-    return { ...applied, outcome: { ...applied.outcome, notify: gateOf(flow, outcome.to, flowName) } };
+    if (from === outcome.to) return applied;
+    return { ...applied, outcome: { ...applied.outcome, notify: true } };
   },
 };
 

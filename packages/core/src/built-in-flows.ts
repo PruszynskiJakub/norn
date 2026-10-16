@@ -176,8 +176,7 @@ export const STORY_FLOW: Flow = {
       color: "5319e7",
       description: "Waiting for agent QA",
       outcomes: {
-        // A story always gets a person's QA after the agent's; the notice says it is the story's.
-        pass: { to: "needs-human-qa", means: "every criterion you could check passed; moves on to QA by a person", note: "evidence", notify: "story" },
+        pass: { to: "needs-human-qa", means: "every criterion you could check passed; moves on to QA by a person", note: "evidence" },
         fail: { to: "qa-failed", means: "put the failures with their repros in the note", note: "evidence" },
       },
     },

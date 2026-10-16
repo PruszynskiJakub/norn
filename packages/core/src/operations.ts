@@ -283,7 +283,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   let fixLimit: number | null = null;
   if (inFlow) ({ outcome: applied, fixLimit } = await entering(inFlow));
   try {
-    await applyOutcome(ctx, issue, applied, { word: word ?? "", note, evidence, flow, skipped });
+    await applyOutcome(ctx, issue, applied, { word: word ?? "", note, evidence, flow: named, skipped });
   } finally {
     await github.deleteClaim(n);
   }

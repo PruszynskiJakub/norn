@@ -231,7 +231,45 @@ describe("humanGate", () => {
     const res = await w.norn("done", "40", "approve");
 
     expect(res.stdout).toContain("A person does the next step, so do not take #40 again. norn has notified the user.");
-    expect(w.notifications.map((n) => [n.title, n.body.split("\n")[0]])).toEqual([["norn: #40 needs you", "needs human QA (type:bug)"]]);
+    expect(w.notifications.map((n) => [n.title, n.body.split("\n")[0]])).toEqual([["norn: #40 needs you", "needs human QA (bug)"]]);
+  });
+
+  test("a gate for mode:afk only notifies with that mode, as one for mode:hil does", async () => {
+    const flow = bugFlow();
+    Object.assign(flow.states.verifying, { when: "afk", passThrough: "pass" });
+    const w = bugAt("reviewing", flow);
+    w.github.issues.get(40)!.labels.push("mode:afk");
+    await w.norn("take", "40");
+
+    await w.norn("done", "40", "approve");
+
+    expect(w.notifications.map((n) => n.body.split("\n")[0])).toEqual(["needs human QA (mode:afk)"]);
+  });
+});
+
+describe("notify on an outcome", () => {
+  test("notify: true tells a person their step waits, without a human gate", async () => {
+    const flow = bugFlow();
+    Object.assign(flow.states.reviewing.outcomes.approve, { notify: true });
+    Object.assign(flow.states.verifying, { behaviours: {} });
+    const w = bugAt("reviewing", flow);
+    await w.norn("take", "40");
+
+    const res = await w.norn("done", "40", "approve");
+
+    expect(res.stdout).toContain("A person does the next step, so do not take #40 again. norn has notified the user.");
+    expect(w.notifications.map((n) => n.body.split("\n")[0])).toEqual(["needs human QA (bug)"]);
+  });
+
+  test("notify is true or false, naming no flow or mode", async () => {
+    const flow = bugFlow();
+    Object.assign(flow.states.reviewing.outcomes.approve, { notify: "story" });
+    const w = bugAt("reviewing", flow);
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("  states.reviewing.outcomes.approve.notify must be true or false.\n");
   });
 });
 
@@ -291,7 +329,7 @@ describe("norn next on an issue of a flow", () => {
       [
         'Issue #40 "Crash on empty input": nothing left that you can do.',
         "Waiting for a human:",
-        "  - #40 needs human QA (type:bug).",
+        "  - #40 needs human QA (bug).",
         "Stop here and report to the user. norn has already notified them.",
       ].join("\n"),
     );

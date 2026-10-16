@@ -142,8 +142,7 @@ export function validateFlow(data: unknown): FlowError[] {
       if (typeof outcome.means !== "string") field(`${o}.means`, STRING);
       for (const key of ["note", "needsHuman", "meansSkipped"])
         if (outcome[key] !== undefined && typeof outcome[key] !== "string") field(`${o}.${key}`, STRING);
-      if (outcome.notify !== undefined && outcome.notify !== "story" && outcome.notify !== "mode:hil")
-        field(`${o}.notify`, { kind: "one-of", values: ["story", "mode:hil"] });
+      if (outcome.notify !== undefined && typeof outcome.notify !== "boolean") field(`${o}.notify`, BOOLEAN);
       if (typeof outcome.to !== "string") field(`${o}.to`, STRING);
       else if (!Object.hasOwn(states, outcome.to) && !(RESERVED_TARGETS as readonly string[]).includes(outcome.to)) {
         errors.push({ kind: "target-unknown", state: name, word, to: outcome.to });
@@ -194,7 +193,7 @@ function checkBehaviours(flow: Record<string, unknown>, state: string, behaviour
       for (const name of Object.keys(params)) if (!Object.hasOwn(declared, name)) errors.push({ kind: "field-unknown", path: `${at}.${behaviour}.${name}` });
       const states = isObject(flow.states) ? flow.states : {};
       for (const l of rule.leadsTo?.(params) ?? []) {
-        if (!Object.hasOwn(states, l.to) && !(RESERVED_TARGETS as readonly string[]).includes(l.to))
+        if (l.param !== null && !Object.hasOwn(states, l.to) && !(RESERVED_TARGETS as readonly string[]).includes(l.to))
           errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${l.param}`, expected: STATE });
       }
     }

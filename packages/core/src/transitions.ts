@@ -177,8 +177,8 @@ export interface Applying {
   word: string;
   note?: string;
   evidence?: Evidence;
-  /** The issue's flow; null for a new issue, which triage gives one. */
-  flow: Flow | null;
+  /** The issue's flow, with its name; null for a new issue, which triage gives one. */
+  flow: NamedFlow | null;
   /** The line naming the states the issue's mode skipped; null for none. */
   skipped: string | null;
 }
@@ -187,8 +187,9 @@ export interface Applying {
  * Applies an outcome to an issue whose claim this session holds: labels,
  * comment and closing. The automatic transitions that follow are in followUps.
  */
-export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, { word, note, evidence, flow, skipped }: Applying): Promise<void> {
+export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, { word, note, evidence, flow: named, skipped }: Applying): Promise<void> {
   const { github } = ctx;
+  const flow = named?.flow ?? null;
   const n = issue.number;
   // An issue whose state its flow dropped moves on from that state.
   const left = flow ? await leftState(ctx, issue, flow) : null;
@@ -230,7 +231,7 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, { w
     await github.comment(n, comment.join("\n"));
     await github.removeLabels(n, remove);
     if (outcome.needsHuman) await notifyNeedsHuman(ctx, n, outcome.needsHuman);
-    else if (outcome.notify) await notifyHumanQa(ctx, n, outcome.notify);
+    else if (outcome.notify && named) await notifyHumanQa(ctx, n, { flow: named.name, mode: flow?.states[outcome.to]?.when ?? null });
   }
 }
 

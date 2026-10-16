@@ -12,6 +12,7 @@ import {
   type FinishCommand,
   FLOWS_DIR,
   type FlowError,
+  type Gate,
   type HandedOverResult,
   type FollowUpTask,
   FOR_HUMAN,
@@ -853,6 +854,9 @@ const DESCRIBE: Partial<Record<string, string>> = {
   "merge-queue": "is in merge-queue",
 };
 
+/** Why a person QAs an issue: the mode its gate runs in only, else its flow, e.g. mode:hil or story. */
+const gateText = (g: Gate) => (g.mode ? `mode:${g.mode}` : g.flow);
+
 /** Which session holds an item, and since when. */
 export function holderText(h: Holder) {
   const who = { this: "this session", yours: "another session of yours", other: "another session" }[h.session];
@@ -867,7 +871,7 @@ export function waitDetail(w: WaitItem): string {
     case "needs-human":
       return w.why ?? "see its latest comment";
     case "human-qa":
-      return `needs human QA (${w.of})`;
+      return `needs human QA (${gateText(w.gate)})`;
     case "held":
       return `is held by ${holderText(w.holder)}`;
     case "owner-merge":
@@ -1028,7 +1032,7 @@ export function renderNotification(n: Notification): { title: string; body: stri
     case "needs-human":
       return { title: `norn: #${n.issue} needs you`, body: `${n.reason}\n${n.url}` };
     case "needs-human-qa":
-      return { title: `norn: #${n.issue} needs you`, body: `needs human QA (${n.of})\n${n.url}` };
+      return { title: `norn: #${n.issue} needs you`, body: `needs human QA (${gateText(n.gate)})\n${n.url}` };
     case "state-left":
       return {
         title: `norn: #${n.issue} needs you`,

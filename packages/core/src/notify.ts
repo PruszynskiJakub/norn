@@ -1,7 +1,14 @@
+import type { Mode } from "./flow.js";
 import type { WaitItem } from "./waiting.js";
 import type { Ctx } from "./transitions.js";
 
 export type Channel = "herdr" | "os";
+
+/** Where a person QAs an issue: its flow, and the mode the state runs in only, e.g. hil for a slice's human QA; null for a state of every mode. */
+export interface Gate {
+  flow: string;
+  mode: Mode | null;
+}
 
 /** Something a person must act on, sent as a local notification. `url` is the issue's page. */
 export type Notification =
@@ -9,8 +16,8 @@ export type Notification =
   | { kind: "needs-human"; issue: number; reason: string; url: string }
   /** The issue was in `state`, which the flow `flow` no longer has, so norn set needs-human on it. */
   | { kind: "state-left"; issue: number; state: string; flow: string; url: string }
-  /** `of` says why a person QAs it, as Outcome.notify does. */
-  | { kind: "needs-human-qa"; issue: number; of: string; url: string }
+  /** A person QAs it at `gate`. */
+  | { kind: "needs-human-qa"; issue: number; gate: Gate; url: string }
   /** Delivery stopped: what waits for a person that no session holds; empty when nothing does. */
   | { kind: "story-waiting"; story: number; waiting: WaitItem[] };
 
@@ -38,6 +45,6 @@ export async function notifyStateLeft(ctx: Ctx, n: number, state: string, flow: 
 }
 
 /** An issue reached QA by a person. */
-export async function notifyHumanQa(ctx: Ctx, n: number, of: string) {
-  await send(ctx, { kind: "needs-human-qa", issue: n, of, url: `${await ctx.github.repoUrl()}/issues/${n}` });
+export async function notifyHumanQa(ctx: Ctx, n: number, gate: Gate) {
+  await send(ctx, { kind: "needs-human-qa", issue: n, gate, url: `${await ctx.github.repoUrl()}/issues/${n}` });
 }

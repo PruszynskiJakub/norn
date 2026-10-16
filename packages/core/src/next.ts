@@ -214,7 +214,7 @@ async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, named:
     return;
   }
   if (uses(flow, state, "humanGate")) {
-    report.waiting.push({ issue: n, reason: "human-qa", of: gateOf(flow, state, name), ...(await humanWork(ctx, issue, flow)) });
+    report.waiting.push({ issue: n, reason: "human-qa", gate: gateOf(named, state), ...(await humanWork(ctx, issue, flow)) });
     return;
   }
   if (holds(flow, state)) {
