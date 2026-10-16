@@ -4,6 +4,8 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-10-16
+
 ### Added
 
 - `psdd dashboard [--port <n>] [--interval <duration>] [--no-open]` serves a read-only page on `127.0.0.1` over your psdd work in this repository: your stories with their slices, what needs you with its `drive <issue>` command, what is worth a look (stale claims, items one fix round from `deliver.maxFixRounds`), and a feed of what happened in psdd's terms, with the agents' implement, review and QA remarks inline and QA remarks linked to their evidence on `psdd/qa/<issue>`. It reads GitHub as you every 2 minutes (at least 30s), one GraphQL query plus `git ls-remote` per read, shared by every open tab; it changes nothing. The default port 4477 moves to the next free one when taken, an explicit `--port` that is taken fails, and a second launch for the same checkout prints the running dashboard's URL. `dashboard.port` and `dashboard.interval` go in `.agents/psdd.config.local.json`; in the team file they are refused. The UI is embedded in the CLI, so there is nothing extra to install.
@@ -120,7 +122,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.5.0...HEAD
+[0.5.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.4.0...v0.5.0
 [0.4.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.3...v0.3.0
 [0.2.3]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.2.2...v0.2.3
