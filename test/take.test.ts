@@ -11,7 +11,7 @@ describe("norn take", () => {
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain('You now hold issue #7 "Rate limiting"');
     expect(res.stdout).toContain("Invoke the skill: norn-triage");
-    expect(res.stdout).toContain("norn done 7 accept");
+    expect(res.stdout).toContain("norn done 7 story");
     expect(res.stdout).toContain("norn done 7 reject");
     expect(res.stdout).toContain("If you have to stop, run: norn release 7");
     expect(w.github.labels(7)).toContain("in-progress");

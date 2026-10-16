@@ -13,7 +13,7 @@ test("a story runs from new issue to its story PR, driven only through norn", as
 
   // Phase 1, attended.
   await step("take", "123");
-  await step("done", "123", "accept");
+  await step("done", "123", "story");
   await step("take", "123");
   await step("done", "123", "questions");
   await step("take", "123");

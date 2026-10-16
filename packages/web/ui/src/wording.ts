@@ -76,7 +76,7 @@ function outcomeSentence(e: Extract<FeedEvent, { kind: "outcome" }>, me: string 
     case "resolving needs-human":
       return "Escalation resolved";
     case "triage":
-      if (e.outcome === "accept") return "Accepted at triage";
+      if (e.outcome === "story") return "Accepted at triage as a story";
       if (e.outcome === "reject") return "Rejected at triage";
       break;
     case "refinement":

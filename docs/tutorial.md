@@ -41,7 +41,7 @@ Start Claude Code in the sandbox and ask:
 norn-drive <issue>
 ```
 
-Triage, refine, clarify, plan and slice are attended: the agent prepares each decision and you make it. Each step ends with the `norn done <issue> <outcome>` the briefing gives (triage `accept`, refine `clear` or `questions`), and `norn-drive` moves on to the next step. Slicing creates the slices as sub-issues and moves the story to implementation.
+Triage, refine, clarify, plan and slice are attended: the agent prepares each decision and you make it. Each step ends with the `norn done <issue> <outcome>` the briefing gives (triage `story`, refine `clear` or `questions`), and `norn-drive` moves on to the next step. Slicing creates the slices as sub-issues and moves the story to implementation.
 
 ## 5. Deliver it unattended
 
