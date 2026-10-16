@@ -39,7 +39,7 @@ norn is built for a team that works in a particular way. It checks some of these
 | **Stories merge into one base branch** (`baseBranch`, the repository's default branch unless configured). | Yes. |
 | **Labels are changed only through norn.** A label changed by hand can leave an issue with two states, which norn refuses to brief until a person fixes it. | Yes, it detects the mess but does not prevent it. |
 | **Everyone works through their own `gh`**, logged in with write access to the repository. | Yes, every command fails without it. |
-| **Stories and slices run norn's built-in process**, so every repository that uses norn works the same way for them. | Yes. Stories and slices run the built-in `story` and `slice` flows, written like a [repository flow](#repository-flows). Other kinds of work run the repository's own flows. |
+| **Stories and slices run norn's built-in process**, so every repository that uses norn works the same way for them. | Yes, unless the repository replaces them. Stories and slices run the built-in `story` and `slice` flows, written like a [repository flow](#repository-flows); a repository's `story.json` or `slice.json` replaces the built-in flow of that name. Other kinds of work run the repository's own flows. |
 
 ## Labels and flags
 
@@ -131,6 +131,8 @@ This process is norn's built-in `slice` flow, in the same format as a [repositor
 ## Repository flows
 
 A repository can run other kinds of work through processes of its own. A flow is a JSON file, `.agents/flows/<name>.json`, and an issue labelled `type:<name>` runs it. norn reads flows from the base branch on GitHub, never from the working tree, so a change to a flow takes effect once it is merged, and everyone runs the same process.
+
+A repository file named like a built-in flow, `story.json` or `slice.json`, replaces that flow completely, with nothing merged from the built-in one. `norn flows export story` writes the built-in flow there as a starting copy; unchanged, it runs exactly like the built-in.
 
 ```json
 {

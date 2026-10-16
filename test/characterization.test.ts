@@ -104,6 +104,21 @@ const scenarios: Scenario[] = [
     via: (w) => w.withProject(mkdtempSync(join(tmpdir(), "norn-char-")), async () => []),
   },
 
+  // flows
+  { name: "flows export", argv: ["flows", "export", "story"], via: (w) => w.withDeps({ cwd: mkdtempSync(join(tmpdir(), "norn-char-")) }) },
+  {
+    name: "flows export over an existing file",
+    argv: ["flows", "export", "slice"],
+    via: (w) => {
+      const cwd = mkdtempSync(join(tmpdir(), "norn-char-"));
+      mkdirSync(join(cwd, ".agents", "flows"), { recursive: true });
+      writeFileSync(join(cwd, ".agents", "flows", "slice.json"), "{}\n");
+      return w.withDeps({ cwd });
+    },
+  },
+  { name: "flows export of a flow that is not built in", argv: ["flows", "export", "bug"] },
+  { name: "flows without export", argv: ["flows"] },
+
   // status
   {
     name: "status of a story with slices",
