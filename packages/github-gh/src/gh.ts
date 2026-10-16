@@ -116,6 +116,15 @@ export class GhGitHub implements GitHub {
     }
   }
 
+  async readFileAt(path: string, ref: string): Promise<string | null> {
+    const at = `${REPO}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${encodeURIComponent(ref)}`;
+    const r = await this.find<{ type?: string; content?: string } | unknown[]>(at);
+    // A directory comes back as a list of its entries.
+    if (r === null || Array.isArray(r) || r.type !== "file" || r.content === undefined) return null;
+    // GitHub breaks the base64 into lines; Buffer skips the line breaks.
+    return Buffer.from(r.content, "base64").toString("utf8");
+  }
+
   private async rawIssue(n: number) {
     return this.api<RestIssue>("GET", `${REPO}/issues/${n}`);
   }

@@ -22,7 +22,8 @@ export const FLAGS = ["type:story", "type:slice", "in-progress", "needs-human", 
 export type Target = State | "closed" | "not-planned";
 
 export interface Outcome {
-  to: Target;
+  /** A state of the issue's flow, closed or not-planned. */
+  to: string;
   /** How the outcome is described in the briefing. */
   means: string;
   /** The outcome needs a note; this names it, e.g. "reason". */
@@ -39,7 +40,7 @@ export interface Step {
   skill: string;
   attended: boolean;
   /** State label the issue moves to when the step is taken, e.g. ready-for-agent → implementation. */
-  enterAs?: State;
+  enterAs?: string;
   /** Keyed by outcome word; the empty key is the single way to end. */
   outcomes: Record<string, Outcome>;
   /** The step can attach evidence files with norn done --evidence <dir>. */

@@ -7,6 +7,7 @@ import { sliceBranch, specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
+import { type Flow, type FlowCache, flowStatesOf } from "./flow.js";
 import { notifyHumanQa, notifyNeedsHuman, type Notify } from "./notify.js";
 
 /** The marker norn writes when it sets needs-human; norn next reads the reason back from it. */
@@ -82,6 +83,8 @@ export interface Ctx {
   nonce: () => string;
   /** Story slugs read during this command; see slug.ts. */
   slugs: Slugs;
+  /** Repository flows read during this command; filled on first use, see repositoryFlow. */
+  flows?: FlowCache;
 }
 
 /** QA evidence files pushed to their branch, to embed in the transition comment. */
@@ -161,19 +164,27 @@ export function evidenceLines(repoUrl: string, e: Evidence): string[] {
  * Applies an outcome to an issue whose claim this session holds: labels,
  * comment and closing. The automatic transitions that follow are in followUps.
  */
-export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, word: string, note?: string, evidence?: Evidence): Promise<void> {
+export async function applyOutcome(
+  ctx: Ctx,
+  issue: Issue,
+  outcome: Outcome,
+  word: string,
+  note?: string,
+  evidence?: Evidence,
+  flow: Flow | null = null,
+): Promise<void> {
   const { github } = ctx;
   const n = issue.number;
-  const from = stateOf(issue) ?? "triage";
+  const from = (flow ? flowStatesOf(issue, flow)[0] : stateOf(issue)) ?? "triage";
   // The resolve step has no outcome word and keeps the state; say what it did.
   const resolved = !word && issue.labels.includes("needs-human") && !outcome.needsHuman;
   const why = word || (resolved ? "needs-human resolved" : "");
   const comment = [`norn: ${from} → ${outcome.to === "not-planned" ? "closed as not planned" : outcome.to}${why ? ` (${why})` : ""}`];
-  const spec = await specLink(ctx, issue);
+  const spec = flow ? null : await specLink(ctx, issue);
   if (spec) comment.push("", `Spec: ${spec}`);
-  // A story records its slug the first time norn writes on it, triage included.
-  const becomesStory = kindOf(issue) === "story" || (kindOf(issue) === "new" && outcome.to !== "not-planned");
-  const slug = becomesStory ? await slugLine(ctx, issue) : null;
+  // A story records its slug the first time norn writes on it, triage included; so does an issue whose flow gives it a branch.
+  const becomesStory = !flow && (kindOf(issue) === "story" || (kindOf(issue) === "new" && outcome.to !== "not-planned"));
+  const slug = becomesStory || flow?.workspace === "own" ? await slugLine(ctx, issue) : null;
   if (slug) comment.push("", slug);
   if (note) comment.push("", note);
   if (evidence) comment.push("", ...evidenceLines(await github.repoUrl(), evidence));
@@ -183,10 +194,11 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
   if (outcome.to === "not-planned" || outcome.to === "closed") {
     await github.comment(n, comment.join("\n"));
     await github.closeIssue(n, outcome.to === "closed" ? "completed" : "not_planned");
-    await github.removeLabels(n, ["in-progress", "needs-human", ...stateLabels(issue)]);
+    await github.removeLabels(n, ["in-progress", "needs-human", ...stateLabels(issue, undefined, flow)]);
   } else {
     const add: string[] = [outcome.to];
-    if (kindOf(issue) === "new") {
+    if (flow) await ensureStateLabel(ctx, flow, outcome.to);
+    else if (kindOf(issue) === "new") {
       add.push("type:story");
       await github.assign(n, [await github.currentUser()]);
     }
@@ -194,7 +206,7 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
       add.push("needs-human");
       comment.push("", needsHumanLine(outcome.needsHuman));
     }
-    const remove = ["in-progress", ...(outcome.needsHuman ? [] : ["needs-human"]), ...stateLabels(issue, outcome.to)];
+    const remove = ["in-progress", ...(outcome.needsHuman ? [] : ["needs-human"]), ...stateLabels(issue, outcome.to, flow)];
     await github.addLabels(n, add);
     await github.comment(n, comment.join("\n"));
     await github.removeLabels(n, remove);
@@ -276,11 +288,30 @@ async function setState(ctx: Ctx, issue: Issue, to: State, why: string) {
 }
 
 /**
- * Every state label on the issue except `keep`. A failed removal can leave two
- * state labels; removing all of them on the next transition cleans that up.
+ * Every state label on the issue except `keep`: of its repository flow, or of
+ * the built-in process. A failed removal can leave two state labels; removing
+ * all of them on the next transition cleans that up.
  */
-export function stateLabels(issue: Issue, keep?: string): State[] {
-  return STATES.filter((s) => s !== keep && issue.labels.includes(s));
+export function stateLabels(issue: Issue, keep?: string, flow: Flow | null = null): string[] {
+  return (flow ? Object.keys(flow.states) : STATES).filter((s) => s !== keep && issue.labels.includes(s));
+}
+
+/** A state's label colour and description when the state names none, by its kind. */
+export const DEFAULT_STATE_LABEL = {
+  attended: { color: "c5def5", description: "a person takes part in this step" },
+  agent: { color: "bfd4f2", description: "an agent runs this step unattended" },
+} as const;
+
+/**
+ * Creates the label of a state of a repository flow when the repository lacks
+ * it, so a merged flow works without norn init. The colour and description come
+ * from the state, or a default by kind. Built-in labels are made by norn init.
+ */
+export async function ensureStateLabel(ctx: Ctx, flow: Flow, state: string): Promise<void> {
+  const s = flow.states[state];
+  if (!s || (await ctx.github.labelNames()).includes(state)) return;
+  const fallback = s.attended ? DEFAULT_STATE_LABEL.attended : DEFAULT_STATE_LABEL.agent;
+  await ctx.github.ensureLabels([{ name: state, color: s.color ?? fallback.color, description: s.description ?? fallback.description }]);
 }
 
 /**

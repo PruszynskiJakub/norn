@@ -212,6 +212,32 @@ describe("GhGitHub issues", () => {
   });
 });
 
+describe("GhGitHub files at a ref", () => {
+  test("readFileAt reads a file's contents at a ref and decodes them", async () => {
+    const text = '{ "start": "triaging" }\n';
+    // GitHub breaks the base64 into lines.
+    const content = `${Buffer.from(text).toString("base64").slice(0, 8)}\n${Buffer.from(text).toString("base64").slice(8)}`;
+    const { exec, calls } = scripted(() => ({ stdout: { type: "file", encoding: "base64", content } }));
+
+    expect(await new GhGitHub(exec).readFileAt(".agents/flows/bug.json", "main")).toBe(text);
+    expect(method(calls[0])).toBe("GET");
+    expect(path(calls[0])).toBe("repos/{owner}/{repo}/contents/.agents/flows/bug.json?ref=main");
+  });
+
+  test("readFileAt encodes the ref, so a branch with a slash is one ref", async () => {
+    const { exec, calls } = scripted(() => ({ stdout: { type: "file", encoding: "base64", content: "" } }));
+    await new GhGitHub(exec).readFileAt(".agents/flows/bug.json", "release/1");
+    expect(path(calls[0])).toBe("repos/{owner}/{repo}/contents/.agents/flows/bug.json?ref=release%2F1");
+  });
+
+  test("readFileAt is null for a missing file or ref, and for a directory", async () => {
+    const missing = scripted(() => ({ code: 1, stderr: "gh: Not Found (HTTP 404)" }));
+    expect(await new GhGitHub(missing.exec).readFileAt(".agents/flows/bug.json", "main")).toBeNull();
+    const dir = scripted(() => ({ stdout: [{ type: "file", name: "bug.json" }] }));
+    expect(await new GhGitHub(dir.exec).readFileAt(".agents/flows", "main")).toBeNull();
+  });
+});
+
 describe("GhGitHub branches and evidence", () => {
   test("pushFiles commits exactly the files on top of the branch's head and moves it without force", async () => {
     let blobs = 0;

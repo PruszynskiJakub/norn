@@ -162,6 +162,21 @@ export class FakeGitHub implements GitHub {
   async labelNames() {
     return [...this.labelDefs.keys()];
   }
+  /** Files on GitHub by ref, then path: what readFileAt reads. Tests seed them with seedFile. */
+  files = new Map<string, Map<string, string>>();
+  /** Puts a file on a branch, as if it were committed and pushed there; the branch is created if missing. */
+  seedFile(path: string, content: string, ref = this.defaultBranchName) {
+    if (!this.files.has(ref)) this.files.set(ref, new Map());
+    this.files.get(ref)!.set(path, content);
+    this.branches.add(ref);
+  }
+  /** A flow at .agents/flows/<name>.json on a branch: an object is written as JSON, a string as it is. */
+  seedFlow(name: string, flow: unknown, ref = this.defaultBranchName) {
+    this.seedFile(`.agents/flows/${name}.json`, typeof flow === "string" ? flow : JSON.stringify(flow, null, 2), ref);
+  }
+  async readFileAt(path: string, ref: string) {
+    return this.files.get(ref)?.get(path) ?? null;
+  }
   /** gh's state; when logged in, only to the hosts in ghHosts. */
   ghAuthState: GhAuth = { kind: "logged-in" };
   ghHosts = ["github.com"];

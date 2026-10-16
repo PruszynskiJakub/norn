@@ -1,6 +1,7 @@
 import type { FinishCommand } from "./briefing.js";
 import type { ConfigProblem, VersionIncompatible } from "./config.js";
 import type { BaseBranchMissing } from "./events.js";
+import type { FlowError } from "./flow.js";
 import type { State } from "./machine.js";
 import type { NotAStory } from "./next.js";
 import type { MergeRefusal } from "./transitions.js";
@@ -18,11 +19,13 @@ export type Refusal =
   | { kind: "provider-mismatch"; provider: Provider; variable: string }
   // No step to take
   | { kind: "closed"; issue: number }
-  | { kind: "ambiguous-state"; issue: number; states: State[]; story: number | null }
+  | { kind: "ambiguous-state"; issue: number; states: string[]; story: number | null }
   | { kind: "story-in-implementation"; issue: number }
   | { kind: "story-in-merge-queue"; issue: number; owner: string | null }
   | { kind: "blocked"; issue: number; blockers: number[]; story: number | null }
-  | { kind: "no-step"; issue: number; state: State | null; story: number | null }
+  | { kind: "no-step"; issue: number; state: string | null; story: number | null }
+  /** The issue's type names a repository flow that is broken; issues of other types are unaffected. */
+  | { kind: "flow-invalid"; issue: number; flow: string; errors: FlowError[] }
   // Claims
   | { kind: "held"; issue: number; slice: boolean; since: string | null; story: number | null }
   /** Held by another session of the same user, who may take it over. */

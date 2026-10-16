@@ -4,6 +4,10 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- Repository flows: a repository can define a process of its own in `.agents/flows/<name>.json`, and an issue labelled `type:<name>` runs it through `norn take` and `norn done`. norn reads flows from the base branch on GitHub, briefs each state's skill and outcomes, gives the issue a branch and a PR into the base branch with `"workspace": "own"`, creates a missing state label on the first transition into it, and refuses a broken flow, with what is wrong, for the issues of its type only. Stories and slices keep the built-in process. See [Repository flows](docs/how-it-works.md#repository-flows).
+
 ## [0.8.0] - 2026-10-16
 
 ### Added

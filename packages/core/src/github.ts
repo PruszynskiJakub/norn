@@ -77,6 +77,9 @@ export interface GitHub {
   /** The names of the labels on the repository. */
   labelNames(): Promise<string[]>;
 
+  /** The text of a file at a ref (branch, tag or commit), e.g. .agents/flows/bug.json on main; null when it is not there. Read-only. */
+  readFileAt(path: string, ref: string): Promise<string | null>;
+
   /** Whether gh is installed and logged in to `host`, e.g. github.com. Read-only, for norn doctor. */
   ghAuth(host: string): Promise<GhAuth>;
   /** The user's role on the repository. */
