@@ -148,7 +148,8 @@ Serves a read-only page on `127.0.0.1` over your norn work in this repository an
 - what needs you (`needs-human` and `needs-human-qa`), each with its `norn-drive` command;
 - what is worth a look: stale claims and items one fix round from the limit;
 - your stories with their slices and progress;
-- a feed of what happened, with the agents' implement, review and QA remarks and links to their evidence.
+- a feed of what happened, with the agents' implement, review and QA remarks and links to their evidence;
+- a Flows page (`#flows`): every flow of the repository, marked built-in, overridden or the repository's own, and valid or invalid with its errors, each drawn as a graph of its states and the outcomes between them, with each state's behaviours and `when` mode. It only shows the flows; you change one by merging a change to its file.
 
 ![The norn dashboard](assets/dashboard.png)
 

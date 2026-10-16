@@ -95,7 +95,12 @@ const KIND_COLOR: Record<StateKind, string> = { gate: "e99695", attended: "c5def
 /** The colour of a state of the item's flow, as a CSS colour: its own, else its kind's. Null for a label that is no state of the flow. */
 export function stateColor(x: Item, label: string): string | null {
   const s = x.flowDef?.states[label];
-  return s ? `#${s.color ?? KIND_COLOR[kindOf(s)]}` : null;
+  return s ? colorOf(s) : null;
+}
+
+/** A state's colour as a CSS colour: its own, else its kind's. */
+export function colorOf(s: FlowState): string {
+  return `#${s.color ?? KIND_COLOR[kindOf(s)]}`;
 }
 
 /** How much a feed event asks for the developer's eye. */
@@ -235,3 +240,79 @@ export const links = {
   commit: (repoUrl: string | null, sha: string) => (repoUrl ? `${repoUrl}/tree/${sha}` : null),
   file: (repoUrl: string | null, sha: string, path: string) => (repoUrl ? `${repoUrl}/blob/${sha}/${path.split("/").map(encodeURIComponent).join("/")}` : null),
 };
+
+/** A way from one state to another in a flow's graph: the outcome words that take it, or what moves an issue along it on its own. */
+export interface FlowEdge {
+  from: string;
+  to: string;
+  words: string[];
+  /** Set when no outcome takes the way: the behaviour that moves the issue on its own, e.g. syncsBlocked, or enterAs. */
+  by: string | null;
+}
+
+/** A flow laid out in layers: each state at its distance from the start, the ends it reaches in a last layer of their own. */
+export interface FlowGraph {
+  layers: string[][];
+  edges: FlowEdge[];
+  /** The ends the flow reaches, e.g. closed, as opposed to its states. */
+  ends: Set<string>;
+}
+
+/** Where a state's behaviours move an issue on their own: a `to` parameter, or closed for waitsForMerge, which ends the issue once its PR merges. */
+function behaviourEdges(state: string, s: FlowState): FlowEdge[] {
+  return Object.entries(s.behaviours ?? {}).flatMap(([name, params]) => {
+    const to = typeof params?.to === "string" ? params.to : name === "waitsForMerge" ? "closed" : null;
+    return to === null ? [] : [{ from: state, to, words: [], by: name }];
+  });
+}
+
+/**
+ * A flow's states and the ways between them, laid out for drawing: states in layers by their distance from the start
+ * along any way, the states no way reaches after them, then the ends. Within a layer, states sit under those leading to them.
+ */
+export function flowGraph(flow: Flow): FlowGraph {
+  const edges: FlowEdge[] = [];
+  for (const [state, s] of Object.entries(flow.states)) {
+    const byTarget = new Map<string, FlowEdge>();
+    for (const [word, o] of Object.entries(s.outcomes)) {
+      const e = byTarget.get(o.to);
+      if (e) e.words.push(word);
+      else byTarget.set(o.to, { from: state, to: o.to, words: [word], by: null });
+    }
+    if (s.enterAs && s.enterAs !== state && !byTarget.has(s.enterAs)) byTarget.set(s.enterAs, { from: state, to: s.enterAs, words: [], by: "enterAs" });
+    edges.push(...byTarget.values(), ...behaviourEdges(state, s));
+  }
+  const isState = (name: string) => Object.hasOwn(flow.states, name);
+  const depth = new Map<string, number>();
+  const queue = isState(flow.start) ? [flow.start] : [];
+  if (queue.length) depth.set(flow.start, 0);
+  while (queue.length) {
+    const at = queue.shift()!;
+    for (const e of edges) {
+      if (e.from !== at || !isState(e.to) || depth.has(e.to)) continue;
+      depth.set(e.to, depth.get(at)! + 1);
+      queue.push(e.to);
+    }
+  }
+  const layers: string[][] = [];
+  for (const [state, d] of depth) {
+    layers[d] ??= [];
+    layers[d].push(state);
+  }
+  const unreached = Object.keys(flow.states).filter((s) => !depth.has(s));
+  if (unreached.length) layers.push(unreached);
+  const ends = new Set(edges.map((e) => e.to).filter((to) => !isState(to)));
+  if (ends.size) layers.push([...ends]);
+  // One pass ordering each layer by where the states leading to it sit, so fewer arrows cross.
+  const place = new Map<string, number>();
+  for (const layer of layers) {
+    const pull = (s: string) => {
+      const from = edges.filter((e) => e.to === s && place.has(e.from)).map((e) => place.get(e.from)!);
+      return from.length ? from.reduce((a, b) => a + b, 0) / from.length : Number.POSITIVE_INFINITY;
+    };
+    const order = new Map(layer.map((s, i) => [s, { pull: pull(s), i }]));
+    layer.sort((a, b) => order.get(a)!.pull - order.get(b)!.pull || order.get(a)!.i - order.get(b)!.i);
+    for (const [i, s] of layer.entries()) place.set(s, i - (layer.length - 1) / 2);
+  }
+  return { layers, edges, ends };
+}

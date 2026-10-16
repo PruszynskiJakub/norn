@@ -1,6 +1,6 @@
 // The dashboard's renderer: every sentence the page shows is worded here, from
 // the typed read model, so the rest of the UI only lays words out.
-import type { ClaimHolder, FeedEvent, WaitingItem } from "@norn/core";
+import type { ClaimHolder, FeedEvent, Flow, FlowError, FlowSource, WaitingItem } from "@norn/core";
 import type { DashboardState, PollFailure } from "../../src/contract.ts";
 import { atGate, type Item, isSliced, stateOf } from "./model.ts";
 
@@ -344,4 +344,100 @@ export function feedTitle(selected: boolean): string {
 
 export function emptyFeed(remarksOnly: boolean): string {
   return remarksOnly ? "No remarks here." : "Nothing here yet.";
+}
+
+export const FLOWS = {
+  nav: "Flows",
+  title: "Flows",
+  sub: "The processes this repository's issues run, as norn reads them from .agents/flows on the base branch. Read-only: a flow changes when a change to its file merges.",
+  none: "No flows read yet.",
+  valid: "valid",
+  invalid: "invalid",
+  graph: "States and the outcomes between them",
+  states: "States",
+  attended: "attended",
+  agent: "agent",
+  start: "start",
+};
+
+export function invalidFlows(n: number): string {
+  return n === 1 ? "1 flow is invalid" : `${n} flows are invalid`;
+}
+
+/** Where a flow comes from, as its badge says it. */
+export function flowSourceLabel(source: FlowSource): string {
+  switch (source) {
+    case "built-in":
+      return "built-in";
+    case "overridden":
+      return "overridden";
+    case "repository":
+      return "repository";
+    default:
+      return unreachable(source);
+  }
+}
+
+/** Where a flow comes from, as a sentence for its badge's hint. */
+export function flowSourceHint(source: FlowSource, name: string): string {
+  switch (source) {
+    case "built-in":
+      return "Ships with norn.";
+    case "overridden":
+      return `Ships with norn; the repository's .agents/flows/${name}.json replaces it.`;
+    case "repository":
+      return `The repository's own, from .agents/flows/${name}.json.`;
+    default:
+      return unreachable(source);
+  }
+}
+
+/** A flow's facts under its description: where it starts, where its work happens, whether triage offers it. */
+export function flowFacts(flow: Flow): string {
+  const where =
+    flow.workspace === "none" ? "no branch" : flow.workspace === "own" ? "its own branch, PR into the base branch" : "a branch off its parent's, PR into it";
+  return `Starts in ${flow.start} · works on ${where}${flow.triage === false ? " · triage doesn't offer it" : ""}`;
+}
+
+/** A behaviour's parameters, e.g. "to ready-for-agent"; empty for none. */
+export function behaviourParams(params: Record<string, unknown> | undefined): string {
+  return Object.entries(params ?? {})
+    .map(([k, v]) => `${k} ${typeof v === "string" ? v : JSON.stringify(v)}`)
+    .join(", ");
+}
+
+/** What is wrong with a flow, as a sentence. */
+export function flowErrorText(e: FlowError): string {
+  switch (e.kind) {
+    case "not-json":
+      return `The file isn't JSON: ${e.detail}`;
+    case "field-invalid":
+      return e.path ? `${e.path} must be ${e.expected}.` : `The flow must be ${e.expected}.`;
+    case "start-unknown":
+      return `start names ${e.start}, which is no state of the flow.`;
+    case "target-unknown":
+      return `The outcome ${e.word} of ${e.state} leads to ${e.to}, which is no state of the flow and no end.`;
+    case "renamed-unknown":
+      return `renamed moves ${e.from} to ${e.to}, which is no state of the flow.`;
+    case "state-reserved":
+      return `The state ${e.state} takes a name norn keeps for itself.`;
+    case "pass-through-invalid":
+      return e.word === null
+        ? `${e.state} runs in one mode only but has no passThrough.`
+        : `The passThrough of ${e.state}, ${e.word}, is not one of its outcomes.`;
+    case "end-unreachable":
+      return `No outcomes lead from ${e.state} to closed or not-planned${e.mode ? ` in mode:${e.mode}` : ""}, so an issue there could never end.`;
+    case "behaviour-unknown":
+      return `${e.state} uses ${e.behaviour}, a behaviour this norn doesn't have.`;
+    case "behaviours-conflict":
+      return `${e.state} uses ${e.behaviours[0]} and ${e.behaviours[1]}, which can't go together.`;
+    case "flow-unknown":
+      return `${e.behaviour} of ${e.state} names the flow ${e.flow}, which the repository doesn't have.`;
+    case "behaviour-needs":
+      return `${e.behaviour} of ${e.state} needs ${e.field} to be ${e.expected}.`;
+    case "flow-reserved":
+      return `The name ${e.flow} is one norn keeps for itself.`;
+    default:
+      return unreachable(e);
+  }
 }
