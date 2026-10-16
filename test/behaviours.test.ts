@@ -15,7 +15,7 @@ function bugFlow(over: Record<string, unknown> = {}) {
       fixing: {
         skill: "bug-fix",
         attended: false,
-        behaviours: ["opensPR"],
+        behaviours: { opensPR: {} },
         outcomes: { fixed: { to: "reviewing", means: "the fix is pushed, moves on to review" } },
       },
       reviewing: {
@@ -30,13 +30,13 @@ function bugFlow(over: Record<string, unknown> = {}) {
         skill: "bug-fix",
         attended: false,
         enterAs: "fixing",
-        behaviours: ["countsFixRounds"],
+        behaviours: { countsFixRounds: {} },
         outcomes: { fixed: { to: "reviewing", means: "the changes are pushed, moves on to review" } },
       },
       verifying: {
         skill: "bug-verify",
         attended: true,
-        behaviours: ["humanGate"],
+        behaviours: { humanGate: {} },
         outcomes: {
           pass: { to: "closed", means: "the bug is gone" },
           fail: { to: "changes-requested", means: "the bug is still there", note: "repro" },
@@ -55,15 +55,37 @@ function bugAt(state: string, flow: unknown = bugFlow()) {
 }
 
 describe("behaviours in a flow", () => {
-  test("a state using a behaviour norn does not know fails validation, naming it", async () => {
+  test("opensPR needs a flow with a workspace of its own", async () => {
+    const w = bugAt("fixing", bugFlow({ workspace: "none" }));
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain('  The state fixing uses the behaviour opensPR, which needs workspace to be "own", for its PR.\n');
+  });
+
+  test("a behaviour's parameters are an object, {} for none", async () => {
     const flow = bugFlow();
-    flow.states.reviewing = { ...flow.states.reviewing, behaviours: ["opensPR", "autoMerge"] } as typeof flow.states.reviewing;
+    flow.states.fixing = { ...flow.states.fixing, behaviours: { opensPR: true } } as unknown as typeof flow.states.fixing;
     const w = bugAt("fixing", flow);
 
     const res = await w.norn("take", "40");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("  The state reviewing uses the behaviour autoMerge, which norn does not know.");
+    expect(res.stdout).toContain("  states.fixing.behaviours.opensPR must be an object of parameters, {} for none.\n");
+  });
+
+  test("a state using a behaviour norn does not know fails validation, naming it", async () => {
+    const flow = bugFlow();
+    flow.states.reviewing = { ...flow.states.reviewing, behaviours: { opensPR: {}, autoMerge: {} } } as typeof flow.states.reviewing;
+    const w = bugAt("fixing", flow);
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain(
+      "  The state reviewing uses the behaviour autoMerge, which this norn does not know; a flow written for a newer norn needs the nornVersion pin raised.",
+    );
   });
 });
 
@@ -181,7 +203,10 @@ describe("humanGate", () => {
   });
 
   test("without a workspace, the app runs where the person is", async () => {
-    const w = bugAt("verifying", bugFlow({ workspace: "none" }));
+    const flow = bugFlow({ workspace: "none" });
+    // opensPR needs a workspace of its own.
+    delete (flow.states.fixing as { behaviours?: unknown }).behaviours;
+    const w = bugAt("verifying", flow);
 
     const out = (await w.norn("take", "40")).stdout;
 
@@ -287,15 +312,6 @@ describe("norn next on an issue of a flow", () => {
     const out = (await w.norn("next", "40")).stdout;
 
     expect(out).toContain("  - #40 is in testing, which the flow bug no longer has; taking it hands it to a person.");
-  });
-
-  test("an issue of a broken flow is refused with what is wrong", async () => {
-    const w = bugAt("reviewing", "{ not json");
-
-    const res = await w.norn("next", "40");
-
-    expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("#40 runs the flow bug, which is broken");
   });
 
   test("a closed issue has nothing left", async () => {

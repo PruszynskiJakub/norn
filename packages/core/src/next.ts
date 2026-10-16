@@ -6,7 +6,7 @@ import { branchAt, createWorktreeCommand, locate } from "./location.js";
 import { isWithin, type Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
 import { uses } from "./behaviours.js";
-import { type Flow, flowStatesOf, flowStep } from "./flow.js";
+import { type Flow, type FlowError, flowNameOf, flowStatesOf, flowStep, type LoadedFlow, repositoryFlow } from "./flow.js";
 import { STATES, kindOf, slicesOf, stateOf, statesOf, type Step, stepFor } from "./machine.js";
 import { storySlug } from "./slug.js";
 import { storyBranch } from "./text.js";
@@ -81,6 +81,8 @@ export type WaitItem = { issue: number } & (
   | { reason: "ambiguous-state"; states: string[] }
   /** The issue is in a state its flow no longer has; taking it hands it to a person. */
   | { reason: "state-left"; state: string; flow: string }
+  /** The issue's type names a repository flow that is broken, so norn cannot run it until a person fixes the flow. */
+  | { reason: "invalid-flow"; flow: string; errors: FlowError[] }
 );
 
 export interface NextReport {
@@ -156,7 +158,7 @@ async function reconcile(ctx: Ctx, storyNumber: number): Promise<Event[]> {
  * What can be done on a story now. Syncs blocked labels and catches up on
  * housekeeping first. With `flow`, on an issue of that repository flow instead.
  */
-export async function computeNext(ctx: Ctx, storyNumber: number, flow: NamedFlow | null = null): Promise<NextReport> {
+export async function computeNext(ctx: Ctx, storyNumber: number, flow: LoadedFlow | null = null): Promise<NextReport> {
   if (flow) return computeNextInFlow(ctx, storyNumber, flow);
   const { github } = ctx;
   await syncBlocked(ctx, storyNumber);
@@ -203,8 +205,20 @@ export async function computeNext(ctx: Ctx, storyNumber: number, flow: NamedFlow
   return report;
 }
 
+/** The issue's broken repository flow, if its type names one, e.g. a slice of an overridden slice flow. */
+async function brokenFlow(ctx: Ctx, issue: Issue) {
+  const name = flowNameOf(issue);
+  const loaded = name === null ? null : await repositoryFlow(ctx, name);
+  return loaded && !loaded.ok ? loaded : null;
+}
+
 async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   const n = issue.number;
+  const broken = await brokenFlow(ctx, issue);
+  if (broken) {
+    report.waiting.push({ issue: n, reason: "invalid-flow", flow: broken.name, errors: broken.errors });
+    return;
+  }
   const state = stateOf(issue);
   const states = statesOf(issue);
   if (states.length > 1) {
@@ -236,16 +250,17 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
 }
 
 /** What can be done on an issue of a repository flow now: it has no slices, so only the issue itself. */
-async function computeNextInFlow(ctx: Ctx, n: number, flow: NamedFlow): Promise<NextReport> {
+async function computeNextInFlow(ctx: Ctx, n: number, loaded: LoadedFlow): Promise<NextReport> {
   const issue = await ctx.github.getIssue(n);
-  const loc = await locate(issue, ctx, flow.flow);
+  const flow = loaded.ok ? loaded : null;
+  const loc = flow ? await locate(issue, ctx, flow.flow) : null;
   const report: NextReport = {
     story: n,
-    flow: flow.name,
+    flow: loaded.name,
     provider: ctx.config.provider,
     maxParallel: ctx.config.maxParallel,
     title: issue.title,
-    state: issue.state === "closed" ? null : (flowStatesOf(issue, flow.flow)[0] ?? null),
+    state: issue.state === "closed" || !flow ? null : (flowStatesOf(issue, flow.flow)[0] ?? null),
     branch: loc?.branch ?? null,
     slices: { total: 0, merged: 0 },
     start: [],
@@ -262,7 +277,9 @@ async function computeNextInFlow(ctx: Ctx, n: number, flow: NamedFlow): Promise<
     report.nothingLeft = true;
     return report;
   }
-  await classifyInFlow(ctx, issue, report, flow);
+  // A broken flow cannot run: a person fixes it first.
+  if (!loaded.ok) report.waiting.push({ issue: n, reason: "invalid-flow", flow: loaded.name, errors: loaded.errors });
+  else await classifyInFlow(ctx, issue, report, loaded);
   report.nothingLeft = report.start.length === 0 && !report.waiting.some((w) => w.reason === "held");
   report.running = report.waiting.filter((w) => w.reason === "held" && w.holder.mine).length;
   report.slots = Math.max(0, ctx.config.maxParallel - report.running);
@@ -382,7 +399,7 @@ async function humanWork(ctx: Ctx, issue: Issue, flow: Flow | null = null): Prom
 }
 
 /** Waiting items only a person can move on. */
-export const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owner-merge", "no-state", "ambiguous-state", "state-left"];
+export const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owner-merge", "no-state", "ambiguous-state", "state-left", "invalid-flow"];
 
 /** Why next refuses: n is not a story. */
 export type NotAStory = { kind: "is-a-slice"; issue: number; story: number | null } | { kind: "not-a-story"; issue: number };

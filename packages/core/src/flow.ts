@@ -1,4 +1,5 @@
 import type { Issue } from "./github.js";
+import { BEHAVIOURS, type Behaviour, type BehaviourName, type BehaviourParams } from "./behaviours.js";
 import type { Outcome, Step } from "./machine.js";
 
 /**
@@ -36,18 +37,14 @@ export interface FlowState {
   when?: Mode;
   /** With when: the outcome word norn follows on its own when the issue's mode skips the state. */
   passThrough?: string;
-  /** Built-in mechanics the state opts into; see behaviours.ts. */
-  behaviours?: BehaviourName[];
+  /** Built-in mechanics the state opts into, by name, with their parameters; see behaviours.ts. */
+  behaviours?: Partial<Record<BehaviourName, BehaviourParams>>;
   /** Keyed by outcome word. */
   outcomes: Record<string, Outcome>;
 }
 
 /** How an issue is worked, from its mode:afk or mode:hil label: unattended, or with a person in the loop. */
 export type Mode = "afk" | "hil";
-
-/** The closed set of behaviours a state can opt into. A name outside it fails validation, e.g. one from a newer norn. */
-export const BEHAVIOURS = ["opensPR", "countsFixRounds", "humanGate"] as const;
-export type BehaviourName = (typeof BEHAVIOURS)[number];
 
 /** A flow read from its file: valid, or kept with what is wrong with it. */
 export type LoadedFlow = { ok: true; name: string; flow: Flow } | { ok: false; name: string; errors: FlowError[] };
@@ -64,12 +61,32 @@ export type FlowError =
   | { kind: "renamed-unknown"; from: string; to: string }
   /** A state takes a name norn keeps for itself, e.g. closed. */
   | { kind: "state-reserved"; state: string }
-  | { kind: "behaviour-unknown"; state: string; behaviour: string }
   /** A state with when has no passThrough (word null), or it names a word that is not one of the state's outcomes. */
-  | { kind: "pass-through-invalid"; state: string; word: string | null };
+  | { kind: "pass-through-invalid"; state: string; word: string | null }
+  /**
+   * No path of outcomes leads from the state to closed or not-planned, so an issue there could never end. With `mode`, the
+   * path is cut only in that mode, where the states for the other mode are passed through.
+   */
+  | { kind: "end-unreachable"; state: string; mode?: Mode }
+  /** A behaviour this norn does not have, e.g. one of a newer norn. */
+  | { kind: "behaviour-unknown"; state: string; behaviour: string }
+  /** Two behaviours of one state that cannot go together. */
+  | { kind: "behaviours-conflict"; state: string; behaviours: [string, string] }
+  /** A behaviour names a flow the repository does not have. */
+  | { kind: "flow-unknown"; state: string; behaviour: string; flow: string }
+  /** A behaviour of the state needs the flow to be otherwise, e.g. opensPR a workspace of its own. */
+  | { kind: "behaviour-needs"; state: string; behaviour: string; field: string; expected: string }
+  /** The flow's name is one norn keeps for itself, e.g. reject, triage's outcome. */
+  | { kind: "flow-reserved"; flow: string };
 
 /** Ends every flow can lead to; no state may take these names. */
 export const RESERVED_TARGETS = ["closed", "not-planned"] as const;
+
+/** Names no flow may take: triage's outcome that closes an issue as not planned. */
+const RESERVED_FLOWS = ["reject"];
+
+/** Flows norn ships, which exist in every repository. */
+const BUILT_IN_FLOWS = ["story", "slice"];
 
 /** Labels norn sets itself on every issue; no state may take these names either. */
 const ENGINE_LABELS = ["in-progress", "needs-human"];
@@ -82,7 +99,7 @@ export function parseFlow(name: string, text: string): LoadedFlow {
   } catch (e) {
     return { ok: false, name, errors: [{ kind: "not-json", detail: (e as Error).message }] };
   }
-  const errors = validateFlow(data);
+  const errors = [...(RESERVED_FLOWS.includes(name) ? [{ kind: "flow-reserved", flow: name } as const] : []), ...validateFlow(data)];
   return errors.length ? { ok: false, name, errors } : { ok: true, name, flow: data as Flow };
 }
 
@@ -116,17 +133,9 @@ export function validateFlow(data: unknown): FlowError[] {
     if (typeof state.attended !== "boolean") field(`${at}.attended`, "true or false");
     for (const key of ["name", "description", "color"]) if (state[key] !== undefined && typeof state[key] !== "string") field(`${at}.${key}`, "a string");
     if (state.evidence !== undefined && typeof state.evidence !== "boolean") field(`${at}.evidence`, "true or false");
+    if (state.behaviours !== undefined) checkBehaviours(data, name, state.behaviours, errors);
     if (state.enterAs !== undefined && (typeof state.enterAs !== "string" || !Object.hasOwn(states, state.enterAs))) {
       field(`${at}.enterAs`, "a state of the flow");
-    }
-    if (state.behaviours !== undefined) {
-      if (!Array.isArray(state.behaviours)) field(`${at}.behaviours`, "a list of behaviour names");
-      else {
-        for (const [i, b] of state.behaviours.entries()) {
-          if (typeof b !== "string") field(`${at}.behaviours.${i}`, "a behaviour name");
-          else if (!(BEHAVIOURS as readonly string[]).includes(b)) errors.push({ kind: "behaviour-unknown", state: name, behaviour: b });
-        }
-      }
     }
     if (!isObject(state.outcomes)) {
       field(`${at}.outcomes`, "an object");
@@ -161,7 +170,102 @@ export function validateFlow(data: unknown): FlowError[] {
         else if (!Object.hasOwn(states, to)) errors.push({ kind: "renamed-unknown", from, to });
       }
   }
+  const passThroughsValid = !errors.some(
+    (e) => e.kind === "pass-through-invalid" || (e.kind === "field-invalid" && /\.(when|passThrough|outcomes)/.test(e.path)),
+  );
+  errors.push(...endUnreachable(states, passThroughsValid));
   return errors;
+}
+
+const isBehaviour = (name: string): name is BehaviourName => Object.hasOwn(BEHAVIOURS, name);
+
+/** Each behaviour must be known, with valid parameters, and allowed beside the state's others. */
+function checkBehaviours(flow: Record<string, unknown>, state: string, behaviours: unknown, errors: FlowError[]) {
+  const at = `states.${state}.behaviours`;
+  if (!isObject(behaviours)) {
+    errors.push({ kind: "field-invalid", path: at, expected: "an object of behaviour names" });
+    return;
+  }
+  const known: BehaviourName[] = [];
+  for (const [behaviour, params] of Object.entries(behaviours)) {
+    if (!isBehaviour(behaviour)) {
+      errors.push({ kind: "behaviour-unknown", state, behaviour });
+      continue;
+    }
+    known.push(behaviour);
+    const rule: Behaviour = BEHAVIOURS[behaviour];
+    if (!isObject(params)) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}`, expected: "an object of parameters, {} for none" });
+    else for (const p of rule.params?.(params) ?? []) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${p.param}`, expected: p.expected });
+    const needs = rule.requires?.(flow);
+    if (needs) errors.push({ kind: "behaviour-needs", state, behaviour, ...needs });
+  }
+  known.forEach((a, i) => {
+    for (const b of known.slice(i + 1)) {
+      const [ra, rb]: Behaviour[] = [BEHAVIOURS[a], BEHAVIOURS[b]];
+      if (ra.excludes?.includes(b) || rb.excludes?.includes(a)) errors.push({ kind: "behaviours-conflict", state, behaviours: [a, b] });
+    }
+  });
+}
+
+/** The states that cannot end, then those that cannot end in one mode only, each state reported once. */
+function endUnreachable(states: Record<string, unknown>, passThroughsValid: boolean): FlowError[] {
+  const errors: FlowError[] = statesThatCannotEnd(states).map((state) => ({ kind: "end-unreachable", state }));
+  const conditional = Object.values(states).some((s) => isObject(s) && s.when !== undefined);
+  if (!conditional || !passThroughsValid) return errors;
+  for (const mode of ["afk", "hil"] as const) {
+    for (const state of statesThatCannotEnd(states, mode)) {
+      if (!errors.some((e) => e.kind === "end-unreachable" && e.state === state)) errors.push({ kind: "end-unreachable", state, mode });
+    }
+  }
+  return errors;
+}
+
+/**
+ * The states from which no path of outcomes reaches closed or not-planned, in file order. In a mode, an outcome into a
+ * state for the other mode leads where that state's pass-through leads, and only the states that run in the mode count.
+ */
+function statesThatCannotEnd(states: Record<string, unknown>, mode?: Mode): string[] {
+  const skips = (to: string) => {
+    const s = states[to];
+    return mode !== undefined && isObject(s) && s.when !== undefined && s.when !== mode;
+  };
+  // Where an outcome lands in the mode; null when its pass-throughs go round in a loop.
+  const land = (to: string): string | null => {
+    const seen: string[] = [];
+    while (skips(to)) {
+      if (seen.includes(to)) return null;
+      seen.push(to);
+      const s = states[to] as Record<string, unknown>;
+      const o = (s.outcomes as Record<string, Record<string, unknown>>)[s.passThrough as string];
+      to = o.to as string;
+    }
+    return to;
+  };
+  const targets = (state: unknown): string[] =>
+    isObject(state) && isObject(state.outcomes)
+      ? Object.values(state.outcomes).flatMap((o) => {
+          const to = isObject(o) && typeof o.to === "string" ? land(o.to) : null;
+          return to === null ? [] : [to];
+        })
+      : [];
+  // An unknown target is reported on its own, so it does not count against the states before it.
+  const ends = new Set<string>([
+    ...RESERVED_TARGETS,
+    ...Object.values(states)
+      .flatMap(targets)
+      .filter((to) => !Object.hasOwn(states, to)),
+  ]);
+  // Walk back from the ends: a state ends once one of its outcomes leads to a state that ends.
+  for (let grew = true; grew; ) {
+    grew = false;
+    for (const [name, state] of Object.entries(states)) {
+      if (!ends.has(name) && targets(state).some((to) => ends.has(to))) {
+        ends.add(name);
+        grew = true;
+      }
+    }
+  }
+  return Object.keys(states).filter((name) => !ends.has(name) && !skips(name));
 }
 
 /** The flow named by the issue's `type:<name>` label, for any type but the built-in story and slice; null for none. */
@@ -191,10 +295,28 @@ export function repositoryFlow(
   ctx.flows ??= new Map();
   let flow = ctx.flows.get(name);
   if (!flow) {
-    flow = ctx.github.readFileAt(`${FLOWS_DIR}/${name}.json`, ctx.config.baseBranch).then((text) => (text === null ? null : parseFlow(name, text)));
+    flow = ctx.github
+      .readFileAt(`${FLOWS_DIR}/${name}.json`, ctx.config.baseBranch)
+      .then((text) => (text === null ? null : checkFlowsNamed(ctx, parseFlow(name, text))));
     ctx.flows.set(name, flow);
   }
   return flow;
+}
+
+/** A valid flow whose behaviours name flows the repository does not have is kept with those errors. */
+async function checkFlowsNamed(ctx: Parameters<typeof repositoryFlow>[0], loaded: LoadedFlow): Promise<LoadedFlow> {
+  if (!loaded.ok) return loaded;
+  const named = Object.entries(loaded.flow.states).flatMap(([state, s]) =>
+    Object.entries(s.behaviours ?? {}).flatMap(([behaviour, params]) => {
+      const rule: Behaviour = BEHAVIOURS[behaviour as BehaviourName];
+      return (rule.flowsNamed?.(params ?? {}) ?? []).map((flow) => ({ state, behaviour, flow }));
+    }),
+  );
+  const exists = async (flow: string) =>
+    BUILT_IN_FLOWS.includes(flow) || (await ctx.github.readFileAt(`${FLOWS_DIR}/${flow}.json`, ctx.config.baseBranch)) !== null;
+  const errors: FlowError[] = [];
+  for (const n of named) if (!(await exists(n.flow))) errors.push({ kind: "flow-unknown", ...n });
+  return errors.length ? { ok: false, name: loaded.name, errors } : loaded;
 }
 
 /** Outcome words of triage that no flow can take: the built-in story and slice, and reject. */
@@ -287,6 +409,6 @@ export function flowStep(issue: Issue, flow: Flow): Step | null {
     ...(s.enterAs ? { enterAs: s.enterAs } : {}),
     outcomes: s.outcomes,
     // A person at a human gate can attach QA evidence.
-    ...(s.evidence || s.behaviours?.includes("humanGate") ? { evidence: true } : {}),
+    ...(s.evidence || (s.behaviours && Object.hasOwn(s.behaviours, "humanGate")) ? { evidence: true } : {}),
   };
 }

@@ -147,13 +147,13 @@ A repository can run other kinds of work through processes of its own. A flow is
       "attended": false,
       "color": "d93f0b",
       "description": "an agent fixes the bug",
-      "behaviours": ["opensPR"],
+      "behaviours": { "opensPR": {} },
       "outcomes": { "fixed": { "to": "verifying", "means": "the fix is pushed, a person checks it" } }
     },
     "verifying": {
       "skill": "bug-verify",
       "attended": true,
-      "behaviours": ["humanGate"],
+      "behaviours": { "humanGate": {} },
       "outcomes": {
         "pass": { "to": "closed", "means": "the bug is gone" },
         "fail": { "to": "changes-requested", "means": "the bug is still there", "note": "repro" }
@@ -163,7 +163,7 @@ A repository can run other kinds of work through processes of its own. A flow is
       "skill": "bug-fix",
       "attended": false,
       "enterAs": "fixing",
-      "behaviours": ["countsFixRounds"],
+      "behaviours": { "countsFixRounds": {} },
       "outcomes": { "fixed": { "to": "verifying", "means": "the fix is pushed, a person checks it again" } }
     }
   }
@@ -177,15 +177,13 @@ A repository can run other kinds of work through processes of its own. A flow is
 - The first transition into a state whose label is missing creates the label, with the state's colour and description, or a default for an attended or an agent step.
 - `needs-human`, claims and `in-progress` work in every flow as they do for stories and slices.
 
-A state opts into norn's built-in mechanics by naming its behaviours. Each one adds its lines to the briefing, its say on `norn done`, and its follow-ups:
+A state opts into norn's built-in mechanics by naming its behaviours, each with an object of its parameters, `{}` when it takes none: `"behaviours": { "opensPR": {} }`. Each one adds its lines to the briefing, its say on `norn done`, and its follow-ups:
 
 | Behaviour | What it does |
 | --- | --- |
-| `opensPR` | The state's briefing says to commit, push and open the issue's PR into the base branch if there is none yet. Once the PR exists, the briefing of every other state names it with its diff. Without `"workspace": "own"` it adds nothing. |
+| `opensPR` | The state's briefing says to commit, push and open the issue's PR into the base branch if there is none yet. Once the PR exists, the briefing of every other state names it with its diff. It needs `"workspace": "own"`. |
 | `countsFixRounds` | Entering the state from another one counts a fix round, and taking the issue from it (or in the state it enters as, once a round is counted) briefs the step as rework. When an outcome would start a round past `deliver.maxFixRounds`, the issue gets `needs-human` instead. Every state with it counts toward the same limit. |
 | `humanGate` | A person does this state's step. An outcome into it notifies the user and tells the agent to stop; `norn next` lists the issue as waiting for a person. The briefing carries the QA wording: run the app, tie remarks to criteria, a repro for every failure, and evidence with `--evidence <dir>`. |
-
-A state naming a behaviour norn does not know makes the flow invalid, e.g. a flow written for a newer norn.
 
 A state can run in one mode only: `"when": "hil"` or `"when": "afk"`, with `passThrough` naming one of its outcomes, e.g. `"when": "hil", "passThrough": "verified"` on a state where a person verifies the fix. When an outcome leads into it and the issue carries the other mode's label, norn never enters the state: it follows the pass-through outcome at once, through any further such states, and writes one transition comment straight to where the issue lands, e.g. `norn: fixing → closed (fixed)` followed by `Skipped verifying in mode:afk: it runs in mode:hil only.` In the state's own mode the state runs as usual, and so it does for an issue with no `mode:` label.
 
@@ -193,7 +191,15 @@ A state can run in one mode only: `"when": "hil"` or `"when": "afk"`, with `pass
 
 Triage chooses the type. Its briefing offers `story`, then one outcome per flow named after the flow, with the flow's `description` as what it means, then `reject`. `norn done <issue> bug` adds `type:bug`, moves the issue to the flow's `start` and assigns it to you, with a transition comment. A flow with `"triage": false` is not offered, and neither is a broken one.
 
-norn checks a flow before it runs it: the start state exists, every target is a state, `closed` or `not-planned`, every `renamed` target is a state, every behaviour is one norn knows, every state with `when` names one of its outcomes as `passThrough`, and no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`). A broken flow is refused, with what is wrong, only for the issues of its own type.
+norn checks a flow strictly before it runs it:
+
+- the fields have the right types, the start state exists, every target is a state, `closed` or `not-planned`, and every `renamed` target is a state;
+- every state with `when` names one of its outcomes as `passThrough`;
+- every state can reach `closed` or `not-planned` through its outcomes, so no issue can be stuck in a loop, in either mode: in `mode:afk` the states for `hil` are passed through, and the other way round;
+- each state's `behaviours` are ones this norn knows, each with an object of parameters (`{}` for none), allowed together and with what they need, e.g. `opensPR` needs `"workspace": "own"`, and any flow they name exists. A flow written for a newer norn fails here, which is what the `nornVersion` pin protects against;
+- no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`), and no flow is named `reject`, triage's outcome.
+
+A broken flow stops only the issues of its own type. `norn take` and `norn done` refuse them with every problem found, triage stops offering the flow, and `norn next` shows them waiting for a person, blocked by the broken flow. Issues of other types keep working.
 
 Flows have no versions: an issue in progress follows the current flow from its next step. When `norn take` finds an issue in a state its flow no longer has (the state norn last moved it to, by its transition comments):
 
