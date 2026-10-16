@@ -41,70 +41,86 @@ interface Raw {
   notifications?: string;
 }
 
+/** A setting psdd cannot use, so it refuses until the file is fixed. */
+export type ConfigProblem =
+  | { kind: "not-an-object"; file: string }
+  | { kind: "invalid-json"; file: string; detail: string }
+  | { kind: "unknown-setting"; file: string; key: string }
+  | { kind: "bad-base-branch"; file: string }
+  | { kind: "bad-provider"; file: string; allowed: readonly string[] }
+  | { kind: "bad-stale-after"; file: string }
+  | { kind: "notifications-in-team-file"; file: string; local: string }
+  | { kind: "bad-notifications"; file: string; allowed: readonly string[] }
+  | { kind: "bad-deliver-number"; file: string; key: string };
+
+/** A setting psdd ignores or clamps, and says so. */
+export type ConfigWarning =
+  | { kind: "stale-after-clamped"; file: string; value: string; minimum: string }
+  | { kind: "team-setting-in-local-file"; file: string; setting: string; team: string };
+
 /**
  * Checks one file's settings. Problems make psdd refuse; warnings are
- * printed and the setting is ignored or clamped. Both are prefixed with the file.
+ * printed and the setting is ignored or clamped.
  */
-function check(file: string, raw: unknown): { problems: string[]; warnings: string[] } {
-  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { problems: [`${file}: must be a JSON object`], warnings: [] };
-  const problems: string[] = [];
-  const warnings: string[] = [];
+function check(file: string, raw: unknown): { problems: ConfigProblem[]; warnings: ConfigWarning[] } {
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) return { problems: [{ kind: "not-an-object", file }], warnings: [] };
+  const problems: ConfigProblem[] = [];
+  const warnings: ConfigWarning[] = [];
   const r = raw as Record<string, unknown>;
   for (const key of Object.keys(r)) {
-    if (!["baseBranch", "worktrees", "claims", "deliver", "notifications"].includes(key)) problems.push(`${file}: unknown setting "${key}"`);
+    if (!["baseBranch", "worktrees", "claims", "deliver", "notifications"].includes(key)) problems.push({ kind: "unknown-setting", file, key });
   }
-  if ("baseBranch" in r && (typeof r.baseBranch !== "string" || !r.baseBranch)) problems.push(`${file}: baseBranch must be a branch name`);
+  if ("baseBranch" in r && (typeof r.baseBranch !== "string" || !r.baseBranch)) problems.push({ kind: "bad-base-branch", file });
   const provider = (r.worktrees as Raw["worktrees"])?.provider;
   if (provider !== undefined && !(PROVIDERS as readonly string[]).includes(provider)) {
-    problems.push(`${file}: worktrees.provider must be one of ${PROVIDERS.join(", ")}`);
+    problems.push({ kind: "bad-provider", file, allowed: PROVIDERS });
   }
   const stale = (r.claims as Raw["claims"])?.staleAfter;
   if (stale !== undefined && !/^\d+[smhd]$/.test(String(stale))) {
-    problems.push(`${file}: claims.staleAfter must be a duration like 90m or 2h`);
+    problems.push({ kind: "bad-stale-after", file });
   } else if (file === TEAM_CONFIG && stale !== undefined && toMs(stale) < MIN_STALE_AFTER_MS) {
-    warnings.push(`${file}: claims.staleAfter ${stale} is below the 10m minimum, so psdd uses 10m; shorter, and live claims get taken over`);
+    warnings.push({ kind: "stale-after-clamped", file, value: stale, minimum: "10m" });
   }
   // These bind every developer's sessions alike, so one person's local file must not change them.
   if (file === LOCAL_CONFIG) {
-    if (stale !== undefined) warnings.push(`${file}: claims.staleAfter is shared by the team, so psdd ignores it here; set it in ${TEAM_CONFIG}`);
+    if (stale !== undefined) warnings.push({ kind: "team-setting-in-local-file", file, setting: "claims.staleAfter", team: TEAM_CONFIG });
     if ((r.deliver as Raw["deliver"])?.maxFixRounds !== undefined) {
-      warnings.push(`${file}: deliver.maxFixRounds is shared by the team, so psdd ignores it here; set it in ${TEAM_CONFIG}`);
+      warnings.push({ kind: "team-setting-in-local-file", file, setting: "deliver.maxFixRounds", team: TEAM_CONFIG });
     }
   }
   if ("notifications" in r) {
-    if (file === TEAM_CONFIG) problems.push(`${file}: notifications is set per developer in ${LOCAL_CONFIG}`);
-    else if (!NOTIFICATIONS.includes(r.notifications as string)) problems.push(`${file}: notifications must be one of ${NOTIFICATIONS.join(", ")}`);
+    if (file === TEAM_CONFIG) problems.push({ kind: "notifications-in-team-file", file, local: LOCAL_CONFIG });
+    else if (!NOTIFICATIONS.includes(r.notifications as string)) problems.push({ kind: "bad-notifications", file, allowed: NOTIFICATIONS });
   }
   const deliver = (r.deliver ?? {}) as Record<string, unknown>;
   for (const key of ["maxParallel", "maxFixRounds"]) {
     const v = deliver[key];
-    if (v !== undefined && !(Number.isInteger(v) && (v as number) > 0)) problems.push(`${file}: deliver.${key} must be a whole number above 0`);
+    if (v !== undefined && !(Number.isInteger(v) && (v as number) > 0)) problems.push({ kind: "bad-deliver-number", file, key });
   }
   return { problems, warnings };
 }
 
-async function read(workspace: Workspace, file: string): Promise<{ raw: Raw; problems: string[]; warnings: string[] }> {
+async function read(workspace: Workspace, file: string): Promise<{ raw: Raw; problems: ConfigProblem[]; warnings: ConfigWarning[] }> {
   const text = await workspace.readFile(file);
   if (text === null) return { raw: {}, problems: [], warnings: [] };
   let raw: unknown;
   try {
     raw = JSON.parse(text);
   } catch (e) {
-    return { raw: {}, problems: [`${file}: not valid JSON (${(e as Error).message})`], warnings: [] };
+    return { raw: {}, problems: [{ kind: "invalid-json", file, detail: (e as Error).message }], warnings: [] };
   }
   const { problems, warnings } = check(file, raw);
   return { raw: problems.length ? {} : (raw as Raw), problems, warnings };
 }
 
-export type Loaded = { ok: true; config: Config; warnings: string[] } | { ok: false; lines: string[] };
+export type Loaded = { ok: true; config: Config; warnings: ConfigWarning[] } | { ok: false; refusal: { kind: "config-invalid"; problems: ConfigProblem[] } };
 
 /** Team file, then the developer's local file on top. */
 export async function loadConfig(workspace: Workspace): Promise<Loaded> {
   const team = await read(workspace, TEAM_CONFIG);
   const local = await read(workspace, LOCAL_CONFIG);
   const problems = [...team.problems, ...local.problems];
-  if (problems.length)
-    return { ok: false, lines: ["psdd cannot read its configuration:", ...problems.map((p) => `  ${p}`), "Fix the file and run the command again."] };
+  if (problems.length) return { ok: false, refusal: { kind: "config-invalid", problems } };
 
   const merged = {
     baseBranch: local.raw.baseBranch ?? team.raw.baseBranch ?? DEFAULT_TEAM_CONFIG.baseBranch,
@@ -130,9 +146,11 @@ export async function loadConfig(workspace: Workspace): Promise<Loaded> {
 }
 
 /** The safety check: a provider named outright must match the environment. */
-export function providerRefusal(config: Config, env: Record<string, string | undefined>): string[] | null {
+export function providerRefusal(
+  config: Config,
+  env: Record<string, string | undefined>,
+): { kind: "provider-mismatch"; provider: Provider; variable: string } | null {
   const variable = ENV_FOR[config.provider];
   if (!variable || env[variable] === "1") return null;
-  const start = config.provider === "herdr" ? "Start from a herdr pane" : "Start from a Claude Code session";
-  return [`The worktree provider is ${config.provider}, but ${variable} is not set.`, `${start}, or switch the provider in ${LOCAL_CONFIG}.`];
+  return { kind: "provider-mismatch", provider: config.provider, variable };
 }

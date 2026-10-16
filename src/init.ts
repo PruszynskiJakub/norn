@@ -57,17 +57,29 @@ export interface InitDeps {
   installSkills: (cwd: string) => Promise<string[]>;
 }
 
-export async function init({ github, cwd, installSkills }: InitDeps): Promise<{ ok: boolean; lines: string[] }> {
+export interface InitResult {
+  ok: true;
+  kind: "initialized";
+  /** How many skills are installed, and which of them this run updated. */
+  skills: number;
+  updated: string[];
+  /** The files given the agent instructions: AGENTS.md, CLAUDE.md or both. */
+  instructed: string[];
+  labels: number;
+}
+
+/** The skill install left out skills psdd briefings name. */
+export interface MissingSkills {
+  kind: "missing-skills";
+  missing: string[];
+}
+
+export async function init({ github, cwd, installSkills }: InitDeps): Promise<InitResult | { ok: false; refusal: MissingSkills }> {
   const updated = await installSkills(cwd);
   const skillsDir = join(cwd, "skills");
   const installed = existsSync(skillsDir) ? readdirSync(skillsDir).filter((d) => existsSync(join(skillsDir, d, "SKILL.md"))) : [];
   const missing = SKILLS.filter((s) => !installed.includes(s));
-  if (missing.length) {
-    return {
-      ok: false,
-      lines: [`Missing skills: ${missing.join(", ")}. The skill install did not provide them into skills/.`, "Fix the install and run psdd init again."],
-    };
-  }
+  if (missing.length) return { ok: false, refusal: { kind: "missing-skills", missing } };
 
   const linkDir = join(cwd, ".claude", "skills");
   mkdirSync(linkDir, { recursive: true });
@@ -91,21 +103,7 @@ export async function init({ github, cwd, installSkills }: InitDeps): Promise<{ 
 
   await github.ensureLabels(labelDefinitions());
 
-  return {
-    ok: true,
-    lines: [
-      "psdd is set up in this project:",
-      `  - ${installed.length} skills in skills/, linked into .claude/skills/`,
-      ...(updated.length ? [`  - updated to this psdd version: ${updated.join(", ")} (git diff skills/ shows the changes)`] : []),
-      "  - .agents/specs/ for story specs",
-      `  - ${TEAM_CONFIG} with the team settings (each developer can override in ${LOCAL_CONFIG})`,
-      "  - .agents/worktrees/ and the local config in .gitignore",
-      `  - how to work with psdd in ${instructed.join(" and ")}`,
-      `  - ${labelDefinitions().length} labels on the repository`,
-      "",
-      `Commit skills/, .claude/skills/, .agents/, .gitignore and ${instructed.join(", ")}. Then ask your agent: drive <issue>`,
-    ],
-  };
+  return { ok: true, kind: "initialized", skills: installed.length, updated, instructed, labels: labelDefinitions().length };
 }
 
 function exists(p: string) {

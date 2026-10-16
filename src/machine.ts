@@ -58,10 +58,9 @@ export function statesOf(issue: Issue): State[] {
   return STATES.filter((s) => issue.labels.includes(s));
 }
 
-/** Why an issue with more than one state label cannot be acted on; null when it has at most one. */
-export function ambiguousStates(issue: Issue): string | null {
-  const states = statesOf(issue);
-  return states.length > 1 ? `has more than one state label (${states.join(", ")}); a person must remove the stale one` : null;
+/** More than one state label: a label change failed halfway, and either could be the real one. */
+export function hasAmbiguousState(issue: Issue): boolean {
+  return statesOf(issue).length > 1;
 }
 
 export function kindOf(issue: Issue): "story" | "slice" | "new" {
@@ -77,7 +76,7 @@ export async function slicesOf(github: { subIssues(parent: number): Promise<Issu
 
 export function stepFor(issue: Issue): Step | null {
   // Two state labels: either could be the real one, so psdd briefs neither.
-  if (ambiguousStates(issue)) return null;
+  if (hasAmbiguousState(issue)) return null;
   const kind = kindOf(issue);
   const state = stateOf(issue);
   // A story always gets a person's QA after the agent's; a slice only in mode:hil.

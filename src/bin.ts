@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { randomBytes } from "node:crypto";
 import { hostname } from "node:os";
-import { ghFailureMessage, run } from "./cli.js";
+import { run } from "./cli.js";
+import { ghFailureMessage } from "./render-text.js";
 import { sessionId } from "./env.js";
 import { GhError, GhGitHub } from "./gh.js";
 import { installSkills } from "./install-skills.js";

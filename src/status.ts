@@ -1,13 +1,17 @@
 import { isStale } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
-import { slicesOf, stateOf, statesOf } from "./machine.js";
-import { storySlug, type Slugs } from "./slug.js";
-import { hhmm, storyBranch } from "./text.js";
+import { slicesOf, statesOf, type State } from "./machine.js";
+import { storySlug } from "./slug.js";
+import { storyBranch } from "./text.js";
+import type { Ctx } from "./transitions.js";
 
-interface Row {
+export interface Row {
   number: number;
   title: string;
-  state: string;
+  /** Closed issues: merged, or closed without merging. */
+  status: "open" | "merged" | "closed";
+  /** The state labels of an open issue. More than one means psdd cannot tell which is real; none, that it is untriaged. */
+  states: State[];
   mode: "afk" | "hil" | null;
   blockedBy: number[];
   needsHuman: boolean;
@@ -15,34 +19,29 @@ interface Row {
   stale: boolean;
 }
 
+export interface StatusResult {
+  ok: true;
+  kind: "status";
+  story: Row & { owner: string | null; branch: string };
+  slices: Row[];
+}
+
 /** Read-only overview. Makes no changes. */
-export async function status(ctx: { github: GitHub; slugs: Slugs }, n: number, now: Date, staleAfterMs: number) {
+export async function status(ctx: Ctx, n: number): Promise<StatusResult> {
   const { github } = ctx;
+  const now = ctx.now();
+  const staleAfterMs = ctx.config.staleAfterMs;
   const story = await github.getIssue(n);
   const slices = await slicesOf(github, n);
   const rows: Row[] = [];
   for (const s of slices) rows.push(await row(github, s, now, staleAfterMs));
   const head = await row(github, story, now, staleAfterMs);
-  const data = {
+  return {
+    ok: true,
+    kind: "status",
     story: { ...head, owner: story.assignees[0] ?? null, branch: storyBranch(n, await storySlug(ctx, story)) },
     slices: rows,
   };
-
-  const describe = (r: Row) => {
-    const parts = [r.state === "blocked" && r.blockedBy.length ? `blocked by ${r.blockedBy.map((b) => `#${b}`).join(", ")}` : r.state];
-    if (r.mode && r.state !== "merged" && r.state !== "closed") parts.push(`mode:${r.mode}`);
-    if (r.needsHuman) parts.push("needs-human");
-    if (r.heldSince) parts.push(`held since ${hhmm(r.heldSince)}${r.stale ? " (stale)" : ""}`);
-    return parts.join(" · ");
-  };
-  const lines = [`Story #${n} "${story.title}": ${describe(head)} · owner ${data.story.owner ? `@${data.story.owner}` : "none"} · branch ${data.story.branch}`];
-  if (rows.length) {
-    lines.push(`Slices (${rows.filter((r) => r.state === "merged").length} of ${rows.length} merged):`);
-    const names = rows.map((r) => `#${r.number} "${r.title}"`);
-    const width = Math.max(...names.map((x) => x.length)) + 3;
-    for (const [i, r] of rows.entries()) lines.push(`  ${names[i].padEnd(width)}${describe(r)}`);
-  } else lines.push("No slices yet.");
-  return { lines, data };
 }
 
 async function row(github: GitHub, issue: Issue, now: Date, staleAfterMs: number): Promise<Row> {
@@ -52,18 +51,12 @@ async function row(github: GitHub, issue: Issue, now: Date, staleAfterMs: number
   return {
     number: issue.number,
     title: issue.title,
-    state: closed ? (issue.stateReason === "not_planned" ? "closed" : "merged") : openState(issue),
+    status: closed ? (issue.stateReason === "not_planned" ? "closed" : "merged") : "open",
+    states: closed ? [] : statesOf(issue),
     mode: issue.labels.includes("mode:hil") ? "hil" : issue.labels.includes("mode:afk") ? "afk" : null,
     blockedBy: blockers.filter((b) => b.state === "open").map((b) => b.number),
     needsHuman: issue.labels.includes("needs-human"),
     heldSince: claim?.since ?? null,
     stale: claim ? isStale(claim, now, staleAfterMs) : false,
   };
-}
-
-/** The state of an open issue as status shows it; two state labels are shown as both, since psdd cannot tell which is real. */
-function openState(issue: Issue): string {
-  const states = statesOf(issue);
-  if (states.length > 1) return `${states.join(" + ")} (more than one state label)`;
-  return stateOf(issue) ?? "untriaged";
 }

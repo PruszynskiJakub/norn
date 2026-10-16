@@ -1,55 +1,65 @@
 import type { Issue } from "./github.js";
-import { locate, workInLines, type Location } from "./location.js";
+import { locate, workIn, type Location, type WorkIn } from "./location.js";
 import { FIX_STATES, kindOf, type State, type Step } from "./machine.js";
-import { sh, specPath, wrap } from "./text.js";
+import { sh, specPath } from "./text.js";
 import { fixRounds, type Ctx } from "./transitions.js";
 
-export function noun(issue: Issue) {
+export function noun(issue: Issue): "issue" | "story" | "slice" {
   const kind = kindOf(issue);
   return kind === "new" ? "issue" : kind;
 }
 
-/**
- * Briefing in fixed order: where you are, what to do, how to finish, what not to do.
- * `from` is the state the issue was in before take moved it, e.g. changes-requested.
- */
-export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: State | null): Promise<string[]> {
-  const n = issue.number;
-  let where = `You now hold ${noun(issue)} #${n} "${issue.title}". Its step is ${step.name}.`;
-  if (step.attended) where += " This step is attended: the user takes part, and you do not decide on your own.";
-  const many = Object.keys(step.outcomes).length > 1;
-  const when = step.attended ? `When the user agrees ${step.name} is finished` : `When ${step.name} is finished`;
-  const loc = await locate(issue, ctx);
-  const workIn = loc ? [...(await workInLines(loc, ctx.workspace, ctx.github, ctx.config.provider)), ""] : [];
-  // take relabels a slice in rework to implementation; `from` and the history say whether this is rework.
-  const rework = step.skill === "implement" && ((from !== null && FIX_STATES.includes(from)) || fixRounds(await ctx.github.listComments(n)) > 0);
-  return [
-    wrap(where),
-    "",
-    ...workIn,
-    `Invoke the skill: ${step.skill}`,
-    ...processLines(issue, step, loc, rework),
-    "",
-    `${when}, run${many ? " one of" : ""}:`,
-    ...finishCommands(n, step),
-    "",
-    `On a long step, run psdd take ${n} again now and then: it keeps your claim fresh.`,
-    `If you have to stop, run: psdd release ${n}`,
-    `If something is wrong and a person is needed, run: psdd escalate ${n} "reason"`,
-    "",
-    "Do not change labels yourself. Only psdd changes them.",
-  ];
+/** One way to finish a step: `psdd done <issue> <word> ["<note>"] [--evidence <dir>]`. */
+export interface FinishCommand {
+  issue: number;
+  /** The outcome word; "" when the step ends only one way. */
+  word: string;
+  /** What the note names, e.g. "reason", when the outcome needs one. */
+  note?: string;
+  /** The step can attach evidence files. */
+  evidence: boolean;
+  /** What the outcome means, e.g. "accepted, moves to refinement". */
+  means: string;
 }
 
-export function finishCommands(n: number, step: Step): string[] {
-  const words = Object.keys(step.outcomes);
-  if (words.length === 1 && words[0] === "") return [`  psdd done ${n}`];
-  const cmds = words.map((w) => {
-    const o = step.outcomes[w];
-    return `psdd done ${n} ${w}${o.note ? ` "${o.note}"` : ""}${step.evidence ? " [--evidence <dir>]" : ""}`;
-  });
-  const width = Math.max(...cmds.map((c) => c.length)) + 3;
-  return cmds.map((c, i) => `  ${c.padEnd(width)}(${step.outcomes[words[i]].means})`);
+/** Everything a session needs to do an issue's step. */
+export interface Briefing {
+  issue: number;
+  noun: "issue" | "story" | "slice";
+  title: string;
+  step: { name: string; skill: string; attended: boolean };
+  /** Where to work; null when the issue has no branch of its own yet, e.g. in triage. */
+  workIn: WorkIn | null;
+  /** The process around the skill: what to read, where the work goes, the commands for it. Content, not formatting. */
+  instructions: string[];
+  finish: FinishCommand[];
+}
+
+/** `from` is the state the issue was in before take moved it, e.g. changes-requested. */
+export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: State | null): Promise<Briefing> {
+  const n = issue.number;
+  const loc = await locate(issue, ctx);
+  // take relabels a slice in rework to implementation; `from` and the history say whether this is rework.
+  const rework = step.skill === "implement" && ((from !== null && FIX_STATES.includes(from)) || fixRounds(await ctx.github.listComments(n)) > 0);
+  return {
+    issue: n,
+    noun: noun(issue),
+    title: issue.title,
+    step: { name: step.name, skill: step.skill, attended: step.attended },
+    workIn: loc ? await workIn(loc, ctx.workspace, ctx.github, ctx.config.provider) : null,
+    instructions: processLines(issue, step, loc, rework),
+    finish: finishCommands(n, step),
+  };
+}
+
+export function finishCommands(n: number, step: Step): FinishCommand[] {
+  return Object.entries(step.outcomes).map(([word, o]) => ({
+    issue: n,
+    word,
+    ...(o.note ? { note: o.note } : {}),
+    evidence: step.evidence ?? false,
+    means: o.means,
+  }));
 }
 
 /**
