@@ -709,3 +709,64 @@ describe("a state for one mode only (when)", () => {
     expect(c.stdout).toContain('  states.verifying.when must be "afk" or "hil".');
   });
 });
+
+describe("a repository flow named like a built-in one", () => {
+  /** A story the team runs its own way: write it up, then close it. */
+  function ownStory() {
+    return bugFlow({
+      description: "Our story: write it up, then ship it.",
+      start: "drafting",
+      states: {
+        drafting: {
+          skill: "our-draft",
+          attended: true,
+          outcomes: { drafted: { to: "closed", means: "the write-up is done" } },
+        },
+      },
+    });
+  }
+
+  test("triage offers it with its own description and start", async () => {
+    const w = setup();
+    w.github.seedFlow("story", ownStory());
+    w.github.seedIssue({ number: 7, title: "Rate limiting" });
+
+    const out = (await w.norn("take", "7")).stdout;
+    await w.norn("done", "7", "story");
+
+    expect(out).toContain("norn done 7 story             (Our story: write it up, then ship it.)");
+    expect(w.github.labels(7).sort()).toEqual(["drafting", "type:story"]);
+  });
+
+  test("runs in place of the built-in flow", async () => {
+    const w = setup();
+    w.github.seedFlow("story", ownStory());
+    w.github.seedIssue({ number: 7, title: "Rate limiting", labels: ["type:story", "drafting"], assignees: ["alice"] });
+
+    const out = (await w.norn("take", "7")).stdout;
+
+    expect(out).toContain("Invoke the skill: our-draft\n");
+    expect(out).toContain("norn done 7 drafted");
+  });
+
+  test("the built-in flow is not consulted: its states are not states of the issue's flow", async () => {
+    const w = setup();
+    w.github.seedFlow("story", ownStory());
+    w.github.seedIssue({ number: 7, title: "Rate limiting", labels: ["type:story", "needs-refinement"], assignees: ["alice"] });
+
+    const out = (await w.norn("take", "7")).stdout;
+
+    expect(out).not.toContain("norn-refine");
+    expect(w.github.labels(7)).not.toContain("in-progress");
+  });
+
+  test("a repository slice flow replaces the built-in slice flow", async () => {
+    const w = setup();
+    w.github.seedFlow("slice", taskFlow());
+    w.github.seedIssue({ number: 8, title: "Part", labels: ["type:slice", "doing"], assignees: ["alice"] });
+
+    const out = (await w.norn("take", "8")).stdout;
+
+    expect(out).toContain("Invoke the skill: task-do\n");
+  });
+});

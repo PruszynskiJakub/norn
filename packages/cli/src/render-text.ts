@@ -31,6 +31,7 @@ import {
 } from "@norn/core";
 import type { DashboardRefusal, DashboardResult } from "./dashboard.js";
 import { type CheckFact, type DoctorCheck, type DoctorResult, doctorFailed } from "./doctor.js";
+import type { FlowExported, FlowsRefusal } from "./flows.js";
 import type { InitResult, InitWouldDowngrade, MissingSkills } from "./init.js";
 
 /**
@@ -50,10 +51,11 @@ export type Answer =
   | TidyResult
   | InitResult
   | DashboardResult
-  | DoctorResult;
+  | DoctorResult
+  | FlowExported;
 
-/** Refusals only the CLI makes: how it was called, and init's skill install. */
-export type CliRefusal = { kind: "usage" } | { kind: "needs-number"; command: string } | MissingSkills | InitWouldDowngrade | DashboardRefusal;
+/** Refusals only the CLI makes: how it was called, init's skill install, the dashboard and flows export. */
+export type CliRefusal = { kind: "usage" } | { kind: "needs-number"; command: string } | MissingSkills | InitWouldDowngrade | DashboardRefusal | FlowsRefusal;
 
 export function unreachable(x: never): never {
   throw new Error(`no wording for ${JSON.stringify(x)}`);
@@ -103,6 +105,7 @@ export const USAGE = [
   "  norn dashboard [--port <n>] [--interval <duration>] [--no-open]",
   "                                     Watch your work in the browser; Ctrl-C stops it",
   "  norn doctor                        Check the whole setup and say what to fix",
+  "  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it",
   "  norn --version                     Print the running norn's version",
   "",
   "Add --json for machine-readable output.",
@@ -218,6 +221,12 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       return [r.flag === "port" ? "--port takes a port number, e.g. 4477." : "--interval takes a duration such as 30s, 2m or 1h."];
     case "missing-skills":
       return [`Missing skills: ${r.missing.join(", ")}. The skill install did not provide them into skills/.`, "Fix the install and run norn init again."];
+    case "flows-usage":
+      return ["Usage: norn flows export <name>", "  Writes the built-in flow <name> to .agents/flows/<name>.json, e.g. norn flows export story."];
+    case "flow-not-built-in":
+      return [`norn has no built-in flow "${r.flow}". Built-in flows: ${r.builtIn.join(", ")}.`];
+    case "flow-file-exists":
+      return [`${r.file} already exists; norn leaves it as it is. Delete it first to export the built-in ${r.flow} flow again.`];
     case "init-would-downgrade":
       return [
         `This repository is set up with norn ${r.repo}, newer than your norn ${r.running}. norn init would roll its skills back.`,
@@ -445,6 +454,11 @@ export function renderAnswer(a: Answer): string[] {
       return renderDashboard(a);
     case "doctor":
       return renderDoctor(a);
+    case "flow-exported":
+      return [
+        `Wrote ${a.file}, a copy of the built-in ${a.flow} flow.`,
+        `Change it there and merge it into the base branch; from then on it runs in place of the built-in ${a.flow} flow, with nothing taken from it.`,
+      ];
     case "initialized":
       return [
         "norn is set up in this project:",

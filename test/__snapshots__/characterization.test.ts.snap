@@ -769,6 +769,62 @@ exports[`output of every command, text and --json > escalate without the claim >
 You do not hold #50. Claim it first with: norn take 50"
 `;
 
+exports[`output of every command, text and --json > flows export > json 1`] = `
+"exit 0
+{
+  "ok": true,
+  "flow": "story",
+  "file": ".agents/flows/story.json",
+  "message": "Wrote .agents/flows/story.json, a copy of the built-in story flow.\\nChange it there and merge it into the base branch; from then on it runs in place of the built-in story flow, with nothing taken from it."
+}"
+`;
+
+exports[`output of every command, text and --json > flows export > text 1`] = `
+"exit 0
+Wrote .agents/flows/story.json, a copy of the built-in story flow.
+Change it there and merge it into the base branch; from then on it runs in place of the built-in story flow, with nothing taken from it."
+`;
+
+exports[`output of every command, text and --json > flows export of a flow that is not built in > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "norn has no built-in flow \\"bug\\". Built-in flows: story, slice."
+}"
+`;
+
+exports[`output of every command, text and --json > flows export of a flow that is not built in > text 1`] = `
+"exit 1
+norn has no built-in flow "bug". Built-in flows: story, slice."
+`;
+
+exports[`output of every command, text and --json > flows export over an existing file > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": ".agents/flows/slice.json already exists; norn leaves it as it is. Delete it first to export the built-in slice flow again."
+}"
+`;
+
+exports[`output of every command, text and --json > flows export over an existing file > text 1`] = `
+"exit 1
+.agents/flows/slice.json already exists; norn leaves it as it is. Delete it first to export the built-in slice flow again."
+`;
+
+exports[`output of every command, text and --json > flows without export > json 1`] = `
+"exit 2
+{
+  "ok": false,
+  "refusal": "Usage: norn flows export <name>\\n  Writes the built-in flow <name> to .agents/flows/<name>.json, e.g. norn flows export story."
+}"
+`;
+
+exports[`output of every command, text and --json > flows without export > text 1`] = `
+"exit 2
+Usage: norn flows export <name>
+  Writes the built-in flow <name> to .agents/flows/<name>.json, e.g. norn flows export story."
+`;
+
 exports[`output of every command, text and --json > incompatible version > json 1`] = `
 "exit 1
 {
@@ -2720,7 +2776,7 @@ exports[`output of every command, text and --json > unknown command > json 1`] =
 "exit 2
 {
   "ok": false,
-  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn --version                     Print the running norn's version\\n\\nAdd --json for machine-readable output."
+  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -2743,6 +2799,7 @@ norn runs work through the SDD process. Commands on an issue take its number exp
   norn dashboard [--port <n>] [--interval <duration>] [--no-open]
                                      Watch your work in the browser; Ctrl-C stops it
   norn doctor                        Check the whole setup and say what to fix
+  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it
   norn --version                     Print the running norn's version
 
 Add --json for machine-readable output."
@@ -2752,7 +2809,7 @@ exports[`output of every command, text and --json > usage > json 1`] = `
 "exit 2
 {
   "ok": false,
-  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn --version                     Print the running norn's version\\n\\nAdd --json for machine-readable output."
+  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -2775,6 +2832,7 @@ norn runs work through the SDD process. Commands on an issue take its number exp
   norn dashboard [--port <n>] [--interval <duration>] [--no-open]
                                      Watch your work in the browser; Ctrl-C stops it
   norn doctor                        Check the whole setup and say what to fix
+  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it
   norn --version                     Print the running norn's version
 
 Add --json for machine-readable output."
