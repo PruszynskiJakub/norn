@@ -170,6 +170,12 @@ exports[`output of every command, text and --json > doctor with problems > json 
       "fix": "norn init"
     },
     {
+      "id": "flows",
+      "level": "ok",
+      "message": "all 2 flows are valid: story, slice",
+      "fix": null
+    },
+    {
       "id": "config",
       "level": "ok",
       "message": "the team and local config are valid",
@@ -211,6 +217,7 @@ exports[`output of every command, text and --json > doctor with problems > text 
 ✓ permission: you have write access to the repository
 ✗ labels: 19 of norn's labels are missing: needs-refinement, needs-clarification, needs-plan, needs-slicing, implementation, needs-review, changes-requested, needs-qa, needs-human-qa, qa-failed, merge-queue, blocked, ready-for-agent, type:story, type:slice, in-progress, needs-human, mode:afk, mode:hil
   fix: norn init
+✓ flows: all 2 flows are valid: story, slice
 ✓ config: the team and local config are valid
 ! version: norn 1.4.2, repo has no nornVersion
   fix: norn init
@@ -259,6 +266,12 @@ exports[`output of every command, text and --json > doctor without gh > json 1`]
       "fix": null
     },
     {
+      "id": "flows",
+      "level": "skipped",
+      "message": "skipped, needs gh",
+      "fix": null
+    },
+    {
       "id": "config",
       "level": "ok",
       "message": "the team and local config are valid",
@@ -300,6 +313,7 @@ exports[`output of every command, text and --json > doctor without gh > text 1`]
 - base-branch: skipped, needs gh
 - permission: skipped, needs gh
 - labels: skipped, needs gh
+- flows: skipped, needs gh
 ✓ config: the team and local config are valid
 ! version: norn 1.4.2, repo has no nornVersion
   fix: norn init

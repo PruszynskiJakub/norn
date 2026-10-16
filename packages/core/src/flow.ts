@@ -336,14 +336,24 @@ export function repositoryFlow(
   if (!flow) {
     flow = ctx.github
       .readFileAt(`${FLOWS_DIR}/${name}.json`, ctx.config.baseBranch)
-      .then((text) => (text === null ? null : checkFlowsNamed(ctx, parseFlow(name, text))));
+      .then((text) =>
+        text === null
+          ? null
+          : checkFlowsNamed(
+              parseFlow(name, text),
+              async (other) => (await ctx.github.readFileAt(`${FLOWS_DIR}/${other}.json`, ctx.config.baseBranch)) !== null,
+            ),
+      );
     ctx.flows.set(name, flow);
   }
   return flow;
 }
 
-/** A valid flow whose behaviours name flows the repository does not have is kept with those errors. */
-async function checkFlowsNamed(ctx: Parameters<typeof repositoryFlow>[0], loaded: LoadedFlow): Promise<LoadedFlow> {
+/**
+ * A valid flow whose behaviours name flows that do not exist is kept with those errors. `exists` says whether a flow
+ * that is not built in exists, e.g. on the base branch.
+ */
+export async function checkFlowsNamed(loaded: LoadedFlow, exists: (flow: string) => Promise<boolean>): Promise<LoadedFlow> {
   if (!loaded.ok) return loaded;
   const named = Object.entries(loaded.flow.states).flatMap(([state, s]) =>
     Object.entries(s.behaviours ?? {}).flatMap(([behaviour, params]) => {
@@ -351,10 +361,8 @@ async function checkFlowsNamed(ctx: Parameters<typeof repositoryFlow>[0], loaded
       return (rule.flowsNamed?.(params ?? {}) ?? []).map((flow) => ({ state, behaviour, flow }));
     }),
   );
-  const exists = async (flow: string) =>
-    BUILT_IN_FLOWS.includes(flow) || (await ctx.github.readFileAt(`${FLOWS_DIR}/${flow}.json`, ctx.config.baseBranch)) !== null;
   const errors: FlowError[] = [];
-  for (const n of named) if (!(await exists(n.flow))) errors.push({ kind: "flow-unknown", ...n });
+  for (const n of named) if (!BUILT_IN_FLOWS.includes(n.flow) && !(await exists(n.flow))) errors.push({ kind: "flow-unknown", ...n });
   return errors.length ? { ok: false, name: loaded.name, errors } : loaded;
 }
 
