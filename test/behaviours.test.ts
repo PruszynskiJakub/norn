@@ -344,6 +344,16 @@ describe("norn next on an issue of a flow", () => {
     );
   });
 
+  test("an item to start is worded by its state's description in the flow", async () => {
+    const flow = bugFlow();
+    Object.assign(flow.states.reviewing, { description: "Waiting for a second pair of eyes" });
+    const w = bugAt("reviewing", flow);
+
+    const out = (await w.norn("next", "40")).stdout;
+
+    expect(out).toContain('  - Issue #40 "Crash on empty input" is in reviewing: Waiting for a second pair of eyes.');
+  });
+
   test("next moves an issue in a state its flow renamed to the new state, and offers it there", async () => {
     const w = bugAt("triaged", { ...bugFlow(), renamed: { triaged: "reviewing" } });
 

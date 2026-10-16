@@ -850,15 +850,10 @@ function renderTidy(r: TidyResult): string {
 
 // next
 
-const DESCRIBE: Partial<Record<string, string>> = {
-  "ready-for-agent": "is ready-for-agent",
-  implementation: "is in implementation with no one holding it",
-  "needs-review": "needs review",
-  "changes-requested": "has changes requested",
-  "needs-qa": "needs QA by an agent",
-  "qa-failed": "failed QA",
-  "merge-queue": "is in merge-queue",
-};
+/** Where an item to start is, in its flow's words: its state, and what the state means, or the step's name without a description. */
+function startState(s: StartItem): string {
+  return `is in ${s.state}: ${s.description ?? s.step}`;
+}
 
 /** Why a person QAs an issue: the mode its gate runs in only, else its flow, e.g. mode:hil or story. */
 const gateText = (g: Gate) => (g.mode ? `mode:${g.mode}` : g.flow);
@@ -972,7 +967,7 @@ export function renderNext(r: NextReport): string {
         `${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run norn next ${r.issue} again.`,
       ),
       "",
-      ...r.start.map((s) => `  - ${itemWhat(s)} ${s.kind !== "issue" && DESCRIBE[s.state] ? DESCRIBE[s.state] : `is in ${s.state}`}.`),
+      ...r.start.map((s) => `  - ${itemWhat(s)} ${startState(s)}.`),
     );
   } else {
     // Attended steps are done with the user, not by a fresh agent of their own.
@@ -993,12 +988,7 @@ export function renderNext(r: NextReport): string {
     );
     for (const s of r.start) {
       const what = itemWhat(s);
-      // An issue of a flow names its own states; DESCRIBE words the built-in ones.
-      const desc =
-        s.kind === "issue" || (s.kind === "story" && !DESCRIBE[s.state])
-          ? `is in ${s.state}: ${s.step}${s.attended ? " (attended: the user takes part)" : ""}.`
-          : `${DESCRIBE[s.state] ?? `is in ${s.state}`}${s.attended ? " (attended: the user takes part)" : ""}.`;
-      out.push(`  - ${what} ${desc}`);
+      out.push(`  - ${what} ${startState(s)}${s.attended ? " (attended: the user takes part)" : ""}.`);
       if (s.worktree) out.push(`    Worktree: ${s.worktree}`);
       if (s.createWorktree) out.push(`    Create the worktree: ${s.createWorktree}`);
       if (s.checkedOutAt && s.branch) out.push(`    ${checkedOutElsewhere(s.branch, s.checkedOutAt)}`);

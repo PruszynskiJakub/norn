@@ -53,13 +53,13 @@ You can start 3 items now. They are independent, so run them in parallel, at
 most 2 at a time, each in its own fresh subagent, told to work in the item's
 worktree:
 
-  - Slice #131 "Per-key limits" is ready-for-agent.
+  - Slice #131 "Per-key limits" is in ready-for-agent: Ready for an agent.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-131
     Start it with: norn take 131
-  - Slice #128 "Limit headers" needs review.
+  - Slice #128 "Limit headers" is in needs-review: Waiting for review.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-128
     Start it with: norn take 128
-  - Slice #127 "Redis store" is in merge-queue.
+  - Slice #127 "Redis store" is in merge-queue: Queued to merge.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-127
     Start it with: norn take 127
 

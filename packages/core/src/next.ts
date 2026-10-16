@@ -30,6 +30,8 @@ export interface StartItem {
   kind: "story" | "slice" | "issue";
   title: string;
   state: string;
+  /** What the state means, as its flow describes it, e.g. "Waiting for review"; null when the flow gives no description. */
+  description: string | null;
   step: string;
   skill: string;
   attended: boolean;
@@ -254,6 +256,7 @@ async function offer(
     kind,
     title: issue.title,
     state,
+    description: flow?.states[state]?.description ?? null,
     step: step.name,
     skill: step.skill,
     attended: step.attended,
