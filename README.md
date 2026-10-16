@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/PruszynskiJakub/ai-engine/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/ai-engine/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/PruszynskiJakub/ai-engine/releases"><img src="https://img.shields.io/badge/release-v0.6.1-blue" alt="Release v0.6.1"></a>
+  <a href="https://github.com/PruszynskiJakub/ai-engine/releases"><img src="https://img.shields.io/badge/release-v0.7.0-blue" alt="Release v0.7.0"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen" alt="Node 20 or later">
 </p>
 
