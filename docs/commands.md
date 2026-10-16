@@ -42,7 +42,7 @@ It ends by suggesting `norn doctor`, which checks what `init` cannot set up.
 npx norn next <story>
 ```
 
-Lists what can be done on the story now, each item with the command that starts it, and what is waiting and why. It is the entry point for `norn-deliver`.
+Lists what can be done on the story now, each item with the command that starts it, and what is waiting and why. It is the entry point for `norn-deliver`. On an issue of a [repository flow](how-it-works.md#repository-flows) it lists the issue itself: for a person at a human gate, else to start, attended as its state says.
 
 ```text
 Story #123 "Rate limiting" is in implementation. 2 of 7 slices are merged
