@@ -1,5 +1,3 @@
-import type { State } from "./machine.js";
-
 /** The story branch would start from the base branch, which is not on GitHub. */
 export interface BaseBranchMissing {
   kind: "base-branch-missing";
@@ -21,8 +19,8 @@ export type Event =
   | BaseBranchMissing
   /** A closed slice's worktree stays until norn tidy removes it. */
   | { kind: "worktree-left-for-tidy"; worktree: string }
-  /** A slice moved between blocked and ready-for-agent with its blockers. */
-  | { kind: "slice-state-changed"; issue: number; state: State }
+  /** A sub-issue moved between the state syncsBlocked holds it in and the one it releases it to, e.g. blocked and ready-for-agent. */
+  | { kind: "slice-state-changed"; issue: number; state: string }
   /** Every slice is merged, so the story moved on to needs-review. */
   | { kind: "story-promoted"; story: number }
   /** The story PR is merged, so norn closed the story. */

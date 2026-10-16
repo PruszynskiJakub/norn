@@ -1,8 +1,8 @@
-import { behaviourFollowUps, entering, leaveRefusal, type OutcomeInput } from "./behaviours.js";
+import { behaviourFollowUps, entering, holds, leaveRefusal, type OutcomeInput, startState } from "./behaviours.js";
 import { briefing, type Briefing, finishCommands } from "./briefing.js";
 import { acquire } from "./claims.js";
 import type { Event } from "./events.js";
-import { type Flow, flowNameOf, flowStatesOf, flowStep, offerFlows, passThrough, repositoryFlow, triageFlows } from "./flow.js";
+import { type Flow, flowNameOf, flowOf, flowStatesOf, flowStep, loadFlow, offerFlows, passThrough, triageFlows } from "./flow.js";
 import type { Issue } from "./github.js";
 import { locate } from "./location.js";
 import { FIX_STATES, kindOf, slicesOf, stateOf, statesOf, type Step, stepFor, type State } from "./machine.js";
@@ -23,11 +23,9 @@ import {
   followRename,
   handOverLeft,
   leftState,
-  followUps,
   needsHumanLine,
   oneLine,
   skipLine,
-  sliceMergeRefusal,
   stateLabels,
 } from "./transitions.js";
 
@@ -101,10 +99,9 @@ export interface NextResult {
 /** GitHub's API takes blobs up to 100 MB; evidence is screenshots, logs and output, far smaller. */
 export const MAX_EVIDENCE_BYTES = 25 * 1024 * 1024;
 
-/** The issue's step: from its repository flow when its type names one, else from the built-in process. */
+/** The issue's step: from its flow when its type names one, else from the built-in process. */
 async function stepOf(ctx: Ctx, issue: Issue): Promise<{ ok: true; step: Step | null; flow: Flow | null } | Refused> {
-  const name = flowNameOf(issue);
-  const loaded = name === null ? null : await repositoryFlow(ctx, name);
+  const loaded = await flowOf(ctx, issue);
   if (!loaded) {
     const step = stepFor(issue);
     // Triage chooses the issue's type: a story, or one of the repository's flows.
@@ -115,7 +112,7 @@ async function stepOf(ctx: Ctx, issue: Issue): Promise<{ ok: true; step: Step | 
   return { ok: true, step: flowStep(issue, loaded.flow), flow: loaded.flow };
 }
 
-/** The issue's state: in its repository flow, or in the built-in process. */
+/** The issue's state: in its flow, or in the built-in process. */
 function stateIn(issue: Issue, flow: Flow | null): string | null {
   return flow ? (flowStatesOf(issue, flow)[0] ?? null) : stateOf(issue);
 }
@@ -126,21 +123,23 @@ async function noStepRefusal(issue: Issue, ctx: Ctx, flow: Flow | null = null): 
   const n = issue.number;
   if (issue.state === "closed") return { kind: "closed", issue: n };
   if (flow) {
+    // Work in the parent's branch is run from the parent: norn next on it has something else to do.
+    const story = flow.workspace === "parent" ? await github.parentOf(n) : null;
     const states = flowStatesOf(issue, flow);
-    if (states.length > 1) return { kind: "ambiguous-state", issue: n, states, story: null };
-    return { kind: "no-step", issue: n, state: states[0] ?? null, story: null };
+    if (states.length > 1) return { kind: "ambiguous-state", issue: n, states, story };
+    const state = states[0] ?? null;
+    if (state !== null && holds(flow, state)) {
+      const open = (await github.blockedBy(n)).filter((b) => b.state === "open");
+      return { kind: "blocked", issue: n, blockers: open.map((b) => b.number), story };
+    }
+    return { kind: "no-step", issue: n, state, story };
   }
   const state = stateOf(issue);
-  const story = kindOf(issue) === "slice" ? await github.parentOf(n) : n;
   const states = statesOf(issue);
-  if (states.length > 1) return { kind: "ambiguous-state", issue: n, states, story };
+  if (states.length > 1) return { kind: "ambiguous-state", issue: n, states, story: n };
   if (kindOf(issue) === "story" && state === "implementation") return { kind: "story-in-implementation", issue: n };
   if (kindOf(issue) === "story" && state === "merge-queue") return { kind: "story-in-merge-queue", issue: n, owner: issue.assignees[0] ?? null };
-  if (state === "blocked") {
-    const open = (await github.blockedBy(n)).filter((b) => b.state === "open");
-    return { kind: "blocked", issue: n, blockers: open.map((b) => b.number), story };
-  }
-  return { kind: "no-step", issue: n, state, story };
+  return { kind: "no-step", issue: n, state, story: n };
 }
 
 export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Promise<TakeResult | Refused> {
@@ -156,7 +155,7 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
   const record = { holder: user, session: ctx.session, since: ctx.now().toISOString() };
   const claim = await acquire(github, n, record, ctx.now(), ctx.config.staleAfterMs, { takeover: opts.takeover });
   if (!claim.ok) {
-    const slice = kindOf(before) === "slice";
+    const slice = first.flow?.workspace === "parent";
     const since = claim.held?.since ?? null;
     if (claim.held?.holder === user) return refuse({ kind: "held-by-your-session", issue: n, slice, since });
     if (opts.takeover && claim.held) return refuse({ kind: "held-by-teammate", issue: n, slice, holder: claim.held.holder, since });
@@ -244,10 +243,6 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   if (kindOf(issue) === "story" && stateOf(issue) === "needs-slicing" && (await slicesOf(github, n)).length === 0) {
     return refuse({ kind: "no-slices", issue: n });
   }
-  if (!flow && step.skill === "norn-merge") {
-    const r = await sliceMergeRefusal(ctx, issue);
-    if (r) return refuse(r);
-  }
   // A state for the other mode is passed through here, so the issue lands in one transition, its comment naming what was skipped.
   const through = flow ? passThrough(flow, issue, outcome) : null;
   const skipped = through?.skipped.length && through.mode ? skipLine(through.skipped, through.mode) : null;
@@ -305,7 +300,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     ...(evidence ? { evidence } : {}),
     fixLimit,
     storyBranchCreated,
-    followUps: inFlow ? await behaviourFollowUps(inFlow, { outcome: applied, fixLimit }) : await followUps(ctx, issue, applied),
+    followUps: inFlow ? await behaviourFollowUps(inFlow, { outcome: applied, fixLimit }) : [],
     deliverable: kindOf(issue) === "story" && outcome.to === "implementation",
     personNext: !!applied.notify && !applied.needsHuman,
   };
@@ -344,10 +339,13 @@ export async function addSlice(ctx: Ctx, story: number, input: { title?: string;
   if (stateOf(parent) !== "needs-slicing") return refuse({ kind: "story-not-slicing", story, state: stateOf(parent) });
   const blockers = await Promise.all(input.blockedBy.map((b) => github.getIssue(b)));
   const open = blockers.filter((b) => b.state === "open");
+  // A story's slices run the slice flow, starting held while a blocker is open.
+  const flow = (await loadFlow(ctx, "slice"))!;
+  if (!flow.ok) return refuse({ kind: "flow-invalid", issue: story, flow: flow.name, errors: flow.errors });
   const slice = await github.createIssue({
     title,
     body: `Slice of #${story}. Spec: ${specPath(story, await storySlug(ctx, parent))}`,
-    labels: ["type:slice", `mode:${mode}`, open.length ? "blocked" : "ready-for-agent"],
+    labels: ["type:slice", `mode:${mode}`, startState(flow.flow, open.length > 0)],
     assignees: parent.assignees,
   });
   await github.addSubIssue(story, slice.number);
@@ -356,15 +354,14 @@ export async function addSlice(ctx: Ctx, story: number, input: { title?: string;
 }
 
 /**
- * What can be done on a story, or on an issue of a repository flow, now; when
- * nothing is left, the user is notified of what waits for them.
+ * What can be done on a story, or on an issue of a flow, now; when nothing is
+ * left, the user is notified of what waits for them.
  */
 export async function next(ctx: Ctx, n: number): Promise<NextResult | Refused> {
   const issue = await ctx.github.getIssue(n);
-  const name = flowNameOf(issue);
   // An issue of a broken flow is not refused: next shows it blocked by the flow.
-  const loaded = name === null ? null : await repositoryFlow(ctx, name);
-  const r = loaded ? null : await notAStory(ctx.github, n);
+  const loaded = await flowOf(ctx, issue);
+  const r = await notAStory(ctx.github, issue, loaded);
   if (r) return refuse(r);
   const report = await computeNext(ctx, n, loaded);
   if (report.nothingLeft && !report.closed) await notifyWaiting(ctx, report);

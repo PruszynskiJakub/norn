@@ -1,5 +1,6 @@
 import type { Issue } from "./github.js";
-import { BEHAVIOURS, type Behaviour, type BehaviourName, type BehaviourParams } from "./behaviours.js";
+import { BEHAVIOURS, type Behaviour, type BehaviourName, type BehaviourParams, holds, uses } from "./behaviours.js";
+import { BUILT_IN } from "./built-in-flows.js";
 import type { Outcome, Step } from "./machine.js";
 
 /**
@@ -85,8 +86,8 @@ export const RESERVED_TARGETS = ["closed", "not-planned"] as const;
 /** Names no flow may take: triage's outcome that closes an issue as not planned. */
 const RESERVED_FLOWS = ["reject"];
 
-/** Flows norn ships, which exist in every repository. */
-const BUILT_IN_FLOWS = ["story", "slice"];
+/** Flows norn ships, which exist in every repository; story is not a flow file yet. */
+const BUILT_IN_FLOWS = ["story", ...Object.keys(BUILT_IN)];
 
 /** Labels norn sets itself on every issue; no state may take these names either. */
 const ENGINE_LABELS = ["in-progress", "needs-human"];
@@ -153,7 +154,8 @@ export function validateFlow(data: unknown): FlowError[] {
         continue;
       }
       if (typeof outcome.means !== "string") field(`${o}.means`, "a string");
-      for (const key of ["note", "needsHuman"]) if (outcome[key] !== undefined && typeof outcome[key] !== "string") field(`${o}.${key}`, "a string");
+      for (const key of ["note", "needsHuman", "meansSkipped"])
+        if (outcome[key] !== undefined && typeof outcome[key] !== "string") field(`${o}.${key}`, "a string");
       if (outcome.notify !== undefined && outcome.notify !== "story" && outcome.notify !== "mode:hil") field(`${o}.notify`, '"story" or "mode:hil"');
       if (typeof outcome.to !== "string") field(`${o}.to`, "a string");
       else if (!Object.hasOwn(states, outcome.to) && !(RESERVED_TARGETS as readonly string[]).includes(outcome.to)) {
@@ -195,7 +197,13 @@ function checkBehaviours(flow: Record<string, unknown>, state: string, behaviour
     known.push(behaviour);
     const rule: Behaviour = BEHAVIOURS[behaviour];
     if (!isObject(params)) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}`, expected: "an object of parameters, {} for none" });
-    else for (const p of rule.params?.(params) ?? []) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${p.param}`, expected: p.expected });
+    else {
+      for (const p of rule.params?.(params) ?? []) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${p.param}`, expected: p.expected });
+      const states = isObject(flow.states) ? flow.states : {};
+      for (const l of rule.leadsTo?.(params) ?? []) {
+        if (!Object.hasOwn(states, l.to)) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${l.param}`, expected: "a state of the flow" });
+      }
+    }
     const needs = rule.requires?.(flow);
     if (needs) errors.push({ kind: "behaviour-needs", state, behaviour, ...needs });
   }
@@ -243,8 +251,8 @@ function statesThatCannotEnd(states: Record<string, unknown>, mode?: Mode): stri
   };
   const targets = (state: unknown): string[] =>
     isObject(state) && isObject(state.outcomes)
-      ? Object.values(state.outcomes).flatMap((o) => {
-          const to = isObject(o) && typeof o.to === "string" ? land(o.to) : null;
+      ? [...Object.values(state.outcomes).flatMap((o) => (isObject(o) && typeof o.to === "string" ? [o.to] : [])), ...behaviourTargets(state)].flatMap((t) => {
+          const to = land(t);
           return to === null ? [] : [to];
         })
       : [];
@@ -268,13 +276,41 @@ function statesThatCannotEnd(states: Record<string, unknown>, mode?: Mode): stri
   return Object.keys(states).filter((name) => !ends.has(name) && !skips(name));
 }
 
-/** The flow named by the issue's `type:<name>` label, for any type but the built-in story and slice; null for none. */
+/** The states a state's behaviours move an issue to on their own, e.g. where syncsBlocked releases it. */
+function behaviourTargets(state: Record<string, unknown>): string[] {
+  if (!isObject(state.behaviours)) return [];
+  return Object.entries(state.behaviours).flatMap(([name, params]) =>
+    isBehaviour(name) && isObject(params) ? ((BEHAVIOURS[name] as Behaviour).leadsTo?.(params) ?? []).map((l) => l.to) : [],
+  );
+}
+
+/** The flow named by the issue's `type:<name>` label, for any type but the built-in story; null for none. */
 export function flowNameOf(issue: Issue): string | null {
   for (const label of issue.labels) {
     const m = /^type:([a-z0-9][a-z0-9_-]*)$/.exec(label);
-    if (m && m[1] !== "story" && m[1] !== "slice") return m[1];
+    if (m && m[1] !== "story") return m[1];
   }
   return null;
+}
+
+/** A built-in flow by name, checked like any other; null when norn has none of that name. */
+export function builtInFlow(name: string): LoadedFlow | null {
+  const flow = BUILT_IN[name];
+  if (!flow) return null;
+  const errors = validateFlow(flow);
+  return errors.length ? { ok: false, name, errors } : { ok: true, name, flow };
+}
+
+/** The flow `name`: a built-in one, or the repository's; null when there is none. */
+export function loadFlow(ctx: Parameters<typeof repositoryFlow>[0], name: string): Promise<LoadedFlow | null> {
+  const builtIn = builtInFlow(name);
+  return builtIn ? Promise.resolve(builtIn) : repositoryFlow(ctx, name);
+}
+
+/** The flow the issue runs, from its type; null when its type names none, e.g. a new issue or a story. */
+export function flowOf(ctx: Parameters<typeof repositoryFlow>[0], issue: Issue): Promise<LoadedFlow | null> {
+  const name = flowNameOf(issue);
+  return name === null ? Promise.resolve(null) : loadFlow(ctx, name);
 }
 
 /** Repository flows read during one command, by name; see repositoryFlow. */
@@ -401,14 +437,27 @@ export function flowStep(issue: Issue, flow: Flow): Step | null {
       outcomes: { "": { to: state, means: `clears needs-human, stays in ${state}` } },
     };
   }
+  // A behaviour moves the issue on from here by itself, e.g. once its blockers close.
+  if (holds(flow, state)) return null;
   const s = flow.states[state];
   return {
     name: s.name ?? state,
     skill: s.skill,
     attended: s.attended,
     ...(s.enterAs ? { enterAs: s.enterAs } : {}),
-    outcomes: s.outcomes,
+    outcomes: Object.fromEntries(Object.entries(s.outcomes).map(([word, o]) => [word, asLanding(flow, issue, o)])),
     // A person at a human gate can attach QA evidence.
-    ...(s.evidence || (s.behaviours && Object.hasOwn(s.behaviours, "humanGate")) ? { evidence: true } : {}),
+    ...(s.evidence || uses(flow, state, "humanGate") ? { evidence: true } : {}),
   };
+}
+
+/** The outcome as the issue's mode lands it, described so when the flow says how. */
+function asLanding(flow: Flow, issue: Issue, outcome: Outcome): Outcome {
+  const { meansSkipped, ...rest } = outcome;
+  return meansSkipped !== undefined && passThrough(flow, issue, outcome).skipped.length ? { ...rest, means: meansSkipped } : rest;
+}
+
+/** Whether an outcome of the state leads, in the issue's mode, to a human gate: a person checks the work after this step. */
+export function gateAhead(flow: Flow, issue: Issue, state: string): boolean {
+  return Object.values(flow.states[state]?.outcomes ?? {}).some((o) => uses(flow, passThrough(flow, issue, o).outcome.to, "humanGate"));
 }

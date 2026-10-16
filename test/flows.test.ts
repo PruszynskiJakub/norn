@@ -172,6 +172,16 @@ describe("the flow's workspace", () => {
 });
 
 describe("state labels on demand", () => {
+  test("a missing label of the built-in slice flow is created as norn init makes it", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 131, labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+    await w.norn("take", "131");
+
+    await w.norn("done", "131");
+
+    expect(w.github.labelDefs.get("needs-review")).toEqual({ color: "5319e7", description: "Code review of the slice PR or the story PR" });
+  });
+
   test("a transition into a state whose label is missing creates it from the state's colour and description", async () => {
     const flow = bugFlow();
     Object.assign(flow.states.fixing, { color: "d93f0b", description: "an agent fixes the bug" });

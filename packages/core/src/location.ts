@@ -31,7 +31,7 @@ export async function locate(
     return { branch, base: ctx.config.baseBranch, worktree: worktreePath(branch), story: issue, slug };
   }
   // A parent workspace is named after the parent's branch, which its PR goes into.
-  if (flow?.workspace === "parent" || (!flow && kindOf(issue) === "slice")) {
+  if (flow?.workspace === "parent") {
     const parent = await ctx.github.parentOf(issue.number);
     if (!parent) return null;
     const story = await ctx.github.getIssue(parent);

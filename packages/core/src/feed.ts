@@ -1,3 +1,5 @@
+import { blockedStates, fixStatesOf } from "./behaviours.js";
+import { builtInFlow, type Flow, flowNameOf, flowStep } from "./flow.js";
 import type { Issue, ObservedStory } from "./github.js";
 import { FIX_STATES, FLAGS, kindOf, STATES, type State, type Step, stepFor, type Target } from "./machine.js";
 import { recordedSlug } from "./slug.js";
@@ -72,6 +74,13 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
   const slug = recordedSlug(story.nornComments.map((c) => c.body)) ?? slugify(story.title);
   const events: FeedEvent[] = [];
   for (const issue of [story, ...slices]) {
+    // A slice runs its flow; the story the process built into norn.
+    const flow = flowIn(issue);
+    const states: readonly string[] = flow ? Object.keys(flow.states) : STATES;
+    const fixStates: readonly string[] = flow ? fixStatesOf(flow) : FIX_STATES;
+    const blocked = flow ? blockedStates(flow) : null;
+    /** Whether norn released the issue from being held by its blockers. */
+    const released = (from: string | null, to: string) => blocked !== null && from === blocked.held && to === blocked.release;
     const base = { issue: issue.number, story: story.number };
     const ofIssue = { ...base, url: issue.url };
     const bodies = issue.nornComments.map((c) => c.body);
@@ -101,12 +110,12 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
         }
         const c = parseTransitionComment(t.body);
         if (!c || c.why === "needs-human resolved") continue;
-        const from = (STATES as readonly string[]).includes(c.from) ? (c.from as State) : null;
+        const from = states.includes(c.from) ? (c.from as State) : null;
         const to = targetOf(c.to);
         const at = { ...base, at: t.at, actor: t.actor, url: t.url };
         if (c.why === "automatic") {
           events.push(
-            from === "blocked" && to === "ready-for-agent"
+            released(from, to)
               ? { ...at, id: `slice:${t.url}`, kind: "slice", action: "unblocked" }
               : { ...at, id: `step:${t.url}`, kind: "step", from, to: to === "not-planned" ? "closed" : (to as State | "closed") },
           );
@@ -115,10 +124,10 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
         // Rounds counted up to this comment, as done counted them when it wrote it.
         // By the comment's URL: norn writes the same words for, say, every implement done without a note.
         const upTo = bodies.slice(0, issue.nornComments.findIndex((pc) => pc.url === t.url) + 1);
-        const step = stepAt(issue, from);
+        const step = stepAt(issue, from, flow);
         // Review or QA sending the issue back starts a round; the implement after it finishes that round.
-        const entersFix = FIX_STATES.includes(to as State) && from !== to;
-        const fixRound = entersFix ? fixRounds(upTo.slice(0, -1)) + 1 : step?.skill === "norn-implement" ? fixRounds(upTo) || null : null;
+        const entersFix = fixStates.includes(to) && from !== to;
+        const fixRound = entersFix ? fixRounds(upTo.slice(0, -1), fixStates) + 1 : fixes(step, from, flow) ? fixRounds(upTo, fixStates) || null : null;
         events.push({
           ...at,
           id: `outcome:${t.url}`,
@@ -153,18 +162,18 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
           });
           continue;
         }
-        if ((STATES as readonly string[]).includes(t.label)) {
+        if (states.includes(t.label)) {
           // A state change shows as the new label added, then the old one removed; norn's own come with a comment that says more.
           if (t.kind === "unlabeled") continue;
           const old = issue.timeline
             .slice(i + 1)
-            .find((u) => u.kind === "unlabeled" && (STATES as readonly string[]).includes(u.label) && Date.parse(u.at) - Date.parse(t.at) <= MATCH_MS);
+            .find((u) => u.kind === "unlabeled" && states.includes(u.label) && Date.parse(u.at) - Date.parse(t.at) <= MATCH_MS);
           if (old?.kind !== "unlabeled") continue;
           if (near(transitions, t.at, (x) => x.c.to === t.label)) continue;
           const from = old.label as State;
           const to = t.label as State;
           events.push(
-            from === "blocked" && to === "ready-for-agent"
+            released(from, to)
               ? { ...ofIssue, id, kind: "slice", action: "unblocked", at: t.at, actor: t.actor }
               : { ...ofIssue, id, kind: "step", from, to, at: t.at, actor: t.actor },
           );
@@ -206,10 +215,28 @@ function targetOf(to: string): Target {
   return to === "closed as not planned" ? "not-planned" : (to as Target);
 }
 
-/** The step an issue in `from` was in, as the machine has it; a new issue's is triage. */
-function stepAt(issue: Issue, from: State | null): Step | null {
-  const flags = issue.labels.filter((l) => !(STATES as readonly string[]).includes(l) && l !== "needs-human");
-  return stepFor({ ...issue, state: "open", labels: from ? [...flags, from] : flags.filter((l) => !l.startsWith("type:")) });
+/**
+ * The built-in flow the issue runs, read without GitHub so the feed stays pure; null for the story, which runs the
+ * process built into norn.
+ */
+function flowIn(issue: Issue): Flow | null {
+  const name = flowNameOf(issue);
+  const loaded = name === null ? null : builtInFlow(name);
+  return loaded?.ok ? loaded.flow : null;
+}
+
+/** The step an issue in `from` was in, in its flow or as the machine has it; a new issue's is triage. */
+function stepAt(issue: Issue, from: State | null, flow: Flow | null): Step | null {
+  const states: readonly string[] = flow ? Object.keys(flow.states) : STATES;
+  const flags = issue.labels.filter((l) => !states.includes(l) && l !== "needs-human");
+  const then = { ...issue, state: "open" as const, labels: from ? [...flags, from] : flags.filter((l) => !l.startsWith("type:")) };
+  return flow ? flowStep(then, flow) : stepFor(then);
+}
+
+/** Whether the step taken in `from` fixes what a fix round sent back: a step in a state that counts rounds, or in the one such a state enters as. */
+function fixes(step: Step | null, from: string | null, flow: Flow | null): boolean {
+  if (!flow) return step?.skill === "norn-implement";
+  return from !== null && fixStatesOf(flow).some((s) => s === from || flow.states[s].enterAs === from);
 }
 
 /** Newest-first lists merged into one, newest first; events at the same time keep their order. */
