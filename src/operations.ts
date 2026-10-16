@@ -192,6 +192,14 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     const r = await sliceMergeRefusal(ctx, issue);
     if (r) return refuse(r);
   }
+  const files = evidenceDir === undefined ? undefined : await ctx.workspace.readEvidence(evidenceDir);
+  if (evidenceDir !== undefined) {
+    if (!files) return refuse({ kind: "evidence-not-a-directory", dir: evidenceDir });
+    if (!files.length) return refuse({ kind: "evidence-empty", dir: evidenceDir });
+    const big = files.filter((f) => f.content.length > MAX_EVIDENCE_BYTES);
+    if (big.length) return refuse({ kind: "evidence-too-big", files: big.map((f) => f.path), limitBytes: MAX_EVIDENCE_BYTES });
+  }
+  // The evidence is checked before anything changes on GitHub, the story branch included.
   let storyBranchCreated: string | null = null;
   if (kindOf(issue) === "story" && outcome.to === "implementation") {
     const branch = await ensureStoryBranch(ctx, issue);
@@ -200,12 +208,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   }
 
   let evidence: Evidence | undefined;
-  if (evidenceDir !== undefined) {
-    const files = await ctx.workspace.readEvidence(evidenceDir);
-    if (!files) return refuse({ kind: "evidence-not-a-directory", dir: evidenceDir });
-    if (!files.length) return refuse({ kind: "evidence-empty", dir: evidenceDir });
-    const big = files.filter((f) => f.content.length > MAX_EVIDENCE_BYTES);
-    if (big.length) return refuse({ kind: "evidence-too-big", files: big.map((f) => f.path), limitBytes: MAX_EVIDENCE_BYTES });
+  if (files) {
     // Pushed before the transition, so the comment can embed the files at their commit.
     const branch = qaBranch(n);
     const sha = await github.pushFiles(branch, files, `QA evidence for #${n} (${step.name}, ${word})`);

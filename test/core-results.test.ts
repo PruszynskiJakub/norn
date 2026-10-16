@@ -44,6 +44,22 @@ describe("done", () => {
     expect(res.ok && res.followUps).toEqual([{ kind: "follow-up-failed", what: "move-story-on", issue: 40, retry: 40, detail: "HTTP 502" }]);
   });
 
+  test("each follow-up that fails is its own event; the others still run", async () => {
+    const w = lastSlice();
+    w.github.seedIssue({ number: 42, title: "Next", labels: ["type:slice", "mode:afk", "blocked"] });
+    w.github.parents.set(42, 40);
+    w.github.blockers.set(42, [41]);
+    const ctx = await w.ctx();
+    await take(ctx, 41, { takeover: false });
+    w.github.blockedBy = async () => {
+      throw new Error("HTTP 500");
+    };
+
+    const res = await done(ctx, 41, {});
+
+    expect(res.ok && res.followUps).toEqual([{ kind: "follow-up-failed", what: "unblock-slices", issue: 40, retry: 40, detail: "HTTP 500" }]);
+  });
+
   test("unblocking a slice is an event", async () => {
     const w = lastSlice();
     w.github.seedIssue({ number: 42, title: "Next", labels: ["type:slice", "mode:afk", "blocked"] });

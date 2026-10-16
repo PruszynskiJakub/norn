@@ -298,6 +298,8 @@ function waitSummary(w: WaitItem): string {
     case "blocked":
     case "held":
       return "";
+    default:
+      return w satisfies never;
   }
 }
 

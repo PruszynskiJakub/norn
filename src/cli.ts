@@ -24,7 +24,7 @@ export interface Result {
 type Refused = { ok: false; refusal: Refusal | CliRefusal };
 
 /** What a command answered, and the configuration warnings to print before it. */
-interface Outcome {
+interface Reply {
   answer: Answer | Refused;
   warnings: ConfigWarning[];
 }
@@ -47,7 +47,7 @@ const NO_NUMBER = new Set(["init", "tidy"]);
 
 const refused = (refusal: Refusal | CliRefusal): Refused => ({ ok: false, refusal });
 
-async function dispatch(argv: string[], input: Deps): Promise<Outcome> {
+async function dispatch(argv: string[], input: Deps): Promise<Reply> {
   const { positionals, flags, bools } = parseArgs(argv);
   const [cmd, ...rest] = positionals;
   if (!cmd || !(cmd in NEEDS_NUMBER || NO_NUMBER.has(cmd))) return { answer: refused({ kind: "usage" }), warnings: [] };

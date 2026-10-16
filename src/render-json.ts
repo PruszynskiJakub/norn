@@ -5,6 +5,7 @@ import {
   type Answer,
   type CliRefusal,
   holderText,
+  unreachable,
   renderAnswer,
   renderEvent,
   renderFailure,
@@ -53,6 +54,8 @@ function data(a: Answer): Record<string, unknown> {
     case "slice-added":
     case "initialized":
       return {};
+    default:
+      return unreachable(a);
   }
 }
 

@@ -23,7 +23,7 @@ export type Answer = TakeResult | DoneResult | EscalateResult | ReleaseResult | 
 /** Refusals only the CLI makes: how it was called, and init's skill install. */
 export type CliRefusal = { kind: "usage" } | { kind: "needs-number"; command: string } | MissingSkills;
 
-function unreachable(x: never): never {
+export function unreachable(x: never): never {
   throw new Error(`no wording for ${JSON.stringify(x)}`);
 }
 
