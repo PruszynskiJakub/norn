@@ -9,13 +9,12 @@ import {
   sliceType,
   slicingState,
   startState,
-  usedIn,
-  uses,
 } from "./behaviours.js";
 import { briefing, type Briefing, finishCommands } from "./briefing.js";
 import { acquire } from "./claims.js";
 import type { Event } from "./events.js";
-import { type Flow, flowNameOf, flowOf, flowStatesOf, flowStep, loadFlow, offerFlows, passThrough, triageFlows } from "./flow.js";
+import { type Flow, flowNameOf, flowStatesOf, flowStep, offerFlows, passThrough, usedIn, uses } from "./flow.js";
+import { flowOf, loadFlow, triageFlows } from "./flow-loading.js";
 import type { Issue } from "./github.js";
 import { locate } from "./location.js";
 import { type Step, TRIAGE } from "./machine.js";

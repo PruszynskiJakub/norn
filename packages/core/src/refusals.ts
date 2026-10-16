@@ -1,7 +1,7 @@
 import type { FinishCommand } from "./briefing.js";
 import type { ConfigProblem, VersionIncompatible } from "./config.js";
 import type { BaseBranchMissing } from "./events.js";
-import type { FlowError } from "./flow.js";
+import type { FlowError } from "./flow-validation.js";
 
 import type { NotAStory } from "./next.js";
 import type { MergeRefusal } from "./transitions.js";

@@ -5,16 +5,13 @@ import { join } from "node:path";
 import { branchAt, createWorktreeCommand, locate } from "./location.js";
 import { isWithin, type Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
-import { gateOf, heldInput, heldWaiting, holds, needsBranch, reconcileState, releaseBlocked, slicesOf, usedIn, uses } from "./behaviours.js";
-import { type Flow, type FlowError, flowNameOf, flowOf, flowStatesOf, flowStep, type LoadedFlow } from "./flow.js";
+import { gateOf, heldInput, heldWaiting, holds, needsBranch, reconcileState, releaseBlocked, slicesOf } from "./behaviours.js";
+import { type Flow, flowNameOf, flowStatesOf, flowStep, type NamedFlow, usedIn, uses } from "./flow.js";
+import { flowOf, validFlow } from "./flow-loading.js";
+import type { LoadedFlow } from "./flow-validation.js";
+import type { Holder, HumanPlace, WaitItem } from "./waiting.js";
 import type { Step } from "./machine.js";
 import { bestEffort, clearClosedState, ensureOwnBranch, leftState, needsHumanReason, type Ctx } from "./transitions.js";
-
-/** A repository flow by its name, the type of the issues that run it. */
-export interface NamedFlow {
-  name: string;
-  flow: Flow;
-}
 
 export interface StartItem {
   issue: number;
@@ -37,41 +34,6 @@ export interface StartItem {
   /** Under plain git, the NORN_SESSION to start the item's agent with, unique per listing, so each agent is its own session. */
   session: string | null;
 }
-
-/** The live claim on an item: which session holds it, since when, and whether it is one of the user's. */
-export interface Holder {
-  session: "this" | "yours" | "other";
-  mine: boolean;
-  since: string;
-}
-
-/** Under herdr, an item for a person is done in its worktree's pane: these say where, as for a StartItem. */
-export interface HumanPlace {
-  branch?: string | null;
-  worktree?: string | null;
-  createWorktree?: string | null;
-  checkedOutAt?: string | null;
-  here?: boolean;
-  /** An item for a person that a session holds. No hand-off is offered for it. */
-  heldBy?: Holder;
-}
-
-export type WaitItem = { issue: number } & (
-  | { reason: "blocked"; blockers: number[] }
-  /** `why` is the reason norn recorded when it set needs-human, as written; null when none is found. */
-  | ({ reason: "needs-human"; why: string | null } & HumanPlace)
-  /** `of` says why a person QAs it, as Outcome.notify does. */
-  | ({ reason: "human-qa"; of: string } & HumanPlace)
-  /** Held by one of the user's own sessions (`holder.mine`): an agent of theirs at work, using a parallel slot. */
-  | { reason: "held"; holder: Holder }
-  | { reason: "owner-merge"; owner: string | null; into: string }
-  | { reason: "no-state" }
-  | { reason: "ambiguous-state"; states: string[] }
-  /** The issue is in a state its flow no longer has; taking it hands it to a person. */
-  | { reason: "state-left"; state: string; flow: string }
-  /** The issue's type names a repository flow that is broken, so norn cannot run it until a person fixes the flow. */
-  | { reason: "invalid-flow"; flow: string; errors: FlowError[] }
-);
 
 export interface NextReport {
   /** The story, or the issue of a repository flow, next is about. */
@@ -128,8 +90,7 @@ async function reconcile(ctx: Ctx, n: number, flow: Flow): Promise<Event[]> {
   for (const i of closed) {
     notes.push(
       ...(await bestEffort("clear-labels", i.number, n, async () => {
-        const loaded = i === issue ? null : await flowOf(ctx, i);
-        await clearClosedState(ctx, i, i === issue ? flow : loaded?.ok ? loaded.flow : null);
+        await clearClosedState(ctx, i, i === issue ? flow : validFlow(await flowOf(ctx, i)));
         return [];
       })),
     );
@@ -144,7 +105,7 @@ async function reconcile(ctx: Ctx, n: number, flow: Flow): Promise<Event[]> {
  */
 export async function computeNext(ctx: Ctx, n: number, loaded: LoadedFlow): Promise<NextReport> {
   const { github } = ctx;
-  const flow = loaded.ok ? loaded.flow : null;
+  const flow = validFlow(loaded);
   // An issue with slices is a story: next runs it with its slices.
   const story = flow !== null && usedIn(flow, "slices");
   if (story) await releaseBlocked(ctx, n);

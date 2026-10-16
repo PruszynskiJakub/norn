@@ -1,6 +1,7 @@
 import { isStale } from "./claims.js";
 import { slicesOf } from "./behaviours.js";
-import { flowOf, flowStatesOf } from "./flow.js";
+import { flowStatesOf } from "./flow.js";
+import { flowOf, validFlow } from "./flow-loading.js";
 import type { Issue } from "./github.js";
 import { storySlug } from "./slug.js";
 import { storyBranch } from "./text.js";
@@ -33,8 +34,8 @@ export async function status(ctx: Ctx, n: number): Promise<StatusResult> {
   const now = ctx.now();
   const staleAfterMs = ctx.config.staleAfterMs;
   const story = await github.getIssue(n);
-  const loaded = await flowOf(ctx, story);
-  const slices = loaded?.ok ? await slicesOf(github, n, loaded.flow) : [];
+  const flow = validFlow(await flowOf(ctx, story));
+  const slices = flow ? await slicesOf(github, n, flow) : [];
   const rows: Row[] = [];
   for (const s of slices) rows.push(await row(ctx, s, now, staleAfterMs));
   const head = await row(ctx, story, now, staleAfterMs);
@@ -49,14 +50,14 @@ export async function status(ctx: Ctx, n: number): Promise<StatusResult> {
 async function row(ctx: Ctx, issue: Issue, now: Date, staleAfterMs: number): Promise<Row> {
   const { github } = ctx;
   const closed = issue.state === "closed";
-  const loaded = closed ? null : await flowOf(ctx, issue);
+  const flow = closed ? null : validFlow(await flowOf(ctx, issue));
   const claim = closed ? null : await github.readClaim(issue.number);
   const blockers = closed ? [] : await github.blockedBy(issue.number);
   return {
     number: issue.number,
     title: issue.title,
     status: closed ? (issue.stateReason === "not_planned" ? "closed" : "merged") : "open",
-    states: loaded?.ok ? flowStatesOf(issue, loaded.flow) : [],
+    states: flow ? flowStatesOf(issue, flow) : [],
     mode: issue.labels.includes("mode:hil") ? "hil" : issue.labels.includes("mode:afk") ? "afk" : null,
     blockedBy: blockers.filter((b) => b.state === "open").map((b) => b.number),
     needsHuman: issue.labels.includes("needs-human"),

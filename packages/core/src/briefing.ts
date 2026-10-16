@@ -1,5 +1,6 @@
-import { behaviourLines, EVIDENCE_FILES, hasSpec, readIssue as readIssueLine, usedIn, uses } from "./behaviours.js";
-import { type Flow, flowNameOf, flowOf, flowStatesOf, gateAhead } from "./flow.js";
+import { behaviourLines, EVIDENCE_FILES, readIssue as readIssueLine } from "./behaviours.js";
+import { type Flow, flowNameOf, flowStatesOf, gateAhead, hasSpec, usedIn, uses } from "./flow.js";
+import { flowOf, validFlow } from "./flow-loading.js";
 import type { Issue } from "./github.js";
 import { locate, workIn, type Location, type WorkIn } from "./location.js";
 import type { Step } from "./machine.js";
@@ -91,8 +92,7 @@ async function flowLines(issue: Issue, step: Step, ctx: Ctx, from: string | null
   }
   const state = flowStatesOf(issue, flow)[0] ?? null;
   // Work in the parent's branch follows the parent's spec.
-  const parentFlow = loc && flow.workspace === "parent" ? await flowOf(ctx, loc.story) : null;
-  const what = noun(parentFlow?.ok ? parentFlow.flow : null);
+  const what = noun(loc && flow.workspace === "parent" ? validFlow(await flowOf(ctx, loc.story)) : null);
   const spec = loc && flow.workspace === "parent" ? [`Spec: ${specPath(loc.story.number, loc.slug)} (${what} #${loc.story.number})`] : [];
   const flowName = flowNameOf(issue) ?? "";
   const lines = [...spec, ...(ownSpec ? [] : [readIssue]), ...(await behaviourLines({ ctx, issue, flow, flowName, state, from, step, loc }))];

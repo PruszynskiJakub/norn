@@ -1,4 +1,4 @@
-import type { WaitItem } from "./next.js";
+import type { WaitItem } from "./waiting.js";
 import type { Ctx } from "./transitions.js";
 
 export type Channel = "herdr" | "os";

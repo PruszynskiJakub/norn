@@ -1,7 +1,9 @@
-import { fixStatesOf, slicesAmong, uses } from "./behaviours.js";
+import { fixStatesOf, slicesAmong } from "./behaviours.js";
 import { isStale } from "./claims.js";
 import { byTime, type FeedEvent, feedOf } from "./feed.js";
-import { type Flow, flowNameOf, flowStatesOf, type LoadedFlow, loadFlow, modeOf, repositoryFlows, type SourcedFlow } from "./flow.js";
+import { type Flow, flowNameOf, flowStatesOf, modeOf, uses } from "./flow.js";
+import { loadFlow, repositoryFlows, type SourcedFlow } from "./flow-loading.js";
+import type { LoadedFlow } from "./flow-validation.js";
 import type { ObservedIssue, ObservedStory } from "./github.js";
 import { recordedSlug } from "./slug.js";
 import { slugify, storyBranch } from "./text.js";

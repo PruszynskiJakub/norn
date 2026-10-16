@@ -7,8 +7,8 @@ import { specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
-import { type Flow, type FlowCache, type Mode, flowStatesOf, loadFlow, stateLabel } from "./flow.js";
-import { hasSpec } from "./behaviours.js";
+import { type Flow, flowStatesOf, hasSpec, type Mode, stateLabel } from "./flow.js";
+import { type FlowCache, loadFlow, validFlow } from "./flow-loading.js";
 import { notifyHumanQa, notifyNeedsHuman, type Notify } from "./notify.js";
 
 /** The marker norn writes when it sets needs-human; norn next reads the reason back from it. */
@@ -197,8 +197,7 @@ export async function applyOutcome(
   const spec = await specLink(ctx, issue, flow);
   if (spec) comment.push("", `Spec: ${spec}`);
   // Triage gives the issue its flow, which it enters here.
-  const given = outcome.flow ? await loadFlow(ctx, outcome.flow) : null;
-  const into = flow ?? (given?.ok ? given.flow : null);
+  const into = flow ?? (outcome.flow ? validFlow(await loadFlow(ctx, outcome.flow)) : null);
   // An issue whose flow gives it a branch of its own records its slug the first time norn writes on it, triage included.
   const slug = into?.workspace === "own" ? await slugLine(ctx, issue) : null;
   if (slug) comment.push("", slug);

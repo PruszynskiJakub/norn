@@ -1,10 +1,11 @@
-import { type Flow, flowNameOf, flowOf, flowStatesOf } from "./flow.js";
+import { type Flow, flowNameOf, flowStatesOf, hasSpec, usedIn, uses } from "./flow.js";
+import { flowOf, validFlow } from "./flow-loading.js";
 import type { GitHub, Issue } from "./github.js";
 import { locate, type Location } from "./location.js";
 import type { Event } from "./events.js";
 import type { Outcome, Step } from "./machine.js";
-import type { WaitItem } from "./next.js";
 import type { Refusal } from "./refusals.js";
+import type { WaitItem } from "./waiting.js";
 import { sh, specPath } from "./text.js";
 import { bestEffort, type Ctx, fixLimitReason, fixRounds, mergeRefusal, oneLine, setState, stateLabels, withShortClaim } from "./transitions.js";
 
@@ -105,27 +106,12 @@ export interface Behaviour {
   followUps?(o: OutcomeInput, applied: Applied): Promise<Event[]>;
 }
 
-/** Whether the state of the flow opts into the behaviour. */
-export function uses(flow: Flow, state: string | null, name: BehaviourName): boolean {
-  return state !== null && Object.hasOwn(flow.states[state]?.behaviours ?? {}, name);
-}
-
-/** Whether any state of the flow opts into the behaviour. */
-export function usedIn(flow: Flow, name: BehaviourName): boolean {
-  return Object.keys(flow.states).some((s) => uses(flow, s, name));
-}
-
 /** The flow's name as a word that starts a sentence, e.g. Slice. */
 const named = (flowName: string) => flowName.charAt(0).toUpperCase() + flowName.slice(1);
 
 /** The params of the behaviour in the state, `{}` when it takes none; undefined when the state does not use it. */
 function paramsOf(flow: Flow, state: string | null, name: BehaviourName): BehaviourParams | undefined {
   return state === null ? undefined : flow.states[state]?.behaviours?.[name];
-}
-
-/** Whether the flow's issues have a spec of their own: one of its states writes it. */
-export function hasSpec(flow: Flow): boolean {
-  return usedIn(flow, "writesSpec");
 }
 
 const writesSpec: Behaviour = {
@@ -245,7 +231,7 @@ export async function moveOnFromSlices(ctx: Ctx, n: number): Promise<Event[]> {
   const { github } = ctx;
   const issue = await github.getIssue(n);
   const loaded = await flowOf(ctx, issue);
-  const flow = loaded?.ok ? loaded.flow : null;
+  const flow = validFlow(loaded);
   const wait = flow ? waitState(flow) : null;
   if (!flow || !loaded || !wait || issue.state !== "open" || flowStatesOf(issue, flow).join() !== wait.held) return [];
   const slices = await slicesOf(github, n, flow);
@@ -471,11 +457,9 @@ export const BEHAVIOURS = {
 
 export type BehaviourName = keyof typeof BEHAVIOURS;
 
-const REGISTRY: Record<BehaviourName, Behaviour> = BEHAVIOURS;
-
 /** The behaviours a flow uses anywhere, in registry order. */
 function inFlow(flow: Flow): Behaviour[] {
-  return (Object.entries(REGISTRY) as [BehaviourName, Behaviour][]).filter(([name]) => usedIn(flow, name)).map(([, b]) => b);
+  return (Object.entries(BEHAVIOURS) as [BehaviourName, Behaviour][]).filter(([name]) => usedIn(flow, name)).map(([, b]) => b);
 }
 
 /** The briefing lines every behaviour of the flow contributes to the step. */
@@ -487,7 +471,7 @@ export async function behaviourLines(b: BriefingInput): Promise<string[]> {
 
 /** The behaviours of one state of the flow, in registry order. */
 function inState(flow: Flow, state: string | null): Behaviour[] {
-  return (Object.entries(REGISTRY) as [BehaviourName, Behaviour][]).filter(([name]) => uses(flow, state, name)).map(([, b]) => b);
+  return (Object.entries(BEHAVIOURS) as [BehaviourName, Behaviour][]).filter(([name]) => uses(flow, state, name)).map(([, b]) => b);
 }
 
 /** Why the behaviours of the state the issue leaves stop the outcome; null when none does. */
@@ -574,8 +558,7 @@ export async function releaseBlocked(ctx: Ctx, parent: number): Promise<Event[]>
   const events: Event[] = [];
   for (const issue of await ctx.github.subIssues(parent)) {
     if (issue.state !== "open") continue;
-    const loaded = await flowOf(ctx, issue);
-    const flow = loaded?.ok ? loaded.flow : null;
+    const flow = validFlow(await flowOf(ctx, issue));
     const states = flow ? blockedStates(flow) : null;
     if (!flow || !states) continue;
     const current = flowStatesOf(issue, flow);
