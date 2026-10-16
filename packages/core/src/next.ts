@@ -56,7 +56,7 @@ export type WaitItem = { issue: number } & (
   | ({ reason: "human-qa"; of: "story" | "mode:hil" } & HumanPlace)
   /** Held by one of the user's own sessions (`holder.mine`): an agent of theirs at work, using a parallel slot. */
   | { reason: "held"; holder: Holder }
-  | { reason: "owner-merge"; owner: string | null }
+  | { reason: "owner-merge"; owner: string | null; into: string }
   | { reason: "no-state" }
   | { reason: "ambiguous-state"; states: State[] }
 );
@@ -157,7 +157,7 @@ export async function computeNext(ctx: Ctx, storyNumber: number): Promise<NextRe
     return report;
   }
   if (stateOf(story) === "merge-queue") {
-    report.waiting.push({ issue: storyNumber, reason: "owner-merge", owner: story.assignees[0] ?? null });
+    report.waiting.push({ issue: storyNumber, reason: "owner-merge", owner: story.assignees[0] ?? null, into: ctx.config.baseBranch });
     report.nothingLeft = true;
     return report;
   }

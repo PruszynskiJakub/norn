@@ -582,7 +582,7 @@ export function waitDetail(w: WaitItem): string {
     case "held":
       return `is held by ${holderText(w.holder)}`;
     case "owner-merge":
-      return `waits for its owner (${w.owner ? `@${w.owner}` : "the story owner"}) to merge the story PR into main`;
+      return `waits for its owner (${w.owner ? `@${w.owner}` : "the story owner"}) to merge the story PR into ${w.into}`;
     case "no-state":
       return "has no state label; a person must set one";
     case "ambiguous-state":
