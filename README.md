@@ -12,13 +12,13 @@ psdd is tested on Claude Code. Other agents are supported but not tested.
 
 CLI for the SDD process. The developer's LLM calls it to run work through the process; GitHub labels, native relations, comments and branches are the only state. See `PRD.html`.
 
-psdd is not on npm. Install it from this repository (you need read access to it) by a release tag; npm builds it on install:
+psdd is not on npm. Install it from this repository (you need read access to it) by a release tag, which carries the built CLI, so nothing is built on install:
 
 ```sh
 npm install -D github:PruszynskiJakub/ai-engine#v0.4.0
 ```
 
-npm 11 warns that psdd's `prepare` script is not covered by `allowScripts`; the build still runs. `npm install-scripts approve psdd` silences it.
+Only release tags can be installed: a branch or commit of the repository has no built CLI.
 
 ```sh
 npx psdd init            # skills, agent instructions, .agents/specs/, team config, .gitignore, labels
@@ -71,6 +71,9 @@ To start over, delete the repository: `gh repo delete psdd-sandbox --yes` (needs
 ### Develop
 
 ```sh
+npm run check     # typecheck, Biome and the tests; CI runs it on every PR
 npm test          # vitest, against an in-memory GitHub and a scripted gh
-npm run build
+npm run build     # bundles the CLI into dist/bin.js
 ```
+
+The code is npm workspaces under `packages/`: `core` (the process, no I/O of its own), `github-gh` and `workspace-local` (the adapters), `cli` and `testing` (fakes and the harness).

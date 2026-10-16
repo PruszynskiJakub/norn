@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 const TEAM = ".agents/psdd.config.json";
 const LOCAL = ".agents/psdd.config.local.json";

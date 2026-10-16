@@ -3,8 +3,21 @@ import { cpSync, existsSync, readdirSync, readFileSync, rmSync, statSync } from 
 import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
-/** The skills shipped inside the psdd package. */
-export const BUNDLED_SKILLS = join(dirname(fileURLToPath(import.meta.url)), "..", "skills");
+/**
+ * The skills shipped inside the psdd package: skills/ next to its package.json.
+ * Looked up from this module, which runs from packages/cli/src/ in the repository
+ * and from dist/ in the built package.
+ */
+export const BUNDLED_SKILLS = findSkills(dirname(fileURLToPath(import.meta.url)));
+
+function findSkills(from: string): string {
+  for (let dir = from; ; dir = dirname(dir)) {
+    const manifest = join(dir, "package.json");
+    if (existsSync(manifest) && JSON.parse(readFileSync(manifest, "utf8")).name === "psdd") return join(dir, "skills");
+    // Not found: the path the built package has, so init names it when it cannot read it.
+    if (dirname(dir) === dir) return join(from, "..", "skills");
+  }
+}
 
 /**
  * Installs psdd's skills into <cwd>/skills/ and returns the names of those it

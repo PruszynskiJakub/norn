@@ -1,8 +1,6 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
-import { DEFAULT_TEAM_CONFIG, LOCAL_CONFIG, TEAM_CONFIG } from "./config.js";
+import { DEFAULT_TEAM_CONFIG, FLAGS, type GitHub, LOCAL_CONFIG, STATES, TEAM_CONFIG } from "@psdd/core";
 import { join } from "node:path";
-import type { GitHub } from "./github.js";
-import { FLAGS, STATES } from "./machine.js";
 
 /** Skills psdd briefings name. */
 export const SKILLS = [

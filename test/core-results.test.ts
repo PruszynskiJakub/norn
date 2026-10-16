@@ -1,7 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { done, next, take } from "../src/operations.js";
-import { tidy } from "../src/tidy.js";
-import { setup } from "./harness.js";
+import { done, next, take, tidy } from "@psdd/core";
+import { setup } from "@psdd/testing";
 
 /**
  * Core operations return typed results with no wording: what a front end other

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 /** The PRD's example: story #123 with 5 slices, 2 merged. */
 function prdExample() {

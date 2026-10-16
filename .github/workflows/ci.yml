@@ -16,3 +16,17 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run check
+      - run: npm run build
+      - name: Install the built package in a throwaway project and run it
+        run: |
+          npm pack --pack-destination "$RUNNER_TEMP"
+          mkdir "$RUNNER_TEMP/app" && cd "$RUNNER_TEMP/app"
+          git init -q && npm init -y > /dev/null
+          npm install "$RUNNER_TEMP"/psdd-*.tgz
+          set +e
+          out=$(npx psdd --help)
+          code=$?
+          set -e
+          echo "$out"
+          test "$code" -eq 2
+          echo "$out" | grep -q "psdd runs work through the SDD process"

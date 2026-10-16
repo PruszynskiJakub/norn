@@ -1,4 +1,4 @@
-import type { Provider, Workspace } from "../src/workspace.js";
+import type { Provider, Workspace } from "@psdd/core";
 
 export class FakeWorkspace implements Workspace {
   root = "/repo";

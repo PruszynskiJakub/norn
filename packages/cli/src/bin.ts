@@ -4,10 +4,9 @@ import { hostname } from "node:os";
 import { run } from "./cli.js";
 import { ghFailureMessage, renderNotification } from "./render-text.js";
 import { sessionId } from "./env.js";
-import { GhError, GhGitHub } from "./gh.js";
+import { GhError, GhGitHub } from "@psdd/github-gh";
 import { installSkills } from "./install-skills.js";
-import { LocalWorkspace, RootError, runCommand } from "./local-workspace.js";
-import { makeNotifier } from "./notifier.js";
+import { LocalWorkspace, makeNotifier, RootError, runCommand } from "@psdd/workspace-local";
 
 try {
   const root = await LocalWorkspace.findRoot(process.cwd());

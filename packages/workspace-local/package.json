@@ -1,0 +1,13 @@
+{
+  "name": "@psdd/workspace-local",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The Workspace and Notify ports on the developer's machine: git, herdr and OS notifications.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@psdd/core": "0.0.0"
+  }
+}

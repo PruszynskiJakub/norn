@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { ClaimRecord, FileToPush, GitHub, Issue, PullRequest } from "./github.js";
+import type { ClaimRecord, FileToPush, GitHub, Issue, PullRequest } from "@psdd/core";
 
 export type Exec = (args: string[], input?: string) => Promise<{ code: number; stdout: string; stderr: string }>;
 

@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 describe("take names the worktree", () => {
   test("the PRD's briefing: a story worktree that does not exist yet, under Claude Code", async () => {

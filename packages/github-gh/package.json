@@ -1,0 +1,13 @@
+{
+  "name": "@psdd/github-gh",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The GitHub port over the user's own gh CLI.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@psdd/core": "0.0.0"
+  }
+}

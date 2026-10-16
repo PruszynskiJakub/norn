@@ -1,6 +1,4 @@
-import type { ConfigWarning } from "./config.js";
-import type { WaitItem } from "./next.js";
-import type { Refusal } from "./refusals.js";
+import type { ConfigWarning, Refusal, Row, WaitItem } from "@psdd/core";
 import {
   type Answer,
   type CliRefusal,
@@ -17,7 +15,6 @@ import {
   tidyNotes,
   waitDetail,
 } from "./render-text.js";
-import type { Row } from "./status.js";
 
 /**
  * --json: `{ ok: true, ...data, message }` or `{ ok: false, refusal }`, plus

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 describe("psdd escalate", () => {
   test("sets needs-human with the reason as a comment and releases the claim; state is kept", async () => {

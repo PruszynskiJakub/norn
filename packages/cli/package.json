@@ -1,0 +1,15 @@
+{
+  "name": "@psdd/cli",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The psdd command line: argument parsing, init, the renderers and the executable.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "@psdd/core": "0.0.0",
+    "@psdd/github-gh": "0.0.0",
+    "@psdd/workspace-local": "0.0.0"
+  }
+}

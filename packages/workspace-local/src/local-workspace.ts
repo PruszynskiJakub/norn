@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { samePath, type Provider, type Workspace } from "./workspace.js";
+import { type Provider, samePath, type Workspace } from "@psdd/core";
 
 /** Runs a command; `env` is added to this process's environment. */
 export type Run = (cmd: string, args: string[], env?: Record<string, string>) => Promise<{ code: number; stdout: string; stderr: string }>;

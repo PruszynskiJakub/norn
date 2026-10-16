@@ -2,8 +2,7 @@ import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { SKILLS } from "../src/init.js";
-import { BUNDLED_SKILLS, installSkills } from "../src/install-skills.js";
+import { BUNDLED_SKILLS, installSkills, SKILLS } from "@psdd/cli";
 
 describe("bundled skills", () => {
   test.each(SKILLS)("%s ships with a SKILL.md named for it", (name) => {

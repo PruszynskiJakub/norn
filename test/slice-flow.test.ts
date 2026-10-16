@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "./harness.js";
+import { setup } from "@psdd/testing";
 
 describe("slice implementation", () => {
   test.each(["ready-for-agent", "changes-requested", "qa-failed"])("taking a slice in %s moves it to implementation and briefs implement", async (state) => {

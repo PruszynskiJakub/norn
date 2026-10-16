@@ -1,0 +1,10 @@
+{
+  "name": "@psdd/core",
+  "version": "0.0.0",
+  "private": true,
+  "description": "psdd's process logic: the state machine, transitions, claims and the ports. No I/O of its own.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

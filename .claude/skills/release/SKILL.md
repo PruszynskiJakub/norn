@@ -5,7 +5,7 @@ disable-model-invocation: true
 argument-hint: "[version]"
 ---
 
-Release psdd from `main`. `$ARGUMENTS` is the version, if given. psdd is not on npm: projects install it from a git tag (`github:PruszynskiJakub/ai-engine#vX.Y.Z`), so the tag is what ships.
+Release psdd from `main`. `$ARGUMENTS` is the version, if given. psdd is not on npm: projects install it from a git tag (`github:PruszynskiJakub/ai-engine#vX.Y.Z`), so the tag is what ships. npm builds nothing on install, so the tag points at a release commit that carries the built `dist/bin.js`; `main` never does.
 
 The user merges every PR. Ask them to, give the link, and wait for "merged". PRs merge with merge commits.
 
@@ -19,8 +19,8 @@ The user merges every PR. Ask them to, give the link, and wait for "merged". PRs
    - `CHANGELOG.md`: add `## [X.Y.Z] - <today>` under `## [Unreleased]`, so the entries move under it and Unreleased is left empty.
    - `CHANGELOG.md` links at the bottom: `[Unreleased]` compares `vX.Y.Z...HEAD`, and a new `[X.Y.Z]` line compares the previous tag with `vX.Y.Z`.
    - `README.md`: every `#v<previous>` install tag becomes `#vX.Y.Z`. `grep -n "#v" README.md` finds them all.
-5. **Check.** `npm ci`, `npm test`, `npm run typecheck` and `npm run build` all pass. A failure stops the release: report it to the user.
+5. **Check.** `npm ci`, `npm run check` and `npm run build` all pass. A failure stops the release: report it to the user.
 6. **PR.** Commit as `Release X.Y.Z` and push the branch. Open a PR titled `Release X.Y.Z`, with a body of one line naming the release's main changes and ending "See CHANGELOG." Ask the user to merge it.
-7. **Tag.** Fetch, and find the merge commit of the release PR on `origin/main` (`gh pr view <n> --json mergeCommit`). Create the annotated tag `vX.Y.Z` with the message `psdd X.Y.Z` on that commit, then push the tag.
+7. **Tag.** Fetch, and find the merge commit of the release PR on `origin/main` (`gh pr view <n> --json mergeCommit`). In the release worktree, check out that commit detached, run `npm ci` and `npm run build`, then `git add -f dist/bin.js` and commit it as `Build psdd X.Y.Z`: the release commit, on no branch. Create the annotated tag `vX.Y.Z` with the message `psdd X.Y.Z` on the release commit, then push the tag. Done when `git ls-tree -r vX.Y.Z --name-only` lists `dist/bin.js` and `origin/main` does not.
 8. **GitHub release.** `gh release create vX.Y.Z --verify-tag --title "psdd X.Y.Z" --notes-file <file>`. The notes are the `## [X.Y.Z]` section of `CHANGELOG.md`, without its heading. Write them to a file in the scratchpad.
 9. **Verify.** `gh release list` shows `psdd X.Y.Z` as Latest, and `git ls-remote --tags origin vX.Y.Z` returns the tag. Remove the release worktree. Report to the user: the version, the release link, the install line `npm install -D github:PruszynskiJakub/ai-engine#vX.Y.Z`, and that projects run `npx psdd init` after upgrading to get the new skills.

@@ -4,6 +4,10 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- Release tags carry the built CLI, so installing psdd from a tag no longer builds it and npm 11 no longer warns about its `prepare` script. Only release tags can be installed now; a branch or commit of the repository has no built CLI.
+
 ## [0.4.0] - 2026-10-15
 
 ### Changed

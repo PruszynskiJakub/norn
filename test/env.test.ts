@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { sessionId } from "../src/env.js";
+import { sessionId } from "@psdd/cli";
 
 describe("session id", () => {
   test("PSDD_SESSION wins, then the Claude Code session, then the herdr pane, then host and repository root", () => {

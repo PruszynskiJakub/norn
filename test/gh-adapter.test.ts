@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { GhGitHub, type Exec } from "../src/gh.js";
+import { type Exec, GhGitHub } from "@psdd/github-gh";
 
 interface Call {
   args: string[];

@@ -2,8 +2,8 @@ import { mkdtempSync, mkdirSync, readlinkSync, writeFileSync, existsSync, readFi
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { AGENT_INSTRUCTIONS, SKILLS } from "../src/init.js";
-import { setup } from "./harness.js";
+import { AGENT_INSTRUCTIONS, SKILLS } from "@psdd/cli";
+import { setup } from "@psdd/testing";
 
 function project() {
   const w = setup();

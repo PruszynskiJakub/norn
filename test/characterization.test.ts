@@ -2,8 +2,8 @@ import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { SKILLS } from "../src/init.js";
-import { setup } from "./harness.js";
+import { SKILLS } from "@psdd/cli";
+import { setup } from "@psdd/testing";
 
 /**
  * Pins the exact text and --json output of every command, refusals included,

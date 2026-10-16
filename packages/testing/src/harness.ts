@@ -1,7 +1,5 @@
-import { run, type Deps } from "../src/cli.js";
-import { loadConfig } from "../src/config.js";
-import { renderNotification } from "../src/render-text.js";
-import type { Ctx } from "../src/transitions.js";
+import { type Deps, renderNotification, run } from "@psdd/cli";
+import { type Ctx, loadConfig } from "@psdd/core";
 import { FakeGitHub } from "./fake-github.js";
 import { FakeWorkspace } from "./fake-workspace.js";
 

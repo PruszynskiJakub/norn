@@ -1,0 +1,25 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": ".",
+    "outDir": ".tsbuild"
+  },
+  "include": ["."],
+  "references": [
+    {
+      "path": "../packages/core"
+    },
+    {
+      "path": "../packages/github-gh"
+    },
+    {
+      "path": "../packages/workspace-local"
+    },
+    {
+      "path": "../packages/cli"
+    },
+    {
+      "path": "../packages/testing"
+    }
+  ]
+}
