@@ -3,7 +3,6 @@ import type { ConfigProblem, VersionIncompatible } from "./config.js";
 import type { BaseBranchMissing } from "./events.js";
 import type { FlowError } from "./flow-validation.js";
 
-import type { NotAStory } from "./next.js";
 import type { MergeRefusal } from "./transitions.js";
 import type { Provider } from "./workspace.js";
 
@@ -54,7 +53,10 @@ export type Refusal =
   | { kind: "add-slice-usage"; story: number }
   /** Slices are added only in `slicing`, the state of the issue's flow with slices; null when its flow has none. */
   | { kind: "story-not-slicing"; story: number; state: string | null; slicing: string | null }
-  | NotAStory;
+  | NextRefusal;
+
+/** Why norn next refuses an issue: one that works in its parent's branch, which moves on with it, or one with no flow yet. */
+export type NextRefusal = { kind: "is-a-slice"; issue: number; story: number | null } | { kind: "not-a-story"; issue: number };
 
 export interface Refused {
   ok: false;

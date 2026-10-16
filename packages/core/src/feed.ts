@@ -74,14 +74,14 @@ export interface FeedContext {
  * linked PRs. Pure: the same story always gives the same events.
  */
 export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
-  const flowOf = (issue: Issue) => fc.flows.get(flowNameOf(issue) ?? "") ?? null;
-  const storyFlow = flowOf(story);
+  const flowFor = (issue: Issue) => fc.flows.get(flowNameOf(issue) ?? "") ?? null;
+  const storyFlow = flowFor(story);
   const slices = storyFlow ? slicesAmong(story.subIssues, storyFlow) : [];
   const slug = recordedSlug(story.nornComments.map((c) => c.body)) ?? slugify(story.title);
   const events: FeedEvent[] = [];
   for (const issue of [story, ...slices]) {
     // Each issue runs its flow, read beforehand so the feed stays pure.
-    const flow = flowOf(issue);
+    const flow = flowFor(issue);
     const states: readonly string[] = flow ? Object.keys(flow.states) : [];
     const fixStates: readonly string[] = flow ? fixStatesOf(flow) : [];
     const blocked = flow ? blockedStates(flow) : null;

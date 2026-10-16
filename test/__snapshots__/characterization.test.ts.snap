@@ -910,7 +910,7 @@ exports[`output of every command, text and --json > next closes a merged story >
 "exit 0
 {
   "ok": true,
-  "story": 30,
+  "issue": 30,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "Ship",
@@ -945,7 +945,7 @@ exports[`output of every command, text and --json > next creates the story branc
 "exit 0
 {
   "ok": true,
-  "story": 40,
+  "issue": 40,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "All done",
@@ -1035,7 +1035,7 @@ exports[`output of every command, text and --json > next on a story closed as no
 "exit 0
 {
   "ok": true,
-  "story": 31,
+  "issue": 31,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "Nope",
@@ -1067,7 +1067,7 @@ exports[`output of every command, text and --json > next on a story in implement
 "exit 0
 {
   "ok": true,
-  "story": 123,
+  "issue": 123,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "Rate limiting",
@@ -1180,7 +1180,7 @@ exports[`output of every command, text and --json > next on a story in implement
 "exit 0
 {
   "ok": true,
-  "story": 123,
+  "issue": 123,
   "provider": "git",
   "maxParallel": 2,
   "title": "Rate limiting",
@@ -1285,7 +1285,7 @@ exports[`output of every command, text and --json > next on a story in implement
 "exit 0
 {
   "ok": true,
-  "story": 123,
+  "issue": 123,
   "provider": "herdr",
   "maxParallel": 2,
   "title": "Rate limiting",
@@ -1415,7 +1415,7 @@ exports[`output of every command, text and --json > next on a story in merge-que
 "exit 0
 {
   "ok": true,
-  "story": 30,
+  "issue": 30,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "Ship",
@@ -1456,7 +1456,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
 "exit 0
 {
   "ok": true,
-  "story": 32,
+  "issue": 32,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "Refine me",
@@ -1511,7 +1511,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
 "exit 0
 {
   "ok": true,
-  "story": 32,
+  "issue": 32,
   "provider": "herdr",
   "maxParallel": 2,
   "title": "Refine me",
@@ -1571,7 +1571,7 @@ exports[`output of every command, text and --json > next when the story branch c
 "exit 0
 {
   "ok": true,
-  "story": 40,
+  "issue": 40,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "No base",
@@ -1609,7 +1609,7 @@ exports[`output of every command, text and --json > next with every slot taken >
 "exit 0
 {
   "ok": true,
-  "story": 123,
+  "issue": 123,
   "provider": "claude-code",
   "maxParallel": 1,
   "title": "Rate limiting",
@@ -1705,7 +1705,7 @@ exports[`output of every command, text and --json > next with nothing left > jso
 "exit 0
 {
   "ok": true,
-  "story": 20,
+  "issue": 20,
   "provider": "claude-code",
   "maxParallel": 2,
   "title": "Waits",
@@ -1759,7 +1759,7 @@ exports[`output of every command, text and --json > next with nothing left under
 "exit 0
 {
   "ok": true,
-  "story": 20,
+  "issue": 20,
   "provider": "herdr",
   "maxParallel": 2,
   "title": "Waits",

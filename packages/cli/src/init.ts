@@ -36,7 +36,7 @@ export const SKILLS = [
 ] as const;
 
 /** The labels of the engine's own flags, which every flow shares. */
-const ENGINE_LABELS: Record<(typeof ENGINE_FLAGS)[number], [string, string]> = {
+const FLAG_LABELS: Record<(typeof ENGINE_FLAGS)[number], [string, string]> = {
   "in-progress": ["fef2c0", "Someone holds the claim (mirror of the git-ref claim)"],
   "needs-human": ["e11d21", "A person is needed; cleared with the norn-resolve skill"],
   "mode:afk": ["bfdadc", "QA by an agent only"],
@@ -46,7 +46,7 @@ const ENGINE_LABELS: Record<(typeof ENGINE_FLAGS)[number], [string, string]> = {
 /** The labels norn needs: those of the valid flows in effect, then the engine's flags. */
 export function labelDefinitions(flows: LoadedFlow[]): LabelDefinition[] {
   const valid = flows.flatMap((l) => (l.ok ? [{ name: l.name, flow: l.flow }] : []));
-  return [...flowLabels(valid), ...ENGINE_FLAGS.map((name) => ({ name, color: ENGINE_LABELS[name][0], description: ENGINE_LABELS[name][1] }))];
+  return [...flowLabels(valid), ...ENGINE_FLAGS.map((name) => ({ name, color: FLAG_LABELS[name][0], description: FLAG_LABELS[name][1] }))];
 }
 
 export interface InitDeps {

@@ -32,6 +32,7 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 - A slice with no `mode:` label now gets QA by a person after the agent's, as every state with `when` runs for an issue with no mode.
 - In a flow, a rework briefing now reads "the latest review or QA comment on #N lists what to fix", and a human gate's briefing starts from the agent's QA comment, as for slices.
 - `norn-deliver` stops at a human gate, where a person checks the work, rather than at a named state; the skill and the docs say so.
+- **Breaking:** `norn next --json` names the issue it is about `issue` instead of `story`, since it works on an issue of any flow, and a waiting item of a broken flow has the reason `flow-invalid`, the same name as the refusal, instead of `invalid-flow`.
 - **Breaking:** triage's outcome `accept` is now `story`: `norn done <issue> story` makes the issue a story in `needs-refinement`. `accept` is gone, with no alias, because triage now chooses the issue's type and `story` is one type among the flows.
 
 ## [0.8.0] - 2026-10-16

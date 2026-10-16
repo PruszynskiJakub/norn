@@ -19,7 +19,7 @@ import { flowOf, loadFlow, triageFlows } from "./flow-loading.js";
 import type { Issue } from "./github.js";
 import { locate } from "./location.js";
 import { type Step, TRIAGE } from "./machine.js";
-import { computeNext, type NextReport, notAStory, notifyWaiting } from "./next.js";
+import { computeNext, type NextReport, nextRefusal, notifyWaiting } from "./next.js";
 import { notifyNeedsHuman } from "./notify.js";
 import { type Refusal, type Refused, refuse } from "./refusals.js";
 import { storySlug } from "./slug.js";
@@ -354,7 +354,7 @@ export async function next(ctx: Ctx, n: number): Promise<NextResult | Refused> {
   const issue = await ctx.github.getIssue(n);
   // An issue of a broken flow is not refused: next shows it blocked by the flow.
   const loaded = await flowOf(ctx, issue);
-  const r = await notAStory(ctx.github, issue, loaded);
+  const r = await nextRefusal(ctx.github, issue, loaded);
   if (r || !loaded) return refuse(r ?? { kind: "not-a-story", issue: n });
   const report = await computeNext(ctx, n, loaded);
   if (report.nothingLeft && !report.closed) await notifyWaiting(ctx, report);

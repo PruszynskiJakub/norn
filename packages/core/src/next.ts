@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { branchAt, createWorktreeCommand, locate } from "./location.js";
 import { isWithin, type Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
+import type { NextRefusal } from "./refusals.js";
 import { gateOf, heldInput, heldWaiting, holds, inFlowOf, needsBranch, reconcileState, releaseBlocked, slicesOf } from "./behaviours.js";
 import { type Flow, flowStatesOf, flowStep, type NamedFlow, usedIn, uses } from "./flow.js";
 import { flowOf, validFlow } from "./flow-loading.js";
@@ -36,8 +37,8 @@ export interface StartItem {
 }
 
 export interface NextReport {
-  /** The story, or the issue of a repository flow, next is about. */
-  story: number;
+  /** The issue next is about: a story with its slices, or an issue of any other flow. */
+  issue: number;
   /** The repository flow the issue runs; absent for a story, which has slices. */
   flow?: string;
   provider: Provider;
@@ -115,7 +116,7 @@ export async function computeNext(ctx: Ctx, n: number, loaded: LoadedFlow): Prom
   const slices = flow ? await slicesOf(github, n, flow) : [];
   const loc = flow ? await locate(issue, ctx, flow) : null;
   const report: NextReport = {
-    story: n,
+    issue: n,
     ...(story ? {} : { flow: loaded.name }),
     provider: ctx.config.provider,
     maxParallel: ctx.config.maxParallel,
@@ -139,7 +140,7 @@ export async function computeNext(ctx: Ctx, n: number, loaded: LoadedFlow): Prom
     return report;
   }
   // A broken flow cannot run: a person fixes it first.
-  if (!loaded.ok) report.waiting.push({ issue: n, reason: "invalid-flow", flow: loaded.name, errors: loaded.errors });
+  if (!loaded.ok) report.waiting.push({ issue: n, reason: "flow-invalid", flow: loaded.name, errors: loaded.errors });
   else await classifyInFlow(ctx, issue, report, loaded, story ? "story" : "issue");
   for (const slice of slices) {
     if (slice.state !== "open") continue;
@@ -158,7 +159,7 @@ async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
   const loaded = await flowOf(ctx, issue);
   if (!loaded) return;
   if (!loaded.ok) {
-    report.waiting.push({ issue: issue.number, reason: "invalid-flow", flow: loaded.name, errors: loaded.errors });
+    report.waiting.push({ issue: issue.number, reason: "flow-invalid", flow: loaded.name, errors: loaded.errors });
     return;
   }
   await classifyInFlow(ctx, issue, report, loaded, "slice");
@@ -284,13 +285,10 @@ async function humanWork(ctx: Ctx, issue: Issue, flow: Flow | null = null): Prom
 }
 
 /** Waiting items only a person can move on. */
-export const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owner-merge", "no-state", "ambiguous-state", "state-left", "invalid-flow"];
-
-/** Why next refuses: n is not a story. */
-export type NotAStory = { kind: "is-a-slice"; issue: number; story: number | null } | { kind: "not-a-story"; issue: number };
+export const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owner-merge", "no-state", "ambiguous-state", "state-left", "flow-invalid"];
 
 /** Why next refuses the issue, of `loaded` flow: one with no flow yet, or one that works in its parent's branch, which moves on with it. */
-export async function notAStory(github: GitHub, issue: Issue, loaded: LoadedFlow | null): Promise<NotAStory | null> {
+export async function nextRefusal(github: GitHub, issue: Issue, loaded: LoadedFlow | null): Promise<NextRefusal | null> {
   const n = issue.number;
   if (loaded?.ok && loaded.flow.workspace === "parent") return { kind: "is-a-slice", issue: n, story: await github.parentOf(n) };
   return loaded ? null : { kind: "not-a-story", issue: n };
@@ -304,5 +302,5 @@ function toNotify(r: NextReport) {
 /** Delivery stops: tell the user what waits for them. */
 export async function notifyWaiting(ctx: Ctx, r: NextReport) {
   if (!r.notified) return;
-  await send(ctx, { kind: "story-waiting", story: r.story, waiting: toNotify(r) });
+  await send(ctx, { kind: "story-waiting", story: r.issue, waiting: toNotify(r) });
 }

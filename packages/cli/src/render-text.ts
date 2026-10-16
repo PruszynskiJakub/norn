@@ -827,7 +827,7 @@ export function waitDetail(w: WaitItem): string {
       return `has more than one state label (${w.states.join(", ")}); a person must remove the stale one`;
     case "state-left":
       return `is in ${w.state}, which the flow ${w.flow} no longer has; taking it hands it to a person`;
-    case "invalid-flow":
+    case "flow-invalid":
       return `is blocked by its flow ${w.flow}, which is broken: ${w.errors.map(flowError).join(" ")} Fix .agents/flows/${w.flow}.json on the base branch`;
     default:
       return unreachable(w);
@@ -882,7 +882,7 @@ function runningNote(r: NextReport) {
 
 /** What next is about, e.g. `Story #123 "Rate limiting"`. */
 function subject(r: NextReport) {
-  return `${r.flow ? "Issue" : "Story"} #${r.story} "${r.title}"`;
+  return `${r.flow ? "Issue" : "Story"} #${r.issue} "${r.title}"`;
 }
 
 /** An item to start, e.g. `Slice #131 "Per-key limits"`. */
@@ -903,12 +903,12 @@ export function renderNext(r: NextReport): string {
   out.push(wrap(head), "");
 
   if (r.start.length === 0) {
-    out.push(`Nothing can be started now. Wait for the running items to finish, then run norn next ${r.story} again.`);
+    out.push(`Nothing can be started now. Wait for the running items to finish, then run norn next ${r.issue} again.`);
   } else if (r.slots === 0 && r.start.every((s) => !s.attended)) {
     const ready = `${r.start.length} item${r.start.length === 1 ? " is" : "s are"} ready`;
     out.push(
       wrap(
-        `${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run norn next ${r.story} again.`,
+        `${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run norn next ${r.issue} again.`,
       ),
       "",
       ...r.start.map((s) => `  - ${itemWhat(s)} ${s.kind !== "issue" && DESCRIBE[s.state] ? DESCRIBE[s.state] : `is in ${s.state}`}.`),
@@ -952,7 +952,7 @@ export function renderNext(r: NextReport): string {
           out.push(
             "    Hand the story to an agent in its worktree, which drives it on with the user:",
             `      ${start}`,
-            `      herdr agent prompt norn-${s.issue} "norn-drive ${r.story}"`,
+            `      herdr agent prompt norn-${s.issue} "norn-drive ${r.issue}"`,
             `      herdr agent focus norn-${s.issue}`,
           );
         }
@@ -965,7 +965,7 @@ export function renderNext(r: NextReport): string {
     out.push("", "Waiting, nothing to do for you:");
     for (const w of r.waiting) out.push(waitLine(w), ...humanHandOff(w));
   }
-  if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. When an item is done, run norn next ${r.story} again.`);
+  if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. When an item is done, run norn next ${r.issue} again.`);
   return out.join("\n");
 }
 

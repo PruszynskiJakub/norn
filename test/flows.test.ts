@@ -352,7 +352,7 @@ describe("a broken flow", () => {
     expect(res.stdout).toContain("Fix .agents/flows/bug.json on the base branch.\n");
     expect(res.stdout).not.toContain("Story #40");
     expect(json.nothingLeft).toBe(true);
-    expect(json.waiting).toEqual([{ issue: 40, reason: "invalid-flow", detail: expect.stringContaining("is blocked by its flow bug, which is broken") }]);
+    expect(json.waiting).toEqual([{ issue: 40, reason: "flow-invalid", detail: expect.stringContaining("is blocked by its flow bug, which is broken") }]);
   });
 
   test("issues of other types are not affected", async () => {

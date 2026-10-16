@@ -37,5 +37,5 @@ export type WaitItem = { issue: number } & (
   /** The issue is in a state its flow no longer has; taking it hands it to a person. */
   | { reason: "state-left"; state: string; flow: string }
   /** The issue's type names a repository flow that is broken, so norn cannot run it until a person fixes the flow. */
-  | { reason: "invalid-flow"; flow: string; errors: FlowError[] }
+  | { reason: "flow-invalid"; flow: string; errors: FlowError[] }
 );
