@@ -19,13 +19,19 @@ interface SlugCtx {
 /** The slug recorded on story n, read once per command. */
 async function recorded(ctx: SlugCtx, n: number): Promise<string | null> {
   if (ctx.slugs.has(n)) return ctx.slugs.get(n)!;
+  const slug = recordedSlug(await ctx.github.listComments(n));
+  ctx.slugs.set(n, slug);
+  return slug;
+}
+
+/** The slug recorded in a story's comments, oldest first; null when none is. */
+export function recordedSlug(comments: string[]): string | null {
   let slug: string | null = null;
-  for (const body of await ctx.github.listComments(n)) {
+  for (const body of comments) {
     // An empty slug leaves "psdd: slug" with nothing after it, and GitHub may drop the trailing space.
     const line = body.split("\n").find((l) => l.startsWith(SLUG_MARK) || l === SLUG_MARK.trimEnd());
     if (line !== undefined) slug = line.slice(SLUG_MARK.length).trim();
   }
-  ctx.slugs.set(n, slug);
   return slug;
 }
 

@@ -26,6 +26,7 @@ npx psdd next 123        # what can be done on story #123 now
 npx psdd take 131        # claim #131 and get its briefing
 npx psdd done 131 [outcome] ["note"] [--evidence <dir>]
 npx psdd tidy            # remove what belongs to closed issues (--dry-run to list)
+npx psdd dashboard       # watch your work in the browser at http://127.0.0.1:4477
 ```
 
 Run `psdd` with no arguments for every command. Add `--json` for scripts.
@@ -35,6 +36,7 @@ Run `psdd` with no arguments for every command. Add `--json` for scripts.
 - Each story and slice works in its own worktree under `.agents/worktrees/<branch>`. The briefing gives its absolute path and, if it is missing, the command to create it for herdr, Claude Code or plain git: it fetches first, starts new branches from `origin/<base>`, and fast-forwards an existing branch from GitHub. If the branch is checked out elsewhere, psdd says where instead.
 - `psdd done` makes only the transition and releases the claim; the follow-ups (story branch, unblocking slices, story PR, needs-review) are best effort. `psdd next` catches up on any that failed. It closes a story whose PR is merged if GitHub did not (PRs into a non-default `baseBranch`).
 - `psdd tidy` removes what belongs to closed issues (QA evidence, worktrees, merged branches, claims), keeping anything unpushed. `deliver` and `drive` run it for you.
+- `psdd dashboard [--port <n>] [--interval <duration>] [--no-open]` serves a read-only page on localhost over your psdd work in this repository: what needs you (needs-human and needs-human-qa, each with its `drive` command), stale claims and items one fix round from the limit, and a feed of what happened with the agents' implement, review and QA remarks and links to their evidence. It reads GitHub as you every 2 minutes (30s at the least), with one GraphQL query plus `git ls-remote` per read, changes nothing and keeps no state. It runs until Ctrl-C. Port 4477 moves to the next free one when taken, unless you gave `--port`; a second launch for the same checkout prints the running one's URL. Set `dashboard.port` and `dashboard.interval` in your local config.
 - Branch, worktree and spec names come from a slug psdd records once on the story (`psdd: slug <slug>`), so renaming a story is safe. A story's slices are its `type:slice` sub-issues in this repository.
 - `psdd next` counts your agents already running against `deliver.maxParallel` and offers only the free slots. An item for a person that a session holds is listed as held by it, with no hand-off, and psdd does not notify about it.
 - Team settings: `.agents/psdd.config.json` (`baseBranch`, `worktrees.provider`, `claims.staleAfter`, `deliver.maxParallel`, `deliver.maxFixRounds`). Each developer can override in the gitignored `.agents/psdd.config.local.json`, which also picks `notifications` (`auto`, `herdr`, `os`, `none`), except `claims.staleAfter` and `deliver.maxFixRounds`, which bind the whole team and are read from the team file only: in the local file psdd ignores them with a warning, and a team `staleAfter` below `10m` is raised to `10m` with a warning.
@@ -73,7 +75,7 @@ To start over, delete the repository: `gh repo delete psdd-sandbox --yes` (needs
 ```sh
 npm run check     # typecheck, Biome and the tests; CI runs it on every PR
 npm test          # vitest, against an in-memory GitHub and a scripted gh
-npm run build     # bundles the CLI into dist/bin.js
+npm run build     # builds the dashboard UI and bundles it with the CLI into dist/bin.js
 ```
 
-The code is npm workspaces under `packages/`: `core` (the process, no I/O of its own), `github-gh` and `workspace-local` (the adapters), `cli` and `testing` (fakes and the harness). [`CODING_STANDARDS.md`](CODING_STANDARDS.md) has the rules for the code and [`CONTEXT.md`](CONTEXT.md) defines the domain terms.
+The code is npm workspaces under `packages/`: `core` (the process, no I/O of its own), `github-gh` and `workspace-local` (the adapters), the front ends `cli` and `web` (the dashboard's server and its React UI in `web/ui`), and `testing` (fakes and the harness). [`CODING_STANDARDS.md`](CODING_STANDARDS.md) has the rules for the code and [`CONTEXT.md`](CONTEXT.md) defines the domain terms.

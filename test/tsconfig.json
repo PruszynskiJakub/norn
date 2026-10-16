@@ -20,6 +20,9 @@
     },
     {
       "path": "../packages/testing"
+    },
+    {
+      "path": "../packages/web"
     }
   ]
 }

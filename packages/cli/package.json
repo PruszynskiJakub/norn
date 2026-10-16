@@ -10,6 +10,7 @@
   "dependencies": {
     "@psdd/core": "0.0.0",
     "@psdd/github-gh": "0.0.0",
-    "@psdd/workspace-local": "0.0.0"
+    "@psdd/workspace-local": "0.0.0",
+    "@psdd/web": "0.0.0"
   }
 }

@@ -1,7 +1,25 @@
 import { spawn } from "node:child_process";
-import type { ClaimRecord, FileToPush, GitHub, Issue, PullRequest } from "@psdd/core";
+import type { ClaimRecord, FileToPush, GitHub, Issue, PullRequest, WorkQuery } from "@psdd/core";
+import { observeWork } from "./observe-work.js";
 
 export type Exec = (args: string[], input?: string) => Promise<{ code: number; stdout: string; stderr: string }>;
+
+const spawnExec =
+  (program: string): Exec =>
+  (args, input) =>
+    new Promise((resolve, reject) => {
+      const child = spawn(program, args, { stdio: ["pipe", "pipe", "pipe"] });
+      let stdout = "";
+      let stderr = "";
+      child.stdout.on("data", (d) => (stdout += d));
+      child.stderr.on("data", (d) => (stderr += d));
+      child.on("error", reject);
+      child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
+      child.stdin.end(input ?? "");
+    });
+
+/** Runs git in the current checkout. */
+export const execGit: Exec = spawnExec("git");
 
 /** Runs the user's own `gh`. */
 export const execGh: Exec = (args, input) =>
@@ -27,6 +45,19 @@ export class GhError extends Error {
     const m = /HTTP (\d{3})/.exec(this.stderr);
     return m ? Number(m[1]) : null;
   }
+}
+
+/** Why a read of GitHub failed, as far as gh's and git's errors tell. */
+export type GhFailure = "auth" | "rate-limit" | "network" | "other";
+
+/** Sorts a failed read for what the user can do about it. Anything unrecognised is other. */
+export function ghFailure(e: unknown): GhFailure {
+  const text = e instanceof GhError ? e.stderr : e instanceof Error ? e.message : String(e);
+  const status = e instanceof GhError ? e.status : null;
+  if (status === 401 || /gh auth login|authentication|Bad credentials/i.test(text)) return "auth";
+  if (/rate limit/i.test(text) || status === 429) return "rate-limit";
+  if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|EAI_AGAIN|could not resolve|connection|network/i.test(text)) return "network";
+  return "other";
 }
 
 const REPO = "repos/{owner}/{repo}";
@@ -57,7 +88,10 @@ function toIssue(r: RestIssue): Issue {
 
 /** GitHub adapter over `gh`, acting as the logged-in user in the current repo. */
 export class GhGitHub implements GitHub {
-  constructor(private exec: Exec = execGh) {}
+  constructor(
+    private exec: Exec = execGh,
+    private git: Exec = execGit,
+  ) {}
 
   private async gh(args: string[], input?: string): Promise<string> {
     const r = await this.exec(args, input);
@@ -285,5 +319,22 @@ export class GhGitHub implements GitHub {
     } catch (e) {
       if (!(e instanceof GhError && (e.status === 404 || e.status === 422))) throw e;
     }
+  }
+
+  async observeWork(query: WorkQuery) {
+    const graphql = async (text: string, vars: Record<string, string | number | null>) => {
+      // gh fills {owner} and {repo} from the current repository.
+      const args = ["api", "graphql", "-F", "owner={owner}", "-F", "name={repo}", "-f", `query=${text}`];
+      for (const [k, v] of Object.entries(vars)) if (v !== null) args.push(typeof v === "number" ? "-F" : "-f", `${k}=${v}`);
+      return JSON.parse(await this.gh(args));
+    };
+    const lsRemote = async () => {
+      // Free against the API limit, unlike listing the refs through it.
+      const args = ["ls-remote", "origin", "refs/psdd/claims/*"];
+      const r = await this.git(args);
+      if (r.code !== 0) throw new GhError(["(git)", ...args], r.stderr);
+      return r.stdout;
+    };
+    return observeWork(graphql, lsRemote, query);
   }
 }

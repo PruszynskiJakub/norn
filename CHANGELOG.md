@@ -4,6 +4,10 @@ All notable changes to psdd are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- `psdd dashboard [--port <n>] [--interval <duration>] [--no-open]` serves a read-only page on `127.0.0.1` over your psdd work in this repository: your stories with their slices, what needs you with its `drive <issue>` command, what is worth a look (stale claims, items one fix round from `deliver.maxFixRounds`), and a feed of what happened in psdd's terms, with the agents' implement, review and QA remarks inline and QA remarks linked to their evidence on `psdd/qa/<issue>`. It reads GitHub as you every 2 minutes (at least 30s), one GraphQL query plus `git ls-remote` per read, shared by every open tab; it changes nothing. The default port 4477 moves to the next free one when taken, an explicit `--port` that is taken fails, and a second launch for the same checkout prints the running dashboard's URL. `dashboard.port` and `dashboard.interval` go in `.agents/psdd.config.local.json`; in the team file they are refused. The UI is embedded in the CLI, so there is nothing extra to install.
+
 ### Changed
 
 - Release tags carry the built CLI, so installing psdd from a tag no longer builds it and npm 11 no longer warns about its `prepare` script. Only release tags can be installed now; a branch or commit of the repository has no built CLI.

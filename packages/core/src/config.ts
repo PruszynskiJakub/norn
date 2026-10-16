@@ -21,6 +21,8 @@ export interface Config {
   maxFixRounds: number;
   /** Where notifications go; null when turned off. */
   notifications: Channel | null;
+  /** The developer's own dashboard settings; null where they set none. */
+  dashboard: { port: number | null; intervalMs: number | null };
 }
 
 const PROVIDERS = ["auto", "herdr", "claude-code", "git"] as const;
@@ -33,12 +35,18 @@ function toMs(duration: string) {
   return Number(duration.slice(0, -1)) * UNITS[duration.slice(-1)];
 }
 
+/** A duration such as 30s, 2m or 1h in milliseconds; null when it is not one. */
+export function durationMs(duration: string): number | null {
+  return /^\d+[smhd]$/.test(duration) ? toMs(duration) : null;
+}
+
 interface Raw {
   baseBranch?: string;
   worktrees?: { provider?: string };
   claims?: { staleAfter?: string };
   deliver?: { maxParallel?: number; maxFixRounds?: number };
   notifications?: string;
+  dashboard?: { port?: number; interval?: string };
 }
 
 /** A setting psdd cannot use, so it refuses until the file is fixed. */
@@ -51,7 +59,9 @@ export type ConfigProblem =
   | { kind: "bad-stale-after"; file: string }
   | { kind: "notifications-in-team-file"; file: string; local: string }
   | { kind: "bad-notifications"; file: string; allowed: readonly string[] }
-  | { kind: "bad-deliver-number"; file: string; key: string };
+  | { kind: "bad-deliver-number"; file: string; key: string }
+  | { kind: "dashboard-in-team-file"; file: string; local: string }
+  | { kind: "bad-dashboard-setting"; file: string; key: "port" | "interval" };
 
 /** A setting psdd ignores or clamps, and says so. */
 export type ConfigWarning =
@@ -68,7 +78,7 @@ function check(file: string, raw: unknown): { problems: ConfigProblem[]; warning
   const warnings: ConfigWarning[] = [];
   const r = raw as Record<string, unknown>;
   for (const key of Object.keys(r)) {
-    if (!["baseBranch", "worktrees", "claims", "deliver", "notifications"].includes(key)) problems.push({ kind: "unknown-setting", file, key });
+    if (!["baseBranch", "worktrees", "claims", "deliver", "notifications", "dashboard"].includes(key)) problems.push({ kind: "unknown-setting", file, key });
   }
   if ("baseBranch" in r && (typeof r.baseBranch !== "string" || !r.baseBranch)) problems.push({ kind: "bad-base-branch", file });
   const provider = (r.worktrees as Raw["worktrees"])?.provider;
@@ -91,6 +101,22 @@ function check(file: string, raw: unknown): { problems: ConfigProblem[]; warning
   if ("notifications" in r) {
     if (file === TEAM_CONFIG) problems.push({ kind: "notifications-in-team-file", file, local: LOCAL_CONFIG });
     else if (!NOTIFICATIONS.includes(r.notifications as string)) problems.push({ kind: "bad-notifications", file, allowed: NOTIFICATIONS });
+  }
+  if ("dashboard" in r) {
+    // Each developer runs their own dashboard; a port in the team file would clash between them.
+    if (file === TEAM_CONFIG) problems.push({ kind: "dashboard-in-team-file", file, local: LOCAL_CONFIG });
+    else {
+      const d = (r.dashboard ?? {}) as Record<string, unknown>;
+      if (typeof d !== "object" || Array.isArray(d)) problems.push({ kind: "bad-dashboard-setting", file, key: "port" });
+      else {
+        if (d.port !== undefined && !(Number.isInteger(d.port) && (d.port as number) > 0 && (d.port as number) < 65536)) {
+          problems.push({ kind: "bad-dashboard-setting", file, key: "port" });
+        }
+        if (d.interval !== undefined && (typeof d.interval !== "string" || durationMs(d.interval) === null)) {
+          problems.push({ kind: "bad-dashboard-setting", file, key: "interval" });
+        }
+      }
+    }
   }
   const deliver = (r.deliver ?? {}) as Record<string, unknown>;
   for (const key of ["maxParallel", "maxFixRounds"]) {
@@ -140,6 +166,10 @@ export async function loadConfig(workspace: Workspace): Promise<Loaded> {
       maxParallel: local.raw.deliver?.maxParallel ?? team.raw.deliver?.maxParallel ?? DEFAULT_TEAM_CONFIG.deliver.maxParallel,
       notifications: channel,
       maxFixRounds: team.raw.deliver?.maxFixRounds ?? DEFAULT_TEAM_CONFIG.deliver.maxFixRounds,
+      dashboard: {
+        port: local.raw.dashboard?.port ?? null,
+        intervalMs: local.raw.dashboard?.interval === undefined ? null : durationMs(local.raw.dashboard.interval),
+      },
     },
     warnings: [...team.warnings, ...local.warnings],
   };

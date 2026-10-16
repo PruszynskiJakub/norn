@@ -2525,7 +2525,7 @@ exports[`output of every command, text and --json > unknown command > json 1`] =
 "exit 2
 {
   "ok": false,
-  "refusal": "psdd runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  psdd init                          Set up this project: skills, .agents/specs/, labels\\n  psdd next <story>                  What can be done on the story now\\n  psdd take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  psdd done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; psdd makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  psdd add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  psdd escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  psdd release <issue>               Give up the claim without a transition\\n  psdd status <story>                Read-only overview of the story and its slices\\n  psdd tidy [--dry-run]              Remove what belongs to closed issues\\n\\nAdd --json for machine-readable output."
+  "refusal": "psdd runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  psdd init                          Set up this project: skills, .agents/specs/, labels\\n  psdd next <story>                  What can be done on the story now\\n  psdd take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  psdd done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; psdd makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  psdd add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  psdd escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  psdd release <issue>               Give up the claim without a transition\\n  psdd status <story>                Read-only overview of the story and its slices\\n  psdd tidy [--dry-run]              Remove what belongs to closed issues\\n  psdd dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -2545,6 +2545,8 @@ psdd runs work through the SDD process. Commands on an issue take its number exp
   psdd release <issue>               Give up the claim without a transition
   psdd status <story>                Read-only overview of the story and its slices
   psdd tidy [--dry-run]              Remove what belongs to closed issues
+  psdd dashboard [--port <n>] [--interval <duration>] [--no-open]
+                                     Watch your work in the browser; Ctrl-C stops it
 
 Add --json for machine-readable output."
 `;
@@ -2553,7 +2555,7 @@ exports[`output of every command, text and --json > usage > json 1`] = `
 "exit 2
 {
   "ok": false,
-  "refusal": "psdd runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  psdd init                          Set up this project: skills, .agents/specs/, labels\\n  psdd next <story>                  What can be done on the story now\\n  psdd take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  psdd done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; psdd makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  psdd add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  psdd escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  psdd release <issue>               Give up the claim without a transition\\n  psdd status <story>                Read-only overview of the story and its slices\\n  psdd tidy [--dry-run]              Remove what belongs to closed issues\\n\\nAdd --json for machine-readable output."
+  "refusal": "psdd runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  psdd init                          Set up this project: skills, .agents/specs/, labels\\n  psdd next <story>                  What can be done on the story now\\n  psdd take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  psdd done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; psdd makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  psdd add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  psdd escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  psdd release <issue>               Give up the claim without a transition\\n  psdd status <story>                Read-only overview of the story and its slices\\n  psdd tidy [--dry-run]              Remove what belongs to closed issues\\n  psdd dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -2573,6 +2575,8 @@ psdd runs work through the SDD process. Commands on an issue take its number exp
   psdd release <issue>               Give up the claim without a transition
   psdd status <story>                Read-only overview of the story and its slices
   psdd tidy [--dry-run]              Remove what belongs to closed issues
+  psdd dashboard [--port <n>] [--interval <duration>] [--no-open]
+                                     Watch your work in the browser; Ctrl-C stops it
 
 Add --json for machine-readable output."
 `;

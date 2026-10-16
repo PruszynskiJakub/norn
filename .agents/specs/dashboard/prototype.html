@@ -1,0 +1,845 @@
+<!doctype html>
+<!--
+  PROTOTYPE — throwaway. Not production code. Do not import, do not ship.
+
+  Question: what should `psdd dashboard` (spec.md in this folder) look like?
+
+  Round 1 (settled): three layouts — A board + feed, B three-pane inbox, C ops table + log.
+  Verdict: B. A and C are dropped from this file.
+
+  Round 2 (this file): the developer wants to read the agents' remarks — the notes that
+  implement, review and QA leave with their outcome — to see what kind of remarks agents raise.
+  Three variants of B that place those remarks differently, switchable via `?variant=B1|B2|B3`
+  and the floating bar (← / → keys also cycle):
+    B1  Inline        — remarks sit in the timeline under their event, collapsed to a few lines.
+    B2  Remarks tab   — a second centre tab that is a reading view of remarks only, with filters.
+    B3  Rounds thread — the right pane shows the selected item's remarks as a round-by-round
+                        conversation (implement → review → fix → review → QA), like a PR thread.
+
+  Spec impact if adopted: the outcome FeedEvent carries the outcome's note (the comment body,
+  markdown) and the implement step's "done" becomes an outcome event too. The port method
+  already reads comments; it now returns their bodies for psdd outcome comments.
+
+  QA remarks and QA-evidence events link to the issue's evidence branch `psdd/qa/<n>` at the
+  commit psdd pushed (src/tidy.ts qaBranch, `psdd done --evidence`), and to each file there.
+  Spec impact: outcome and qa-evidence events carry `evidence: { branch, sha, files }`.
+
+  Round 3: "looks good but too dense, nothing steers the eye". Same three variants, calmer:
+    - one focal point: a hero that says how many things need you, each as a card with its drive command;
+      "worth a look" below it for quiet agents and items one round from the fix limit
+    - colour only means attention (orange = needs you, amber = stuck/failed); everything else neutral
+    - significant events read as sentences; runs of routine ones (claims, steps, slices) fold into one line
+    - fewer badges, more whitespace, a 720px reading column; right pane speaks in sentences
+
+  The bar also flips page states (loaded / initial loading / poll error with stale data);
+  ◐ toggles the theme. Open by double-clicking. No build, no network, no persistence.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>psdd dashboard prototype</title>
+<style>
+  /* Round 3: calm. Neutral by default; colour only where the developer is needed or something is stuck. */
+  :root {
+    --bg: #fbfbfa; --card: #ffffff; --fg: #18181b; --soft: #3f3f46; --muted: #71717a; --faint: #a1a1aa; --muted-bg: #f4f4f3;
+    --border: #ececea; --accent: #2563eb; --accent-bg: #eef3fe;
+    --ok: #15803d; --ok-bg: #f0f7f1; --warn: #b45309; --warn-bg: #fdf6ea;
+    --bad: #c2410c; --bad-bg: #fdf1ea; --violet: #6d28d9; --violet-bg: #f4f1fd;
+    --mono: ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0c0c0d; --card: #141416; --fg: #f4f4f5; --soft: #d4d4d8; --muted: #a1a1aa; --faint: #63636b; --muted-bg: #1b1b1e;
+      --border: #232327; --accent: #7aa7ff; --accent-bg: #16213a;
+      --ok: #6ccf8e; --ok-bg: #0f2017; --warn: #f0b860; --warn-bg: #2a2010;
+      --bad: #fb923c; --bad-bg: #2b170c; --violet: #b49cff; --violet-bg: #1e1733;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0c0c0d; --card: #141416; --fg: #f4f4f5; --soft: #d4d4d8; --muted: #a1a1aa; --faint: #63636b; --muted-bg: #1b1b1e;
+    --border: #232327; --accent: #7aa7ff; --accent-bg: #16213a;
+    --ok: #6ccf8e; --ok-bg: #0f2017; --warn: #f0b860; --warn-bg: #2a2010;
+    --bad: #fb923c; --bad-bg: #2b170c; --violet: #b49cff; --violet-bg: #1e1733;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--fg); font: 15px/1.6 var(--sans); -webkit-font-smoothing: antialiased; }
+  a { color: inherit; text-decoration: none; }
+  a:hover { text-decoration: underline; text-underline-offset: 3px; }
+  button { font: inherit; color: inherit; cursor: pointer; }
+  .mono { font-family: var(--mono); font-size: 0.85em; }
+  .muted { color: var(--muted); }
+  .faint { color: var(--faint); }
+  .small { font-size: 13px; }
+  .quiet { border: 0; background: none; padding: 4px 8px; border-radius: 8px; color: var(--muted); font-size: 13px; }
+  .quiet:hover { background: var(--muted-bg); color: var(--fg); }
+  .linkbtn { border: 0; background: none; padding: 0; color: var(--muted); font-size: 13px; }
+  .linkbtn:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+
+  .pips { display: inline-flex; gap: 3px; vertical-align: middle; }
+  .pips i { width: 14px; height: 4px; border-radius: 2px; background: var(--border); }
+  .pips i.on { background: var(--warn); }
+  .pips.full i.on { background: var(--bad); }
+  .cmd { font-family: var(--mono); font-size: 12.5px; background: var(--card); border: 1px solid var(--border);
+    border-radius: 8px; padding: 3px 10px; display: inline-flex; gap: 8px; align-items: center; color: var(--soft); }
+  .cmd button { border: 0; background: none; padding: 0; color: var(--faint); font-size: 12px; font-family: var(--sans); }
+  .cmd button:hover { color: var(--fg); }
+  .skeleton { background: linear-gradient(90deg, var(--muted-bg), var(--border), var(--muted-bg)); background-size: 200% 100%;
+    animation: sk 1.4s infinite linear; border-radius: 10px; }
+  @keyframes sk { from { background-position: 200% 0 } to { background-position: -200% 0 } }
+  .spin { width: 12px; height: 12px; border: 2px solid var(--border); border-top-color: var(--muted); border-radius: 50%;
+    animation: rot .8s linear infinite; display: inline-block; vertical-align: -1px; }
+  @keyframes rot { to { transform: rotate(360deg) } }
+  .stale-data { opacity: .55; }
+  .notice { color: var(--warn); font-size: 13px; margin: -4px 0 20px; }
+
+  /* remark markdown */
+  .md { font-size: 14px; line-height: 1.65; color: var(--soft); }
+  .md p { margin: 0 0 8px; }
+  .md ul, .md ol { margin: 2px 0 8px; padding-left: 20px; }
+  .md li { margin: 3px 0; }
+  .md code { font-family: var(--mono); font-size: 12.5px; background: var(--muted-bg); padding: 1px 5px; border-radius: 5px; }
+  .md pre { font-family: var(--mono); font-size: 12.5px; background: var(--muted-bg); padding: 10px 12px; border-radius: 10px; overflow-x: auto; margin: 6px 0 10px; }
+  .md h4 { margin: 10px 0 4px; font-size: 13px; font-weight: 600; color: var(--fg); }
+  .md b { color: var(--fg); font-weight: 600; }
+  .md > :last-child { margin-bottom: 0; }
+  .remark { background: var(--muted-bg); border-radius: 12px; padding: 12px 16px; margin-top: 10px; }
+  .remark.warn, .remark.bad { box-shadow: inset 3px 0 0 var(--warn); }
+  .clamp { max-height: 5.2em; overflow: hidden; position: relative; }
+  .clamp::after { content: ""; position: absolute; left: 0; right: 0; bottom: 0; height: 2em; background: linear-gradient(transparent, var(--muted-bg)); }
+  .card .clamp::after { background: linear-gradient(transparent, var(--card)); }
+
+  /* QA evidence branch */
+  .evidence { margin-top: 12px; border-radius: 10px; background: var(--card); border: 1px solid var(--border); overflow: hidden; }
+  .evidence .eh, .evidence.compact { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 8px 12px; font-size: 13px; }
+  .evidence.compact { display: inline-flex; padding: 4px 10px; margin-top: 8px; }
+  .evidence .ebranch { font-family: var(--mono); font-size: 12.5px; color: var(--ok); }
+  .evidence .efiles { display: flex; flex-wrap: wrap; gap: 4px 16px; padding: 4px 12px 10px; font-family: var(--mono); font-size: 12.5px; }
+  .evidence .efiles a { color: var(--muted); }
+  .evidence .efiles a:hover { color: var(--fg); }
+
+  /* floating prototype switcher — deliberately NOT part of the design */
+  #proto-bar { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 1000;
+    display: flex; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 999px;
+    background: #111; color: #fff; box-shadow: 0 8px 30px rgba(0,0,0,.35); font: 13px var(--sans);
+    border: 2px dashed #f0abfc; max-width: calc(100vw - 24px); flex-wrap: wrap; justify-content: center; }
+  #proto-bar button { background: #262626; border: 0; color: #fff; border-radius: 999px; padding: 4px 10px; }
+  #proto-bar button:hover { background: #404040; }
+  #proto-bar button.on { background: #f0abfc; color: #111; }
+  #proto-bar .lbl { padding: 0 8px; min-width: 190px; text-align: center; font-weight: 600; }
+  #proto-bar .sep { width: 1px; height: 18px; background: #404040; margin: 0 2px; }
+  #proto-bar .tag { font-size: 10px; letter-spacing: .08em; color: #f0abfc; padding-left: 6px; }
+
+  /* ===== layout ===== */
+  .B { display: grid; grid-template-columns: 264px 1fr 340px; height: 100vh; }
+  .B.wide { grid-template-columns: 248px 1fr 460px; }
+  .B aside, .B main, .B section { overflow-y: auto; }
+  .B aside { padding: 20px 12px 100px; border-right: 1px solid var(--border); }
+  .B main { padding: 28px 40px 120px; }
+  .B .col { max-width: 720px; margin: 0 auto; }
+  .B section.detail { padding: 28px 24px 110px; border-left: 1px solid var(--border); background: var(--card); }
+
+  /* sidebar */
+  .brand { padding: 0 10px 18px; display: flex; flex-direction: column; }
+  .brand b { font-size: 15px; letter-spacing: -.01em; }
+  .brand span { font-size: 12px; color: var(--faint); }
+  .grp { padding: 18px 10px 6px; font-size: 12px; color: var(--faint); }
+  .nav { display: flex; gap: 10px; align-items: center; padding: 5px 10px; border-radius: 8px; cursor: pointer; font-size: 14px; color: var(--soft); }
+  .nav:hover { background: var(--muted-bg); }
+  .nav.sel { background: var(--muted-bg); color: var(--fg); font-weight: 500; }
+  .nav .t { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .nav.story { color: var(--fg); font-weight: 500; margin-top: 6px; }
+  .nav.child { padding-left: 14px; font-size: 13.5px; color: var(--muted); }
+  .nav.child.sel { color: var(--fg); }
+  .nav .count { font-size: 12px; background: var(--warn-bg); color: var(--warn); padding: 0 7px; border-radius: 999px; font-weight: 500; }
+  .flag { font-size: 12px; white-space: nowrap; }
+  .flag.bad { color: var(--bad); }
+  .flag.warn { color: var(--warn); }
+  .d { width: 7px; height: 7px; border-radius: 50%; flex: none; background: var(--border); }
+  .d.live { background: var(--accent); box-shadow: 0 0 0 3px var(--accent-bg); }
+  .d.done { background: transparent; border: 1.5px solid var(--ok); }
+  .d.blocked { background: transparent; border: 1.5px dashed var(--faint); }
+  .d.warn { background: var(--warn); }
+  .d.bad { background: var(--bad); }
+
+  /* top line */
+  .top { display: flex; align-items: center; gap: 6px; margin-bottom: 28px; min-height: 30px; }
+  .top .crumb { flex: 1; font-size: 13px; color: var(--faint); }
+  .top .crumb a { color: var(--muted); }
+
+  /* hero: what needs you */
+  .hero h1 { font-size: 26px; line-height: 1.25; letter-spacing: -.02em; margin: 0 0 6px; font-weight: 600; }
+  .hero .sub { color: var(--muted); margin: 0 0 22px; }
+  .need { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center; padding: 16px 18px; background: var(--card);
+    border: 1px solid var(--border); border-radius: 14px; margin-bottom: 10px; cursor: pointer; transition: border-color .15s, box-shadow .15s; }
+  .need:hover { border-color: var(--faint); box-shadow: 0 2px 10px rgba(0,0,0,.04); }
+  .need .nt { font-weight: 500; font-size: 15.5px; }
+  .need .nr { color: var(--muted); font-size: 14px; grid-column: 1; }
+  .need .na { grid-row: 1 / span 2; grid-column: 2; display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+  .need .kind { font-size: 12.5px; font-weight: 500; }
+  .need.bad .kind { color: var(--bad); }
+  .need.warn .kind { color: var(--warn); }
+  .look { margin: 26px 0 0; }
+  .look h3, .sec { font-size: 13px; font-weight: 500; color: var(--faint); margin: 0 0 10px; }
+  .look .row { display: flex; gap: 10px; align-items: baseline; padding: 6px 0; font-size: 14px; color: var(--soft); cursor: pointer; }
+  .look .row:hover .t { text-decoration: underline; text-underline-offset: 3px; }
+  .divider { height: 1px; background: var(--border); margin: 40px 0 28px; }
+
+  /* timeline */
+  .day { font-size: 13px; color: var(--faint); margin: 26px 0 8px; }
+  .ev { display: grid; grid-template-columns: 52px 1fr; gap: 0 14px; padding: 10px 0; }
+  .ev .tm { font-size: 13px; color: var(--faint); padding-top: 1px; font-variant-numeric: tabular-nums; }
+  .ev .s { color: var(--fg); }
+  .ev .s .att { display: inline-block; width: 7px; height: 7px; border-radius: 50%; margin-right: 8px; vertical-align: 1px; }
+  .ev .s .att.warn { background: var(--warn); }
+  .ev .s .att.bad { background: var(--bad); }
+  .ev .s .att.ok { background: var(--ok); }
+  .ev .s .att.none { background: var(--border); }
+  .ev .where { color: var(--muted); }
+  .ev .who { font-size: 13px; color: var(--faint); margin-top: 1px; }
+  .ev .who a { color: var(--faint); }
+  .ev .who a:hover { color: var(--fg); }
+  .ev.routine { padding: 3px 0; }
+  .ev.routine .s { font-size: 13.5px; color: var(--muted); }
+  .routine-toggle { border: 0; background: none; padding: 0; font-size: 13px; color: var(--faint); }
+  .routine-toggle:hover { color: var(--fg); }
+
+  .seg { display: inline-flex; gap: 2px; padding: 3px; background: var(--muted-bg); border-radius: 10px; }
+  .seg button { border: 0; background: none; padding: 3px 12px; border-radius: 8px; font-size: 13px; color: var(--muted); }
+  .seg button.on { background: var(--card); color: var(--fg); box-shadow: 0 1px 2px rgba(0,0,0,.06); }
+  .sechead { display: flex; align-items: center; gap: 12px; margin-bottom: 6px; flex-wrap: wrap; }
+  .sechead .sec { margin: 0; flex: 1; }
+
+  /* remark cards (B2) */
+  .rcard { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 18px 20px; margin: 14px 0; }
+  .rcard .rh { font-weight: 500; }
+  .rcard .rt { font-size: 13px; color: var(--faint); margin: 2px 0 12px; }
+
+  /* right pane */
+  .detail .kicker { font-size: 13px; color: var(--faint); }
+  .detail h3 { font-size: 18px; line-height: 1.35; margin: 4px 0 6px; letter-spacing: -.01em; font-weight: 600; }
+  .detail .status { color: var(--soft); margin: 0 0 18px; }
+  .pipeline { display: flex; gap: 3px; margin: 0 0 6px; }
+  .pipeline span { flex: 1; height: 4px; border-radius: 2px; background: var(--border); }
+  .pipeline span.done { background: var(--ok); }
+  .pipeline span.cur { background: var(--accent); }
+  .pipelabels { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--faint); margin-bottom: 22px; }
+  .facts { list-style: none; padding: 0; margin: 0 0 22px; }
+  .facts li { padding: 9px 0; border-top: 1px solid var(--border); font-size: 14px; color: var(--soft); display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+  .facts li:last-child { border-bottom: 1px solid var(--border); }
+  .yours { background: var(--warn-bg); border-radius: 12px; padding: 14px 16px; margin: 0 0 22px; }
+  .yours b { font-weight: 500; color: var(--warn); display: block; margin-bottom: 2px; font-size: 14px; }
+  .yours p { margin: 0 0 10px; font-size: 14px; color: var(--soft); }
+  .prog { margin-bottom: 18px; cursor: pointer; }
+  .prog .pt { font-size: 14px; display: flex; justify-content: space-between; gap: 10px; }
+  .prog .pt span:last-child { color: var(--faint); font-size: 13px; white-space: nowrap; }
+  .bar { height: 4px; border-radius: 2px; background: var(--border); margin-top: 6px; overflow: hidden; }
+  .bar i { display: block; height: 100%; background: var(--ok); border-radius: 2px; }
+
+  /* B3 thread */
+  .round { margin: 26px 0 12px; font-size: 13px; color: var(--faint); display: flex; align-items: center; gap: 10px; }
+  .round::after { content: ""; flex: 1; height: 1px; background: var(--border); }
+  .msg { margin-bottom: 16px; }
+  .msg .mh { display: flex; gap: 8px; align-items: baseline; margin-bottom: 6px; font-size: 14px; }
+  .msg .mh b { font-weight: 500; }
+  .msg .mh .warn { color: var(--warn); }
+  .msg .bubble { background: var(--muted-bg); border-radius: 12px; padding: 12px 14px; }
+  .msg.warn .bubble { box-shadow: inset 3px 0 0 var(--warn); }
+
+  @media (max-width: 1000px) {
+    .B, .B.wide { grid-template-columns: 1fr; height: auto; }
+    .B aside, .B section.detail { border: 0; }
+    .B main { padding: 20px 16px 120px; }
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="proto-bar"></div>
+
+<script>
+/* ------------------------------------------------------------------ *
+ *  Mock /api/state — shaped like the core read model in spec.md,     *
+ *  plus `note` (markdown comment body) on outcome events.            *
+ * ------------------------------------------------------------------ */
+const NOW = new Date("2026-10-16T14:32:00Z").getTime();
+const min = (m) => new Date(NOW - m * 60000).toISOString();
+const ME = "PruszynskiJakub";
+const REPO = "PruszynskiJakub/ai-engine";
+const gh = (n, frag = "") => `https://github.com/${REPO}/issues/${n}${frag}`;
+const pr = (n) => `https://github.com/${REPO}/pull/${n}`;
+const MAX_FIX = 3;
+
+const STATE = {
+  repo: REPO, me: ME, lastUpdated: min(0.6), pollIntervalMs: 120000, lastError: null,
+  board: [
+    {
+      number: 71, title: "Local dashboard: observe your psdd work on GitHub", state: "implementation", owner: ME,
+      branch: "psdd/71-local-dashboard", closedAt: null, mode: null, needsHuman: false, holder: null, fixRounds: 0, maxFixRounds: MAX_FIX,
+      slices: [
+        { number: 72, title: "Core read model: observe() + FeedEvent union", state: "merged", mode: "afk", blockedBy: [], holder: null, fixRounds: 1, maxFixRounds: MAX_FIX, needsHuman: false },
+        { number: 73, title: "github-gh: one GraphQL query + ls-remote claims", state: "needs-review", mode: "afk", blockedBy: [], holder: { session: "s-3f2a", since: min(9), stale: false }, fixRounds: 1, maxFixRounds: MAX_FIX, needsHuman: false },
+        { number: 74, title: "@psdd/web server: poller, cache, /api/state", state: "implementation", mode: "afk", blockedBy: [], holder: { session: "s-9c41", since: min(97), stale: true }, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
+        { number: 75, title: "Dashboard UI: board, waiting strip, feed", state: "blocked", mode: "hil", blockedBy: [73, 74], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
+        { number: 76, title: "psdd dashboard command: ports, interval, --no-open", state: "needs-human-qa", mode: "hil", blockedBy: [], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
+        { number: 77, title: "Release: Vite build + embed + smoke test", state: "ready-for-agent", mode: "afk", blockedBy: [], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
+      ],
+    },
+    {
+      number: 58, title: "Claims as refs under refs/psdd/claims", state: "implementation", owner: ME,
+      branch: "psdd/58-claims-as-refs", closedAt: null, mode: null, needsHuman: false, holder: null, fixRounds: 0, maxFixRounds: MAX_FIX,
+      slices: [
+        { number: 61, title: "take/release write and delete the claim ref", state: "changes-requested", mode: "afk", blockedBy: [], holder: null, fixRounds: 3, maxFixRounds: MAX_FIX, needsHuman: true },
+        { number: 62, title: "tidy removes stale claim refs", state: "qa-failed", mode: "afk", blockedBy: [], holder: { session: "s-71be", since: min(4), stale: false }, fixRounds: 2, maxFixRounds: MAX_FIX, needsHuman: false },
+        { number: 63, title: "status reads holders from ls-remote", state: "merge-queue", mode: "afk", blockedBy: [], holder: { session: "s-71be", since: min(1), stale: false }, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
+      ],
+    },
+    {
+      number: 53, title: "Typed results from core operations", state: "needs-human-qa", owner: ME,
+      branch: "psdd/53-typed-results", closedAt: null, mode: null, needsHuman: false, holder: null, fixRounds: 1, maxFixRounds: MAX_FIX,
+      slices: [
+        { number: 66, title: "next/done return typed results", state: "merged", mode: "afk", blockedBy: [], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
+        { number: 67, title: "Renderers produce all wording", state: "merged", mode: "afk", blockedBy: [], holder: null, fixRounds: 2, maxFixRounds: MAX_FIX, needsHuman: false },
+      ],
+    },
+    {
+      number: 52, title: "Package layout: core / adapters / front ends", state: "closed", owner: ME,
+      branch: "psdd/52-package-layout", closedAt: min(60 * 52), mode: null, needsHuman: false, holder: null, fixRounds: 0, maxFixRounds: MAX_FIX,
+      slices: [
+        { number: 54, title: "Boundary test", state: "merged", mode: "afk", blockedBy: [], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
+        { number: 55, title: "Move adapters", state: "merged", mode: "afk", blockedBy: [], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
+      ],
+    },
+  ],
+};
+const R61 = "fix rounds exhausted (3/3); review keeps flagging the race on concurrent take";
+STATE.waitingForMe = [
+  { number: 61, story: 58, kind: "needs-human", title: "take/release write and delete the claim ref", reason: R61, since: min(22), command: "drive 61" },
+  { number: 76, story: 71, kind: "needs-human-qa", title: "psdd dashboard command: ports, interval, --no-open", reason: "mode:hil — agent QA passed, your QA is next", since: min(41), command: "drive 76" },
+  { number: 53, story: 53, kind: "needs-human-qa", title: "Typed results from core operations", reason: "story QA — every slice merged, agent QA passed", since: min(185), command: "drive 53" },
+];
+
+const me = { login: ME };
+const agent = (s) => ({ login: ME, session: s });
+const mate = { login: "ola-kowalczyk" };
+let cid = 100;
+const oc = (issue, story, m, session, step, outcome, note, fixRound) =>
+  ({ kind: "outcome", issue, story, at: min(m), actor: agent(session), step, outcome, fixRound, maxFixRounds: MAX_FIX, note, url: gh(issue, `#issuecomment-${cid++}`) });
+
+STATE.feed = [
+  { kind: "claim", action: "taken", issue: 63, story: 58, at: min(1), actor: agent("s-71be"), url: gh(63) },
+  oc(63, 58, 1.2, "s-0d3e", "agent QA", "pass", `All 4 acceptance criteria checked against a scratch repo.
+
+- [x] \`status 58\` shows holders read from \`git ls-remote\`
+- [x] stale claims marked after \`claims.staleAfter\`
+- [x] no REST call per slice (verified with \`GH_DEBUG=api\`)
+- [x] closed slices show no holder
+
+Evidence: 4 files (terminal captures, api log).`),
+  { kind: "qa-evidence", issue: 63, story: 58, at: min(1.3), actor: agent("s-0d3e"), files: 4, url: gh(63, "#issuecomment-2") },
+  { kind: "claim", action: "taken", issue: 62, story: 58, at: min(4), actor: agent("s-71be"), url: gh(62) },
+  oc(62, 58, 6, "s-0d3e", "agent QA", "fail", `1 of 3 criteria failed.
+
+#### Failure
+\`tidy\` deletes a claim ref that is **stale but whose issue is still open with in-progress**, so the next \`take\` sees no holder while the label says otherwise.
+
+#### Repro
+\`\`\`
+psdd take 62 --session s-a
+# wait > staleAfter, label stays in-progress
+psdd tidy
+git ls-remote origin 'refs/psdd/claims/*'   # empty
+gh issue view 62 --json labels               # still in-progress
+\`\`\`
+Expected: \`tidy\` clears \`in-progress\` in the same pass, or leaves the ref.`, 2),
+  { kind: "step", issue: 62, story: 58, at: min(6), actor: agent("s-0d3e"), from: "needs-qa", to: "qa-failed", url: gh(62) },
+  oc(73, 71, 9, "s-3f2a", "implement", "done", `Fix round 1: addressed all three review requests.
+
+- pagination now follows \`pageInfo.endCursor\` for sub-issues **and** timeline items (was sub-issues only)
+- \`ls-remote\` parsing ignores refs outside \`refs/psdd/claims/\` and tolerates a trailing newline
+- moved the GraphQL document into \`queries/observe.graphql\`; tests load the same file
+
+Not done: did not add retry on 502, out of scope for this slice (noted on #74).`, 1),
+  { kind: "step", issue: 73, story: 71, at: min(9), actor: agent("s-3f2a"), from: "changes-requested", to: "needs-review", url: gh(73) },
+  { kind: "claim", action: "taken", issue: 73, story: 71, at: min(9), actor: agent("s-3f2a"), url: gh(73) },
+  { kind: "claim", action: "released", issue: 73, story: 71, at: min(9.5), actor: agent("s-5a10"), url: gh(73) },
+  { kind: "other-activity", issue: 71, story: 71, at: min(14), actor: mate, detail: "commented", url: gh(71, "#issuecomment-4") },
+  { kind: "needs-human", action: "raised", issue: 61, story: 58, at: min(22), actor: agent("s-8811"), reason: R61, url: gh(61, "#issuecomment-5") },
+  oc(61, 58, 22, "s-8811", "review", "changes-requested", `Same problem as rounds 1 and 2, now in a new place.
+
+1. **Race on concurrent take** — \`take\` checks \`ls-remote\` then pushes the ref. Two sessions can both see no holder and both push; the second push wins silently because it uses \`--force\`. Push without force and treat "rejected" as "already held".
+2. The test added for this mocks \`git push\` to always succeed, so it cannot catch the race. Script the fake to reject the second push.
+
+Escalating: three rounds have not converged on the push semantics; a person should decide whether claims need a compare-and-swap.`, 3),
+  oc(61, 58, 48, "s-2b07", "implement", "done", `Fix round 2: replaced the read-then-write with a single \`git push\` of the claim ref, checking the exit code.`, 2),
+  oc(61, 58, 70, "s-8811", "review", "changes-requested", `1. **Still racy** — the push uses \`--force\`, so it never fails and the exit-code check is dead code.
+2. \`release\` deletes the ref without checking that this session holds it; a stale session can release a fresh claim.`, 2),
+  oc(61, 58, 105, "s-2b07", "implement", "done", `Fix round 1: \`take\` now re-reads the ref after writing it and backs off if another session's id is there.`, 1),
+  oc(61, 58, 130, "s-8811", "review", "changes-requested", `1. **Race on concurrent take**: \`take\` reads with \`ls-remote\` then writes; two sessions can interleave.
+2. Nit: \`claimRef()\` builds the ref name in two places; use the one in \`claims.ts\`.`, 1),
+  oc(61, 58, 160, "s-2b07", "implement", "done", `Claim is now a ref \`refs/psdd/claims/<n>\` whose message carries session and time. \`take\` creates it, \`release\` deletes it. Tests cover take, release and stale.`),
+  { kind: "claim", action: "stale", issue: 74, story: 71, at: min(37), actor: agent("s-9c41"), url: gh(74) },
+  oc(76, 71, 41, "s-0d3e", "agent QA", "pass", `Every criterion I could check passed. Moving to human QA (mode:hil).
+
+- [x] default port 4477; next free port announced when taken
+- [x] explicit \`--port\` that is taken fails with a clear message
+- [x] second launch prints the running URL and exits
+- [x] interval below 30s raised to the floor with a warning
+- [ ] **browser actually opens** — cannot check headless, left for you
+- [ ] **Ctrl-C leaves no process behind** — checked with \`ps\`, but please confirm on macOS`),
+  { kind: "step", issue: 76, story: 71, at: min(41), actor: agent("s-0d3e"), from: "needs-qa", to: "needs-human-qa", url: gh(76) },
+  { kind: "qa-evidence", issue: 76, story: 71, at: min(41), actor: agent("s-0d3e"), files: 6, url: gh(76, "#issuecomment-7") },
+  oc(76, 71, 55, "s-5a10", "review", "approve", `Looks good. Thin launcher as the spec asks; server start is injected and tests use the CLI harness.
+
+Minor, not blocking: \`--interval 10\` warns "raised to 30s" — consider printing the config key too.`),
+  { kind: "pr", action: "merged", issue: 72, story: 71, at: min(58), actor: agent("s-7e22"), prNumber: 81, target: "slice", url: pr(81) },
+  { kind: "slice", action: "unblocked", issue: 77, story: 71, at: min(58), actor: agent("s-7e22"), url: gh(77) },
+  oc(73, 71, 66, "s-5a10", "review", "changes-requested", `Three requests.
+
+1. **Pagination is partial** — only \`subIssues\` follows \`endCursor\`; \`timelineItems\` stops at 100. A story with a long history silently loses events.
+2. \`parseLsRemote\` will treat any ref as a claim. Filter to \`refs/psdd/claims/\`.
+3. The GraphQL query is a template string in the adapter and a copy in the test. Keep one source.`, 1),
+  oc(73, 71, 78, "s-3f2a", "implement", "done", `\`observe\` implemented in github-gh: one \`gh api graphql\` call (stories, sub-issues, labels, blockers, PRs, timeline since), claims via \`git ls-remote\`. Adapter tests against scripted \`gh\`.`),
+  { kind: "pr", action: "opened", issue: 73, story: 71, at: min(80), actor: agent("s-3f2a"), prNumber: 82, target: "slice", url: pr(82) },
+  { kind: "other-activity", issue: 58, story: 58, at: min(120), actor: mate, detail: "added label \"priority:high\"", url: gh(58) },
+  oc(53, 53, 185, "s-44aa", "agent QA", "pass", `Story QA: every slice merged; ran the full suite and the release smoke test on the story branch.
+
+- [x] \`next\`, \`done\`, \`status\` return typed results; CLI output unchanged (golden files)
+- [x] no wording produced outside renderers (grep for string literals in core)
+- [ ] **judge the wording of the new error messages** — left for you`),
+  { kind: "step", issue: 53, story: 53, at: min(185), actor: agent("s-44aa"), from: "needs-qa", to: "needs-human-qa", url: gh(53) },
+  { kind: "pr", action: "opened", issue: 71, story: 71, at: min(60 * 5), actor: me, prNumber: 80, target: "story", url: pr(80) },
+  { kind: "slice", action: "created", issue: 72, story: 71, at: min(60 * 5 + 2), actor: me, url: gh(72) },
+  { kind: "slice", action: "created", issue: 73, story: 71, at: min(60 * 5 + 2), actor: me, url: gh(73) },
+  { kind: "slice", action: "created", issue: 74, story: 71, at: min(60 * 5 + 2), actor: me, url: gh(74) },
+  { kind: "step", issue: 71, story: 71, at: min(60 * 5 + 3), actor: me, from: "needs-slicing", to: "implementation", url: gh(71) },
+  { kind: "needs-human", action: "resolved", issue: 67, story: 53, at: min(60 * 20), actor: me, url: gh(67, "#issuecomment-9") },
+  { kind: "pr", action: "merged", issue: 52, story: 52, at: min(60 * 52), actor: mate, prNumber: 74, target: "story", url: pr(74) },
+].sort((a, b) => b.at.localeCompare(a.at));
+
+/** QA evidence as psdd pushes it: files on psdd/qa/<n>, embedded at the commit (see `psdd done --evidence`). */
+const EVIDENCE = {
+  63: { sha: "4be19c2a7d", files: ["status-58.txt", "stale-claim.txt", "gh-debug-api.log", "closed-slices.txt"] },
+  62: { sha: "a03f7e51b9", files: ["repro.sh", "tidy-output.txt", "ls-remote-after.txt"] },
+  76: { sha: "9d2c4410ef", files: ["port-taken.png", "explicit-port.txt", "second-launch.txt", "interval-floor.txt", "ps-after-ctrl-c.txt", "dashboard.png"] },
+  53: { sha: "e71b0d93aa", files: ["golden-diff.txt", "smoke-test.log", "grep-core-strings.txt"] },
+};
+for (const e of STATE.feed) {
+  const ev = EVIDENCE[e.issue];
+  if (ev && (e.kind === "qa-evidence" || (e.kind === "outcome" && e.step === "agent QA"))) e.evidence = { branch: `psdd/qa/${e.issue}`, ...ev };
+}
+
+/* ------------------------------------------------------------------ *
+ *  Web-side renderer: the only place that turns typed data to words. *
+ * ------------------------------------------------------------------ */
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+function ago(iso) {
+  const m = Math.round((NOW - new Date(iso).getTime()) / 60000);
+  if (m < 1) return "just now";
+  if (m < 60) return `${m}m ago`;
+  if (m < 60 * 24) return `${Math.floor(m / 60)}h ${m % 60 ? (m % 60) + "m " : ""}ago`;
+  return `${Math.floor(m / 1440)}d ago`;
+}
+const hhmm = (iso) => new Date(iso).toISOString().slice(11, 16);
+const actorName = (a) => a.session ? `agent ${a.session}` : a.login === ME ? "you" : `@${a.login}`;
+const actorBadge = (a) => a.session
+  ? `<span class="badge b-vio" title="@${esc(a.login)} via session ${esc(a.session)}">⚙ ${esc(a.session)}</span>`
+  : a.login === ME ? `<span class="badge b-acc">you</span>` : `<span class="badge">@${esc(a.login)}</span>`;
+
+/** Tiny markdown: paragraphs, - lists, - [x] checklists, 1. lists, ``` blocks, #### headings, `code`, **bold**. */
+function md(src) {
+  const inline = (s) => esc(s).replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>");
+  const out = []; let list = null; let code = null; let para = [];
+  const flushP = () => { if (para.length) { out.push(`<p>${inline(para.join(" "))}</p>`); para = []; } };
+  const flushL = () => { if (list) { out.push(`<${list.t}>${list.items.join("")}</${list.t}>`); list = null; } };
+  for (const line of src.split("\n")) {
+    if (code) { if (line.startsWith("```")) { out.push(`<pre>${esc(code.join("\n"))}</pre>`); code = null; } else code.push(line); continue; }
+    if (line.startsWith("```")) { flushP(); flushL(); code = []; continue; }
+    let m;
+    if ((m = line.match(/^#### (.*)/))) { flushP(); flushL(); out.push(`<h4>${inline(m[1])}</h4>`); continue; }
+    if ((m = line.match(/^- \[( |x)\] (.*)/))) { flushP(); if (!list || list.t !== "ul") { flushL(); list = { t: "ul", items: [] }; }
+      list.items.push(`<li style="list-style:none;margin-left:-18px">${m[1] === "x" ? "✅" : "⬜"} ${inline(m[2])}</li>`); continue; }
+    if ((m = line.match(/^- (.*)/))) { flushP(); if (!list || list.t !== "ul") { flushL(); list = { t: "ul", items: [] }; } list.items.push(`<li>${inline(m[1])}</li>`); continue; }
+    if ((m = line.match(/^\d+\. (.*)/))) { flushP(); if (!list || list.t !== "ol") { flushL(); list = { t: "ol", items: [] }; } list.items.push(`<li>${inline(m[1])}</li>`); continue; }
+    if (!line.trim()) { flushP(); flushL(); continue; }
+    flushL(); para.push(line);
+  }
+  flushP(); flushL();
+  return `<div class="md">${out.join("")}</div>`;
+}
+
+function eventText(e) {
+  switch (e.kind) {
+    case "step": return `${e.from} → ${e.to}`;
+    case "outcome": return `${e.step}: ${e.outcome}${e.fixRound ? `, fix round ${e.fixRound}/${e.maxFixRounds}` : ""}`;
+    case "needs-human": return e.action === "raised" ? `needs-human raised — ${e.reason}` : "needs-human resolved";
+    case "qa-evidence": return `QA evidence pushed to ${e.evidence?.branch ?? "the QA branch"} (${e.files} files)`;
+    case "slice": return e.action === "created" ? "slice created" : "slice unblocked";
+    case "pr": return `${e.target} PR #${e.prNumber} ${e.action}`;
+    case "claim": return e.action === "taken" ? "claim taken" : e.action === "released" ? "claim released" : "claim went stale";
+    case "other-activity": return `other activity: ${e.detail}`;
+  }
+}
+/** Tone of an event: drives node colour, remark border, badges. */
+function tone(e) {
+  if (e.kind === "outcome") return /fail|changes/.test(e.outcome) ? "warn" : e.step === "implement" ? "acc" : "ok";
+  if (e.kind === "claim") return e.action === "stale" ? "warn" : "";
+  if (e.kind === "needs-human") return e.action === "raised" ? "bad" : "ok";
+  return { step: "acc", "qa-evidence": "ok", slice: "acc", pr: "vio" }[e.kind] ?? "";
+}
+const stepGroup = (e) => e.step === "implement" ? "implement" : e.step === "review" ? "review" : "qa";
+function stateBadge(s) {
+  const cls = { merged: "b-ok", "merge-queue": "b-ok", closed: "b-ok", "needs-human-qa": "b-warn", "qa-failed": "b-bad",
+    "changes-requested": "b-warn", "needs-review": "b-acc", "needs-qa": "b-acc", implementation: "b-acc" }[s] ?? "";
+  return `<span class="badge ${cls}">${esc(s)}</span>`;
+}
+const outcomeBadge = (e) => `<span class="badge b-${tone(e)}">${esc(e.step)} · ${esc(e.outcome)}</span>`;
+const modeBadge = (m) => m ? `<span class="badge ${m === "hil" ? "b-warn" : ""}" title="${m === "hil" ? "will need your QA" : "agent QA only"}">mode:${m}</span>` : "";
+const pips = (used, max) => `<span class="pips ${used >= max ? "full" : ""}" title="fix rounds ${used}/${max}">${Array.from({ length: max }, (_, i) => `<i class="${i < used ? "on" : ""}"></i>`).join("")}</span>`;
+function holderBadge(h) {
+  if (!h) return "";
+  return h.stale
+    ? `<span class="badge b-warn" title="held by ${esc(h.session)} since ${hhmm(h.since)}, no heartbeat">◌ ${esc(h.session)} · stale</span>`
+    : `<span class="badge b-vio" title="held since ${hhmm(h.since)}">◉ ${esc(h.session)} · ${ago(h.since).replace(" ago", "")}</span>`;
+}
+const treeUrl = (ev) => `https://github.com/${REPO}/tree/${ev.sha}`;
+const branchUrl = (ev) => `https://github.com/${REPO}/tree/${ev.branch}`;
+const fileUrl = (ev, f) => `https://github.com/${REPO}/blob/${ev.sha}/${f}`;
+const fileIcon = (f) => /\.(png|jpe?g|gif|webp)$/.test(f) ? "🖼" : /\.(log|txt)$/.test(f) ? "📄" : "⌁";
+/** Link block to the QA evidence branch, pinned to the commit the comment embeds. */
+function evidenceBlock(ev, compact = false) {
+  if (!ev) return "";
+  const head = `<a class="ebranch" href="${branchUrl(ev)}" target="_blank" title="branch with every QA run's evidence for this issue">⑂ ${esc(ev.branch)}</a>
+    <a class="mono muted small" href="${treeUrl(ev)}" target="_blank" title="the commit this QA run pushed">@ ${ev.sha.slice(0, 7)}</a>
+    <span class="muted small">${ev.files.length} files</span>`;
+  if (compact) return `<div class="evidence compact">${head}</div>`;
+  return `<div class="evidence"><div class="eh">${head}<a class="small" style="margin-left:auto" href="${treeUrl(ev)}" target="_blank">browse evidence ↗</a></div>
+    <div class="efiles">${ev.files.map((f) => `<a href="${fileUrl(ev, f)}" target="_blank">${fileIcon(f)} ${esc(f)}</a>`).join("")}</div></div>`;
+}
+const noteBody = (e) => md(e.note) + evidenceBlock(e.evidence);
+const copyCmd = (c) => `<span class="cmd">${esc(c)}<button onclick="event.stopPropagation();navigator.clipboard?.writeText('${esc(c)}');this.textContent='copied'">copy</button></span>`;
+
+function allItems() {
+  const out = [];
+  for (const s of STATE.board) { out.push({ ...s, isStory: true, story: s.number }); for (const sl of s.slices) out.push({ ...sl, story: s.number }); }
+  return out;
+}
+const itemByNumber = (n) => allItems().find((i) => i.number === n);
+const remarks = () => STATE.feed.filter((e) => e.note);
+
+/* ------------------------------------------------------------------ *
+ *  Page state (prototype only)                                       *
+ * ------------------------------------------------------------------ */
+const ui = { selected: null, pageState: "loaded", tab: "activity", step: "all", onlyRemarks: false, open: new Set(), expanded: new Set() };
+const ERR = { title: "Couldn't reach GitHub (rate limit)", what: "showing data from 14:31, trying again at the next poll" };
+function select(n) { ui.selected = ui.selected === n ? null : n; render(); }
+function feedFor(sel) {
+  if (sel == null) return STATE.feed;
+  const it = itemByNumber(sel);
+  return STATE.feed.filter((e) => it?.isStory ? e.story === sel : e.issue === sel);
+}
+function toggle(set, id) { set.has(id) ? set.delete(id) : set.add(id); render(); }
+function toggleOpen(id) { toggle(ui.open, id); }
+function fakeRefresh(b) { b.innerHTML = `<span class="spin"></span> Refreshing`; setTimeout(render, 700); }
+const sk = (n, h = 26) => Array.from({ length: n }, () => `<div class="skeleton" style="height:${h}px;margin:10px 0"></div>`).join("");
+
+/* ------------------------------------------------------------------ *
+ *  Attention: what deserves the developer's eye, and how much.       *
+ *  Everything else is routine and stays quiet.                       *
+ * ------------------------------------------------------------------ */
+const isRoutine = (e) => !(e.kind === "outcome" || e.kind === "needs-human" || (e.kind === "pr" && e.action === "merged") || (e.kind === "claim" && e.action === "stale"));
+function attention(e) {
+  if (e.kind === "needs-human") return e.action === "raised" ? "bad" : "ok";
+  if (e.kind === "claim") return "warn";
+  if (e.kind === "outcome") return /fail|changes/.test(e.outcome) ? "warn" : e.step === "implement" ? "none" : "ok";
+  return "none";
+}
+/** One plain sentence per significant event; routine ones keep psdd's terms. */
+function say(e) {
+  if (e.kind === "outcome") {
+    if (e.step === "implement") return e.fixRound ? `Fix round ${e.fixRound} pushed` : "Implementation pushed";
+    if (e.step === "review") return e.outcome === "approve" ? "Review approved" : `Review asked for changes`;
+    return e.outcome === "pass" ? `${e.step === "human QA" ? "Your QA" : "Agent QA"} passed` : `${e.step === "human QA" ? "Your QA" : "Agent QA"} failed`;
+  }
+  if (e.kind === "needs-human") return e.action === "raised" ? "Escalated to you" : "Escalation resolved";
+  if (e.kind === "pr" && e.action === "merged") return `${e.target === "story" ? "Story" : "Slice"} merged`;
+  if (e.kind === "claim" && e.action === "stale") return `Agent ${e.actor.session} went quiet`;
+  return eventText(e);
+}
+const roundNote = (e) => e.kind === "outcome" && e.fixRound && e.step !== "implement" ? ` <span class="muted">· round ${e.fixRound} of ${e.maxFixRounds}</span>` : "";
+function where(e) {
+  if (ui.selected === e.issue) return "";
+  const it = itemByNumber(e.issue);
+  return ` <span class="where">on ${esc(it?.title ?? "#" + e.issue)}</span>`;
+}
+const who = (e) => e.actor.session ? `agent ${e.actor.session}` : e.actor.login === ME ? "you" : `@${e.actor.login}`;
+const HUMAN_STATE = {
+  "ready-for-agent": "Ready for an agent", implementation: "Being implemented", "needs-review": "Waiting for review",
+  "changes-requested": "Back for fixes after review", "needs-qa": "Waiting for agent QA", "needs-human-qa": "Waiting for your QA",
+  "qa-failed": "Back for fixes after QA", "merge-queue": "Queued to merge", merged: "Merged", blocked: "Blocked", closed: "Closed",
+};
+function dotClass(x) {
+  if (x.needsHuman) return "bad";
+  if (x.state === "needs-human-qa") return "warn";
+  if (x.holder?.stale) return "warn";
+  if (["merged", "closed"].includes(x.state)) return "done";
+  if (x.state === "blocked") return "blocked";
+  if (x.holder) return "live";
+  return "";
+}
+function flag(x) {
+  if (x.needsHuman) return `<span class="flag bad">needs you</span>`;
+  if (x.state === "needs-human-qa") return `<span class="flag warn">your QA</span>`;
+  if (x.holder?.stale) return `<span class="flag warn">quiet</span>`;
+  return "";
+}
+const pips2 = (x) => `<span class="pips ${x.fixRounds >= x.maxFixRounds ? "full" : ""}">${Array.from({ length: x.maxFixRounds }, (_, i) => `<i class="${i < x.fixRounds ? "on" : ""}"></i>`).join("")}</span>`;
+const copy = (c) => `<span class="cmd" onclick="event.stopPropagation()">${esc(c)}<button onclick="navigator.clipboard?.writeText('${esc(c)}');this.textContent='copied'">copy</button></span>`;
+const quietFor = (h) => ago(h.since).replace(" ago", "");
+
+/* ================================================================== *
+ *  B — three-pane inbox. `remarkMode` = B1 | B2 | B3 decides only    *
+ *  where the agents' remarks appear.                                 *
+ * ================================================================== */
+function VariantB(remarkMode) {
+  const sel = ui.selected && itemByNumber(ui.selected);
+  const loading = ui.pageState === "loading";
+  return `<div class="B ${remarkMode === "B3" ? "wide" : ""}">
+    <aside>${sidebar(loading)}</aside>
+    <main><div class="col">
+      <div class="top">
+        <span class="crumb">${sel ? `<a href="#" onclick="select(null);return false">Overview</a> / #${sel.number}` : ""}</span>
+        ${loading ? `<span class="small muted"><span class="spin"></span> Loading history…</span>`
+          : `<button class="quiet" onclick="fakeRefresh(this)" title="refreshes every 2 minutes">Updated ${ago(STATE.lastUpdated)} ↻</button>`}
+        ${themeBtn()}
+      </div>
+      ${ui.pageState === "error" ? `<div class="notice">${ERR.title} · ${ERR.what}</div>` : ""}
+      ${loading ? sk(1, 34) + sk(3, 76) + sk(6, 40) : `<div class="${ui.pageState === "error" ? "stale-data" : ""}">
+        ${sel ? `<h1 style="font-size:24px;letter-spacing:-.02em;margin:0 0 4px;line-height:1.3">${esc(sel.title)}</h1>
+          <p class="muted" style="margin:0 0 28px">${HUMAN_STATE[sel.state] ?? sel.state}</p>` : hero() + `<div class="divider"></div>`}
+        ${centre(remarkMode)}</div>`}
+    </div></main>
+    <section class="detail">${loading ? sk(6, 30) : remarkMode === "B3" ? (sel ? threadB3(sel) : latestB3()) : sel ? detail(sel) : progress()}</section>
+  </div>`;
+}
+
+function sidebar(loading) {
+  const waiting = STATE.waitingForMe.length;
+  const open = STATE.board.filter((s) => s.state !== "closed");
+  const closed = STATE.board.filter((s) => s.state === "closed");
+  return `<div class="brand"><b>psdd</b><span>${REPO}</span></div>
+    <div class="nav ${ui.selected == null ? "sel" : ""}" onclick="select(null)"><span class="t">Overview</span>${waiting ? `<span class="count">${waiting}</span>` : ""}</div>
+    ${loading ? sk(8, 22) : `
+    <div class="grp">Your stories</div>
+    ${open.map((s) => `
+      <div class="nav story ${ui.selected === s.number ? "sel" : ""}" onclick="select(${s.number})"><span class="t">${esc(s.title)}</span>${flag(s)}</div>
+      ${s.slices.map((x) => `<div class="nav child ${ui.selected === x.number ? "sel" : ""}" onclick="select(${x.number})">
+        <span class="d ${dotClass(x)}"></span><span class="t">${esc(x.title)}</span>${flag(x)}</div>`).join("")}`).join("")}
+    ${closed.length ? `<div class="grp">Closed this week</div>${closed.map((s) => `<div class="nav child ${ui.selected === s.number ? "sel" : ""}" onclick="select(${s.number})"><span class="d done"></span><span class="t">${esc(s.title)}</span></div>`).join("")}` : ""}`}`;
+}
+
+/* The one thing the page wants you to read first. */
+function hero() {
+  const w = STATE.waitingForMe;
+  const items = allItems().filter((i) => !i.isStory && i.state !== "merged");
+  const working = items.filter((i) => i.holder && !i.holder.stale).length;
+  const quiet = items.filter((i) => i.holder?.stale);
+  const close = items.filter((i) => !i.needsHuman && i.fixRounds > 0 && i.fixRounds === i.maxFixRounds - 1);
+  const n = ["Nothing", "One thing", "Two things", "Three things", "Four things"][w.length] ?? `${w.length} things`;
+  return `<div class="hero">
+    <h1>${n} ${w.length === 1 ? "needs" : "need"} you${w.length ? "" : " right now"}</h1>
+    <p class="sub">${working} agent${working === 1 ? " is" : "s are"} working${quiet.length ? `, ${quiet.length} went quiet` : ""}.</p>
+    ${w.map((x) => {
+      const escalated = x.kind === "needs-human";
+      return `<div class="need ${escalated ? "bad" : "warn"}" onclick="select(${x.number})">
+        <div class="nt">${esc(x.title)}</div>
+        <div class="nr">${escalated ? esc(x.reason.replace(/^fix rounds exhausted \(\d\/\d\); /, "")) : x.number === x.story ? "Every slice merged and agent QA passed. Your QA closes the story." : "Agent QA passed. A few checks need a person."}</div>
+        <div class="na"><span class="kind">${escalated ? "Escalated" : "Your QA"} · ${ago(x.since)}</span>${copy(x.command)}</div>
+      </div>`; }).join("")}
+    ${quiet.length || close.length ? `<div class="look"><h3>Worth a look</h3>
+      ${quiet.map((x) => `<div class="row" onclick="select(${x.number})"><span class="d warn" style="align-self:center"></span><span class="t">${esc(x.title)}</span><span class="faint small">agent ${x.holder.session} quiet for ${quietFor(x.holder)}</span></div>`).join("")}
+      ${close.map((x) => `<div class="row" onclick="select(${x.number})"><span class="d" style="align-self:center;background:var(--faint)"></span><span class="t">${esc(x.title)}</span><span class="faint small">${x.fixRounds} of ${x.maxFixRounds} fix rounds used</span></div>`).join("")}
+    </div>` : ""}
+  </div>`;
+}
+
+function centre(mode) {
+  const feed = feedFor(ui.selected);
+  const title = ui.selected ? "History" : "What happened";
+  if (mode === "B1") {
+    const evs = ui.onlyRemarks ? feed.filter((e) => e.note && (ui.step === "all" || stepGroup(e) === ui.step)) : feed;
+    return `<div class="sechead"><h3 class="sec">${title}</h3>
+      ${ui.onlyRemarks ? stepSeg() : ""}
+      <div class="seg"><button class="${ui.onlyRemarks ? "" : "on"}" onclick="ui.onlyRemarks=false;render()">Everything</button><button class="${ui.onlyRemarks ? "on" : ""}" onclick="ui.onlyRemarks=true;render()">Remarks</button></div></div>
+      ${timeline(evs, (e) => e.note ? inlineRemark(e) : "")}`;
+  }
+  if (mode === "B2") {
+    return `<div class="sechead"><h3 class="sec">${title}</h3>
+      ${ui.tab === "remarks" ? stepSeg() : ""}
+      <div class="seg"><button class="${ui.tab === "activity" ? "on" : ""}" onclick="ui.tab='activity';render()">Activity</button><button class="${ui.tab === "remarks" ? "on" : ""}" onclick="ui.tab='remarks';render()">Remarks</button></div></div>
+      ${ui.tab === "activity"
+        ? timeline(feed, (e) => e.note ? `<button class="linkbtn" style="margin-top:4px" onclick="ui.tab='remarks';render()">Read the remark →</button>` : "")
+        : remarksB2(feed)}`;
+  }
+  return `<div class="sechead"><h3 class="sec">${title}</h3></div>
+    ${timeline(feed, (e) => e.note && ui.selected !== e.issue ? `<button class="linkbtn" style="margin-top:4px" onclick="ui.selected=${e.issue};render()">Read the thread →</button>` : "")}`;
+}
+function stepSeg() {
+  return `<div class="seg">${["all", "implement", "review", "qa"].map((k) =>
+    `<button class="${ui.step === k ? "on" : ""}" onclick="ui.step='${k}';render()">${{ all: "All", implement: "Implement", review: "Review", qa: "QA" }[k]}</button>`).join("")}</div>`;
+}
+
+/* Significant events read as sentences; runs of routine ones fold into one quiet line. */
+function timeline(feed, extra) {
+  if (!feed.length) return `<p class="muted">Nothing here yet.</p>`;
+  const days = {};
+  for (const e of feed) { const d = new Date(e.at); const k = d.getUTCDate() === new Date(NOW).getUTCDate() ? "Today" : d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" }); (days[k] ??= []).push(e); }
+  return Object.entries(days).map(([day, evs]) => {
+    const chunks = [];
+    for (const e of evs) {
+      const last = chunks[chunks.length - 1];
+      if (isRoutine(e) && last?.routine) last.evs.push(e); else chunks.push({ routine: isRoutine(e), evs: [e] });
+    }
+    return `<div class="day">${day}</div>${chunks.map((c) => c.routine ? routineChunk(c.evs) : significant(c.evs[0], extra)).join("")}`;
+  }).join("");
+}
+function significant(e, extra) {
+  return `<div class="ev"><span class="tm">${hhmm(e.at)}</span><div>
+    <div class="s"><span class="att ${attention(e)}"></span>${esc(say(e))}${roundNote(e)}${where(e)}</div>
+    <div class="who">${who(e)} · <a href="${e.url}" target="_blank">GitHub ↗</a></div>
+    ${extra(e)}</div></div>`;
+}
+function routineChunk(evs) {
+  const id = evs[0].url + evs[0].at + evs.length;
+  if (!ui.expanded.has(id)) return `<div class="ev routine"><span class="tm">${hhmm(evs[0].at)}</span><div>
+    <button class="routine-toggle" onclick="toggle(ui.expanded,'${id}')">${evs.length === 1 ? esc(eventText(evs[0])) + where(evs[0]) : `${evs.length} routine updates`} <span>›</span></button></div></div>`;
+  return evs.map((e, i) => `<div class="ev routine"><span class="tm">${hhmm(e.at)}</span><div class="s">${esc(eventText(e))}${where(e)} <span class="faint">· ${who(e)}</span>
+    ${i === 0 && evs.length > 1 ? `<button class="routine-toggle" onclick="toggle(ui.expanded,'${id}')">hide</button>` : ""}
+    ${e.kind === "qa-evidence" ? `<br>${evidenceBlock(e.evidence, true)}` : ""}</div></div>`).join("");
+}
+
+/* ---- B1: remark inline, clamped ---- */
+function inlineRemark(e) {
+  const open = ui.open.has(e.url);
+  return `<div class="remark ${attention(e)}"><div class="${open ? "" : "clamp"}">${md(e.note)}</div>
+    <button class="linkbtn" style="margin-top:6px" onclick="toggleOpen('${e.url}')">${open ? "Show less" : "Show the whole remark"}</button>
+    ${open ? evidenceBlock(e.evidence) : evidenceBlock(e.evidence, true)}</div>`;
+}
+
+/* ---- B2: remarks as a reading view ---- */
+function remarksB2(feed) {
+  const evs = feed.filter((e) => e.note && (ui.step === "all" || stepGroup(e) === ui.step));
+  return evs.map((e) => `<div class="rcard">
+      <div class="rh"><span class="att ${attention(e)}" style="display:inline-block;width:7px;height:7px;border-radius:50%;margin-right:8px;vertical-align:1px;background:var(--${{ warn: "warn", bad: "bad", ok: "ok" }[attention(e)] ?? "border"})"></span>${esc(say(e))}${roundNote(e)}</div>
+      <div class="rt">${ui.selected === e.issue ? "" : `<a href="#" onclick="select(${e.issue});return false">${esc(itemByNumber(e.issue)?.title ?? "")}</a> · `}${who(e)} · ${ago(e.at)} · <a href="${e.url}" target="_blank">GitHub ↗</a></div>
+      ${noteBody(e)}
+    </div>`).join("") || `<p class="muted">No remarks here.</p>`;
+}
+
+/* ---- B3: round-by-round thread in the right pane ---- */
+function threadB3(x) {
+  const evs = STATE.feed.filter((e) => e.note && (x.isStory ? e.story === x.number : e.issue === x.number)).slice().reverse();
+  let round = -1;
+  const body = evs.map((e) => {
+    const r = e.step === "implement" ? (e.fixRound ?? 0) : null;
+    let head = "";
+    if (r != null && r !== round) { round = r; head = `<div class="round">${r === 0 ? "First implementation" : `Fix round ${r} of ${e.maxFixRounds}`}</div>`; }
+    else if (r == null && e.step !== "review" && round !== "qa") { round = "qa"; head = `<div class="round">QA</div>`; }
+    const att = attention(e);
+    return `${head}<div class="msg ${att}"><div class="mh"><b class="${att === "warn" ? "warn" : ""}">${esc(say(e))}</b><span class="faint small">${who(e)} · ${hhmm(e.at)}</span>
+      <a class="faint small" style="margin-left:auto" href="${e.url}" target="_blank">↗</a></div>
+      <div class="bubble">${noteBody(e)}</div></div>`;
+  }).join("");
+  return `${head(x)}${body || `<p class="muted small">No remarks yet. Implement, review and QA notes appear here round by round.</p>`}`;
+}
+function latestB3() {
+  return `<div class="kicker">Latest remarks</div><p class="small muted" style="margin:4px 0 18px">Pick a story or slice to read its rounds as a thread.</p>
+    ${remarks().slice(0, 5).map((e) => `<div class="msg ${attention(e)}" style="cursor:pointer" onclick="select(${e.issue})">
+      <div class="mh"><b class="${attention(e) === "warn" ? "warn" : ""}">${esc(say(e))}</b><span class="faint small">${ago(e.at)}</span></div>
+      <div class="faint small" style="margin:-4px 0 6px">${esc(itemByNumber(e.issue)?.title ?? "")}</div>
+      <div class="bubble"><div class="clamp">${md(e.note)}</div></div></div>`).join("")}`;
+}
+
+/* ---- right pane: selected item, in sentences ---- */
+function head(x) {
+  const w = STATE.waitingForMe.find((w) => w.number === x.number);
+  const parent = !x.isStory && STATE.board.find((s) => s.number === x.story);
+  return `<div class="kicker">${x.isStory ? "Story" : `Slice of <a href="#" onclick="select(${x.story});return false">${esc(parent.title)}</a>`}</div>
+    <h3>${esc(x.title)}</h3>
+    <p class="status">${HUMAN_STATE[x.state] ?? x.state}${x.holder ? x.holder.stale ? `. Agent ${x.holder.session} went quiet ${quietFor(x.holder)} ago.` : `. Agent ${x.holder.session} on it for ${quietFor(x.holder)}.` : "."}</p>
+    ${w ? `<div class="yours"><b>${w.kind === "needs-human" ? "Escalated to you" : "Waiting for your QA"}</b><p>${esc(w.reason)}</p>${copy(w.command)}</div>` : ""}`;
+}
+function detail(x) {
+  const stops = ["ready-for-agent", "implementation", "needs-review", "needs-qa", "merge-queue"];
+  const at = x.state === "merged" ? 9 : ["changes-requested", "qa-failed"].includes(x.state) ? 1 : x.state === "needs-human-qa" ? 3 : stops.indexOf(x.state);
+  const ev = STATE.feed.find((e) => e.evidence && e.issue === x.number)?.evidence;
+  return `${head(x)}
+    ${x.isStory || x.state === "blocked" ? "" : `<div class="pipeline">${stops.map((s, i) => `<span class="${i < at ? "done" : i === at ? "cur" : ""}"></span>`).join("")}</div>
+      <div class="pipelabels"><span>build</span><span>review</span><span>QA</span><span>merge</span></div>`}
+    <ul class="facts">
+      ${x.blockedBy?.length ? `<li>Waits for ${x.blockedBy.map((b) => `<a href="#" onclick="select(${b});return false">${esc(itemByNumber(b).title)}</a>`).join(" and ")}</li>` : ""}
+      ${x.isStory ? "" : `<li>${pips2(x)} ${x.fixRounds ? `${x.fixRounds} of ${x.maxFixRounds} fix rounds used` : "No fix rounds yet"}</li>`}
+      ${x.mode === "hil" ? `<li>You QA this one before it merges</li>` : ""}
+      ${x.isStory ? `<li>${x.slices.filter((s) => s.state === "merged").length} of ${x.slices.length} slices merged</li><li><span class="mono muted">${esc(x.branch)}</span></li>` : ""}
+    </ul>
+    ${ev ? `<div class="kicker" style="margin-bottom:-4px">Latest QA evidence</div>${evidenceBlock(ev)}` : ""}
+    <p style="margin-top:22px"><a class="small muted" href="${gh(x.number)}" target="_blank">Open on GitHub ↗</a></p>`;
+}
+function progress() {
+  const open = STATE.board.filter((s) => s.state !== "closed");
+  return `<div class="kicker" style="margin-bottom:16px">Progress</div>
+    ${open.map((s) => { const m = s.slices.filter((x) => x.state === "merged").length; return `<div class="prog" onclick="select(${s.number})">
+      <div class="pt"><span>${esc(s.title)}</span><span>${m} of ${s.slices.length}</span></div>
+      <div class="bar"><i style="width:${(m / s.slices.length) * 100}%"></i></div></div>`; }).join("")}`;
+}
+
+/* ------------------------------------------------------------------ *
+ *  Switcher (prototype chrome)                                       *
+ * ------------------------------------------------------------------ */
+const VARIANTS = [
+  { key: "B1", name: "Remarks inline", render: () => VariantB("B1") },
+  { key: "B2", name: "Remarks tab", render: () => VariantB("B2") },
+  { key: "B3", name: "Rounds thread", render: () => VariantB("B3") },
+];
+const params = new URLSearchParams(location.search);
+let current = VARIANTS.findIndex((v) => v.key === params.get("variant"));
+if (current < 0) current = 0;
+ui.pageState = ["loaded", "loading", "error"].includes(params.get("state")) ? params.get("state") : "loaded";
+
+function setUrl() {
+  const p = new URLSearchParams(location.search);
+  p.set("variant", VARIANTS[current].key);
+  ui.pageState === "loaded" ? p.delete("state") : p.set("state", ui.pageState);
+  try { history.replaceState(null, "", "?" + p.toString()); } catch {}
+}
+function go(d) { current = (current + d + VARIANTS.length) % VARIANTS.length; setUrl(); render(); }
+function setPageState(s) { ui.pageState = s; STATE.lastError = s === "error" ? ERR : null; setUrl(); render(); }
+function themeBtn() { return `<button class="quiet" onclick="toggleTheme()" title="light / dark">◐</button>`; }
+function toggleTheme() {
+  const r = document.documentElement;
+  const dark = r.dataset.theme ? r.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = dark ? "light" : "dark";
+}
+
+function render() {
+  const v = VARIANTS[current];
+  document.getElementById("app").innerHTML = v.render();
+  document.getElementById("proto-bar").innerHTML = `
+    <span class="tag">PROTOTYPE</span>
+    <button onclick="go(-1)" aria-label="previous variant">←</button>
+    <span class="lbl">${v.key} (${v.name})</span>
+    <button onclick="go(1)" aria-label="next variant">→</button>
+    <span class="sep"></span>
+    ${["loaded", "loading", "error"].map((s) => `<button class="${ui.pageState === s ? "on" : ""}" onclick="setPageState('${s}')">${s}</button>`).join("")}`;
+}
+addEventListener("keydown", (e) => {
+  if (e.target.closest?.("input, textarea, [contenteditable]")) return;
+  if (e.key === "ArrowLeft") go(-1);
+  if (e.key === "ArrowRight") go(1);
+});
+setUrl();
+render();
+</script>
+</body>
+</html>

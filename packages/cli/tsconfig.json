@@ -14,6 +14,9 @@
     },
     {
       "path": "../workspace-local"
+    },
+    {
+      "path": "../web"
     }
   ]
 }

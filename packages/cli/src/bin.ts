@@ -7,6 +7,7 @@ import { sessionId } from "./env.js";
 import { GhError, GhGitHub } from "@psdd/github-gh";
 import { installSkills } from "./install-skills.js";
 import { LocalWorkspace, makeNotifier, RootError, runCommand } from "@psdd/workspace-local";
+import { launchDashboard } from "@psdd/web";
 
 try {
   const root = await LocalWorkspace.findRoot(process.cwd());
@@ -20,6 +21,7 @@ try {
     notify: (channel, notification) => show(channel, renderNotification(notification)),
     cwd: root,
     installSkills,
+    dashboard: launchDashboard,
   });
   process.stdout.write(`${res.stdout}\n`);
   process.exitCode = res.exitCode;

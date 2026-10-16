@@ -100,4 +100,88 @@ export interface GitHub {
   /** Issue numbers that have a claim ref. */
   listClaims(): Promise<number[]>;
   deleteClaim(number: number): Promise<void>;
+
+  /**
+   * The developer's psdd work in one read, for the dashboard: their stories with
+   * slices, labels, blockers, linked PRs, psdd's comments and the timeline since
+   * `since`, and the claims. Read-only and cheap: one query, plus the claim refs.
+   */
+  observeWork(query: WorkQuery): Promise<Work>;
+}
+
+/** What observeWork asks for: one developer's psdd work in this repository. */
+export interface WorkQuery {
+  /** The developer's GitHub login. */
+  user: string;
+  /** Closed stories count when they closed at or after this ISO time. */
+  closedSince: string;
+  /** Timeline items after this ISO time; null for the whole history. */
+  since: string | null;
+}
+
+/** An item on an issue's timeline, as GitHub records it. `actor` is a login, null for a deleted account. */
+export type TimelineItem =
+  | { kind: "labeled" | "unlabeled"; label: string; at: string; actor: string | null }
+  /** `body` only for psdd's own comments (see isPsddComment); null for anyone else's. */
+  | { kind: "comment"; at: string; actor: string | null; url: string; body: string | null }
+  | { kind: "closed" | "reopened"; at: string; actor: string | null }
+  | { kind: "sub-issue-added"; child: number; at: string; actor: string | null }
+  /** Anything else; `detail` names it as GitHub does, e.g. RenamedTitleEvent. */
+  | { kind: "other"; at: string; actor: string | null; url: string | null; detail: string };
+
+/** A comment psdd wrote, with its body. Oldest first on ObservedIssue. */
+export interface PsddComment {
+  body: string;
+  at: string;
+  actor: string | null;
+  url: string;
+}
+
+/** A pull request that mentions an issue, as it is now. */
+export interface LinkedPullRequest {
+  number: number;
+  url: string;
+  head: string;
+  base: string;
+  state: "open" | "closed" | "merged";
+  createdAt: string;
+  mergedAt: string | null;
+  author: string | null;
+  mergedBy: string | null;
+}
+
+/** An issue with everything the dashboard reads from it. */
+export interface ObservedIssue extends Issue {
+  url: string;
+  closedAt: string | null;
+  /** Every blocker, open or closed. */
+  blockedBy: { number: number; state: "open" | "closed" }[];
+  /** psdd's comments over the whole history: transitions, markers and notes. */
+  psddComments: PsddComment[];
+  pullRequests: LinkedPullRequest[];
+  /** Timeline items after the query's `since`, oldest first. */
+  timeline: TimelineItem[];
+}
+
+export interface ObservedStory extends ObservedIssue {
+  /** Its sub-issues in this repository, of any kind. */
+  subIssues: ObservedIssue[];
+}
+
+/** A claim ref as read back; `record` is null when its commit could not be read as a claim. */
+export interface ClaimRef {
+  issue: number;
+  sha: string;
+  record: ClaimRecord | null;
+}
+
+/** One read of a developer's work: their stories and every claim in the repository. */
+export interface Work {
+  repoUrl: string;
+  /**
+   * Stories assigned to the user, open or closed since `closedSince`, plus the
+   * story of any item a claim of the user's points at.
+   */
+  stories: ObservedStory[];
+  claims: ClaimRef[];
 }

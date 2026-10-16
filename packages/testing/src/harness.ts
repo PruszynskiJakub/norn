@@ -1,16 +1,21 @@
 import { type Deps, renderNotification, run } from "@psdd/cli";
+import type { DashboardLaunch, DashboardOptions } from "@psdd/web";
 import { type Ctx, loadConfig } from "@psdd/core";
 import { FakeGitHub } from "./fake-github.js";
 import { FakeWorkspace } from "./fake-workspace.js";
 
 export function setup(opts: { now?: string; session?: string; user?: string } = {}) {
   const github = new FakeGitHub(opts.user ?? "alice");
+  github.clock = () => now;
   const workspace = new FakeWorkspace();
   const notifications: { channel: string; title: string; body: string }[] = [];
   let now = new Date(opts.now ?? "2026-10-13T12:00:00Z");
   /** Nonces handed out in turn; tests push the ones they expect. */
   const nonces: string[] = [];
   let made = 0;
+  /** What psdd dashboard asked to start, and what the start answers. */
+  const launches: DashboardOptions[] = [];
+  const dashboard = { answer: null as DashboardLaunch | null };
   const deps: Deps = {
     github,
     workspace,
@@ -25,12 +30,20 @@ export function setup(opts: { now?: string; session?: string; user?: string } = 
     installSkills: async () => {
       throw new Error("not in this test");
     },
+    dashboard: async (opts) => {
+      launches.push(opts);
+      return dashboard.answer ?? { kind: "started", url: `http://127.0.0.1:${opts.port}`, port: opts.port, opened: opts.open };
+    },
   };
   return {
     github,
     workspace,
     notifications,
     nonces,
+    launches,
+    set launchAnswer(a: DashboardLaunch) {
+      dashboard.answer = a;
+    },
     setNow(iso: string) {
       now = new Date(iso);
     },

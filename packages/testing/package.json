@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "@psdd/core": "0.0.0",
-    "@psdd/cli": "0.0.0"
+    "@psdd/cli": "0.0.0",
+    "@psdd/web": "0.0.0"
   }
 }

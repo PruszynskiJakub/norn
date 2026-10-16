@@ -1,0 +1,31 @@
+{
+  "name": "@psdd/web",
+  "version": "0.0.0",
+  "private": true,
+  "description": "The local dashboard: an HTTP server over the core read model, and its React UI.",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build:ui": "vite build --config ui/vite.config.ts"
+  },
+  "dependencies": {
+    "@psdd/core": "0.0.0",
+    "@psdd/github-gh": "0.0.0",
+    "@psdd/workspace-local": "0.0.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.4"
+  }
+}

@@ -4,9 +4,9 @@ Rules for psdd's code, each one checkable in a review. `npm run check` (typechec
 
 ## Packages
 
-1. The code lives in `packages/`: `core` (process logic and the ports), the adapters `github-gh` and `workspace-local`, the front end `cli`, and `testing`.
+1. The code lives in `packages/`: `core` (process logic and the ports), the adapters `github-gh` and `workspace-local`, the front ends `cli` and `web` (the dashboard), and `testing`.
 2. `core` imports no other package and no `node:` module except `node:path`. It does no I/O of its own: everything goes through the GitHub, Workspace and Notify ports.
-3. An adapter imports only `@psdd/core`. Only a front end (today `cli`) wires adapters to the core.
+3. An adapter imports only `@psdd/core`. Only a front end (`cli`, `web`) wires adapters to the core.
 4. `@psdd/testing` is imported only from tests.
 5. Every `@psdd/*` import is declared in the importing package's `package.json`, and every declared one is used. A relative import never leaves its package.
 
@@ -15,7 +15,7 @@ Rules 2–5 are enforced by `test/boundaries.test.ts`.
 ## Results, refusals and wording
 
 6. A core operation returns data: a result, or `{ ok: false, refusal }`. Results, events and refusals are discriminated unions on `kind` with kebab-case values, carrying facts (numbers, branch names, timestamps), not sentences.
-7. Only renderers produce wording. Everything psdd prints is written in `packages/cli/src/render-text.ts`; `--json` is built from it by `render-json.ts`. Notifications are typed too: core sends a `Notification` through the Notify port, and the front end words it. Core composes text only for GitHub (comments and the markers psdd reads back) and the skill instructions inside a briefing, which are content the briefing carries.
+7. Only renderers produce wording. Everything psdd prints is written in `packages/cli/src/render-text.ts`; `--json` is built from it by `render-json.ts`. The dashboard serves the core's read model as JSON, and its UI words it in `packages/web/ui/src/wording.ts`. Notifications are typed too: core sends a `Notification` through the Notify port, and the front end words it. Core composes text only for GitHub (comments and the markers psdd reads back) and the skill instructions inside a briefing, which are content the briefing carries.
 8. A renderer switches exhaustively on `kind` and ends in a `never` check, so a variant without wording fails the typecheck.
 9. Text that comes from outside psdd (a `gh` error, a user's note, a reason read back from a comment) travels as an opaque `detail` (or a named field like `why`) and is never parsed.
 10. A refusal comes before any change to GitHub. It says why, and what to do instead.

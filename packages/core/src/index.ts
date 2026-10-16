@@ -15,3 +15,5 @@ export * from "./text.js";
 export * from "./tidy.js";
 export * from "./transitions.js";
 export * from "./workspace.js";
+export * from "./feed.js";
+export * from "./observe.js";
