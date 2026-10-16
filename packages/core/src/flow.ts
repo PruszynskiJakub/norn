@@ -86,8 +86,8 @@ export const RESERVED_TARGETS = ["closed", "not-planned"] as const;
 /** Names no flow may take: triage's outcome that closes an issue as not planned. */
 const RESERVED_FLOWS = ["reject"];
 
-/** Flows norn ships, which exist in every repository; story is not a flow file yet. */
-const BUILT_IN_FLOWS = ["story", ...Object.keys(BUILT_IN)];
+/** Flows norn ships, which exist in every repository. */
+const BUILT_IN_FLOWS = Object.keys(BUILT_IN);
 
 /** Labels norn sets itself on every issue; no state may take these names either. */
 const ENGINE_LABELS = ["in-progress", "needs-human"];
@@ -201,7 +201,8 @@ function checkBehaviours(flow: Record<string, unknown>, state: string, behaviour
       for (const p of rule.params?.(params) ?? []) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${p.param}`, expected: p.expected });
       const states = isObject(flow.states) ? flow.states : {};
       for (const l of rule.leadsTo?.(params) ?? []) {
-        if (!Object.hasOwn(states, l.to)) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${l.param}`, expected: "a state of the flow" });
+        if (!Object.hasOwn(states, l.to) && !(RESERVED_TARGETS as readonly string[]).includes(l.to))
+          errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${l.param}`, expected: "a state of the flow" });
       }
     }
     const needs = rule.requires?.(flow);
@@ -284,11 +285,11 @@ function behaviourTargets(state: Record<string, unknown>): string[] {
   );
 }
 
-/** The flow named by the issue's `type:<name>` label, for any type but the built-in story; null for none. */
+/** The flow named by the issue's `type:<name>` label; null for none. */
 export function flowNameOf(issue: Issue): string | null {
   for (const label of issue.labels) {
     const m = /^type:([a-z0-9][a-z0-9_-]*)$/.exec(label);
-    if (m && m[1] !== "story") return m[1];
+    if (m) return m[1];
   }
   return null;
 }
@@ -307,7 +308,7 @@ export function loadFlow(ctx: Parameters<typeof repositoryFlow>[0], name: string
   return builtIn ? Promise.resolve(builtIn) : repositoryFlow(ctx, name);
 }
 
-/** The flow the issue runs, from its type; null when its type names none, e.g. a new issue or a story. */
+/** The flow the issue runs, from its type; null when its type names none, e.g. a new issue. */
 export function flowOf(ctx: Parameters<typeof repositoryFlow>[0], issue: Issue): Promise<LoadedFlow | null> {
   const name = flowNameOf(issue);
   return name === null ? Promise.resolve(null) : loadFlow(ctx, name);
@@ -355,12 +356,13 @@ async function checkFlowsNamed(ctx: Parameters<typeof repositoryFlow>[0], loaded
   return errors.length ? { ok: false, name: loaded.name, errors } : loaded;
 }
 
-/** Outcome words of triage that no flow can take: the built-in story and slice, and reject. */
-const NOT_A_FLOW_WORD = ["story", "slice", "reject"];
+/** Outcome words of triage that no repository flow can take: the built-in flows' names, and reject. */
+const NOT_A_FLOW_WORD = [...BUILT_IN_FLOWS, "reject"];
 
 /**
- * The repository's flows triage offers, in name order: every valid flow on the
- * base branch whose name can be a type and that does not set triage to false.
+ * The flows triage offers: the built-in ones in their order, then the
+ * repository's in name order, each valid and not setting triage to false. A
+ * repository flow is read from the base branch, and its name must be a type.
  */
 export async function triageFlows(
   ctx: Parameters<typeof repositoryFlow>[0] & { github: { listFilesAt(dir: string, ref: string): Promise<string[]> } },
@@ -370,11 +372,18 @@ export async function triageFlows(
     .map((file) => file.slice(0, -".json".length))
     .filter((name) => /^[a-z0-9][a-z0-9_-]*$/.test(name) && !NOT_A_FLOW_WORD.includes(name))
     .sort();
-  const loaded = await Promise.all(names.map((name) => repositoryFlow(ctx, name)));
+  const loaded = [...BUILT_IN_FLOWS.map(builtInFlow), ...(await Promise.all(names.map((name) => repositoryFlow(ctx, name))))];
   return loaded.flatMap((l) => (l?.ok && l.flow.triage !== false ? [{ name: l.name, flow: l.flow }] : []));
 }
 
-/** Triage's step with an outcome for each offered flow, after story and before reject. */
+/** The built-in flow the issue runs, read without GitHub, e.g. for the read model, which stays pure; null for none. */
+export function builtInFlowOf(issue: Issue): Flow | null {
+  const name = flowNameOf(issue);
+  const loaded = name === null ? null : builtInFlow(name);
+  return loaded?.ok ? loaded.flow : null;
+}
+
+/** Triage's step with an outcome for each offered flow, before reject. */
 export function offerFlows(step: Step, flows: { name: string; flow: Flow }[]): Step {
   const { reject, ...rest } = step.outcomes;
   const offered: Record<string, Outcome> = Object.fromEntries(flows.map(({ name, flow }) => [name, { to: flow.start, means: flow.description, flow: name }]));

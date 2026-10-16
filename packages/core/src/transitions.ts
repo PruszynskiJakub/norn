@@ -1,13 +1,14 @@
 import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
-import { FIX_STATES, STATES, kindOf, slicesOf, stateOf, type Outcome } from "./machine.js";
+import type { Outcome } from "./machine.js";
 import { locate } from "./location.js";
 import { SLUG_MARK, slugLine, storySlug, type Slugs } from "./slug.js";
 import { specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
-import { type Flow, type FlowCache, type Mode, flowStatesOf, repositoryFlow } from "./flow.js";
+import { type Flow, type FlowCache, type Mode, flowStatesOf, loadFlow } from "./flow.js";
+import { hasSpec } from "./behaviours.js";
 import { notifyHumanQa, notifyNeedsHuman, type Notify } from "./notify.js";
 
 /** The marker norn writes when it sets needs-human; norn next reads the reason back from it. */
@@ -65,10 +66,10 @@ const TRANSITION = /^norn: (\S+) → (\S+)/;
  * Fix rounds that count toward the limit, read from norn's transition comments:
  * entries into a fix state from another state, since the last time the limit
  * escalated. A person resolving that escalation so starts a fresh budget.
- * `fixStates` are the states that count: the built-in ones, or those of a flow
- * that opt into countsFixRounds.
+ * `fixStates` are the states that count: those of the issue's flow that opt
+ * into countsFixRounds.
  */
-export function fixRounds(comments: string[], fixStates: readonly string[] = FIX_STATES): number {
+export function fixRounds(comments: string[], fixStates: readonly string[]): number {
   let rounds = 0;
   for (const body of comments) {
     if (FIX_LIMIT.test(body)) {
@@ -109,7 +110,7 @@ const EVIDENCE_HEAD = /^Evidence \((\S+) at (\S+)\):$/;
 /** An evidence file line as evidenceLines writes it: an embedded image or a link, at its commit. */
 const EVIDENCE_FILE = /^(?:!\[(.*)\]\((\S+?)\?raw=true\)|- \[(.*)\]\((\S+)\))$/;
 
-/** A transition comment norn wrote, read back: what applyOutcome, setState and closeMergedStory put in it. */
+/** A transition comment norn wrote, read back: what applyOutcome, setState and waitsForMerge put in it. */
 export interface TransitionComment {
   /** The state before; "triage" for a new issue. */
   from: string;
@@ -188,19 +189,18 @@ export async function applyOutcome(
   const n = issue.number;
   // An issue whose state its flow dropped moves on from that state.
   const left = flow ? await leftState(ctx, issue, flow) : null;
-  const from = (flow ? (flowStatesOf(issue, flow)[0] ?? left) : stateOf(issue)) ?? "triage";
+  const from = (flow ? (flowStatesOf(issue, flow)[0] ?? left) : null) ?? "triage";
   // The resolve step has no outcome word and keeps the state; say what it did.
   const resolved = !word && issue.labels.includes("needs-human") && !outcome.needsHuman;
   const why = word || (resolved ? "needs-human resolved" : "");
   const comment = [`norn: ${from} → ${outcome.to === "not-planned" ? "closed as not planned" : outcome.to}${why ? ` (${why})` : ""}`];
   const spec = await specLink(ctx, issue, flow);
   if (spec) comment.push("", `Spec: ${spec}`);
-  // Triage may give the issue a repository flow, which it enters here.
-  const given = outcome.flow ? await repositoryFlow(ctx, outcome.flow) : null;
+  // Triage gives the issue its flow, which it enters here.
+  const given = outcome.flow ? await loadFlow(ctx, outcome.flow) : null;
   const into = flow ?? (given?.ok ? given.flow : null);
-  // A story records its slug the first time norn writes on it, triage included; so does an issue whose flow gives it a branch.
-  const becomesStory = !flow && (kindOf(issue) === "story" || (kindOf(issue) === "new" && !outcome.flow && outcome.to !== "not-planned"));
-  const slug = becomesStory || into?.workspace === "own" ? await slugLine(ctx, issue) : null;
+  // An issue whose flow gives it a branch of its own records its slug the first time norn writes on it, triage included.
+  const slug = into?.workspace === "own" ? await slugLine(ctx, issue) : null;
   if (slug) comment.push("", slug);
   if (skipped) comment.push("", skipped);
   if (note) comment.push("", note);
@@ -211,19 +211,19 @@ export async function applyOutcome(
   if (outcome.to === "not-planned" || outcome.to === "closed") {
     await github.comment(n, comment.join("\n"));
     await github.closeIssue(n, outcome.to === "closed" ? "completed" : "not_planned");
-    await github.removeLabels(n, ["in-progress", "needs-human", ...stateLabels(issue, undefined, flow)]);
+    await github.removeLabels(n, ["in-progress", "needs-human", ...stateLabels(issue, undefined, into)]);
   } else {
     const add: string[] = [outcome.to];
     if (into) await ensureStateLabel(ctx, into, outcome.to);
-    if (!flow && kindOf(issue) === "new") {
-      add.push(`type:${outcome.flow ?? "story"}`);
+    if (!flow && outcome.flow) {
+      add.push(`type:${outcome.flow}`);
       await github.assign(n, [await github.currentUser()]);
     }
     if (outcome.needsHuman) {
       add.push("needs-human");
       comment.push("", needsHumanLine(outcome.needsHuman));
     }
-    const remove = ["in-progress", ...(outcome.needsHuman ? [] : ["needs-human"]), ...stateLabels(issue, outcome.to, flow), ...(left ? [left] : [])];
+    const remove = ["in-progress", ...(outcome.needsHuman ? [] : ["needs-human"]), ...stateLabels(issue, outcome.to, into), ...(left ? [left] : [])];
     await github.addLabels(n, add);
     await github.comment(n, comment.join("\n"));
     await github.removeLabels(n, remove);
@@ -243,9 +243,9 @@ export async function bestEffort(what: FollowUpTask, issue: number, retry: numbe
 
 export type Ensured = { ok: true; created: boolean; branch: string } | { ok: false; refusal: BaseBranchMissing };
 
-/** Creates the story branch from the base branch unless it is already on GitHub. */
-export async function ensureStoryBranch(ctx: Ctx, story: Issue): Promise<Ensured> {
-  const branch = storyBranch(story.number, await storySlug(ctx, story));
+/** Creates the branch of an issue with a workspace of its own from the base branch, unless it is already on GitHub. */
+export async function ensureOwnBranch(ctx: Ctx, issue: Issue): Promise<Ensured> {
+  const branch = storyBranch(issue.number, await storySlug(ctx, issue));
   if (await ctx.github.branchExists(branch)) return { ok: true, created: false, branch };
   const base = ctx.config.baseBranch;
   if (!(await ctx.github.branchExists(base))) return { ok: false, refusal: { kind: "base-branch-missing", branch, base } };
@@ -253,9 +253,9 @@ export async function ensureStoryBranch(ctx: Ctx, story: Issue): Promise<Ensured
   return { ok: true, created: true, branch };
 }
 
-/** The spec a transition comment links: a story's own, or the parent's for an issue that works in its parent's branch. */
+/** The spec a transition comment links: the issue's own when its flow writes one, or the parent's for an issue that works in its parent's branch. */
 async function specLink(ctx: Ctx, issue: Issue, flow: Flow | null): Promise<string | null> {
-  let story = !flow && kindOf(issue) === "story" ? issue : null;
+  let story = flow?.workspace === "own" && hasSpec(flow) ? issue : null;
   if (flow?.workspace === "parent") {
     const p = await ctx.github.parentOf(issue.number);
     if (p) story = await ctx.github.getIssue(p);
@@ -280,12 +280,12 @@ export async function withShortClaim(ctx: Ctx, n: number, fn: () => Promise<void
   return true;
 }
 
-/** Moves an issue to `to` on norn's own, saying why, under a claim this session holds; `flow` is the issue's, when it runs one. */
-export async function setState(ctx: Ctx, issue: Issue, to: string, why: string, flow: Flow | null = null) {
-  const from = flow ? (flowStatesOf(issue, flow)[0] ?? null) : stateOf(issue);
-  // A story from before the slug marker records it here, under the short claim.
-  const slug = !flow && kindOf(issue) === "story" ? await slugLine(ctx, issue) : null;
-  if (flow) await ensureStateLabel(ctx, flow, to);
+/** Moves an issue of `flow` to `to` on norn's own, saying why, under a claim this session holds. */
+export async function setState(ctx: Ctx, issue: Issue, to: string, why: string, flow: Flow) {
+  const from = flowStatesOf(issue, flow)[0] ?? null;
+  // An issue with a branch of its own from before the slug marker records it here, under the short claim.
+  const slug = flow.workspace === "own" ? await slugLine(ctx, issue) : null;
+  await ensureStateLabel(ctx, flow, to);
   await ctx.github.addLabels(issue.number, [to]);
   await ctx.github.comment(issue.number, `norn: ${from} → ${to} (automatic)\n\n${why}${slug ? `\n\n${slug}` : ""}`);
   await ctx.github.removeLabels(issue.number, stateLabels(issue, to, flow));
@@ -332,12 +332,12 @@ export async function handOverLeft(ctx: Ctx, issue: Issue, name: string, state: 
 }
 
 /**
- * Every state label on the issue except `keep`: of its repository flow, or of
- * the built-in process. A failed removal can leave two state labels; removing
- * all of them on the next transition cleans that up.
+ * Every state label of the issue's flow on the issue except `keep`; none
+ * without a flow. A failed removal can leave two state labels; removing all of
+ * them on the next transition cleans that up.
  */
 export function stateLabels(issue: Issue, keep?: string, flow: Flow | null = null): string[] {
-  return (flow ? Object.keys(flow.states) : STATES).filter((s) => s !== keep && issue.labels.includes(s));
+  return (flow ? Object.keys(flow.states) : []).filter((s) => s !== keep && issue.labels.includes(s));
 }
 
 /** A state's label colour and description when the state names none, by its kind. */
@@ -359,56 +359,13 @@ export async function ensureStateLabel(ctx: Ctx, flow: Flow, state: string): Pro
 }
 
 /**
- * Closes a story in merge-queue whose story PR is merged. GitHub closes it
- * through `Closes #N` only for PRs into the default branch, so a baseBranch like
- * develop would leave it open for good. Returns whether the story was closed.
+ * Removes the state labels of its flow a closed issue still carries, e.g. one
+ * GitHub closed through its PR. Returns whether it changed anything.
  */
-export async function closeMergedStory(ctx: Ctx, story: Issue): Promise<boolean> {
-  if (story.state !== "open" || stateOf(story) !== "merge-queue") return false;
-  const branch = storyBranch(story.number, await storySlug(ctx, story));
-  const pr = await ctx.github.findPullRequest(branch);
-  if (pr?.state !== "merged") return false;
-  return withShortClaim(ctx, story.number, async () => {
-    await ctx.github.comment(story.number, `norn: merge-queue → closed (automatic)\n\nThe story PR #${pr.number} is merged into ${pr.base}.`);
-    await ctx.github.closeIssue(story.number, "completed");
-    await ctx.github.removeLabels(story.number, ["in-progress", ...stateLabels(story)]);
-  });
-}
-
-/**
- * Removes the state labels a closed issue still carries, e.g. merge-queue on a
- * story GitHub closed through its PR. Returns whether it changed anything.
- */
-export async function clearClosedState(ctx: Ctx, issue: Issue): Promise<boolean> {
-  const left = stateLabels(issue);
+export async function clearClosedState(ctx: Ctx, issue: Issue, flow: Flow | null): Promise<boolean> {
+  const left = stateLabels(issue, undefined, flow);
   if (issue.state !== "closed" || left.length === 0) return false;
   return withShortClaim(ctx, issue.number, () => ctx.github.removeLabels(issue.number, left));
-}
-
-/** Once every slice is merged, opens the story PR and moves the story to needs-review. */
-export async function promoteStory(ctx: Ctx, storyNumber: number): Promise<Event[]> {
-  const { github } = ctx;
-  const events: Event[] = [];
-  const slices = await slicesOf(github, storyNumber);
-  const story = await github.getIssue(storyNumber);
-  if (story.state === "open" && slices.length && slices.every((s) => s.state === "closed") && stateOf(story) === "implementation") {
-    const slug = await storySlug(ctx, story);
-    const branch = storyBranch(story.number, slug);
-    const base = ctx.config.baseBranch;
-    const moved = await withShortClaim(ctx, storyNumber, async () => {
-      const pr =
-        (await github.findPullRequest(branch)) ??
-        (await github.createPullRequest({
-          head: branch,
-          base,
-          title: story.title,
-          body: `Closes #${story.number}\n\nSpec: ${specPath(story.number, slug)}`,
-        }));
-      await setState(ctx, story, "needs-review", `Every slice is merged into ${branch}. Story PR: #${pr.number}.`);
-    });
-    if (moved) events.push({ kind: "story-promoted", story: storyNumber });
-  }
-  return events;
 }
 
 /** Why a slice's merge cannot finish yet. */

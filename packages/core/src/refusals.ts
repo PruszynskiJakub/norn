@@ -2,7 +2,7 @@ import type { FinishCommand } from "./briefing.js";
 import type { ConfigProblem, VersionIncompatible } from "./config.js";
 import type { BaseBranchMissing } from "./events.js";
 import type { FlowError } from "./flow.js";
-import type { State } from "./machine.js";
+
 import type { NotAStory } from "./next.js";
 import type { MergeRefusal } from "./transitions.js";
 import type { Provider } from "./workspace.js";
@@ -20,8 +20,10 @@ export type Refusal =
   // No step to take
   | { kind: "closed"; issue: number }
   | { kind: "ambiguous-state"; issue: number; states: string[]; story: number | null }
-  | { kind: "story-in-implementation"; issue: number }
-  | { kind: "story-in-merge-queue"; issue: number; owner: string | null }
+  /** The issue waits in `state` for its slices, which move it on; see waitsForSlices. */
+  | { kind: "story-in-implementation"; issue: number; state: string }
+  /** The issue waits in `state` for its owner to merge its PR; see waitsForMerge. */
+  | { kind: "story-in-merge-queue"; issue: number; owner: string | null; state: string }
   | { kind: "blocked"; issue: number; blockers: number[]; story: number | null }
   | { kind: "no-step"; issue: number; state: string | null; story: number | null }
   /** The issue's type names a repository flow that is broken; issues of other types are unaffected. */
@@ -50,7 +52,8 @@ export type Refusal =
   // Other commands
   | { kind: "reason-missing"; issue: number }
   | { kind: "add-slice-usage"; story: number }
-  | { kind: "story-not-slicing"; story: number; state: State | null }
+  /** Slices are added only in `slicing`, the state of the issue's flow with slices; null when its flow has none. */
+  | { kind: "story-not-slicing"; story: number; state: string | null; slicing: string | null }
   | NotAStory;
 
 export interface Refused {

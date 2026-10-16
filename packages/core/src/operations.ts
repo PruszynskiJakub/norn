@@ -1,11 +1,24 @@
-import { behaviourFollowUps, entering, holds, leaveRefusal, type OutcomeInput, startState } from "./behaviours.js";
+import {
+  behaviourFollowUps,
+  entering,
+  heldRefusal,
+  holds,
+  leaveRefusal,
+  needsBranch,
+  type OutcomeInput,
+  sliceType,
+  slicingState,
+  startState,
+  usedIn,
+  uses,
+} from "./behaviours.js";
 import { briefing, type Briefing, finishCommands } from "./briefing.js";
 import { acquire } from "./claims.js";
 import type { Event } from "./events.js";
 import { type Flow, flowNameOf, flowOf, flowStatesOf, flowStep, loadFlow, offerFlows, passThrough, triageFlows } from "./flow.js";
 import type { Issue } from "./github.js";
 import { locate } from "./location.js";
-import { FIX_STATES, kindOf, slicesOf, stateOf, statesOf, type Step, stepFor, type State } from "./machine.js";
+import { type Step, TRIAGE } from "./machine.js";
 import { computeNext, type NextReport, notAStory, notifyWaiting } from "./next.js";
 import { notifyNeedsHuman } from "./notify.js";
 import { type Refusal, type Refused, refuse } from "./refusals.js";
@@ -15,11 +28,9 @@ import { specPath } from "./text.js";
 import {
   applyOutcome,
   type Ctx,
+  ensureOwnBranch,
   ensureStateLabel,
   type Evidence,
-  ensureStoryBranch,
-  fixLimitReason,
-  fixRounds,
   followRename,
   handOverLeft,
   leftState,
@@ -59,10 +70,10 @@ export interface DoneResult {
   evidence?: Evidence;
   /** The fix-round limit the outcome reached, so the issue needs a human instead of another round; null when not reached. */
   fixLimit: number | null;
-  /** The story branch created before the story moved to implementation. */
+  /** The issue's own branch, created on GitHub before it entered a state that needs it, e.g. one waiting for its slices. */
   storyBranchCreated: string | null;
   followUps: Event[];
-  /** The story is now in implementation, so deliver can run it unattended. */
+  /** The issue now waits for its slices, so deliver can run them unattended. */
   deliverable: boolean;
   /** A person does the next step and has been notified. */
   personNext: boolean;
@@ -99,22 +110,17 @@ export interface NextResult {
 /** GitHub's API takes blobs up to 100 MB; evidence is screenshots, logs and output, far smaller. */
 export const MAX_EVIDENCE_BYTES = 25 * 1024 * 1024;
 
-/** The issue's step: from its flow when its type names one, else from the built-in process. */
+/** The issue's step: from its flow when its type names one, else triage, which chooses its type. */
 async function stepOf(ctx: Ctx, issue: Issue): Promise<{ ok: true; step: Step | null; flow: Flow | null } | Refused> {
   const loaded = await flowOf(ctx, issue);
-  if (!loaded) {
-    const step = stepFor(issue);
-    // Triage chooses the issue's type: a story, or one of the repository's flows.
-    if (step && kindOf(issue) === "new" && step.name === "triage") return { ok: true, step: offerFlows(step, await triageFlows(ctx)), flow: null };
-    return { ok: true, step, flow: null };
-  }
+  if (!loaded) return { ok: true, step: offerFlows(TRIAGE, await triageFlows(ctx)), flow: null };
   if (!loaded.ok) return refuse({ kind: "flow-invalid", issue: issue.number, flow: loaded.name, errors: loaded.errors });
   return { ok: true, step: flowStep(issue, loaded.flow), flow: loaded.flow };
 }
 
-/** The issue's state: in its flow, or in the built-in process. */
+/** The issue's state in its flow; null for none, or for an issue with no flow yet. */
 function stateIn(issue: Issue, flow: Flow | null): string | null {
-  return flow ? (flowStatesOf(issue, flow)[0] ?? null) : stateOf(issue);
+  return flow ? (flowStatesOf(issue, flow)[0] ?? null) : null;
 }
 
 /** Why an issue has no step to take. */
@@ -122,24 +128,14 @@ async function noStepRefusal(issue: Issue, ctx: Ctx, flow: Flow | null = null): 
   const { github } = ctx;
   const n = issue.number;
   if (issue.state === "closed") return { kind: "closed", issue: n };
-  if (flow) {
-    // Work in the parent's branch is run from the parent: norn next on it has something else to do.
-    const story = flow.workspace === "parent" ? await github.parentOf(n) : null;
-    const states = flowStatesOf(issue, flow);
-    if (states.length > 1) return { kind: "ambiguous-state", issue: n, states, story };
-    const state = states[0] ?? null;
-    if (state !== null && holds(flow, state)) {
-      const open = (await github.blockedBy(n)).filter((b) => b.state === "open");
-      return { kind: "blocked", issue: n, blockers: open.map((b) => b.number), story };
-    }
-    return { kind: "no-step", issue: n, state, story };
-  }
-  const state = stateOf(issue);
-  const states = statesOf(issue);
-  if (states.length > 1) return { kind: "ambiguous-state", issue: n, states, story: n };
-  if (kindOf(issue) === "story" && state === "implementation") return { kind: "story-in-implementation", issue: n };
-  if (kindOf(issue) === "story" && state === "merge-queue") return { kind: "story-in-merge-queue", issue: n, owner: issue.assignees[0] ?? null };
-  return { kind: "no-step", issue: n, state, story: n };
+  if (!flow) return { kind: "no-step", issue: n, state: null, story: null };
+  // Work in the parent's branch is run from the parent, and an issue with slices from itself: norn next on it has something else to do.
+  const story = flow.workspace === "parent" ? await github.parentOf(n) : usedIn(flow, "slices") ? n : null;
+  const states = flowStatesOf(issue, flow);
+  if (states.length > 1) return { kind: "ambiguous-state", issue: n, states, story };
+  const state = states[0] ?? null;
+  if (state !== null && holds(flow, state)) return heldRefusal({ ctx, issue, flow, flowName: flowNameOf(issue) ?? "", state }, story);
+  return { kind: "no-step", issue: n, state, story };
 }
 
 export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Promise<TakeResult | Refused> {
@@ -240,9 +236,6 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   }
   if (outcome.note && !note) return refuse({ kind: "note-missing", issue: n, word: word ?? "", note: outcome.note, evidence: step.evidence ?? false });
   if (evidenceDir !== undefined && !step.evidence) return refuse({ kind: "evidence-not-allowed", issue: n, step: step.name, finish: finishCommands(n, step) });
-  if (kindOf(issue) === "story" && stateOf(issue) === "needs-slicing" && (await slicesOf(github, n)).length === 0) {
-    return refuse({ kind: "no-slices", issue: n });
-  }
   // A state for the other mode is passed through here, so the issue lands in one transition, its comment naming what was skipped.
   const through = flow ? passThrough(flow, issue, outcome) : null;
   const skipped = through?.skipped.length && through.mode ? skipLine(through.skipped, through.mode) : null;
@@ -259,10 +252,10 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     const big = files.filter((f) => f.content.length > MAX_EVIDENCE_BYTES);
     if (big.length) return refuse({ kind: "evidence-too-big", files: big.map((f) => f.path), limitBytes: MAX_EVIDENCE_BYTES });
   }
-  // The evidence is checked before anything changes on GitHub, the story branch included.
+  // The evidence is checked before anything changes on GitHub, the issue's branch included.
   let storyBranchCreated: string | null = null;
-  if (kindOf(issue) === "story" && outcome.to === "implementation") {
-    const branch = await ensureStoryBranch(ctx, issue);
+  if (flow && needsBranch(flow, landed.to)) {
+    const branch = await ensureOwnBranch(ctx, issue);
     if (!branch.ok) return refuse(branch.refusal);
     if (branch.created) storyBranchCreated = branch.branch;
   }
@@ -277,15 +270,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
 
   let applied = outcome;
   let fixLimit: number | null = null;
-  // A round starts when review or QA sends the issue back; resolving needs-human stays put and is no round.
   if (inFlow) ({ outcome: applied, fixLimit } = await entering(inFlow));
-  else if (FIX_STATES.includes(outcome.to as State) && stateOf(issue) !== outcome.to) {
-    const rounds = fixRounds(await github.listComments(n)) + 1;
-    if (rounds > ctx.config.maxFixRounds) {
-      fixLimit = ctx.config.maxFixRounds;
-      applied = { ...outcome, needsHuman: `${note ? `escalated: "${oneLine(note)}" ` : ""}${fixLimitReason(fixLimit)}` };
-    }
-  }
   try {
     await applyOutcome(ctx, issue, applied, word ?? "", note, evidence, flow, skipped);
   } finally {
@@ -301,7 +286,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     fixLimit,
     storyBranchCreated,
     followUps: inFlow ? await behaviourFollowUps(inFlow, { outcome: applied, fixLimit }) : [],
-    deliverable: kindOf(issue) === "story" && outcome.to === "implementation",
+    deliverable: flow !== null && uses(flow, landed.to, "waitsForSlices"),
     personNext: !!applied.notify && !applied.needsHuman,
   };
 }
@@ -336,16 +321,21 @@ export async function addSlice(ctx: Ctx, story: number, input: { title?: string;
   const notHeld = await checkHeld(ctx, story);
   if (notHeld) return notHeld;
   const parent = await github.getIssue(story);
-  if (stateOf(parent) !== "needs-slicing") return refuse({ kind: "story-not-slicing", story, state: stateOf(parent) });
+  const of = await flowOf(ctx, parent);
+  if (of && !of.ok) return refuse({ kind: "flow-invalid", issue: story, flow: of.name, errors: of.errors });
+  const state = of ? (flowStatesOf(parent, of.flow)[0] ?? null) : null;
+  // Slices are added only in the state of the parent's flow with the slices behaviour, which names their type.
+  if (!of || !uses(of.flow, state, "slices")) return refuse({ kind: "story-not-slicing", story, state, slicing: of ? slicingState(of.flow) : null });
+  const type = sliceType(of.flow)!;
   const blockers = await Promise.all(input.blockedBy.map((b) => github.getIssue(b)));
   const open = blockers.filter((b) => b.state === "open");
-  // A story's slices run the slice flow, starting held while a blocker is open.
-  const flow = (await loadFlow(ctx, "slice"))!;
+  // The slices run the flow of their type, starting held while a blocker is open.
+  const flow = (await loadFlow(ctx, type))!;
   if (!flow.ok) return refuse({ kind: "flow-invalid", issue: story, flow: flow.name, errors: flow.errors });
   const slice = await github.createIssue({
     title,
     body: `Slice of #${story}. Spec: ${specPath(story, await storySlug(ctx, parent))}`,
-    labels: ["type:slice", `mode:${mode}`, startState(flow.flow, open.length > 0)],
+    labels: [`type:${type}`, `mode:${mode}`, startState(flow.flow, open.length > 0)],
     assignees: parent.assignees,
   });
   await github.addSubIssue(story, slice.number);
@@ -354,15 +344,15 @@ export async function addSlice(ctx: Ctx, story: number, input: { title?: string;
 }
 
 /**
- * What can be done on a story, or on an issue of a flow, now; when nothing is
- * left, the user is notified of what waits for them.
+ * What can be done on an issue of a flow, and on its slices, now; when nothing
+ * is left, the user is notified of what waits for them.
  */
 export async function next(ctx: Ctx, n: number): Promise<NextResult | Refused> {
   const issue = await ctx.github.getIssue(n);
   // An issue of a broken flow is not refused: next shows it blocked by the flow.
   const loaded = await flowOf(ctx, issue);
   const r = await notAStory(ctx.github, issue, loaded);
-  if (r) return refuse(r);
+  if (r || !loaded) return refuse(r ?? { kind: "not-a-story", issue: n });
   const report = await computeNext(ctx, n, loaded);
   if (report.nothingLeft && !report.closed) await notifyWaiting(ctx, report);
   return { ok: true, kind: "next", report };

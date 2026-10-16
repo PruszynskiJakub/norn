@@ -21,7 +21,7 @@ export type Event =
   | { kind: "worktree-left-for-tidy"; worktree: string }
   /** A sub-issue moved between the state syncsBlocked holds it in and the one it releases it to, e.g. blocked and ready-for-agent. */
   | { kind: "slice-state-changed"; issue: number; state: string }
-  /** Every slice is merged, so the story moved on to needs-review. */
+  /** Every slice is merged, so the story moved on to the state waitsForSlices names, with its PR open. */
   | { kind: "story-promoted"; story: number }
   /** The story PR is merged, so norn closed the story. */
   | { kind: "story-closed"; story: number }

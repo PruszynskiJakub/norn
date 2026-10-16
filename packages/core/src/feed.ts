@@ -1,7 +1,8 @@
-import { blockedStates, fixStatesOf } from "./behaviours.js";
-import { builtInFlow, type Flow, flowNameOf, flowStep } from "./flow.js";
+import { blockedStates, fixStatesOf, slicesAmong } from "./behaviours.js";
+import type { State, Target } from "./built-in-flows.js";
+import { builtInFlowOf, type Flow, flowStep } from "./flow.js";
 import type { Issue, ObservedStory } from "./github.js";
-import { FIX_STATES, FLAGS, kindOf, STATES, type State, type Step, stepFor, type Target } from "./machine.js";
+import { ENGINE_FLAGS, type Step } from "./machine.js";
 import { recordedSlug } from "./slug.js";
 import { sliceBranch, slugify, storyBranch } from "./text.js";
 import { type Evidence, fixRounds, needsHumanIn, parseTransitionComment } from "./transitions.js";
@@ -70,14 +71,15 @@ export interface FeedContext {
  * linked PRs. Pure: the same story always gives the same events.
  */
 export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
-  const slices = story.subIssues.filter((i) => kindOf(i) === "slice");
+  const storyFlow = builtInFlowOf(story);
+  const slices = storyFlow ? slicesAmong(story.subIssues, storyFlow) : [];
   const slug = recordedSlug(story.nornComments.map((c) => c.body)) ?? slugify(story.title);
   const events: FeedEvent[] = [];
   for (const issue of [story, ...slices]) {
-    // A slice runs its flow; the story the process built into norn.
-    const flow = flowIn(issue);
-    const states: readonly string[] = flow ? Object.keys(flow.states) : STATES;
-    const fixStates: readonly string[] = flow ? fixStatesOf(flow) : FIX_STATES;
+    // Each issue runs its flow, read without GitHub so the feed stays pure.
+    const flow = builtInFlowOf(issue);
+    const states: readonly string[] = flow ? Object.keys(flow.states) : [];
+    const fixStates: readonly string[] = flow ? fixStatesOf(flow) : [];
     const blocked = flow ? blockedStates(flow) : null;
     /** Whether norn released the issue from being held by its blockers. */
     const released = (from: string | null, to: string) => blocked !== null && from === blocked.held && to === blocked.release;
@@ -93,9 +95,9 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
       list.find((x) => Math.abs(Date.parse(x.t.at) - Date.parse(at)) <= MATCH_MS && ok(x));
     const markers = issue.timeline.flatMap((t) => (t.kind === "comment" && t.body !== null ? [{ t, reason: needsHumanIn(t.body) }] : []));
 
-    // The PR from the issue's own branch: the story PR on the story, a slice PR on its slice. A PR comes
-    // before what norn does about it at the same time, e.g. closing the story it merged.
-    const branch = issue === story ? storyBranch(story.number, slug) : sliceBranch(story.number, slug, issue.number);
+    // The PR from the issue's branch, as its workspace names it: the story PR on the story, a slice PR on its slice.
+    // A PR comes before what norn does about it at the same time, e.g. closing the story it merged.
+    const branch = flow?.workspace === "parent" ? sliceBranch(story.number, slug, issue.number) : storyBranch(issue.number, slug);
     const target = issue === story ? "story" : "slice";
     for (const pr of issue.pullRequests.filter((p) => p.head === branch)) {
       const at = { ...base, url: pr.url, target, pr: pr.number } as const;
@@ -127,7 +129,7 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
         const step = stepAt(issue, from, flow);
         // Review or QA sending the issue back starts a round; the implement after it finishes that round.
         const entersFix = fixStates.includes(to) && from !== to;
-        const fixRound = entersFix ? fixRounds(upTo.slice(0, -1), fixStates) + 1 : fixes(step, from, flow) ? fixRounds(upTo, fixStates) || null : null;
+        const fixRound = entersFix ? fixRounds(upTo.slice(0, -1), fixStates) + 1 : fixes(from, flow) ? fixRounds(upTo, fixStates) || null : null;
         events.push({
           ...at,
           id: `outcome:${t.url}`,
@@ -179,7 +181,7 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
           );
           continue;
         }
-        if ((FLAGS as readonly string[]).includes(t.label)) continue;
+        if ((ENGINE_FLAGS as readonly string[]).includes(t.label) || t.label.startsWith("type:")) continue;
         events.push({
           ...ofIssue,
           id,
@@ -215,28 +217,16 @@ function targetOf(to: string): Target {
   return to === "closed as not planned" ? "not-planned" : (to as Target);
 }
 
-/**
- * The built-in flow the issue runs, read without GitHub so the feed stays pure; null for the story, which runs the
- * process built into norn.
- */
-function flowIn(issue: Issue): Flow | null {
-  const name = flowNameOf(issue);
-  const loaded = name === null ? null : builtInFlow(name);
-  return loaded?.ok ? loaded.flow : null;
-}
-
-/** The step an issue in `from` was in, in its flow or as the machine has it; a new issue's is triage. */
+/** The step an issue of the flow in `from` was in; null for none, e.g. triage, before it had the flow. */
 function stepAt(issue: Issue, from: State | null, flow: Flow | null): Step | null {
-  const states: readonly string[] = flow ? Object.keys(flow.states) : STATES;
-  const flags = issue.labels.filter((l) => !states.includes(l) && l !== "needs-human");
-  const then = { ...issue, state: "open" as const, labels: from ? [...flags, from] : flags.filter((l) => !l.startsWith("type:")) };
-  return flow ? flowStep(then, flow) : stepFor(then);
+  if (!flow || !from) return null;
+  const flags = issue.labels.filter((l) => !Object.hasOwn(flow.states, l) && l !== "needs-human");
+  return flowStep({ ...issue, state: "open" as const, labels: [...flags, from] }, flow);
 }
 
 /** Whether the step taken in `from` fixes what a fix round sent back: a step in a state that counts rounds, or in the one such a state enters as. */
-function fixes(step: Step | null, from: string | null, flow: Flow | null): boolean {
-  if (!flow) return step?.skill === "norn-implement";
-  return from !== null && fixStatesOf(flow).some((s) => s === from || flow.states[s].enterAs === from);
+function fixes(from: string | null, flow: Flow | null): boolean {
+  return flow !== null && from !== null && fixStatesOf(flow).some((s) => s === from || flow.states[s].enterAs === from);
 }
 
 /** Newest-first lists merged into one, newest first; events at the same time keep their order. */

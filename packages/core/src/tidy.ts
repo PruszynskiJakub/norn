@@ -1,6 +1,8 @@
 import { join, relative } from "node:path";
+import { slicesOf } from "./behaviours.js";
+import { noun } from "./briefing.js";
+import { type Flow, flowOf } from "./flow.js";
 import type { Issue, PullRequest } from "./github.js";
-import { kindOf, slicesOf } from "./machine.js";
 import { storySlug } from "./slug.js";
 import { sliceBranch, storyBranch, worktreePath } from "./text.js";
 import type { Ctx } from "./transitions.js";
@@ -14,7 +16,8 @@ export function qaBranch(n: number) {
 /** Something tidy removes. `into` is where a branch was merged. */
 export type Removal =
   | { kind: "qa-branch"; branch: string; issue: number }
-  | { kind: "worktree"; path: string; of: "story" | "slice" | "new"; issue: number }
+  /** `of` is what the issue is called, see noun. */
+  | { kind: "worktree"; path: string; of: "story" | "slice" | "issue"; issue: number }
   | { kind: "local-branch"; branch: string; into: string }
   | { kind: "remote-branch"; branch: string; into: string }
   | { kind: "claim"; issue: number };
@@ -44,8 +47,10 @@ export interface TidyResult {
 interface Owned {
   branch: string;
   issue: Issue;
-  /** Where the branch merges: the story branch for a slice, the base branch for a story. */
+  /** Where the branch merges: the parent's branch for a slice, the base branch for an issue with a branch of its own. */
   into: string;
+  /** The issue's flow. */
+  flow: Flow;
 }
 
 /**
@@ -120,7 +125,7 @@ export async function tidy(ctx: Ctx, dryRun: boolean): Promise<TidyResult> {
         report.kept.push(keep);
         continue;
       }
-      localFree = await attempt({ kind: "worktree", path: rel, of: kindOf(owned.issue), issue: n }, () => workspace.removeWorktree(rel, ctx.config.provider));
+      localFree = await attempt({ kind: "worktree", path: rel, of: noun(owned.flow), issue: n }, () => workspace.removeWorktree(rel, ctx.config.provider));
     } else if (checkedOut && merged && local.has(branch)) {
       report.kept.push({ kind: "branch-checked-out", branch, at: checkedOut.path });
     }
@@ -148,18 +153,21 @@ async function mergedHead(ctx: Ctx, branch: string, pr: PullRequest | null) {
 }
 
 /**
- * The story or slice a branch belongs to, from the story's recorded slug and
- * its slices. Anything else, e.g. a branch named by hand, is not norn's.
+ * The issue a branch belongs to: one whose flow gives it a branch of its own,
+ * from its recorded slug, or one of its slices. Anything else, e.g. a branch
+ * named by hand, is not norn's.
  */
 async function ownerOf(ctx: Ctx, branch: string, issue: (n: number) => Promise<Issue | null>, slices: Map<number, Promise<Issue[]>>): Promise<Owned | null> {
   const m = /^(\d+)-/.exec(branch);
   if (!m) return null;
   const story = await issue(Number(m[1]));
-  if (!story || kindOf(story) !== "story") return null;
+  const loaded = story ? await flowOf(ctx, story) : null;
+  if (!story || !loaded?.ok || loaded.flow.workspace !== "own") return null;
   const own = storyBranch(story.number, await storySlug(ctx, story));
-  if (branch === own) return { branch, issue: story, into: ctx.config.baseBranch };
+  if (branch === own) return { branch, issue: story, into: ctx.config.baseBranch, flow: loaded.flow };
   if (!branch.startsWith(`${own}-`)) return null;
-  if (!slices.has(story.number)) slices.set(story.number, slicesOf(ctx.github, story.number));
+  if (!slices.has(story.number)) slices.set(story.number, slicesOf(ctx.github, story.number, loaded.flow));
   const slice = (await slices.get(story.number)!).find((s) => sliceBranch(story.number, own.slice(`${story.number}-`.length), s.number) === branch);
-  return slice ? { branch, issue: slice, into: own } : null;
+  const sliceFlow = slice ? await flowOf(ctx, slice) : null;
+  return slice && sliceFlow?.ok ? { branch, issue: slice, into: own, flow: sliceFlow.flow } : null;
 }

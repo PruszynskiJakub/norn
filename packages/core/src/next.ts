@@ -5,12 +5,10 @@ import { join } from "node:path";
 import { branchAt, createWorktreeCommand, locate } from "./location.js";
 import { isWithin, type Provider } from "./workspace.js";
 import type { GitHub, Issue } from "./github.js";
-import { gateOf, holds, releaseBlocked, uses } from "./behaviours.js";
-import { type Flow, type FlowError, flowOf, flowStatesOf, flowStep, type LoadedFlow } from "./flow.js";
-import { STATES, kindOf, slicesOf, stateOf, statesOf, type Step, stepFor } from "./machine.js";
-import { storySlug } from "./slug.js";
-import { storyBranch } from "./text.js";
-import { bestEffort, clearClosedState, closeMergedStory, ensureStoryBranch, leftState, needsHumanReason, promoteStory, type Ctx } from "./transitions.js";
+import { gateOf, heldInput, heldWaiting, holds, needsBranch, reconcileState, releaseBlocked, slicesOf, usedIn, uses } from "./behaviours.js";
+import { type Flow, type FlowError, flowNameOf, flowOf, flowStatesOf, flowStep, type LoadedFlow } from "./flow.js";
+import type { Step } from "./machine.js";
+import { bestEffort, clearClosedState, ensureOwnBranch, leftState, needsHumanReason, type Ctx } from "./transitions.js";
 
 /** A repository flow by its name, the type of the issues that run it. */
 export interface NamedFlow {
@@ -104,39 +102,34 @@ export interface NextReport {
 }
 
 /**
- * Catches the story up with what earlier commands left undone or could not do:
- * the story branch, moving on once every slice is merged, closing a merged
- * story and clearing state labels left on closed issues. Removing what closed
- * issues leave behind is norn tidy's. Returns what changed or failed.
+ * Catches the issue up with what earlier commands left undone or could not do:
+ * its own branch, what the behaviours of its state do on their own, e.g. moving
+ * on once every slice is merged or closing it once its PR is merged, and
+ * clearing state labels left on closed issues. Removing what closed issues
+ * leave behind is norn tidy's. Returns what changed or failed.
  */
-async function reconcile(ctx: Ctx, storyNumber: number): Promise<Event[]> {
+async function reconcile(ctx: Ctx, n: number, flow: Flow): Promise<Event[]> {
   const { github } = ctx;
   const notes: Event[] = [];
-  const story = await github.getIssue(storyNumber);
-  if (story.state === "open" && stateOf(story) === "implementation") {
+  const issue = await github.getIssue(n);
+  const held = issue.state === "open" ? heldInput(ctx, issue, flow) : null;
+  if (held && needsBranch(flow, held.state)) {
     try {
-      const branch = await ensureStoryBranch(ctx, story);
+      const branch = await ensureOwnBranch(ctx, issue);
       if (!branch.ok) notes.push(branch.refusal);
       else if (branch.created) notes.push({ kind: "story-branch-created", branch: branch.branch });
     } catch (e) {
       notes.push({ kind: "story-branch-failed", detail: (e as Error).message });
     }
   }
-  notes.push(...(await bestEffort("move-story-on", storyNumber, storyNumber, () => promoteStory(ctx, storyNumber))));
-  notes.push(
-    ...(await bestEffort("close-merged-story", storyNumber, storyNumber, async () => {
-      if (!(await closeMergedStory(ctx, story))) return [];
-      story.state = "closed";
-      story.labels = story.labels.filter((l) => !(STATES as readonly string[]).includes(l));
-      return [{ kind: "story-closed", story: storyNumber }];
-    })),
-  );
-  const closed = (await slicesOf(github, storyNumber)).filter((s) => s.state === "closed");
-  if (story.state === "closed") closed.push(story);
-  for (const issue of closed) {
+  if (held) notes.push(...(await reconcileState(held)));
+  const closed = (await slicesOf(github, n, flow)).filter((s) => s.state === "closed");
+  if (issue.state === "closed") closed.push(issue);
+  for (const i of closed) {
     notes.push(
-      ...(await bestEffort("clear-labels", issue.number, storyNumber, async () => {
-        await clearClosedState(ctx, issue);
+      ...(await bestEffort("clear-labels", i.number, n, async () => {
+        const loaded = i === issue ? null : await flowOf(ctx, i);
+        await clearClosedState(ctx, i, i === issue ? flow : loaded?.ok ? loaded.flow : null);
         return [];
       })),
     );
@@ -145,110 +138,33 @@ async function reconcile(ctx: Ctx, storyNumber: number): Promise<Event[]> {
 }
 
 /**
- * What can be done on a story now. Syncs blocked labels and catches up on
- * housekeeping first. With `flow`, on an issue of that repository flow instead.
+ * What can be done on an issue of a flow now: on the issue itself and, for
+ * one with slices, on each of them. Syncs blocked labels and catches up on
+ * housekeeping first. An issue of a broken flow waits for a person to fix it.
  */
-export async function computeNext(ctx: Ctx, storyNumber: number, flow: LoadedFlow | null = null): Promise<NextReport> {
-  if (flow) return computeNextInFlow(ctx, storyNumber, flow);
+export async function computeNext(ctx: Ctx, n: number, loaded: LoadedFlow): Promise<NextReport> {
   const { github } = ctx;
-  await releaseBlocked(ctx, storyNumber);
-  const notes = await reconcile(ctx, storyNumber);
-  const story = await github.getIssue(storyNumber);
-  const slices = await slicesOf(github, storyNumber);
+  const flow = loaded.ok ? loaded.flow : null;
+  // An issue with slices is a story: next runs it with its slices.
+  const story = flow !== null && usedIn(flow, "slices");
+  if (story) await releaseBlocked(ctx, n);
+  const notes = flow ? await reconcile(ctx, n, flow) : [];
+  const issue = await github.getIssue(n);
+  const slices = flow ? await slicesOf(github, n, flow) : [];
+  const loc = flow ? await locate(issue, ctx, flow) : null;
   const report: NextReport = {
-    story: storyNumber,
+    story: n,
+    ...(story ? {} : { flow: loaded.name }),
     provider: ctx.config.provider,
     maxParallel: ctx.config.maxParallel,
-    title: story.title,
-    // A closed story has no state, whatever labels GitHub left on it.
-    state: story.state === "closed" ? null : stateOf(story),
-    branch: storyBranch(storyNumber, await storySlug(ctx, story)),
+    title: issue.title,
+    // A closed issue has no state, whatever labels GitHub left on it.
+    state: issue.state === "closed" || !flow ? null : (flowStatesOf(issue, flow)[0] ?? null),
+    branch: loc?.branch ?? null,
     slices: { total: slices.length, merged: slices.filter((s) => s.state === "closed").length },
     start: [],
     waiting: [],
     notes,
-    nothingLeft: false,
-    closed: story.state === "closed",
-    notPlanned: story.stateReason === "not_planned",
-    notified: ctx.config.notifications !== null,
-    running: 0,
-    slots: ctx.config.maxParallel,
-  };
-  if (report.closed) {
-    report.nothingLeft = true;
-    return report;
-  }
-  if (stateOf(story) === "merge-queue") {
-    report.waiting.push({ issue: storyNumber, reason: "owner-merge", owner: story.assignees[0] ?? null, into: ctx.config.baseBranch });
-    report.nothingLeft = true;
-    return report;
-  }
-  for (const issue of [story, ...slices]) {
-    if (issue.state !== "open") continue;
-    await classify(ctx, issue, report);
-  }
-  report.nothingLeft = report.start.length === 0 && !report.waiting.some((w) => w.reason === "held");
-  report.running = report.waiting.filter((w) => w.reason === "held" && w.holder.mine).length;
-  report.slots = Math.max(0, ctx.config.maxParallel - report.running);
-  // A person already at work on everything waiting for one needs no notice.
-  report.notified &&= toNotify(report).length > 0 || !report.waiting.some((w) => "heldBy" in w && w.heldBy);
-  return report;
-}
-
-/** Sorts the story or one of its slices between people and agents; a slice runs its flow. */
-async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
-  const n = issue.number;
-  const loaded = await flowOf(ctx, issue);
-  if (loaded && !loaded.ok) {
-    report.waiting.push({ issue: n, reason: "invalid-flow", flow: loaded.name, errors: loaded.errors });
-    return;
-  }
-  if (loaded) {
-    await classifyInFlow(ctx, issue, report, loaded, "slice");
-    return;
-  }
-  const state = stateOf(issue);
-  const states = statesOf(issue);
-  if (states.length > 1) {
-    report.waiting.push({ issue: n, reason: "ambiguous-state", states });
-    return;
-  }
-  if (issue.labels.includes("needs-human")) {
-    report.waiting.push({ issue: n, reason: "needs-human", why: await needsHumanReason(ctx.github, n), ...(await humanWork(ctx, issue)) });
-    return;
-  }
-  // The state itself says a person is needed; their agent takes it with them.
-  if (state === "needs-human-qa") {
-    report.waiting.push({ issue: n, reason: "human-qa", of: "story", ...(await humanWork(ctx, issue)) });
-    return;
-  }
-  if (!state) {
-    // Not skipped silently: with no state norn cannot brief it, and delivery must not report nothing left.
-    report.waiting.push({ issue: n, reason: "no-state" });
-    return;
-  }
-  const step = stepFor(issue);
-  if (!step) return;
-  await offer(ctx, issue, report, { kind: "story", state, step, flow: null });
-}
-
-/** What can be done on an issue of a repository flow now: it has no slices, so only the issue itself. */
-async function computeNextInFlow(ctx: Ctx, n: number, loaded: LoadedFlow): Promise<NextReport> {
-  const issue = await ctx.github.getIssue(n);
-  const flow = loaded.ok ? loaded : null;
-  const loc = flow ? await locate(issue, ctx, flow.flow) : null;
-  const report: NextReport = {
-    story: n,
-    flow: loaded.name,
-    provider: ctx.config.provider,
-    maxParallel: ctx.config.maxParallel,
-    title: issue.title,
-    state: issue.state === "closed" || !flow ? null : (flowStatesOf(issue, flow.flow)[0] ?? null),
-    branch: loc?.branch ?? null,
-    slices: { total: 0, merged: 0 },
-    start: [],
-    waiting: [],
-    notes: [],
     nothingLeft: false,
     closed: issue.state === "closed",
     notPlanned: issue.stateReason === "not_planned",
@@ -262,12 +178,28 @@ async function computeNextInFlow(ctx: Ctx, n: number, loaded: LoadedFlow): Promi
   }
   // A broken flow cannot run: a person fixes it first.
   if (!loaded.ok) report.waiting.push({ issue: n, reason: "invalid-flow", flow: loaded.name, errors: loaded.errors });
-  else await classifyInFlow(ctx, issue, report, loaded, "issue");
+  else await classifyInFlow(ctx, issue, report, loaded, story ? "story" : "issue");
+  for (const slice of slices) {
+    if (slice.state !== "open") continue;
+    await classify(ctx, slice, report);
+  }
   report.nothingLeft = report.start.length === 0 && !report.waiting.some((w) => w.reason === "held");
   report.running = report.waiting.filter((w) => w.reason === "held" && w.holder.mine).length;
   report.slots = Math.max(0, ctx.config.maxParallel - report.running);
+  // A person already at work on everything waiting for one needs no notice.
   report.notified &&= toNotify(report).length > 0 || !report.waiting.some((w) => "heldBy" in w && w.heldBy);
   return report;
+}
+
+/** Sorts one of the story's slices between people and agents: it runs its own flow. */
+async function classify(ctx: Ctx, issue: Issue, report: NextReport) {
+  const loaded = await flowOf(ctx, issue);
+  if (!loaded) return;
+  if (!loaded.ok) {
+    report.waiting.push({ issue: issue.number, reason: "invalid-flow", flow: loaded.name, errors: loaded.errors });
+    return;
+  }
+  await classifyInFlow(ctx, issue, report, loaded, "slice");
 }
 
 /**
@@ -308,8 +240,9 @@ async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, { name
     return;
   }
   if (holds(flow, state)) {
-    const open = (await ctx.github.blockedBy(n)).filter((b) => b.state === "open");
-    report.waiting.push({ issue: n, reason: "blocked", blockers: open.map((b) => b.number) });
+    // What holds it says what it waits for, if anything a listing needs.
+    const item = await heldWaiting({ ctx, issue, flow, flowName: flowNameOf(issue) ?? name, state });
+    if (item) report.waiting.push(item);
     return;
   }
   const step = flowStep(issue, flow);
@@ -393,12 +326,11 @@ export const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owne
 /** Why next refuses: n is not a story. */
 export type NotAStory = { kind: "is-a-slice"; issue: number; story: number | null } | { kind: "not-a-story"; issue: number };
 
-/** Why next refuses the issue, of `loaded` flow: one with no flow but a story, or one that works in its parent's branch, which moves on with it. */
+/** Why next refuses the issue, of `loaded` flow: one with no flow yet, or one that works in its parent's branch, which moves on with it. */
 export async function notAStory(github: GitHub, issue: Issue, loaded: LoadedFlow | null): Promise<NotAStory | null> {
   const n = issue.number;
   if (loaded?.ok && loaded.flow.workspace === "parent") return { kind: "is-a-slice", issue: n, story: await github.parentOf(n) };
-  if (loaded || kindOf(issue) === "story") return null;
-  return { kind: "not-a-story", issue: n };
+  return loaded ? null : { kind: "not-a-story", issue: n };
 }
 
 /** What waits for a person that no session holds. */

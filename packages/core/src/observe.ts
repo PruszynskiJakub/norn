@@ -1,7 +1,9 @@
+import { fixStatesOf, slicesAmong, uses } from "./behaviours.js";
+import type { State } from "./built-in-flows.js";
 import { isStale } from "./claims.js";
 import { byTime, type FeedEvent, feedOf } from "./feed.js";
+import { builtInFlowOf, type Flow, flowStatesOf, modeOf } from "./flow.js";
 import type { ObservedIssue, ObservedStory } from "./github.js";
-import { kindOf, type State, stateOf, statesOf } from "./machine.js";
 import { recordedSlug } from "./slug.js";
 import { slugify, storyBranch } from "./text.js";
 import { type Ctx, fixRounds, lastNeedsHumanReason, needsHumanIn, parseTransitionComment } from "./transitions.js";
@@ -36,7 +38,7 @@ export interface BoardItem {
   needsHuman: boolean;
   /** The reason norn recorded for needs-human, opaque; null without one. */
   needsHumanReason: string | null;
-  /** A person QAs it before it merges: every story, and a slice in mode:hil. */
+  /** A person QAs it before it merges: its flow has a human gate for its mode, e.g. every story, and a slice in mode:hil. */
   humanQa: boolean;
   /** The QA evidence of its latest run, if any. */
   latestEvidence: { branch: string; sha: string; files: string[] } | null;
@@ -101,24 +103,25 @@ export async function observe(ctx: Ctx, opts: { since?: string | null; previous?
     const c = claims.get(n);
     return c ? { login: c.holder, session: c.session, since: c.since, stale: isStale(c, now, ctx.config.staleAfterMs) } : null;
   };
-  const item = (i: ObservedIssue, story: boolean): BoardItem => {
+  const item = (i: ObservedIssue): BoardItem => {
     const closed = i.state === "closed";
     const bodies = i.nornComments.map((c) => c.body);
+    const flow = builtInFlowOf(i);
     return {
       number: i.number,
       title: i.title,
       url: i.url,
       status: closed ? (i.stateReason === "not_planned" ? "closed" : "merged") : "open",
-      states: closed ? [] : statesOf(i),
+      states: closed || !flow ? [] : (flowStatesOf(i, flow) as State[]),
       labels: [...i.labels],
       mode: i.labels.includes("mode:hil") ? "hil" : i.labels.includes("mode:afk") ? "afk" : null,
       blockedBy: closed ? [] : i.blockedBy.filter((b) => b.state === "open").map((b) => b.number),
       holder: closed ? null : holder(i.number),
-      fixRounds: fixRounds(bodies),
+      fixRounds: flow ? fixRounds(bodies, fixStatesOf(flow)) : 0,
       maxFixRounds: ctx.config.maxFixRounds,
       needsHuman: i.labels.includes("needs-human"),
       needsHumanReason: i.labels.includes("needs-human") ? lastNeedsHumanReason(bodies) : null,
-      humanQa: story || i.labels.includes("mode:hil"),
+      humanQa: flow !== null && gated(flow, i),
       latestEvidence:
         [...bodies]
           .reverse()
@@ -134,22 +137,26 @@ export async function observe(ctx: Ctx, opts: { since?: string | null; previous?
   const board: BoardStory[] = work.stories.filter(mine).map((s) => {
     const slug = recordedSlug(s.nornComments.map((c) => c.body)) ?? slugify(s.title);
     return {
-      ...item(s, true),
+      ...item(s),
       owner: s.assignees[0] ?? null,
       branch: storyBranch(s.number, slug),
-      slices: s.subIssues.filter((i) => kindOf(i) === "slice").map((i) => item(i, false)),
+      slices: slicesOfStory(s).map(item),
     };
   });
   const waiting: WaitingItem[] = [];
   for (const s of work.stories.filter((s) => s.assignees.includes(me) && s.state === "open")) {
-    for (const i of [s, ...s.subIssues.filter((i) => kindOf(i) === "slice")]) {
+    for (const i of [s, ...slicesOfStory(s)]) {
       if (i.state !== "open") continue;
-      const kind = i.labels.includes("needs-human") ? "needs-human" : stateOf(i) === "needs-human-qa" ? "needs-human-qa" : null;
+      const flow = builtInFlowOf(i);
+      const states = flow ? flowStatesOf(i, flow) : [];
+      // At a human gate, a person QAs it.
+      const gate = flow && states.length === 1 && uses(flow, states[0], "humanGate") ? states[0] : null;
+      const kind = i.labels.includes("needs-human") ? "needs-human" : gate ? "needs-human-qa" : null;
       if (!kind) continue;
       const bodies = i.nornComments.map((c) => c.body);
       const entered = [...i.nornComments]
         .reverse()
-        .find((c) => (kind === "needs-human" ? needsHumanIn(c.body) !== null : parseTransitionComment(c.body)?.to === "needs-human-qa"));
+        .find((c) => (kind === "needs-human" ? needsHumanIn(c.body) !== null : parseTransitionComment(c.body)?.to === gate));
       waiting.push({
         issue: i.number,
         story: s.number,
@@ -179,6 +186,18 @@ export async function observe(ctx: Ctx, opts: { since?: string | null; previous?
     feed: byTime(feed),
     claims: snapshot,
   };
+}
+
+/** A story's slices on the board: the sub-issues of the type its flow's slices behaviour names. */
+function slicesOfStory(s: ObservedStory): ObservedIssue[] {
+  const flow = builtInFlowOf(s);
+  return flow ? slicesAmong(s.subIssues, flow) : [];
+}
+
+/** Whether a person QAs an issue of the flow: it has a human gate that runs in the issue's mode. An issue with no mode runs every state. */
+function gated(flow: Flow, issue: ObservedIssue): boolean {
+  const mode = modeOf(issue);
+  return Object.entries(flow.states).some(([name, s]) => uses(flow, name, "humanGate") && (!s.when || s.when === mode));
 }
 
 /**
