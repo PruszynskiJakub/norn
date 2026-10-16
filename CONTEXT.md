@@ -36,6 +36,10 @@ The flow an issue runs, carried as its `type:<name>` label, e.g. `type:bug` runs
 **Workspace**:
 Where a flow's work happens: `none`, no branch; `own`, a branch of the issue's own with one PR into the base branch.
 
+**Orphaned issue**:
+An issue left in a state its flow no longer has. norn moves it to the new name when the flow's `renamed` map names the state, and otherwise hands it to a person through `needs-human`.
+_Avoid_: stale state, migrated issue
+
 **State**:
 Where an issue is in its process, carried as exactly one state label, e.g. `needs-review`. Two state labels mean a label change failed halfway, and norn acts on neither.
 

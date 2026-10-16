@@ -20,6 +20,9 @@ import {
   ensureStoryBranch,
   fixLimitReason,
   fixRounds,
+  followRename,
+  handOverLeft,
+  leftState,
   followUps,
   needsHumanLine,
   oneLine,
@@ -144,7 +147,9 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
   const before = await github.getIssue(n);
   const first = await stepOf(ctx, before);
   if (!first.ok) return first;
-  if (!first.step || before.state === "closed") return refuse(await noStepRefusal(before, ctx, first.flow));
+  // An issue left in a state its flow no longer has is moved or handed to a person under the claim.
+  const left = first.flow && !first.step ? await leftState(ctx, before, first.flow) : null;
+  if ((!first.step && !left) || before.state === "closed") return refuse(await noStepRefusal(before, ctx, first.flow));
 
   const user = await github.currentUser();
   const record = { holder: user, session: ctx.session, since: ctx.now().toISOString() };
@@ -158,7 +163,23 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
   }
   // Re-read under the claim: labels may have moved between the first read and the claim.
   const issue = await github.getIssue(n);
-  const resolved = await stepOf(ctx, issue);
+  let resolved = await stepOf(ctx, issue);
+  if (resolved.ok && resolved.flow && !resolved.step) {
+    const from = await leftState(ctx, issue, resolved.flow);
+    const to = from === null ? undefined : resolved.flow.renamed?.[from];
+    const name = flowNameOf(issue)!;
+    if (from !== null && to !== undefined) {
+      await followRename(ctx, issue, resolved.flow, name, from, to);
+      resolved = await stepOf(ctx, issue);
+    } else if (from !== null) {
+      try {
+        await handOverLeft(ctx, issue, name, from);
+      } finally {
+        await github.deleteClaim(n);
+      }
+      return refuse({ kind: "state-left", issue: n, state: from, flow: name });
+    }
+  }
   if (!resolved.ok || !resolved.step) {
     await github.deleteClaim(n);
     return resolved.ok ? refuse(await noStepRefusal(issue, ctx, resolved.flow)) : resolved;

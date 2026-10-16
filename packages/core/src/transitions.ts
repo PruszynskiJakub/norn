@@ -177,7 +177,9 @@ export async function applyOutcome(
 ): Promise<void> {
   const { github } = ctx;
   const n = issue.number;
-  const from = (flow ? flowStatesOf(issue, flow)[0] : stateOf(issue)) ?? "triage";
+  // An issue whose state its flow dropped moves on from that state.
+  const left = flow ? await leftState(ctx, issue, flow) : null;
+  const from = (flow ? (flowStatesOf(issue, flow)[0] ?? left) : stateOf(issue)) ?? "triage";
   // The resolve step has no outcome word and keeps the state; say what it did.
   const resolved = !word && issue.labels.includes("needs-human") && !outcome.needsHuman;
   const why = word || (resolved ? "needs-human resolved" : "");
@@ -211,7 +213,7 @@ export async function applyOutcome(
       add.push("needs-human");
       comment.push("", needsHumanLine(outcome.needsHuman));
     }
-    const remove = ["in-progress", ...(outcome.needsHuman ? [] : ["needs-human"]), ...stateLabels(issue, outcome.to, flow)];
+    const remove = ["in-progress", ...(outcome.needsHuman ? [] : ["needs-human"]), ...stateLabels(issue, outcome.to, flow), ...(left ? [left] : [])];
     await github.addLabels(n, add);
     await github.comment(n, comment.join("\n"));
     await github.removeLabels(n, remove);
@@ -290,6 +292,46 @@ async function setState(ctx: Ctx, issue: Issue, to: State, why: string) {
   await ctx.github.addLabels(issue.number, [to]);
   await ctx.github.comment(issue.number, `norn: ${from} → ${to} (automatic)\n\n${why}${slug ? `\n\n${slug}` : ""}`);
   await ctx.github.removeLabels(issue.number, stateLabels(issue, to));
+}
+
+/**
+ * The state an issue of a repository flow was left in that the flow no longer
+ * has; null when it carries a state of the flow, or never had one. A label the
+ * flow's `renamed` names counts; else the state norn last moved it to.
+ */
+export async function leftState(ctx: Ctx, issue: Issue, flow: Flow): Promise<string | null> {
+  if (issue.state === "closed" || flowStatesOf(issue, flow).length) return null;
+  const renamed = Object.keys(flow.renamed ?? {}).find((s) => issue.labels.includes(s));
+  if (renamed) return renamed;
+  const comments = await ctx.github.listComments(issue.number);
+  for (const body of [...comments].reverse()) {
+    const t = parseTransitionComment(body);
+    if (!t) continue;
+    const ended = t.to === "closed" || t.to === "closed as not planned";
+    return ended || Object.hasOwn(flow.states, t.to) ? null : t.to;
+  }
+  return null;
+}
+
+/** Moves an issue in a renamed state to its new name, under the claim this session holds. */
+export async function followRename(ctx: Ctx, issue: Issue, flow: Flow, name: string, from: string, to: string): Promise<void> {
+  const n = issue.number;
+  await ensureStateLabel(ctx, flow, to);
+  await ctx.github.addLabels(n, [to]);
+  await ctx.github.comment(n, `norn: ${from} → ${to} (automatic)\n\nThe flow ${name} renamed the state ${from} to ${to}.`);
+  await ctx.github.removeLabels(n, [from]);
+  issue.labels = [...issue.labels.filter((l) => l !== from), to];
+}
+
+/** Hands an issue in a state its flow no longer has to a person, under the claim this session holds. */
+export async function handOverLeft(ctx: Ctx, issue: Issue, name: string, state: string): Promise<void> {
+  const n = issue.number;
+  const why = `the state ${state} is no longer in the flow ${name}`;
+  await ctx.github.addLabels(n, ["needs-human"]);
+  await ctx.github.comment(n, needsHumanLine(why));
+  // The old label goes, so the resolve step moves the issue into a state of the flow.
+  await ctx.github.removeLabels(n, [state, "in-progress"]);
+  await notifyNeedsHuman(ctx, n, why);
 }
 
 /**

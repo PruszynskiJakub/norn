@@ -393,3 +393,67 @@ describe("triage offers the flows", () => {
     expect(res.outcomes).toEqual(["story", "reject"]);
   });
 });
+
+describe("a flow that changed under issues in progress", () => {
+  test("a renamed target that is not a state of the flow fails validation", async () => {
+    const w = bugAt("reproducing", bugFlow({ renamed: { verifying: "checking", repro: "reproducing" } }));
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("#40 runs the flow bug, which is broken");
+    expect(res.stdout).toContain("  renamed moves verifying to checking, which is not one of its states.");
+    expect(res.stdout).not.toContain("repro to");
+  });
+
+  test("take moves an issue in a renamed state to its new name, with a transition comment, and briefs that state", async () => {
+    const w = bugAt("repro", bugFlow({ renamed: { repro: "reproducing" } }));
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(0);
+    expect(res.stdout).toContain("Its step is reproducing.");
+    expect(res.stdout).toContain("Invoke the skill: bug-repro\n");
+    expect(w.github.labels(40).sort()).toEqual(["in-progress", "reproducing", "type:bug"]);
+    expect(w.github.comments(40)).toEqual(["norn: repro → reproducing (automatic)\n\nThe flow bug renamed the state repro to reproducing."]);
+  });
+
+  /** A bug that norn moved into verifying, a state the bug flow has since dropped. */
+  async function leftInVerifying() {
+    const w = bugAt("verifying");
+    await w.github.comment(40, "norn: fixing → verifying (fixed)");
+    return w;
+  }
+
+  test("take hands an issue in a removed state to a person, naming the state and the flow", async () => {
+    const w = await leftInVerifying();
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toBe(
+      [
+        "#40 is in verifying, which the flow bug no longer has, so it now needs a human.",
+        "Run norn take 40 to resolve it: a person moves it to a state of the flow.",
+      ].join("\n"),
+    );
+    expect(w.github.labels(40).sort()).toEqual(["needs-human", "type:bug"]);
+    expect(w.github.comments(40).at(-1)).toBe("norn: needs-human — the state verifying is no longer in the flow bug");
+    expect(w.github.claim(40)).toBeNull();
+  });
+
+  test("resolving it moves the issue into the state of the flow a person picks", async () => {
+    const w = await leftInVerifying();
+    await w.norn("take", "40");
+
+    const out = (await w.norn("take", "40")).stdout;
+    const res = await w.norn("done", "40", "fixing");
+
+    expect(out).toContain("Invoke the skill: norn-resolve\n");
+    expect(out).toContain("norn done 40 reproducing");
+    expect(out).toContain("norn done 40 fixing");
+    expect(res.exitCode).toBe(0);
+    expect(w.github.labels(40).sort()).toEqual(["fixing", "type:bug"]);
+    expect(w.github.comments(40).at(-1)).toBe("norn: verifying → fixing (fixing)");
+  });
+});
