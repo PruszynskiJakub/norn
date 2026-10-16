@@ -7,7 +7,7 @@ import { sliceBranch, specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
-import { notifyNeedsHuman, type Notify } from "./notify.js";
+import { notifyHumanQa, notifyNeedsHuman, type Notify } from "./notify.js";
 
 /** The marker psdd writes when it sets needs-human; psdd next reads the reason back from it. */
 export const NEEDS_HUMAN_MARK = "psdd: needs-human — ";
@@ -131,7 +131,7 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
     await github.comment(n, comment.join("\n"));
     await github.removeLabels(n, remove);
     if (outcome.needsHuman) await notifyNeedsHuman(ctx, n, outcome.needsHuman);
-    else if (outcome.notify) await notifyNeedsHuman(ctx, n, outcome.notify);
+    else if (outcome.notify) await notifyHumanQa(ctx, n, outcome.notify);
   }
 }
 

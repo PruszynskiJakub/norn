@@ -1,5 +1,11 @@
 import { runCommand, type Run } from "./local-workspace.js";
-import type { Message, Notify } from "./notify.js";
+import type { Channel } from "./notify.js";
+
+/** A notification as worded by the front end. */
+export interface Message {
+  title: string;
+  body: string;
+}
 
 const appleScriptString = (s: string) => `"${s.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
 
@@ -26,7 +32,7 @@ function osCommand(platform: NodeJS.Platform, { title, body }: Message): Command
 }
 
 /** Local notifications through herdr or the operating system. */
-export function makeNotifier(platform: NodeJS.Platform = process.platform, run: Run = runCommand): Notify {
+export function makeNotifier(platform: NodeJS.Platform = process.platform, run: Run = runCommand): (channel: Channel, message: Message) => Promise<void> {
   return async (channel, message) => {
     const [cmd, args, env] =
       channel === "herdr"

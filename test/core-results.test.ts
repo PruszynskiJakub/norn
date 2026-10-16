@@ -150,6 +150,33 @@ describe("next", () => {
     expect(res.ok && res.report.notes).toEqual([{ kind: "story-closed", story: 30 }]);
   });
 
+  test("closing a merged story that fails is a follow-up-failed event", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 30, title: "Ship", labels: ["type:story", "merge-queue"] });
+    w.github.prs.push({ number: 99, head: "30-ship", base: "main", state: "merged" });
+    w.github.closeIssue = async () => {
+      throw new Error("HTTP 502");
+    };
+
+    const res = await next(await w.ctx(), 30);
+
+    expect(res.ok && res.report.notes).toEqual([{ kind: "follow-up-failed", what: "close-merged-story", issue: 30, retry: 30, detail: "HTTP 502" }]);
+  });
+
+  test("clearing a closed slice's labels that fails names the slice", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 40, title: "Story", labels: ["type:story", "needs-review"] });
+    w.github.seedIssue({ number: 41, title: "Done", state: "closed", labels: ["type:slice", "mode:afk", "merge-queue"] });
+    w.github.parents.set(41, 40);
+    w.github.removeLabels = async () => {
+      throw new Error("HTTP 502");
+    };
+
+    const res = await next(await w.ctx(), 40);
+
+    expect(res.ok && res.report.notes).toEqual([{ kind: "follow-up-failed", what: "clear-labels", issue: 41, retry: 40, detail: "HTTP 502" }]);
+  });
+
   test("a slice is refused, naming its story", async () => {
     const w = lastSlice();
     expect(await next(await w.ctx(), 41)).toEqual({ ok: false, refusal: { kind: "is-a-slice", issue: 41, story: 40 } });

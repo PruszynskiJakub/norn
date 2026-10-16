@@ -2,6 +2,7 @@ import { parseArgs } from "./args.js";
 import type { Briefing, FinishCommand } from "./briefing.js";
 import { type ConfigProblem, type ConfigWarning, LOCAL_CONFIG, TEAM_CONFIG } from "./config.js";
 import type { Event, FollowUpTask } from "./events.js";
+import type { Notification } from "./notify.js";
 import type { InitResult, MissingSkills } from "./init.js";
 import type { Holder, NextReport, WaitItem } from "./next.js";
 import { FOR_HUMAN } from "./next.js";
@@ -653,4 +654,23 @@ export function renderNext(r: NextReport): string {
   }
   if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. When an item is done, run psdd next ${r.story} again.`);
   return out.join("\n");
+}
+
+// Notifications
+
+/** A notification's title says who must act on what; its body gives the reason and the link. */
+export function renderNotification(n: Notification): { title: string; body: string } {
+  switch (n.kind) {
+    case "needs-human":
+      return { title: `psdd: #${n.issue} needs you`, body: `${n.reason}\n${n.url}` };
+    case "needs-human-qa":
+      return { title: `psdd: #${n.issue} needs you`, body: `needs human QA (${n.of})\n${n.url}` };
+    case "story-waiting":
+      return {
+        title: `psdd: story #${n.story} is waiting for you`,
+        body: n.waiting.map((w) => `#${w.issue} ${waitDetail(w)}`).join("\n") || "Nothing left to do on the story.",
+      };
+    default:
+      return unreachable(n);
+  }
 }

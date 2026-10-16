@@ -282,33 +282,8 @@ function toNotify(r: NextReport) {
   return r.waiting.filter((w) => FOR_HUMAN.includes(w.reason) && !("heldBy" in w && w.heldBy));
 }
 
-/** What the notification says waits on an item. */
-function waitSummary(w: WaitItem): string {
-  switch (w.reason) {
-    case "needs-human":
-      return w.why ?? "see its latest comment";
-    case "human-qa":
-      return `needs human QA (${w.of})`;
-    case "owner-merge":
-      return `waits for its owner (${w.owner ? `@${w.owner}` : "the story owner"}) to merge the story PR into main`;
-    case "no-state":
-      return "has no state label; a person must set one";
-    case "ambiguous-state":
-      return `has more than one state label (${w.states.join(", ")}); a person must remove the stale one`;
-    case "blocked":
-    case "held":
-      return "";
-    default:
-      return w satisfies never;
-  }
-}
-
 /** Delivery stops: tell the user what waits for them. */
 export async function notifyWaiting(ctx: Ctx, r: NextReport) {
   if (!r.notified) return;
-  const waiting = toNotify(r);
-  await send(ctx, {
-    title: `psdd: story #${r.story} is waiting for you`,
-    body: waiting.map((w) => `#${w.issue} ${waitSummary(w)}`).join("\n") || "Nothing left to do on the story.",
-  });
+  await send(ctx, { kind: "story-waiting", story: r.story, waiting: toNotify(r) });
 }

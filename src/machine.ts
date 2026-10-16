@@ -29,8 +29,8 @@ export interface Outcome {
   note?: string;
   /** After the transition, set needs-human; this is who must do what, e.g. an escalation's reason. */
   needsHuman?: string;
-  /** After the transition, a person is needed without the needs-human flag; this is what for, e.g. "needs human QA (mode:hil)". */
-  notify?: string;
+  /** After the transition, a person does QA without the needs-human flag: for a story, or for a slice in mode:hil. */
+  notify?: "story" | "mode:hil";
 }
 
 export interface Step {
@@ -112,7 +112,7 @@ export function stepFor(issue: Issue): Step | null {
               to: "needs-human-qa",
               means: "every criterion you could check passed; moves on to QA by a person",
               note: "evidence",
-              notify: humanQaReason(issue),
+              notify: kind === "story" ? "story" : "mode:hil",
             }
           : { to: "merge-queue", means: "every criterion passed, moves to the merge queue", note: "evidence" },
         fail: { to: "qa-failed", means: "put the failures with their repros in the note", note: "evidence" },
@@ -203,9 +203,4 @@ export function stepFor(issue: Issue): Step | null {
     };
   }
   return null;
-}
-
-/** Why an issue in needs-human-qa waits for a person. */
-export function humanQaReason(issue: Issue) {
-  return kindOf(issue) === "story" ? "needs human QA (story)" : "needs human QA (mode:hil)";
 }

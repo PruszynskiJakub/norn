@@ -1,5 +1,6 @@
 import { run, type Deps } from "../src/cli.js";
 import { loadConfig } from "../src/config.js";
+import { renderNotification } from "../src/render-text.js";
 import type { Ctx } from "../src/transitions.js";
 import { FakeGitHub } from "./fake-github.js";
 import { FakeWorkspace } from "./fake-workspace.js";
@@ -18,8 +19,9 @@ export function setup(opts: { now?: string; session?: string; user?: string } = 
     now: () => now,
     session: opts.session ?? "session-1",
     nonce: () => nonces.shift() ?? `n${++made}`,
-    notify: async (channel, message) => {
-      notifications.push({ channel, ...message });
+    // Recorded as the CLI words them, as the user would see them.
+    notify: async (channel, notification) => {
+      notifications.push({ channel, ...renderNotification(notification) });
     },
     cwd: "/nonexistent",
     installSkills: async () => {
