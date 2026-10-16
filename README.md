@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/PruszynskiJakub/norn/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/norn/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/PruszynskiJakub/norn/releases"><img src="https://img.shields.io/badge/release-v0.7.0-blue" alt="Release v0.7.0"></a>
+  <a href="https://github.com/PruszynskiJakub/norn/releases"><img src="https://img.shields.io/badge/release-v0.8.0-blue" alt="Release v0.8.0"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen" alt="Node 20 or later">
 </p>
 
@@ -52,7 +52,7 @@ You ask your agent `norn-drive <issue>` to shape a story with you. Once it is sl
 norn is not on npm yet. While this repository is private, you need read access to it. Install a release tag, which carries the built CLI:
 
 ```sh
-npm install -D github:PruszynskiJakub/norn#v0.7.0
+npm install -D github:PruszynskiJakub/norn#v0.8.0
 ```
 
 Only release tags can be installed: a branch or commit has no built CLI.

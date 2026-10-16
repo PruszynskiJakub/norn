@@ -4,6 +4,8 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-10-16
+
 ### Added
 
 - `norn doctor` checks the whole setup at once: `gh` and its login, the git checkout and `origin`, `baseBranch` on GitHub, your write access, the labels, the config, the norn version, the skills, the agent instructions and the worktree provider. It lists every check with the command that fixes it, changes nothing, and exits 1 only when a check fails, so CI can run it. `--json` gives `{ ok, checks }`. It runs outside a checkout too, and says so.
@@ -169,7 +171,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/norn/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/norn/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/PruszynskiJakub/norn/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/PruszynskiJakub/norn/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/PruszynskiJakub/norn/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/PruszynskiJakub/norn/compare/v0.5.1...v0.6.0
