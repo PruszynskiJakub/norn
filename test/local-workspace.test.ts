@@ -2,8 +2,8 @@ import { mkdtempSync, mkdirSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
-import { LocalWorkspace, type Run } from "@psdd/workspace-local";
-import { isWithin, samePath } from "@psdd/core";
+import { LocalWorkspace, type Run } from "@shepherd/workspace-local";
+import { isWithin, samePath } from "@shepherd/core";
 
 function scripted(handler: (cmd: string, args: string[]) => { code?: number; stdout?: string } | undefined) {
   const calls: string[] = [];
@@ -37,8 +37,8 @@ describe("LocalWorkspace", () => {
     expect(calls[0]).toBe("git -C /repo rev-list --count refs/heads/ahead --not --remotes");
   });
 
-  test("readEvidence reads every file under the directory, relative to where psdd runs", async () => {
-    const cwd = mkdtempSync(join(tmpdir(), "psdd-evidence-"));
+  test("readEvidence reads every file under the directory, relative to where shepherd runs", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "shepherd-evidence-"));
     mkdirSync(join(cwd, "qa", "logs"), { recursive: true });
     writeFileSync(join(cwd, "qa", "shot.png"), "png");
     writeFileSync(join(cwd, "qa", "logs", "run.txt"), "ok");
@@ -111,12 +111,12 @@ describe("LocalWorkspace", () => {
   });
 
   test("readFile reads relative to the repository root; missing files are null", async () => {
-    const root = mkdtempSync(join(tmpdir(), "psdd-ws-"));
+    const root = mkdtempSync(join(tmpdir(), "shepherd-ws-"));
     mkdirSync(join(root, ".agents"));
-    writeFileSync(join(root, ".agents", "psdd.config.json"), "{}");
+    writeFileSync(join(root, ".agents", "shepherd.config.json"), "{}");
     const ws = new LocalWorkspace(root, {}, scripted(() => ({})).run);
-    expect(await ws.readFile(".agents/psdd.config.json")).toBe("{}");
-    expect(await ws.readFile(".agents/psdd.config.local.json")).toBeNull();
+    expect(await ws.readFile(".agents/shepherd.config.json")).toBe("{}");
+    expect(await ws.readFile(".agents/shepherd.config.local.json")).toBeNull();
   });
 
   /** git as seen from a directory: rev-parse prints git-dir, common dir and toplevel; core.worktree as configured. */
@@ -145,7 +145,7 @@ describe("LocalWorkspace", () => {
   test("a repo cloned with --separate-git-dir uses its toplevel; from a linked worktree it cannot be found and says so", async () => {
     expect(await LocalWorkspace.findRoot("/sep", repoAt("/elsewhere/sep.git", "/elsewhere/sep.git", "/sep"))).toBe("/sep");
     const fromWorktree = repoAt("/elsewhere/sep.git/worktrees/x", "/elsewhere/sep.git", "/sep-x");
-    await expect(LocalWorkspace.findRoot("/sep-x", fromWorktree)).rejects.toThrow("Run psdd from the main checkout.");
+    await expect(LocalWorkspace.findRoot("/sep-x", fromWorktree)).rejects.toThrow("Run shepherd from the main checkout.");
   });
 });
 

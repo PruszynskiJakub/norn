@@ -37,7 +37,7 @@ export interface HeldClaim extends ClaimRecord {
 }
 
 /**
- * Everything psdd needs from GitHub. The real adapter shells out to the
+ * Everything shepherd needs from GitHub. The real adapter shells out to the
  * user's own `gh`; tests use an in-memory fake.
  */
 export interface GitHub {
@@ -86,7 +86,7 @@ export interface GitHub {
   findPullRequest(head: string): Promise<PullRequest | null>;
   createPullRequest(input: { head: string; base: string; title: string; body: string }): Promise<PullRequest>;
 
-  /** Atomically create refs/psdd/claims/<issue>. False when it already exists. */
+  /** Atomically create refs/shepherd/claims/<issue>. False when it already exists. */
   createClaim(number: number, record: ClaimRecord): Promise<boolean>;
   /**
    * Points the claim ref at a new record, but only while it still points at
@@ -102,14 +102,14 @@ export interface GitHub {
   deleteClaim(number: number): Promise<void>;
 
   /**
-   * The developer's psdd work in one read, for the dashboard: their stories with
-   * slices, labels, blockers, linked PRs, psdd's comments and the timeline since
+   * The developer's shepherd work in one read, for the dashboard: their stories with
+   * slices, labels, blockers, linked PRs, shepherd's comments and the timeline since
    * `since`, and the claims. Read-only and cheap: one query, plus the claim refs.
    */
   observeWork(query: WorkQuery): Promise<Work>;
 }
 
-/** What observeWork asks for: one developer's psdd work in this repository. */
+/** What observeWork asks for: one developer's shepherd work in this repository. */
 export interface WorkQuery {
   /** The developer's GitHub login. */
   user: string;
@@ -122,15 +122,15 @@ export interface WorkQuery {
 /** An item on an issue's timeline, as GitHub records it. `actor` is a login, null for a deleted account. */
 export type TimelineItem =
   | { kind: "labeled" | "unlabeled"; label: string; at: string; actor: string | null }
-  /** `body` only for psdd's own comments (see isPsddComment); null for anyone else's. */
+  /** `body` only for shepherd's own comments (see isShepherdComment); null for anyone else's. */
   | { kind: "comment"; at: string; actor: string | null; url: string; body: string | null }
   | { kind: "closed" | "reopened"; at: string; actor: string | null }
   | { kind: "sub-issue-added"; child: number; at: string; actor: string | null }
   /** Anything else; `detail` names it as GitHub does, e.g. RenamedTitleEvent. */
   | { kind: "other"; at: string; actor: string | null; url: string | null; detail: string };
 
-/** A comment psdd wrote, with its body. Oldest first on ObservedIssue. */
-export interface PsddComment {
+/** A comment shepherd wrote, with its body. Oldest first on ObservedIssue. */
+export interface ShepherdComment {
   body: string;
   at: string;
   actor: string | null;
@@ -156,8 +156,8 @@ export interface ObservedIssue extends Issue {
   closedAt: string | null;
   /** Every blocker, open or closed. */
   blockedBy: { number: number; state: "open" | "closed" }[];
-  /** psdd's comments over the whole history: transitions, markers and notes. */
-  psddComments: PsddComment[];
+  /** shepherd's comments over the whole history: transitions, markers and notes. */
+  shepherdComments: ShepherdComment[];
   pullRequests: LinkedPullRequest[];
   /** Timeline items after the query's `since`, oldest first. */
   timeline: TimelineItem[];

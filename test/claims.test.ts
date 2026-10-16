@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { acquire } from "@psdd/core";
-import { FakeGitHub } from "@psdd/testing";
+import { acquire } from "@shepherd/core";
+import { FakeGitHub } from "@shepherd/testing";
 
 const now = new Date("2026-10-13T15:00:00Z");
 const twoHours = 2 * 3_600_000;

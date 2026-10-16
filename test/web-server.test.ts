@@ -1,7 +1,7 @@
 import { createServer, type Server } from "node:net";
 import { afterEach, describe, expect, test } from "vitest";
-import { type DashboardState, serveDashboard } from "@psdd/web";
-import { setup } from "@psdd/testing";
+import { type DashboardState, serveDashboard } from "@shepherd/web";
+import { setup } from "@shepherd/testing";
 
 /** The dashboard over the fakes, with polls run by hand: each scheduled poll waits in `due` until the test runs it. */
 async function dashboard(opts: { port?: number; explicit?: boolean; root?: string; w?: ReturnType<typeof setup> } = {}) {
@@ -94,8 +94,8 @@ describe("the dashboard server", () => {
     const s = await started(d);
     await s.idle();
     d.w.setNow("2026-10-13T12:02:00Z");
-    await d.w.psdd("take", "11");
-    await d.w.psdd("done", "11");
+    await d.w.shepherd("take", "11");
+    await d.w.shepherd("done", "11");
 
     d.due.shift()!.fn();
     await s.idle();
@@ -113,7 +113,7 @@ describe("the dashboard server", () => {
     const s = await started(d);
     await s.idle();
     d.w.setNow("2026-10-13T12:01:00Z");
-    await d.w.psdd("take", "11");
+    await d.w.shepherd("take", "11");
 
     const res = await fetch(`${s.url}/api/refresh`, { method: "POST" });
 
@@ -140,10 +140,10 @@ describe("the dashboard server", () => {
     expect(after.lastError).toEqual({ at: "2026-10-13T12:02:00.000Z", reason: "rate-limit", detail: "API rate limit exceeded" });
   });
 
-  test("names psdd and the checkout on the identity endpoint", async () => {
+  test("names shepherd and the checkout on the identity endpoint", async () => {
     const s = await started(await dashboard({ root: "/work/app" }));
 
-    expect(await (await fetch(`${s.url}/api/identity`)).json()).toEqual({ app: "psdd-dashboard", root: "/work/app" });
+    expect(await (await fetch(`${s.url}/api/identity`)).json()).toEqual({ app: "shepherd-dashboard", root: "/work/app" });
   });
 });
 

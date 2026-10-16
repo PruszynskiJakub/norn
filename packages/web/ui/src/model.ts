@@ -1,4 +1,4 @@
-import type { BoardItem, BoardStory, FeedEvent, State } from "@psdd/core";
+import type { BoardItem, BoardStory, FeedEvent, State } from "@shepherd/core";
 
 /** A board item with the story it belongs to. */
 export interface Item extends BoardItem {

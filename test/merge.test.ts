@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "@psdd/testing";
+import { setup } from "@shepherd/testing";
 
 /** Story #123 in implementation with slices 127 → 131 → 132 chained by blocked-by, plus independent 128. */
 function storyWithSlices() {
@@ -20,7 +20,7 @@ function storyWithSlices() {
 describe("merge-queue on a slice", () => {
   test("is briefed with the merge skill and the PR into the story branch", async () => {
     const w = storyWithSlices();
-    const res = await w.psdd("take", "127");
+    const res = await w.shepherd("take", "127");
     expect(res.stdout).toContain("Invoke the skill: merge");
     expect(res.stdout).toContain("Merge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.");
     expect(res.stdout).toContain("Then merge the PR: gh pr merge 123-rate-limiting-127 --merge");
@@ -29,9 +29,9 @@ describe("merge-queue on a slice", () => {
   test("done is refused while the slice PR is not merged", async () => {
     const w = storyWithSlices();
     w.github.prs.push({ number: 50, head: "123-rate-limiting-127", base: "123-rate-limiting", state: "open" });
-    await w.psdd("take", "127");
+    await w.shepherd("take", "127");
 
-    const res = await w.psdd("done", "127");
+    const res = await w.shepherd("done", "127");
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain("PR #50 from 123-rate-limiting-127 is not merged yet");
@@ -41,9 +41,9 @@ describe("merge-queue on a slice", () => {
   test("done is refused when the slice PR targets another branch than the story branch", async () => {
     const w = storyWithSlices();
     w.github.prs.push({ number: 50, head: "123-rate-limiting-127", base: "main", state: "open" });
-    await w.psdd("take", "127");
+    await w.shepherd("take", "127");
 
-    const res = await w.psdd("done", "127");
+    const res = await w.shepherd("done", "127");
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain("PR #50 from 123-rate-limiting-127 targets main, not the story branch 123-rate-limiting.");
@@ -53,21 +53,21 @@ describe("merge-queue on a slice", () => {
   test("a slice PR already merged into main is refused, not counted as merged into the story", async () => {
     const w = storyWithSlices();
     w.github.prs.push({ number: 50, head: "123-rate-limiting-127", base: "main", state: "merged" });
-    await w.psdd("take", "127");
+    await w.shepherd("take", "127");
 
-    const res = await w.psdd("done", "127");
+    const res = await w.shepherd("done", "127");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("psdd escalate 127 'slice PR #50 was merged into main, not 123-rate-limiting'");
+    expect(res.stdout).toContain("shepherd escalate 127 'slice PR #50 was merged into main, not 123-rate-limiting'");
     expect(w.github.issues.get(127)!.state).toBe("open");
   });
 
   test("done closes the slice and unblocks dependents with no open blockers", async () => {
     const w = storyWithSlices();
     w.github.prs.push({ number: 50, head: "123-rate-limiting-127", base: "123-rate-limiting", state: "merged" });
-    await w.psdd("take", "127");
+    await w.shepherd("take", "127");
 
-    const res = await w.psdd("done", "127");
+    const res = await w.shepherd("done", "127");
 
     expect(res.exitCode).toBe(0);
     const s127 = w.github.issues.get(127)!;
@@ -85,9 +85,9 @@ describe("merge-queue on a slice", () => {
     const w = storyWithSlices();
     for (const s of [128, 131, 132]) w.github.issues.get(s)!.state = "closed";
     w.github.prs.push({ number: 50, head: "123-rate-limiting-127", base: "123-rate-limiting", state: "merged" });
-    await w.psdd("take", "127");
+    await w.shepherd("take", "127");
 
-    await w.psdd("done", "127");
+    await w.shepherd("done", "127");
 
     expect(w.github.labels(123).sort()).toEqual(["needs-review", "type:story"]);
     const pr = w.github.prs.find((p) => p.head === "123-rate-limiting")!;
@@ -101,36 +101,36 @@ describe("story transitions around slices", () => {
   test("finishing slicing creates the story branch from main", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-slicing"], assignees: ["alice"] });
-    await w.psdd("take", "123");
-    await w.psdd("add-slice", "123", "Redis store", "--mode", "afk");
+    await w.shepherd("take", "123");
+    await w.shepherd("add-slice", "123", "Redis store", "--mode", "afk");
 
-    await w.psdd("done", "123");
+    await w.shepherd("done", "123");
 
     expect(w.github.branches.has("123-rate-limiting")).toBe(true);
   });
 
   test("a story in implementation cannot be taken; its label follows its slices", async () => {
     const w = storyWithSlices();
-    const res = await w.psdd("take", "123");
+    const res = await w.shepherd("take", "123");
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain("follows its slices");
-    expect(res.stdout).toContain("psdd next 123");
+    expect(res.stdout).toContain("shepherd next 123");
     expect(w.github.claim(123)).toBeNull();
   });
 
   test("a story in merge-queue is merged by its owner, not by an agent step", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "merge-queue"], assignees: ["bob"] });
-    const res = await w.psdd("take", "123");
+    const res = await w.shepherd("take", "123");
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain("Only the story owner (@bob) merges the story PR;");
-    expect(res.stdout).toContain("psdd next 123 closes the story if GitHub has not");
+    expect(res.stdout).toContain("shepherd next 123 closes the story if GitHub has not");
     expect(w.github.claim(123)).toBeNull();
   });
 
   test("a blocked slice cannot be taken", async () => {
     const w = storyWithSlices();
-    const res = await w.psdd("take", "131");
+    const res = await w.shepherd("take", "131");
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain("#131 is blocked by #127");
     expect(w.github.claim(131)).toBeNull();

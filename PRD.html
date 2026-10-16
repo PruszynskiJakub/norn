@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>psdd PRD</title>
+<title>shepherd PRD</title>
 <style>
   :root {
     --bg: #ffffff; --fg: #1f1f1d; --muted: #5f5e5a; --border: #dedcd5;
@@ -56,17 +56,17 @@
 <body>
 <main>
 
-<h1>psdd — CLI for the SDD process</h1>
+<h1>shepherd — CLI for the SDD process</h1>
 <p class="byline">2026-10-13 · Jakub Pruszyński</p>
-<p class="lead">psdd is a CLI that the developer's LLM calls to run work through the organisation's spec-driven process, with GitHub labels as the only source of truth.</p>
+<p class="lead">shepherd is a CLI that the developer's LLM calls to run work through the organisation's spec-driven process, with GitHub labels as the only source of truth.</p>
 <p>This document holds the vision and the way of working. The domain terms it uses (story, slice, step, claim, briefing, outcome, needs-human, fix round and the rest) are defined in <a href="CONTEXT.md"><code>CONTEXT.md</code></a>; a new concept here adds its entry there in the same change.</p>
 
 <h2 id="purpose-and-principles">Purpose and principles</h2>
 <ul>
-  <li><strong>The LLM is the operator and psdd is the process.</strong> The agent asks psdd what to do next and which skill to use, does the work, then asks psdd to record the result.</li>
-  <li><strong>GitHub is the source of truth.</strong> State lives in issue and PR labels, native "blocked by" relations, comments and branches. psdd keeps no state of its own.</li>
+  <li><strong>The LLM is the operator and shepherd is the process.</strong> The agent asks shepherd what to do next and which skill to use, does the work, then asks shepherd to record the result.</li>
+  <li><strong>GitHub is the source of truth.</strong> State lives in issue and PR labels, native "blocked by" relations, comments and branches. shepherd keeps no state of its own.</li>
   <li><strong>The developer's own <code>gh</code> is used.</strong> No separate auth or server. Every label change, comment, PR and merge is made as the user.</li>
-  <li><strong>psdd owns transitions, skills own content.</strong> Only psdd changes labels, and it allows only valid transitions. The skill for each state tells the agent how to do the work.</li>
+  <li><strong>shepherd owns transitions, skills own content.</strong> Only shepherd changes labels, and it allows only valid transitions. The skill for each state tells the agent how to do the work.</li>
   <li><strong>Work is scoped to one story.</strong> Every session declares the story it works on.</li>
 </ul>
 
@@ -126,7 +126,7 @@
 <ul>
   <li><strong>The agent collects the evidence; a person decides.</strong> An <code>auto-qa</code> failure goes straight to <code>qa-failed</code>. Only a person passes a <code>mode:hil</code> slice or a story.</li>
   <li><strong><code>auto-qa</code></strong> runs the app as a user would and records, per criterion, what it ran, what it saw and the evidence. What only a person can check comes from the slice's verifier reason; the agent lists it with whatever it could prepare. On a <code>mode:afk</code> slice it escalates what it cannot check.</li>
-  <li><strong>Evidence</strong> is the <code>psdd done</code> note on the issue, with files from <code>--evidence &lt;dir&gt;</code> pushed to <code>psdd/qa/&lt;issue&gt;</code> and embedded at their commit.</li>
+  <li><strong>Evidence</strong> is the <code>shepherd done</code> note on the issue, with files from <code>--evidence &lt;dir&gt;</code> pushed to <code>shepherd/qa/&lt;issue&gt;</code> and embedded at their commit.</li>
   <li><strong><code>qa</code></strong> starts from that note: the person's agent runs the app locally and walks them through what is left. The person may fail any criterion, with a repro.</li>
   <li><strong>The person's own remarks</strong> are tied to criteria and fail them. A remark outside the criteria becomes a follow-up issue by default; the person may pull it into this item or drop it.</li>
   <li><strong><code>needs-human</code></strong> in either state means an escalation, cleared by <code>resolve</code>.</li>
@@ -145,7 +145,7 @@
   <li>There is one PR per slice.</li>
   <li>The story owner is also the owner of all its slices.</li>
   <li>Fixes after story-level <code>changes-requested</code> or <code>qa-failed</code> are committed straight onto the story branch.</li>
-  <li><strong>The slug is recorded once.</strong> psdd writes <code>psdd: slug &lt;slug&gt;</code> in its first comment on a story and derives the branch, slice branches, worktrees and spec path from it, so renaming the story on GitHub changes none of them.</li>
+  <li><strong>The slug is recorded once.</strong> shepherd writes <code>shepherd: slug &lt;slug&gt;</code> in its first comment on a story and derives the branch, slice branches, worktrees and spec path from it, so renaming the story on GitHub changes none of them.</li>
   <li>A story's slices are its sub-issues labelled <code>type:slice</code> in this repository. Other sub-issues a person attaches are ignored.</li>
   <li>A slice merge is accepted only when its PR targets the story branch.</li>
 </ul>
@@ -155,9 +155,9 @@
 <ul>
   <li><strong>Story worktree:</strong> refine, clarify, plan, slice, story review, story QA and story fixes run here.</li>
   <li><strong>Slice worktree:</strong> implement, review, QA and merge run here, each as a new subagent.</li>
-  <li><strong>The briefing carries the process; skills carry the craft.</strong> Skills know nothing of psdd, labels, branches or worktrees: each ends on a result (a spec, a verdict, a breakdown). The briefing says what to read, where the work is committed and pushed, which commands create slices and PRs, and which finish command each result maps to.</li>
-  <li><strong>psdd says where to work.</strong> The <code>take</code> briefing names the worktree path and branch. If the worktree is missing, it gives the command to create it for the tool in use.</li>
-  <li><strong>Base branch:</strong> a slice worktree starts from the story branch, and the story worktree from <code>main</code>, as they are on GitHub. A branch that already exists keeps its commits and is brought up to date; one checked out in another checkout gets no create command, and psdd names that checkout instead.</li>
+  <li><strong>The briefing carries the process; skills carry the craft.</strong> Skills know nothing of shepherd, labels, branches or worktrees: each ends on a result (a spec, a verdict, a breakdown). The briefing says what to read, where the work is committed and pushed, which commands create slices and PRs, and which finish command each result maps to.</li>
+  <li><strong>shepherd says where to work.</strong> The <code>take</code> briefing names the worktree path and branch. If the worktree is missing, it gives the command to create it for the tool in use.</li>
+  <li><strong>Base branch:</strong> a slice worktree starts from the story branch, and the story worktree from <code>main</code>, as they are on GitHub. A branch that already exists keeps its commits and is brought up to date; one checked out in another checkout gets no create command, and shepherd names that checkout instead.</li>
   <li><strong>The commands work from any directory,</strong> including another worktree.</li>
 </ul>
 <div class="table-wrap"><table>
@@ -165,22 +165,22 @@
   <tbody>
     <tr><td>herdr</td><td>Inside herdr</td><td>A new herdr agent in the worktree's pane</td></tr>
     <tr><td>Claude Code</td><td>Inside Claude Code</td><td>A new subagent told to work in the worktree. Claude Code's built-in worktree isolation is not used</td></tr>
-    <tr><td>git</td><td>Otherwise</td><td>A new agent session started in the worktree, as its own session, as <code>psdd next</code> lists it</td></tr>
+    <tr><td>git</td><td>Otherwise</td><td>A new agent session started in the worktree, as its own session, as <code>shepherd next</code> lists it</td></tr>
   </tbody>
 </table></div>
 <ul>
-  <li><code>psdd init</code> adds <code>.agents/worktrees/</code> to <code>.gitignore</code>.</li>
-  <li><a href="#housekeeping"><code>psdd tidy</code></a> removes worktrees of closed items with the tool in use, never the one it runs in.</li>
-  <li>When the story PR is merged and GitHub has not closed the story, e.g. with a base branch other than the default, <code>psdd next</code> closes it. It also removes state labels left on closed issues.</li>
+  <li><code>shepherd init</code> adds <code>.agents/worktrees/</code> to <code>.gitignore</code>.</li>
+  <li><a href="#housekeeping"><code>shepherd tidy</code></a> removes worktrees of closed items with the tool in use, never the one it runs in.</li>
+  <li>When the story PR is merged and GitHub has not closed the story, e.g. with a base branch other than the default, <code>shepherd next</code> closes it. It also removes state labels left on closed issues.</li>
   <li>A worktree left behind by a session whose claim went stale is kept: the session may only be slow, and its commits are there. The next holder is told to check <code>git status</code> before starting.</li>
 </ul>
 
-<h2 id="housekeeping">Housekeeping: psdd tidy</h2>
-<p>All cleanup is <code>psdd tidy</code>. It removes what belongs to closed issues: QA evidence branches, worktrees, merged slice and story branches, and claim refs. Anything with uncommitted or unpushed work is named, not removed. It is idempotent; <code>--dry-run</code> only lists. <code>deliver</code> runs it when it starts and stops, <code>drive</code> when a story finishes. Nothing is cleaned up at merge: the owner merges the story on GitHub, where psdd does not run.</p>
+<h2 id="housekeeping">Housekeeping: shepherd tidy</h2>
+<p>All cleanup is <code>shepherd tidy</code>. It removes what belongs to closed issues: QA evidence branches, worktrees, merged slice and story branches, and claim refs. Anything with uncommitted or unpushed work is named, not removed. It is idempotent; <code>--dry-run</code> only lists. <code>deliver</code> runs it when it starts and stops, <code>drive</code> when a story finishes. Nothing is cleaned up at merge: the owner merges the story on GitHub, where shepherd does not run.</p>
 
 <h2 id="configuration">Configuration</h2>
-<p>Team settings live in a committed <code>.agents/psdd.config.json</code>. Each developer picks their worktree tool in a gitignored <code>.agents/psdd.config.local.json</code>, which wins over the team file. <code>claims.staleAfter</code> and <code>deliver.maxFixRounds</code> bind everyone's claims and rounds, so psdd reads them from the team file only. Set in the local file, they are ignored with a warning; a team <code>staleAfter</code> below <code>10m</code> is raised to <code>10m</code> with a warning. Commands still run in both cases.</p>
-<pre><code>// .agents/psdd.config.json (committed)
+<p>Team settings live in a committed <code>.agents/shepherd.config.json</code>. Each developer picks their worktree tool in a gitignored <code>.agents/shepherd.config.local.json</code>, which wins over the team file. <code>claims.staleAfter</code> and <code>deliver.maxFixRounds</code> bind everyone's claims and rounds, so shepherd reads them from the team file only. Set in the local file, they are ignored with a warning; a team <code>staleAfter</code> below <code>10m</code> is raised to <code>10m</code> with a warning. Commands still run in both cases.</p>
+<pre><code>// .agents/shepherd.config.json (committed)
 {
   "baseBranch": "main",
   "worktrees": { "provider": "auto" },
@@ -188,13 +188,13 @@
   "deliver": { "maxParallel": 2, "maxFixRounds": 3 }
 }
 
-// .agents/psdd.config.local.json (gitignored, per developer)
+// .agents/shepherd.config.local.json (gitignored, per developer)
 { "worktrees": { "provider": "herdr" }, "notifications": "auto" }</code></pre>
 <ul>
   <li><strong>Provider</strong> is <code>auto</code>, <code>herdr</code>, <code>claude-code</code> or <code>git</code>. <code>auto</code> uses the detection in the Worktrees table, in order: herdr first, then Claude Code, then plain git.</li>
-  <li><strong>The environment is a safety check.</strong> If the provider is <code>herdr</code> but psdd is not running inside herdr, psdd refuses and tells the agent to start from a herdr pane or switch the provider in the local file.</li>
+  <li><strong>The environment is a safety check.</strong> If the provider is <code>herdr</code> but shepherd is not running inside herdr, shepherd refuses and tells the agent to start from a herdr pane or switch the provider in the local file.</li>
   <li><strong>Labels are fixed</strong> and not configurable, so every repo in the organisation works the same way.</li>
-  <li><code>psdd init</code> creates the team file with defaults, taking <code>baseBranch</code> from the repository's default branch, and adds the local file to <code>.gitignore</code>.</li>
+  <li><code>shepherd init</code> creates the team file with defaults, taking <code>baseBranch</code> from the repository's default branch, and adds the local file to <code>.gitignore</code>.</li>
   <li><strong>The worktree location is fixed</strong> at <code>.agents/worktrees/</code>, like the labels.</li>
 </ul>
 
@@ -203,11 +203,11 @@
 <ul>
   <li><strong>Only one agent can win.</strong> Two subagents can't take the same slice: the second one is refused. Checking a label first cannot guarantee that.</li>
   <li><strong>The <code>in-progress</code> label mirrors the claim,</strong> so it shows in GitHub. The claim is the real lock.</li>
-  <li><strong>Claims are held for the whole step,</strong> e.g. all of implement on a slice, and released when handing over to the next state. A person's step is claimed too: <code>psdd next</code> lists an item waiting for a person that a session holds as "held by &lt;session&gt; (since hh:mm)", and offers no hand-off for it.</li>
-  <li><strong>Stale claims.</strong> A claim records its holder, session and time. psdd treats a claim older than 2 hours as abandoned and lets another session take it over; two sessions taking over at once cannot both win.</li>
-  <li><strong>Taking over your own stopped session.</strong> <code>psdd take &lt;issue&gt; --takeover</code> takes over a claim of the same GitHub user at any age, e.g. a session closed partway through refinement, with the same note to check <code>git status</code>. Without the flag, take refuses and names the command. It never takes another user's claim. Agents in <code>deliver</code> share their user, so the flag is for people, who know the other session has stopped.</li>
-  <li><strong>Refreshing a claim.</strong> <code>psdd take</code> on an issue the same session already holds briefs again and moves the claim's time forward. Long steps re-run it, e.g. after each implement commit, so a slow session is not taken for crashed.</li>
-  <li><strong>Transition first, then follow-ups.</strong> <code>psdd done</code> checks its preconditions (a story leaving slicing gets its branch first), changes the labels and releases the claim. The automatic transitions after it, such as unblocking slices and opening the story PR, are best effort: a failure is reported, and <code>psdd next</code> repeats them.</li>
+  <li><strong>Claims are held for the whole step,</strong> e.g. all of implement on a slice, and released when handing over to the next state. A person's step is claimed too: <code>shepherd next</code> lists an item waiting for a person that a session holds as "held by &lt;session&gt; (since hh:mm)", and offers no hand-off for it.</li>
+  <li><strong>Stale claims.</strong> A claim records its holder, session and time. shepherd treats a claim older than 2 hours as abandoned and lets another session take it over; two sessions taking over at once cannot both win.</li>
+  <li><strong>Taking over your own stopped session.</strong> <code>shepherd take &lt;issue&gt; --takeover</code> takes over a claim of the same GitHub user at any age, e.g. a session closed partway through refinement, with the same note to check <code>git status</code>. Without the flag, take refuses and names the command. It never takes another user's claim. Agents in <code>deliver</code> share their user, so the flag is for people, who know the other session has stopped.</li>
+  <li><strong>Refreshing a claim.</strong> <code>shepherd take</code> on an issue the same session already holds briefs again and moves the claim's time forward. Long steps re-run it, e.g. after each implement commit, so a slow session is not taken for crashed.</li>
+  <li><strong>Transition first, then follow-ups.</strong> <code>shepherd done</code> checks its preconditions (a story leaving slicing gets its branch first), changes the labels and releases the claim. The automatic transitions after it, such as unblocking slices and opening the story PR, are best effort: a failure is reported, and <code>shepherd next</code> repeats them.</li>
 </ul>
 
 <h2 id="artifacts">Artifacts</h2>
@@ -215,7 +215,7 @@
 <ul>
   <li>Slices are GitHub issues only. They have no markdown files.</li>
   <li>Open questions live in a section of <code>spec.md</code>. When a question is answered it is removed, and the decision is written into the section of the spec it affects.</li>
-  <li>All comments are posted as the user through <code>gh</code>. Review and QA notes and the reason for <code>needs-human</code> go in comments. On each transition psdd posts a short comment linking to the spec at its commit.</li>
+  <li>All comments are posted as the user through <code>gh</code>. Review and QA notes and the reason for <code>needs-human</code> go in comments. On each transition shepherd posts a short comment linking to the spec at its commit.</li>
 </ul>
 <pre><code>.agents/
   specs/
@@ -223,7 +223,7 @@
       spec.md        # refine → clarify → plan</code></pre>
 
 <h2 id="skills-and-setup">Skills and setup</h2>
-<p><code>psdd init</code> sets psdd up in a client project. It installs the skills with <code>npx skills &lt;psdd repo&gt;</code> into a root <code>skills/</code> directory, symlinks them into <code>.claude/skills/</code>, and creates <code>.agents/specs/</code>. psdd briefings then tell the agent which skill to invoke by name.</p>
+<p><code>shepherd init</code> sets shepherd up in a client project. It installs the skills with <code>npx skills &lt;shepherd repo&gt;</code> into a root <code>skills/</code> directory, symlinks them into <code>.claude/skills/</code>, and creates <code>.agents/specs/</code>. shepherd briefings then tell the agent which skill to invoke by name.</p>
 <div class="table-wrap"><table>
   <thead><tr><th>State</th><th>Skill</th></tr></thead>
   <tbody>
@@ -241,61 +241,61 @@
     <tr><td>story after slicing, started by the user</td><td>deliver (orchestrates the others)</td></tr>
   </tbody>
 </table>
-<p>The step skills lean on three reference skills that psdd also installs: <code>interview</code> (refine, clarify, plan, resolve), and <code>codebase-design</code> (plan) and <code>tdd</code> (implement), adapted from <a href="https://github.com/mattpocock/skills">mattpocock/skills</a> (MIT). The spec's Behaviour items are numbered user stories; slices, review and QA check against them by number, and the Plan names the seams that implement tests at.</p></div>
+<p>The step skills lean on three reference skills that shepherd also installs: <code>interview</code> (refine, clarify, plan, resolve), and <code>codebase-design</code> (plan) and <code>tdd</code> (implement), adapted from <a href="https://github.com/mattpocock/skills">mattpocock/skills</a> (MIT). The spec's Behaviour items are numbered user stories; slices, review and QA check against them by number, and the Plan names the seams that implement tests at.</p></div>
 
 <h2 id="sessions">Sessions</h2>
 <p>A session always works on one declared story. An unattended session is, for example, a Claude Code session whose main agent hands out next actions to subagents.</p>
 <ol>
-  <li>The main agent asks psdd for every actionable item on the story, each with its skill and worktree.</li>
+  <li>The main agent asks shepherd for every actionable item on the story, each with its skill and worktree.</li>
   <li>It starts a fresh subagent per item, in that item's worktree (under herdr, a new herdr agent in the worktree's pane). Unblocked slices run in parallel.</li>
-  <li>Each subagent claims its issue, follows the skill, and asks psdd to make the transition. The next phase gets a new subagent.</li>
-  <li>When a slice reaches <code>needs-human-qa</code>, psdd notifies the user and the session carries on with slices not blocked by it.</li>
-  <li>A person records their QA result through their agent, which calls psdd. Under herdr, that agent works in the item's worktree pane, like every other phase: with each item waiting for a person (<code>needs-human-qa</code> or <code>needs-human</code>), <code>psdd next</code> lists how to hand it to an agent there if the user does it now, or, inside that worktree, says to take it in the current session. Under the other providers the person's agent works from wherever it runs.</li>
+  <li>Each subagent claims its issue, follows the skill, and asks shepherd to make the transition. The next phase gets a new subagent.</li>
+  <li>When a slice reaches <code>needs-human-qa</code>, shepherd notifies the user and the session carries on with slices not blocked by it.</li>
+  <li>A person records their QA result through their agent, which calls shepherd. Under herdr, that agent works in the item's worktree pane, like every other phase: with each item waiting for a person (<code>needs-human-qa</code> or <code>needs-human</code>), <code>shepherd next</code> lists how to hand it to an agent there if the user does it now, or, inside that worktree, says to take it in the current session. Under the other providers the person's agent works from wherever it runs.</li>
 </ol>
-<p>The main agent never edits labels directly. It only calls psdd.</p>
-<p><strong>Which session holds a claim.</strong> psdd keeps no state, so it tells sessions apart by their environment, never by the current directory: an agent moves between the main checkout and worktrees within one session. Under the plain git provider, <code>psdd next</code> gives each agent it lists a session of its own, fresh each time, so a new agent on an item whose claim went stale takes it over rather than passing for the old holder.</p>
-<p><strong>Known limit: claude-code provider.</strong> Claude Code subagents share their parent's session, so under the claude-code provider the deliver orchestrator and all its subagents are one psdd session, and psdd cannot stop one subagent finishing, releasing or escalating another's item. Isolation relies on <code>psdd next</code> listing held items as "held by this session", so the orchestrator never hands an item out twice. For per-agent isolation, use herdr: each herdr agent is its own session.</p>
+<p>The main agent never edits labels directly. It only calls shepherd.</p>
+<p><strong>Which session holds a claim.</strong> shepherd keeps no state, so it tells sessions apart by their environment, never by the current directory: an agent moves between the main checkout and worktrees within one session. Under the plain git provider, <code>shepherd next</code> gives each agent it lists a session of its own, fresh each time, so a new agent on an item whose claim went stale takes it over rather than passing for the old holder.</p>
+<p><strong>Known limit: claude-code provider.</strong> Claude Code subagents share their parent's session, so under the claude-code provider the deliver orchestrator and all its subagents are one shepherd session, and shepherd cannot stop one subagent finishing, releasing or escalating another's item. Isolation relies on <code>shepherd next</code> listing held items as "held by this session", so the orchestrator never hands an item out twice. For per-agent isolation, use herdr: each herdr agent is its own session.</p>
 
 <h2 id="unattended-delivery">Unattended delivery: the deliver skill</h2>
 <p><code>deliver &lt;story id&gt;</code> runs a story unattended from <code>implementation</code> until it needs a human. The user starts it once slicing is done.</p>
 <ol>
-  <li>Run <code>psdd tidy</code> once at the start, then ask psdd for work: <code>psdd next &lt;story&gt;</code>.</li>
-  <li>Start a fresh subagent per actionable item in its worktree (a herdr agent under herdr), up to the free slots <code>psdd next</code> gives (see Limits).</li>
+  <li>Run <code>shepherd tidy</code> once at the start, then ask shepherd for work: <code>shepherd next &lt;story&gt;</code>.</li>
+  <li>Start a fresh subagent per actionable item in its worktree (a herdr agent under herdr), up to the free slots <code>shepherd next</code> gives (see Limits).</li>
   <li>Wait for subagents to finish (under herdr, with <code>herdr agent wait --until done|blocked</code>), then go back to step 1.</li>
-  <li>When an item gets <code>needs-human</code>, psdd notifies the user (see <a href="#notifications">Notifications</a>) and the orchestrator carries on with everything not blocked by it.</li>
+  <li>When an item gets <code>needs-human</code>, shepherd notifies the user (see <a href="#notifications">Notifications</a>) and the orchestrator carries on with everything not blocked by it.</li>
   <li>Once all slices are merged into the story branch, run story review and story <code>auto-qa</code> the same way, plus implement fixes if either asks for changes.</li>
-  <li>Stop when the story reaches <code>needs-human-qa</code> (always a person) or when only items waiting for a person remain, also when a person is already doing them. Run <code>psdd tidy</code>, then end with a report: what is done, what is waiting, and who needs to act. Delivery does not wait on a person's work: the person's <code>drive</code> session offers <code>deliver</code> again when they finish.</li>
+  <li>Stop when the story reaches <code>needs-human-qa</code> (always a person) or when only items waiting for a person remain, also when a person is already doing them. Run <code>shepherd tidy</code>, then end with a report: what is done, what is waiting, and who needs to act. Delivery does not wait on a person's work: the person's <code>drive</code> session offers <code>deliver</code> again when they finish.</li>
 </ol>
 <p><strong>Rules for the orchestrator</strong></p>
 <ul>
   <li>Never do a phase's work itself. Every phase gets a new subagent.</li>
-  <li>Never touch labels, branches or PRs. Only call psdd.</li>
+  <li>Never touch labels, branches or PRs. Only call shepherd.</li>
   <li>Never take an item flagged <code>needs-human</code> or in <code>needs-human-qa</code>.</li>
   <li>If the user runs <code>drive</code> in the orchestrator's session, do that step with them, then go back to the loop: the <code>deliver</code> they asked for still stands. <code>drive</code> does not offer <code>deliver</code> again from a session already running it.</li>
 </ul>
 <p><strong>Limits</strong></p>
 <ul>
-  <li><strong>Parallelism:</strong> at most 2 subagents at once (<code>deliver.maxParallel</code>). <code>psdd next</code> counts the user's agents already running on the story (items held by their sessions) and offers only the free slots: "at most 1 at a time (1 of your agents is running, the limit is 2)". At the limit it lists the ready items without start commands and says to wait for one to finish. A teammate's agents and a person's work do not count. psdd does not know which orchestrator started an agent, so two orchestrators of the same user share the limit; marking the running orchestrator is <a href="https://github.com/PruszynskiJakub/ai-engine/issues/26">issue #26</a>.</li>
-  <li><strong>Fix rounds:</strong> after 3 rounds of <code>changes-requested</code> or <code>qa-failed</code> on the same issue, psdd sets <code>needs-human</code> instead of sending it back to implement (<code>deliver.maxFixRounds</code>). psdd counts rounds from the issue's label history, so it keeps no state of its own.</li>
+  <li><strong>Parallelism:</strong> at most 2 subagents at once (<code>deliver.maxParallel</code>). <code>shepherd next</code> counts the user's agents already running on the story (items held by their sessions) and offers only the free slots: "at most 1 at a time (1 of your agents is running, the limit is 2)". At the limit it lists the ready items without start commands and says to wait for one to finish. A teammate's agents and a person's work do not count. shepherd does not know which orchestrator started an agent, so two orchestrators of the same user share the limit; marking the running orchestrator is <a href="https://github.com/PruszynskiJakub/ai-engine/issues/26">issue #26</a>.</li>
+  <li><strong>Fix rounds:</strong> after 3 rounds of <code>changes-requested</code> or <code>qa-failed</code> on the same issue, shepherd sets <code>needs-human</code> instead of sending it back to implement (<code>deliver.maxFixRounds</code>). shepherd counts rounds from the issue's label history, so it keeps no state of its own.</li>
 </ul>
-<p><strong>When nothing is left to do,</strong> <code>psdd next</code> says so explicitly:</p>
+<p><strong>When nothing is left to do,</strong> <code>shepherd next</code> says so explicitly:</p>
 <pre><code>Story #123 "Rate limiting": nothing left that you can do.
 
 Waiting for a human:
   - #129 needs human QA (mode:hil).
   - #131 escalated: "Redis client times out in tests" (3 fix rounds reached).
 
-Stop here and report to the user. psdd has already notified them.</code></pre>
+Stop here and report to the user. shepherd has already notified them.</code></pre>
 
 <h2 id="notifications">Notifications</h2>
-<p>psdd sends local notifications itself, so they fire whatever agent tool is in use and do not depend on the orchestrator remembering.</p>
+<p>shepherd sends local notifications itself, so they fire whatever agent tool is in use and do not depend on the orchestrator remembering.</p>
 <p><strong>Events (more may be added later)</strong></p>
 <ul>
   <li><strong>A person is needed:</strong> <code>needs-human</code> is set (an escalation or an issue hitting the fix-round limit), or a <code>mode:hil</code> slice or the story reaches <code>needs-human-qa</code>.</li>
-  <li><strong><code>deliver</code> stops:</strong> <code>psdd next</code> reports nothing left to do, with a summary of what is waiting. Items a session already holds are left out; if a person is already doing everything that waits, nothing is sent.</li>
+  <li><strong><code>deliver</code> stops:</strong> <code>shepherd next</code> reports nothing left to do, with a summary of what is waiting. Items a session already holds are left out; if a person is already doing everything that waits, nothing is sent.</li>
 </ul>
-<p>The title says who must act on what ("psdd: #131 needs you"). The body gives the reason and the issue link.</p>
-<p><strong>Delivery</strong> is chosen per developer in <code>.agents/psdd.config.local.json</code> with <code>"notifications"</code>:</p>
+<p>The title says who must act on what ("shepherd: #131 needs you"). The body gives the reason and the issue link.</p>
+<p><strong>Delivery</strong> is chosen per developer in <code>.agents/shepherd.config.local.json</code> with <code>"notifications"</code>:</p>
 <div class="table-wrap"><table>
   <thead><tr><th>Value</th><th>Delivery</th></tr></thead>
   <tbody>
@@ -307,9 +307,9 @@ Stop here and report to the user. psdd has already notified them.</code></pre>
 </table></div>
 
 <h2 id="cli">CLI</h2>
-<p>psdd answers in prose written as instructions to the agent. The agent reports outcomes and psdd chooses the next state. It is installed into the project and run through <code>npx</code>.</p>
+<p>shepherd answers in prose written as instructions to the agent. The agent reports outcomes and shepherd chooses the next state. It is installed into the project and run through <code>npx</code>.</p>
 <ul>
-  <li><strong>Outcomes, not states.</strong> The agent never names a label. It reports what happened (<code>approve</code>, <code>fail</code>), and psdd makes the transition.</li>
+  <li><strong>Outcomes, not states.</strong> The agent never names a label. It reports what happened (<code>approve</code>, <code>fail</code>), and shepherd makes the transition.</li>
   <li><strong>Issue as an argument.</strong> Every command takes the story or issue number explicitly. There is no session state.</li>
   <li><strong>Fixed response order:</strong> where you are, what to do now (including the skill to invoke), how to finish (exact commands), what not to do.</li>
   <li><strong>Refusals are instructions.</strong> They say why the call was refused and what to do instead.</li>
@@ -319,15 +319,15 @@ Stop here and report to the user. psdd has already notified them.</code></pre>
 <div class="table-wrap"><table>
   <thead><tr><th>Command</th><th>Purpose</th></tr></thead>
   <tbody>
-    <tr><td><code>psdd init</code></td><td>Set up a project: skills, <code>.agents/specs/</code>, labels</td></tr>
-    <tr><td><code>psdd next &lt;story&gt;</code></td><td>What can be done on the story now. The orchestrator's entry point</td></tr>
-    <tr><td><code>psdd take &lt;issue&gt;</code></td><td>Claim the issue and get the briefing for its current step</td></tr>
-    <tr><td><code>psdd done &lt;issue&gt; [outcome] ["note"] [--evidence &lt;dir&gt;]</code></td><td>Finish the step; psdd transitions, comments and releases the claim. The outcome is only needed when the step can end more than one way. <code>--evidence</code> attaches QA files</td></tr>
-    <tr><td><code>psdd add-slice &lt;story&gt; "title" --blocked-by &lt;issue&gt; --mode afk|hil</code></td><td>Create a slice as a sub-issue with labels, native blocked-by and mode. Used by the slice skill</td></tr>
-    <tr><td><code>psdd escalate &lt;issue&gt; "reason"</code></td><td>Set <code>needs-human</code> with the reason as a comment; release the claim</td></tr>
-    <tr><td><code>psdd release &lt;issue&gt;</code></td><td>Give up the claim without a transition</td></tr>
-    <tr><td><code>psdd status &lt;story&gt;</code></td><td>Read-only overview of the story and its slices</td></tr>
-    <tr><td><code>psdd tidy [--dry-run]</code></td><td>Remove what belongs to closed issues</td></tr>
+    <tr><td><code>shepherd init</code></td><td>Set up a project: skills, <code>.agents/specs/</code>, labels</td></tr>
+    <tr><td><code>shepherd next &lt;story&gt;</code></td><td>What can be done on the story now. The orchestrator's entry point</td></tr>
+    <tr><td><code>shepherd take &lt;issue&gt;</code></td><td>Claim the issue and get the briefing for its current step</td></tr>
+    <tr><td><code>shepherd done &lt;issue&gt; [outcome] ["note"] [--evidence &lt;dir&gt;]</code></td><td>Finish the step; shepherd transitions, comments and releases the claim. The outcome is only needed when the step can end more than one way. <code>--evidence</code> attaches QA files</td></tr>
+    <tr><td><code>shepherd add-slice &lt;story&gt; "title" --blocked-by &lt;issue&gt; --mode afk|hil</code></td><td>Create a slice as a sub-issue with labels, native blocked-by and mode. Used by the slice skill</td></tr>
+    <tr><td><code>shepherd escalate &lt;issue&gt; "reason"</code></td><td>Set <code>needs-human</code> with the reason as a comment; release the claim</td></tr>
+    <tr><td><code>shepherd release &lt;issue&gt;</code></td><td>Give up the claim without a transition</td></tr>
+    <tr><td><code>shepherd status &lt;story&gt;</code></td><td>Read-only overview of the story and its slices</td></tr>
+    <tr><td><code>shepherd tidy [--dry-run]</code></td><td>Remove what belongs to closed issues</td></tr>
   </tbody>
 </table></div>
 <div class="table-wrap"><table>
@@ -336,19 +336,19 @@ Stop here and report to the user. psdd has already notified them.</code></pre>
     <tr><td>triage</td><td>triage</td><td><code>accept</code> → needs-refinement · <code>reject</code> → closed as not planned</td></tr>
     <tr><td>needs-refinement</td><td>refine</td><td><code>clear</code> → needs-plan · <code>questions</code> → needs-clarification</td></tr>
     <tr><td>needs-clarification</td><td>clarify</td><td><code>answered</code> → needs-plan · <code>questions</code> → stays</td></tr>
-    <tr><td>needs-plan</td><td>plan</td><td><code>psdd done &lt;story&gt;</code> → needs-slicing</td></tr>
-    <tr><td>needs-slicing</td><td>slice</td><td><code>psdd done &lt;story&gt;</code> → implementation</td></tr>
-    <tr><td>implementation, changes-requested, qa-failed</td><td>implement</td><td><code>psdd done &lt;issue&gt;</code> → needs-review</td></tr>
+    <tr><td>needs-plan</td><td>plan</td><td><code>shepherd done &lt;story&gt;</code> → needs-slicing</td></tr>
+    <tr><td>needs-slicing</td><td>slice</td><td><code>shepherd done &lt;story&gt;</code> → implementation</td></tr>
+    <tr><td>implementation, changes-requested, qa-failed</td><td>implement</td><td><code>shepherd done &lt;issue&gt;</code> → needs-review</td></tr>
     <tr><td>needs-review</td><td>review</td><td><code>approve</code> → needs-qa · <code>request-changes</code> → changes-requested</td></tr>
     <tr><td>needs-qa</td><td>auto-qa</td><td><code>pass</code> → merge-queue (<code>mode:afk</code> slice) or needs-human-qa (<code>mode:hil</code> slice, story) · <code>fail</code> → qa-failed</td></tr>
     <tr><td>needs-human-qa</td><td>qa</td><td><code>pass</code> → merge-queue · <code>fail</code> → qa-failed</td></tr>
-    <tr><td>merge-queue (slice)</td><td>merge</td><td><code>psdd done &lt;slice&gt;</code> → closed; dependents recomputed</td></tr>
-    <tr><td>needs-human</td><td>resolve</td><td><code>psdd done &lt;issue&gt;</code> → flag cleared, state kept</td></tr>
+    <tr><td>merge-queue (slice)</td><td>merge</td><td><code>shepherd done &lt;slice&gt;</code> → closed; dependents recomputed</td></tr>
+    <tr><td>needs-human</td><td>resolve</td><td><code>shepherd done &lt;issue&gt;</code> → flag cleared, state kept</td></tr>
   </tbody>
 </table></div>
 <p>Steps with a single way to end take no outcome word.</p>
 
-<p><strong><code>psdd next 123</code></strong></p>
+<p><strong><code>shepherd next 123</code></strong></p>
 <pre><code>Story #123 "Rate limiting" is in implementation. 2 of 5 slices are merged
 into story/123-rate-limiting.
 
@@ -356,17 +356,17 @@ You can start 3 items now. They are independent, so run them in parallel,
 each in its own subagent:
 
   - Slice #131 "Per-key limits" is ready-for-agent.
-    Start it with: psdd take 131
+    Start it with: shepherd take 131
   - Slice #128 "Limit headers" needs review.
-    Start it with: psdd take 128
+    Start it with: shepherd take 128
   - Slice #127 "Redis store" is in merge-queue.
-    Start it with: psdd take 127
+    Start it with: shepherd take 127
 
 Waiting, nothing to do for you:
   - #132 is blocked by #131.
   - #129 needs human QA (mode:hil). Do not take it.</code></pre>
 
-<p><strong><code>psdd take 123</code></strong> (story in needs-refinement)</p>
+<p><strong><code>shepherd take 123</code></strong> (story in needs-refinement)</p>
 <pre><code>You now hold story #123 "Rate limiting". Its step is refinement. This step
 is attended: the user takes part, and you do not decide on your own.
 
@@ -377,20 +377,20 @@ It does not exist yet. Create it first:
 Invoke the skill: refine
 Spec to work on: .agents/specs/123-rate-limiting/spec.md
 Read the issue: gh issue view 123 --comments
-Commit the spec on 123-rate-limiting and push it, so the link psdd posts resolves.
+Commit the spec on 123-rate-limiting and push it, so the link shepherd posts resolves.
 
 When the user agrees refinement is finished, run one of:
-  psdd done 123 clear       (no open questions, moves on to planning)
-  psdd done 123 questions   (open questions, moves to clarification)
+  shepherd done 123 clear       (no open questions, moves on to planning)
+  shepherd done 123 questions   (open questions, moves to clarification)
 
-On a long step, run psdd take 123 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 123</code></pre>
+On a long step, run shepherd take 123 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 123</code></pre>
 
 <p><strong>A refusal</strong></p>
 <pre><code>Slice #131 is already held by another session (since 14:02).
-Do not work on it. Run psdd next 123 and pick a different item.</code></pre>
+Do not work on it. Run shepherd next 123 and pick a different item.</code></pre>
 
-<p><strong>Automatic transitions psdd makes</strong></p>
+<p><strong>Automatic transitions shepherd makes</strong></p>
 <ul>
   <li>Slice issues created: story goes to <code>implementation</code>.</li>
   <li>A slice merges: dependents with no open blockers go from <code>blocked</code> to <code>ready-for-agent</code>.</li>
@@ -399,9 +399,9 @@ Do not work on it. Run psdd next 123 and pick a different item.</code></pre>
 </ul>
 
 <h2 id="recommendations">Recommendations</h2>
-<p>psdd does not require these tools, but they make working with it faster.</p>
+<p>shepherd does not require these tools, but they make working with it faster.</p>
 <ul>
-  <li><strong><a href="https://herdr.dev/agent-guide.md">herdr</a>:</strong> the preferred worktree provider. Each phase runs as its own herdr agent in the worktree's pane, <code>deliver</code> waits on agents with <code>herdr agent wait</code>, and notifications show inside herdr. psdd picks it first in <code>auto</code> mode.</li>
+  <li><strong><a href="https://herdr.dev/agent-guide.md">herdr</a>:</strong> the preferred worktree provider. Each phase runs as its own herdr agent in the worktree's pane, <code>deliver</code> waits on agents with <code>herdr agent wait</code>, and notifications show inside herdr. shepherd picks it first in <code>auto</code> mode.</li>
   <li><strong><a href="https://ghostty.org">Ghostty</a>:</strong> the recommended terminal to run herdr and the agents in.</li>
 </ul>
 

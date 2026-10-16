@@ -1,8 +1,19 @@
 # Changelog
 
-All notable changes to psdd are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and psdd uses [Semantic Versioning](https://semver.org/).
+All notable changes to shepherd (called psdd until 0.5.1) are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and shepherd uses [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
+
+### Changed
+
+- psdd is renamed shepherd. The command is `shepherd` (`npx shepherd …`), the workspace packages are `@shepherd/*`, and every name shepherd stores is renamed with no fallback to the old one:
+  - the slug comment `psdd: slug <slug>` is `shepherd: slug <slug>`, and the other markers shepherd reads back from comments are renamed the same way;
+  - claims are `refs/shepherd/claims/<issue>` and QA evidence branches `shepherd/qa/<issue>`;
+  - the config files are `.agents/shepherd.config.json` and `.agents/shepherd.config.local.json`;
+  - the section in `AGENTS.md` and `CLAUDE.md` sits between `<!-- shepherd:start -->` and `<!-- shepherd:end -->`;
+  - the environment variables are `SHEPHERD_SESSION` and `SHEPHERD_SKILLS_SOURCE`.
+
+  To upgrade a repository from psdd 0.5.x: finish or release the claims in flight (`psdd done`, `psdd tidy`), install shepherd, rename the two config files, delete the old psdd section from `AGENTS.md` and `CLAUDE.md` and run `npx shepherd init`. On every open story, add the comment `shepherd: slug <slug>` with the slug from its `psdd: slug` comment, or shepherd derives the slug again from the current title.
 
 ## [0.5.1] - 2026-10-16
 

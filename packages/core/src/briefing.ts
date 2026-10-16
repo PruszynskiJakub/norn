@@ -9,7 +9,7 @@ export function noun(issue: Issue): "issue" | "story" | "slice" {
   return kind === "new" ? "issue" : kind;
 }
 
-/** One way to finish a step: `psdd done <issue> <word> ["<note>"] [--evidence <dir>]`. */
+/** One way to finish a step: `shepherd done <issue> <word> ["<note>"] [--evidence <dir>]`. */
 export interface FinishCommand {
   issue: number;
   /** The outcome word; "" when the step ends only one way. */
@@ -75,7 +75,7 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
   if (!loc) return [];
   const story = loc.story;
   const spec = specPath(story.number, loc.slug);
-  const pushSpec = `Commit the spec on ${loc.branch} and push it, so the link psdd posts resolves.`;
+  const pushSpec = `Commit the spec on ${loc.branch} and push it, so the link shepherd posts resolves.`;
   const rework = isRework ? [`This is rework: the latest review or QA comment on #${n} lists what to fix. ${readIssue}`] : [];
   if (step.skill === "resolve") {
     const lines = [`The latest needs-human comment gives the reason. ${readIssue}`, `Record the outcome on the issue: gh issue comment ${n}`];
@@ -89,7 +89,7 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
     if (step.skill === "slice") {
       lines.push(
         "Create the slices in dependency order, blockers first, one command per slice:",
-        `  psdd add-slice ${n} "title" --mode afk|hil [--blocked-by <slice>]...`,
+        `  shepherd add-slice ${n} "title" --mode afk|hil [--blocked-by <slice>]...`,
         "  --mode afk when an agent can verify every criterion, hil when a person must also look at it.",
         "Then give each slice its body: gh issue edit <slice> --body-file <file>",
         `Push ${loc.branch} once the slices exist, so slice PRs can target it.`,
@@ -125,11 +125,11 @@ function processLines(issue: Issue, step: Step, loc: Location | null, isRework: 
 function qaLines(issue: Issue, step: Step, loc: Location, readIssue: string): string[] {
   const n = issue.number;
   const files =
-    "Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: psdd pushes the files and embeds them in the comment. Do not commit them.";
+    "Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: shepherd pushes the files and embeds them in the comment. Do not commit them.";
   if (step.skill === "auto-qa") {
     const lines = ["Your note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.", files];
     if (kindOf(issue) === "slice" && issue.labels.includes("mode:afk")) {
-      lines.push(`No person checks this slice after you. A criterion you cannot check is never passed: run psdd escalate ${n} "reason".`);
+      lines.push(`No person checks this slice after you. A criterion you cannot check is never passed: run shepherd escalate ${n} "reason".`);
     } else {
       lines.push(
         "A person QAs this after you. For what only a person can check (the slice's verifier reason), list it in the note",

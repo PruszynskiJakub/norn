@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { boundaryViolations, type Pkg, readPackages } from "./boundaries.js";
 
 function pkg(name: string, files: Record<string, string>, deps: string[] = []): Pkg {
-  const dir = `packages/${name.replace("@psdd/", "")}`;
+  const dir = `packages/${name.replace("@shepherd/", "")}`;
   return {
     name,
     dir,
@@ -11,20 +11,20 @@ function pkg(name: string, files: Record<string, string>, deps: string[] = []): 
   };
 }
 
-const core = (source = "") => pkg("@psdd/core", { "index.ts": source });
+const core = (source = "") => pkg("@shepherd/core", { "index.ts": source });
 
 describe("the layering rules", () => {
   test("core may import node:path and itself, nothing else", () => {
     const res = boundaryViolations([
-      pkg("@psdd/core", {
+      pkg("@shepherd/core", {
         "index.ts": 'import { join } from "node:path";\nimport { x } from "./x.js";\nimport { spawn } from "node:child_process";',
-        "x.ts": 'export * from "@psdd/cli";\nconst m = await import("node:fs");',
+        "x.ts": 'export * from "@shepherd/cli";\nconst m = await import("node:fs");',
       }),
-      pkg("@psdd/cli", {}),
+      pkg("@shepherd/cli", {}),
     ]);
     expect(res).toEqual([
       "packages/core/src/index.ts → node:child_process: core imports no node: module but node:path",
-      "packages/core/src/x.ts → @psdd/cli: core imports no other package",
+      "packages/core/src/x.ts → @shepherd/cli: core imports no other package",
       "packages/core/src/x.ts → node:fs: core imports no node: module but node:path",
     ]);
   });
@@ -32,37 +32,37 @@ describe("the layering rules", () => {
   test("an adapter imports only core", () => {
     const res = boundaryViolations([
       core(),
-      pkg("@psdd/github-gh", { "gh.ts": 'import { spawn } from "node:child_process";\nimport type { GitHub } from "@psdd/core";' }, ["@psdd/core"]),
-      pkg("@psdd/workspace-local", { "w.ts": 'import { GhGitHub } from "@psdd/github-gh";' }, ["@psdd/core", "@psdd/github-gh"]),
+      pkg("@shepherd/github-gh", { "gh.ts": 'import { spawn } from "node:child_process";\nimport type { GitHub } from "@shepherd/core";' }, ["@shepherd/core"]),
+      pkg("@shepherd/workspace-local", { "w.ts": 'import { GhGitHub } from "@shepherd/github-gh";' }, ["@shepherd/core", "@shepherd/github-gh"]),
     ]);
     expect(res).toEqual([
-      "packages/workspace-local/src/w.ts → @psdd/github-gh: an adapter imports only @psdd/core",
-      "packages/workspace-local/package.json → @psdd/core: declared but never imported",
+      "packages/workspace-local/src/w.ts → @shepherd/github-gh: an adapter imports only @shepherd/core",
+      "packages/workspace-local/package.json → @shepherd/core: declared but never imported",
     ]);
   });
 
   test("only a front end wires adapters", () => {
     const res = boundaryViolations([
       core(),
-      pkg("@psdd/github-gh", {}, []),
-      pkg("@psdd/cli", { "bin.ts": 'import { GhGitHub } from "@psdd/github-gh";' }, ["@psdd/github-gh"]),
-      pkg("@psdd/testing", { "h.ts": 'import { GhGitHub } from "@psdd/github-gh";' }, ["@psdd/github-gh"]),
+      pkg("@shepherd/github-gh", {}, []),
+      pkg("@shepherd/cli", { "bin.ts": 'import { GhGitHub } from "@shepherd/github-gh";' }, ["@shepherd/github-gh"]),
+      pkg("@shepherd/testing", { "h.ts": 'import { GhGitHub } from "@shepherd/github-gh";' }, ["@shepherd/github-gh"]),
     ]);
-    expect(res).toEqual(["packages/testing/src/h.ts → @psdd/github-gh: only a front end wires adapters"]);
+    expect(res).toEqual(["packages/testing/src/h.ts → @shepherd/github-gh: only a front end wires adapters"]);
   });
 
   test("testing is imported only from tests", () => {
     const res = boundaryViolations([
       core(),
-      pkg("@psdd/testing", {}),
-      pkg("@psdd/cli", { "cli.ts": 'import { setup } from "@psdd/testing";' }, ["@psdd/testing"]),
+      pkg("@shepherd/testing", {}),
+      pkg("@shepherd/cli", { "cli.ts": 'import { setup } from "@shepherd/testing";' }, ["@shepherd/testing"]),
     ]);
-    expect(res).toEqual(["packages/cli/src/cli.ts → @psdd/testing: @psdd/testing is imported only from tests"]);
+    expect(res).toEqual(["packages/cli/src/cli.ts → @shepherd/testing: @shepherd/testing is imported only from tests"]);
   });
 
   test("an internal import is declared in the importer's package.json", () => {
-    const res = boundaryViolations([core(), pkg("@psdd/cli", { "cli.ts": 'import { take } from "@psdd/core";' })]);
-    expect(res).toEqual(["packages/cli/src/cli.ts → @psdd/core: not declared in packages/cli/package.json"]);
+    const res = boundaryViolations([core(), pkg("@shepherd/cli", { "cli.ts": 'import { take } from "@shepherd/core";' })]);
+    expect(res).toEqual(["packages/cli/src/cli.ts → @shepherd/core: not declared in packages/cli/package.json"]);
   });
 
   test("an import after a regex literal is still read", () => {
@@ -74,12 +74,12 @@ describe("the layering rules", () => {
   });
 
   test("a relative import stays inside its package", () => {
-    const res = boundaryViolations([core(), pkg("@psdd/cli", { "cli.ts": 'import { take } from "../../core/src/operations.js";' })]);
+    const res = boundaryViolations([core(), pkg("@shepherd/cli", { "cli.ts": 'import { take } from "../../core/src/operations.js";' })]);
     expect(res).toEqual(["packages/cli/src/cli.ts → ../../core/src/operations.js: a relative import stays inside its package"]);
   });
 });
 
-describe("psdd's packages", () => {
+describe("shepherd's packages", () => {
   test("keep to the layering rules", () => {
     expect(boundaryViolations(readPackages())).toEqual([]);
   });

@@ -1,4 +1,4 @@
-import type { FeedEvent } from "@psdd/core";
+import type { FeedEvent } from "@shepherd/core";
 import { useLayoutEffect, useRef, useState } from "react";
 import { cn } from "../lib/utils.ts";
 import { type Attention, type StepGroup, attentionOf, feedFor, isSignificant, stepGroupOf } from "../model.ts";

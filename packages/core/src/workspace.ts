@@ -27,7 +27,7 @@ export function isWithin(path: string, dir: string, platform = process.platform)
 export interface Workspace {
   /** Absolute path of the main repository checkout. */
   root: string;
-  /** Absolute path psdd was started in; may be inside a worktree. */
+  /** Absolute path shepherd was started in; may be inside a worktree. */
   cwd: string;
   env: Record<string, string | undefined>;
   /** Reads a file relative to root; null when missing. */

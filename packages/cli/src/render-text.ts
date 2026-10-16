@@ -27,12 +27,12 @@ import {
   TEAM_CONFIG,
   type TidyResult,
   type WaitItem,
-} from "@psdd/core";
+} from "@shepherd/core";
 import type { DashboardRefusal, DashboardResult } from "./dashboard.js";
 import type { InitResult, MissingSkills } from "./init.js";
 
 /**
- * Every sentence psdd prints. Each union is switched on exhaustively, so a
+ * Every sentence shepherd prints. Each union is switched on exhaustively, so a
  * variant without wording fails the typecheck instead of printing nothing.
  */
 
@@ -75,7 +75,7 @@ export function wrap(text: string, width = 76) {
     .join("\n");
 }
 
-/** An ISO timestamp as the time of day psdd shows, e.g. 14:02. */
+/** An ISO timestamp as the time of day shepherd shows, e.g. 14:02. */
 export function hhmm(iso: string) {
   return iso.slice(11, 16);
 }
@@ -83,21 +83,21 @@ export function hhmm(iso: string) {
 const issues = (ns: number[]) => ns.map((b) => `#${b}`).join(", ");
 
 export const USAGE = [
-  "psdd runs work through the SDD process. Commands on an issue take its number explicitly.",
+  "shepherd runs work through the SDD process. Commands on an issue take its number explicitly.",
   "",
-  "  psdd init                          Set up this project: skills, .agents/specs/, labels",
-  "  psdd next <story>                  What can be done on the story now",
-  "  psdd take <issue> [--takeover]     Claim the issue and get the briefing for its step;",
+  "  shepherd init                          Set up this project: skills, .agents/specs/, labels",
+  "  shepherd next <story>                  What can be done on the story now",
+  "  shepherd take <issue> [--takeover]     Claim the issue and get the briefing for its step;",
   "                                     --takeover takes it from a stopped session of yours",
-  '  psdd done <issue> [outcome] ["note"] [--evidence <dir>]',
-  "                                     Finish the step; psdd makes the transition.",
+  '  shepherd done <issue> [outcome] ["note"] [--evidence <dir>]',
+  "                                     Finish the step; shepherd makes the transition.",
   "                                     --evidence attaches the QA files in <dir>",
-  '  psdd add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
-  '  psdd escalate <issue> "reason"     Set needs-human and release the claim',
-  "  psdd release <issue>               Give up the claim without a transition",
-  "  psdd status <story>                Read-only overview of the story and its slices",
-  "  psdd tidy [--dry-run]              Remove what belongs to closed issues",
-  "  psdd dashboard [--port <n>] [--interval <duration>] [--no-open]",
+  '  shepherd add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
+  '  shepherd escalate <issue> "reason"     Set needs-human and release the claim',
+  "  shepherd release <issue>               Give up the claim without a transition",
+  "  shepherd status <story>                Read-only overview of the story and its slices",
+  "  shepherd tidy [--dry-run]              Remove what belongs to closed issues",
+  "  shepherd dashboard [--port <n>] [--interval <duration>] [--no-open]",
   "                                     Watch your work in the browser; Ctrl-C stops it",
   "",
   "Add --json for machine-readable output.",
@@ -105,13 +105,13 @@ export const USAGE = [
 
 /** How to call each command that takes an issue number. */
 export const NEEDS_NUMBER: Record<string, string> = {
-  next: "psdd next <story>",
-  take: "psdd take <issue>",
-  done: 'psdd done <issue> [outcome] ["note"] [--evidence <dir>]',
-  "add-slice": 'psdd add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
-  escalate: 'psdd escalate <issue> "reason"',
-  release: "psdd release <issue>",
-  status: "psdd status <story>",
+  next: "shepherd next <story>",
+  take: "shepherd take <issue>",
+  done: 'shepherd done <issue> [outcome] ["note"] [--evidence <dir>]',
+  "add-slice": 'shepherd add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
+  escalate: 'shepherd escalate <issue> "reason"',
+  release: "shepherd release <issue>",
+  status: "shepherd status <story>",
 };
 
 /**
@@ -124,8 +124,8 @@ export function ghFailureMessage(argv: string[], error: string): string {
   const lines = ["GitHub refused a call. Some changes from this command may already be applied.", error];
   if (cmd && n && /^\d+$/.test(n)) {
     lines.push(
-      `See where things stand with: psdd status ${n} (for a slice, psdd status <its story> shows the whole story)`,
-      `Check gh auth status and that you are inside the repository, then retry: psdd ${argv.map(sh).join(" ")}`,
+      `See where things stand with: shepherd status ${n} (for a slice, shepherd status <its story> shows the whole story)`,
+      `Check gh auth status and that you are inside the repository, then retry: shepherd ${argv.map(sh).join(" ")}`,
     );
   } else {
     lines.push("Check gh auth status and that you are inside the repository, then retry the command.");
@@ -167,9 +167,9 @@ function problem(p: ConfigProblem): string {
 export function renderWarning(w: ConfigWarning): string {
   switch (w.kind) {
     case "stale-after-clamped":
-      return `${w.file}: claims.staleAfter ${w.value} is below the ${w.minimum} minimum, so psdd uses ${w.minimum}; shorter, and live claims get taken over`;
+      return `${w.file}: claims.staleAfter ${w.value} is below the ${w.minimum} minimum, so shepherd uses ${w.minimum}; shorter, and live claims get taken over`;
     case "team-setting-in-local-file":
-      return `${w.file}: ${w.setting} is shared by the team, so psdd ignores it here; set it in ${w.team}`;
+      return `${w.file}: ${w.setting} is shared by the team, so shepherd ignores it here; set it in ${w.team}`;
     default:
       return unreachable(w);
   }
@@ -179,13 +179,13 @@ export function renderWarning(w: ConfigWarning): string {
 
 /** The ways to finish a step, aligned, with what each means. */
 function finishLines(finish: FinishCommand[]): string[] {
-  if (finish.length === 1 && finish[0].word === "") return [`  psdd done ${finish[0].issue}`];
-  const cmds = finish.map((f) => `psdd done ${f.issue} ${f.word}${f.note ? ` "${f.note}"` : ""}${f.evidence ? " [--evidence <dir>]" : ""}`);
+  if (finish.length === 1 && finish[0].word === "") return [`  shepherd done ${finish[0].issue}`];
+  const cmds = finish.map((f) => `shepherd done ${f.issue} ${f.word}${f.note ? ` "${f.note}"` : ""}${f.evidence ? " [--evidence <dir>]" : ""}`);
   const width = Math.max(...cmds.map((c) => c.length)) + 3;
   return cmds.map((c, i) => `  ${c.padEnd(width)}(${finish[i].means})`);
 }
 
-const pick = (story: number | null) => (story ? `Run psdd next ${story} and pick a different item.` : "Pick a different item.");
+const pick = (story: number | null) => (story ? `Run shepherd next ${story} and pick a different item.` : "Pick a different item.");
 
 export function renderRefusal(r: Refusal | CliRefusal): string[] {
   switch (r.kind) {
@@ -198,9 +198,9 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
     case "bad-dashboard-flag":
       return [r.flag === "port" ? "--port takes a port number, e.g. 4477." : "--interval takes a duration such as 30s, 2m or 1h."];
     case "missing-skills":
-      return [`Missing skills: ${r.missing.join(", ")}. The skill install did not provide them into skills/.`, "Fix the install and run psdd init again."];
+      return [`Missing skills: ${r.missing.join(", ")}. The skill install did not provide them into skills/.`, "Fix the install and run shepherd init again."];
     case "config-invalid":
-      return ["psdd cannot read its configuration:", ...r.problems.map((p) => `  ${problem(p)}`), "Fix the file and run the command again."];
+      return ["shepherd cannot read its configuration:", ...r.problems.map((p) => `  ${problem(p)}`), "Fix the file and run the command again."];
     case "provider-mismatch": {
       const start = r.provider === "herdr" ? "Start from a herdr pane" : "Start from a Claude Code session";
       return [`The worktree provider is ${r.provider}, but ${r.variable} is not set.`, `${start}, or switch the provider in ${LOCAL_CONFIG}.`];
@@ -212,26 +212,26 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
     case "story-in-implementation":
       return [
         `Story #${r.issue} is in implementation. Its label follows its slices; there is no step to take on the story itself.`,
-        `Run psdd next ${r.issue} to see its slices.`,
+        `Run shepherd next ${r.issue} to see its slices.`,
       ];
     case "story-in-merge-queue":
       return [
         `Story #${r.issue} is in merge-queue. Only the story owner (${r.owner ? `@${r.owner}` : "unassigned"}) merges the story PR;`,
-        `once it is merged, psdd next ${r.issue} closes the story if GitHub has not. Do not merge it yourself.`,
+        `once it is merged, shepherd next ${r.issue} closes the story if GitHub has not. Do not merge it yourself.`,
       ];
     case "blocked":
       return [`#${r.issue} is blocked by ${issues(r.blockers) || "other issues"}. Do not work on it yet.`, pick(r.story)];
     case "no-step":
-      return [`#${r.issue} (${r.state ?? "no state"}) has no step psdd can brief.`, pick(r.story)];
+      return [`#${r.issue} (${r.state ?? "no state"}) has no step shepherd can brief.`, pick(r.story)];
     case "held":
       return [
         `${heldWhat(r)} is already held by another session (since ${heldSince(r.since)}).`,
-        `Do not work on it.${r.story ? ` Run psdd next ${r.story} and pick a different item.` : ""}`,
+        `Do not work on it.${r.story ? ` Run shepherd next ${r.story} and pick a different item.` : ""}`,
       ];
     case "held-by-your-session":
       return [
         `${heldWhat(r)} is held by another session of yours (since ${heldSince(r.since)}).`,
-        `If that session has stopped, take it over here: psdd take ${r.issue} --takeover`,
+        `If that session has stopped, take it over here: shepherd take ${r.issue} --takeover`,
         "If it is still running, do not work on it.",
       ];
     case "held-by-teammate":
@@ -240,7 +240,7 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
         "Ask them to release it, or wait until the claim goes stale.",
       ];
     case "not-claimed":
-      return [`You do not hold #${r.issue}. Claim it first with: psdd take ${r.issue}`];
+      return [`You do not hold #${r.issue}. Claim it first with: shepherd take ${r.issue}`];
     case "held-by-other-session":
       return [`#${r.issue} is held by another session (since ${hhmm(r.since)}). Do not work on it or finish it.`];
     case "outcome-missing":
@@ -248,7 +248,7 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
     case "outcome-unknown":
       return [`"${r.word}" is not an outcome of ${r.step}.`, "Finish with one of:", ...finishLines(r.finish)];
     case "note-missing":
-      return [`This outcome needs a ${r.note}. Run:`, `  psdd done ${r.issue} ${r.word} "${r.note}"${r.evidence ? " [--evidence <dir>]" : ""}`];
+      return [`This outcome needs a ${r.note}. Run:`, `  shepherd done ${r.issue} ${r.word} "${r.note}"${r.evidence ? " [--evidence <dir>]" : ""}`];
     case "evidence-not-allowed":
       return [`--evidence is for QA steps; ${r.step} takes none. Finish without it:`, ...finishLines(r.finish)];
     case "evidence-not-a-directory":
@@ -263,36 +263,36 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
     case "no-slices":
       return [
         `Story #${r.issue} has no slices yet. Create them first, one per slice, with:`,
-        `  psdd add-slice ${r.issue} "title" --mode afk|hil [--blocked-by <issue>]`,
+        `  shepherd add-slice ${r.issue} "title" --mode afk|hil [--blocked-by <issue>]`,
       ];
     case "not-in-story":
       return [`#${r.issue} is not a sub-issue of a story.`];
     case "no-slice-pr":
-      return [`No PR from ${r.head} was found. Open and merge it before running psdd done ${r.issue}.`];
+      return [`No PR from ${r.head} was found. Open and merge it before running shepherd done ${r.issue}.`];
     case "slice-pr-wrong-base":
       return [
         `PR #${r.pr} from ${r.head} targets ${r.base}, not the story branch ${r.storyBranch}.`,
         r.merged
-          ? `Its changes are not on ${r.storyBranch}, and a person must sort that out. Run: psdd escalate ${r.issue} ${sh(`slice PR #${r.pr} was merged into ${r.base}, not ${r.storyBranch}`)}`
-          : `Retarget it with: gh pr edit ${r.pr} --base ${sh(r.storyBranch)}, then merge it and run psdd done ${r.issue}.`,
+          ? `Its changes are not on ${r.storyBranch}, and a person must sort that out. Run: shepherd escalate ${r.issue} ${sh(`slice PR #${r.pr} was merged into ${r.base}, not ${r.storyBranch}`)}`
+          : `Retarget it with: gh pr edit ${r.pr} --base ${sh(r.storyBranch)}, then merge it and run shepherd done ${r.issue}.`,
       ];
     case "slice-pr-not-merged":
-      return [`PR #${r.pr} from ${r.head} is not merged yet.`, `Merge it into ${r.base} (resolve conflicts if needed), then run psdd done ${r.issue}.`];
+      return [`PR #${r.pr} from ${r.head} is not merged yet.`, `Merge it into ${r.base} (resolve conflicts if needed), then run shepherd done ${r.issue}.`];
     case "base-branch-missing":
       return [
         `The story branch ${r.branch} would start from ${r.base}, but ${r.base} does not exist on GitHub.`,
         `Set baseBranch in ${TEAM_CONFIG} to the repository's default branch and run the command again.`,
       ];
     case "reason-missing":
-      return ["Say why a human is needed. Run:", `  psdd escalate ${r.issue} "reason"`];
+      return ["Say why a human is needed. Run:", `  shepherd escalate ${r.issue} "reason"`];
     case "add-slice-usage":
-      return ["add-slice needs a title and a mode. Run:", `  psdd add-slice ${r.story} "title" --mode afk|hil [--blocked-by <issue>]...`];
+      return ["add-slice needs a title and a mode. Run:", `  shepherd add-slice ${r.story} "title" --mode afk|hil [--blocked-by <issue>]...`];
     case "story-not-slicing":
       return [`Story #${r.story} is in ${r.state ?? "no state"}, not needs-slicing. Slices are only added while slicing.`];
     case "is-a-slice":
-      return [`#${r.issue} is a slice${r.story ? ` of story #${r.story}. Run psdd next ${r.story}` : ""} instead.`];
+      return [`#${r.issue} is a slice${r.story ? ` of story #${r.story}. Run shepherd next ${r.story}` : ""} instead.`];
     case "not-a-story":
-      return [`#${r.issue} is not a story yet. Triage it first with: psdd take ${r.issue}`];
+      return [`#${r.issue} is not a story yet. Triage it first with: shepherd take ${r.issue}`];
     default:
       return unreachable(r);
   }
@@ -318,7 +318,7 @@ export function renderEvent(e: Event): string[] {
     case "base-branch-missing":
       return renderRefusal(e);
     case "worktree-left-for-tidy":
-      return [`Its worktree ${e.worktree} is removed by the next psdd tidy.`];
+      return [`Its worktree ${e.worktree} is removed by the next shepherd tidy.`];
     case "slice-state-changed":
       return [`#${e.issue} is now ${e.state}.`];
     case "story-promoted":
@@ -327,7 +327,7 @@ export function renderEvent(e: Event): string[] {
       return [`The story PR is merged. Closed story #${e.story}.`];
     case "follow-up-failed": {
       const what = e.what === "clear-labels" ? `clear the labels of #${e.issue}` : TASKS[e.what];
-      return [`Could not ${what}: ${e.detail}. psdd next ${e.retry} will retry this.`];
+      return [`Could not ${what}: ${e.detail}. shepherd next ${e.retry} will retry this.`];
     }
     default:
       return unreachable(e);
@@ -360,13 +360,13 @@ export function renderAnswer(a: Answer): string[] {
       return renderDashboard(a);
     case "initialized":
       return [
-        "psdd is set up in this project:",
+        "shepherd is set up in this project:",
         `  - ${a.skills} skills in skills/, linked into .claude/skills/`,
-        ...(a.updated.length ? [`  - updated to this psdd version: ${a.updated.join(", ")} (git diff skills/ shows the changes)`] : []),
+        ...(a.updated.length ? [`  - updated to this shepherd version: ${a.updated.join(", ")} (git diff skills/ shows the changes)`] : []),
         "  - .agents/specs/ for story specs",
         `  - ${TEAM_CONFIG} with the team settings (each developer can override in ${LOCAL_CONFIG})`,
         "  - .agents/worktrees/ and the local config in .gitignore",
-        `  - how to work with psdd in ${a.instructed.join(" and ")}`,
+        `  - how to work with shepherd in ${a.instructed.join(" and ")}`,
         `  - ${a.labels} labels on the repository`,
         "",
         `Commit skills/, .claude/skills/, .agents/, .gitignore and ${a.instructed.join(", ")}. Then ask your agent: drive <issue>`,
@@ -385,10 +385,10 @@ function duration(ms: number) {
 
 function renderDashboard(a: DashboardResult): string[] {
   const raised = a.raisedFrom
-    ? [`psdd warning: --interval ${a.raisedFrom} is below the 30s floor, so the dashboard reads GitHub every ${duration(a.intervalMs)}.`]
+    ? [`shepherd warning: --interval ${a.raisedFrom} is below the 30s floor, so the dashboard reads GitHub every ${duration(a.intervalMs)}.`]
     : [];
-  if (a.launch.kind === "already-running") return [...raised, `psdd dashboard is already running for this repository at ${a.launch.url}.`];
-  const where = `psdd dashboard is running at ${a.launch.url} and reads GitHub every ${duration(a.intervalMs)}.`;
+  if (a.launch.kind === "already-running") return [...raised, `shepherd dashboard is already running for this repository at ${a.launch.url}.`];
+  const where = `shepherd dashboard is running at ${a.launch.url} and reads GitHub every ${duration(a.intervalMs)}.`;
   return [
     ...raised,
     a.launch.port === a.port ? where : `Port ${a.port} is taken, so ${where}`,
@@ -430,11 +430,11 @@ export function renderBriefing(b: Briefing): string[] {
     `${when}, run${b.finish.length > 1 ? " one of" : ""}:`,
     ...finishLines(b.finish),
     "",
-    `On a long step, run psdd take ${n} again now and then: it keeps your claim fresh.`,
-    `If you have to stop, run: psdd release ${n}`,
-    `If something is wrong and a person is needed, run: psdd escalate ${n} "reason"`,
+    `On a long step, run shepherd take ${n} again now and then: it keeps your claim fresh.`,
+    `If you have to stop, run: shepherd release ${n}`,
+    `If something is wrong and a person is needed, run: shepherd escalate ${n} "reason"`,
     "",
-    "Do not change labels yourself. Only psdd changes them.",
+    "Do not change labels yourself. Only shepherd changes them.",
   ];
 }
 
@@ -465,13 +465,13 @@ function renderDone(d: DoneResult): string[] {
   if (d.storyBranchCreated) lines.push(...renderEvent({ kind: "story-branch-created", branch: d.storyBranchCreated }));
   lines.push(...d.followUps.flatMap(renderEvent));
   if (d.deliverable) lines.push(`To run the story unattended until it needs a human, the user can start the deliver skill: deliver ${n}`);
-  if (d.personNext) lines.push(`A person does the next step, so do not take #${n} again. psdd has notified the user.`);
+  if (d.personNext) lines.push(`A person does the next step, so do not take #${n} again. shepherd has notified the user.`);
   return lines;
 }
 
 // status
 
-/** The state as status shows it; two state labels are shown as both, since psdd cannot tell which is real. */
+/** The state as status shows it; two state labels are shown as both, since shepherd cannot tell which is real. */
 export function rowState(r: Row): string {
   if (r.status !== "open") return r.status;
   if (r.states.length > 1) return `${r.states.join(" + ")} (more than one state label)`;
@@ -520,13 +520,13 @@ export function renderRemoval(r: Removal): string {
 export function renderKept(k: Kept): string {
   switch (k.kind) {
     case "worktree-in-use":
-      return `${k.path}: psdd is running inside it. Run psdd tidy from another directory to remove it.`;
+      return `${k.path}: shepherd is running inside it. Run shepherd tidy from another directory to remove it.`;
     case "worktree-dirty":
       return `${k.path}: it has uncommitted changes. Commit and push them, or remove it by hand when done.`;
     case "worktree-unpushed":
       return `${k.path}: branch ${k.branch} has commits that are not on GitHub. Push them, or remove it by hand when done.`;
     case "branch-checked-out":
-      return `branch ${k.branch}: it is checked out at ${k.at}. Switch that checkout to another branch to let psdd tidy remove it.`;
+      return `branch ${k.branch}: it is checked out at ${k.at}. Switch that checkout to another branch to let shepherd tidy remove it.`;
     case "branch-unpushed":
       return `branch ${k.branch}: it has commits that are not on GitHub. Push them, or delete it by hand.`;
     default:
@@ -544,7 +544,10 @@ function renderTidy(r: TidyResult): string {
   const notes = tidyNotes(r);
   const out: string[] = [...notes];
   if (r.removed.length) {
-    out.push(r.dryRun ? "psdd tidy would remove (dry run, nothing was changed):" : "psdd tidy removed:", ...r.removed.map((x) => `  - ${renderRemoval(x)}`));
+    out.push(
+      r.dryRun ? "shepherd tidy would remove (dry run, nothing was changed):" : "shepherd tidy removed:",
+      ...r.removed.map((x) => `  - ${renderRemoval(x)}`),
+    );
   }
   if (r.kept.length) out.push("Kept, so no work is lost:", ...r.kept.map((x) => `  - ${renderKept(x)}`));
   if (r.failed.length) out.push("Could not remove, the rest still ran:", ...r.failed.map((x) => `  - ${renderFailure(x)}`));
@@ -603,9 +606,9 @@ function humanHandOff(w: WaitItem): string[] {
   return [
     "    If the user does it now, hand it to an agent in its worktree:",
     ...(w.createWorktree ? [`      Create the worktree: ${w.createWorktree}`] : []),
-    `      herdr agent start psdd-${w.issue} --kind claude --pane <pane of ${w.worktree}>`,
-    `      herdr agent prompt psdd-${w.issue} "drive ${w.issue}"`,
-    `      herdr agent focus psdd-${w.issue}`,
+    `      herdr agent start shepherd-${w.issue} --kind claude --pane <pane of ${w.worktree}>`,
+    `      herdr agent prompt shepherd-${w.issue} "drive ${w.issue}"`,
+    `      herdr agent focus shepherd-${w.issue}`,
   ];
 }
 
@@ -629,7 +632,7 @@ function renderNothingLeft(r: NextReport): string {
   const out = [...r.notes.flatMap(renderEvent), `Story #${r.story} "${r.title}": nothing left that you can do.`];
   if (human.length) out.push("Waiting for a human:", ...human.flatMap((w) => [`  - #${w.issue} ${humanDetail(w)}.`, ...humanHandOff(w)]));
   if (blocked.length) out.push("Blocked until then:", ...blocked.map(waitLine));
-  out.push(`Stop here and report to the user.${r.notified ? " psdd has already notified them." : ""}`);
+  out.push(`Stop here and report to the user.${r.notified ? " shepherd has already notified them." : ""}`);
   return out.join("\n");
 }
 
@@ -651,12 +654,12 @@ export function renderNext(r: NextReport): string {
   out.push(wrap(head), "");
 
   if (r.start.length === 0) {
-    out.push(`Nothing can be started now. Wait for the running items to finish, then run psdd next ${r.story} again.`);
+    out.push(`Nothing can be started now. Wait for the running items to finish, then run shepherd next ${r.story} again.`);
   } else if (r.slots === 0 && r.start.every((s) => !s.attended)) {
     const ready = `${r.start.length} item${r.start.length === 1 ? " is" : "s are"} ready`;
     out.push(
       wrap(
-        `${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run psdd next ${r.story} again.`,
+        `${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run shepherd next ${r.story} again.`,
       ),
       "",
       ...r.start.map((s) => `  - ${s.kind === "slice" ? "Slice" : "Story"} #${s.issue} "${s.title}" ${DESCRIBE[s.state] ?? `is in ${s.state}`}.`),
@@ -689,22 +692,22 @@ export function renderNext(r: NextReport): string {
       if (s.createWorktree) out.push(`    Create the worktree: ${s.createWorktree}`);
       if (s.checkedOutAt && s.branch) out.push(`    ${checkedOutElsewhere(s.branch, s.checkedOutAt)}`);
       if (r.provider === "herdr" && s.worktree) {
-        const start = `herdr agent start psdd-${s.issue} --kind claude --pane <pane of ${s.worktree}>`;
+        const start = `herdr agent start shepherd-${s.issue} --kind claude --pane <pane of ${s.worktree}>`;
         if (!s.attended) {
-          const prompt = `Work in ${s.worktree}. Run psdd take ${s.issue}, follow its briefing to the end, and finish with the psdd command it gives.`;
-          out.push(`    Start an agent: ${start}`, `    Then prompt it: herdr agent prompt psdd-${s.issue} "${prompt}"`);
+          const prompt = `Work in ${s.worktree}. Run shepherd take ${s.issue}, follow its briefing to the end, and finish with the shepherd command it gives.`;
+          out.push(`    Start an agent: ${start}`, `    Then prompt it: herdr agent prompt shepherd-${s.issue} "${prompt}"`);
         } else if (s.here) out.push("    You are in its worktree: take it in this session.");
         else {
           // An attended step needs the user, so the new agent drives the story from its worktree and this session stops.
           out.push(
             "    Hand the story to an agent in its worktree, which drives it on with the user:",
             `      ${start}`,
-            `      herdr agent prompt psdd-${s.issue} "drive ${r.story}"`,
-            `      herdr agent focus psdd-${s.issue}`,
+            `      herdr agent prompt shepherd-${s.issue} "drive ${r.story}"`,
+            `      herdr agent focus shepherd-${s.issue}`,
           );
         }
       }
-      if (s.session && s.worktree) out.push(`    Start an agent in ${s.worktree} with PSDD_SESSION=${s.session} set.`);
+      if (s.session && s.worktree) out.push(`    Start an agent in ${s.worktree} with SHEPHERD_SESSION=${s.session} set.`);
       out.push(`    Start it with: ${s.command}`);
     }
   }
@@ -712,7 +715,7 @@ export function renderNext(r: NextReport): string {
     out.push("", "Waiting, nothing to do for you:");
     for (const w of r.waiting) out.push(waitLine(w), ...humanHandOff(w));
   }
-  if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. When an item is done, run psdd next ${r.story} again.`);
+  if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. When an item is done, run shepherd next ${r.story} again.`);
   return out.join("\n");
 }
 
@@ -722,12 +725,12 @@ export function renderNext(r: NextReport): string {
 export function renderNotification(n: Notification): { title: string; body: string } {
   switch (n.kind) {
     case "needs-human":
-      return { title: `psdd: #${n.issue} needs you`, body: `${n.reason}\n${n.url}` };
+      return { title: `shepherd: #${n.issue} needs you`, body: `${n.reason}\n${n.url}` };
     case "needs-human-qa":
-      return { title: `psdd: #${n.issue} needs you`, body: `needs human QA (${n.of})\n${n.url}` };
+      return { title: `shepherd: #${n.issue} needs you`, body: `needs human QA (${n.of})\n${n.url}` };
     case "story-waiting":
       return {
-        title: `psdd: story #${n.story} is waiting for you`,
+        title: `shepherd: story #${n.story} is waiting for you`,
         body: n.waiting.map((w) => `#${w.issue} ${waitDetail(w)}`).join("\n") || "Nothing left to do on the story.",
       };
     default:

@@ -7,8 +7,8 @@ import type { MergeRefusal } from "./transitions.js";
 import type { Provider } from "./workspace.js";
 
 /**
- * Why psdd will not do what was asked, with the facts a front end needs to
- * say so. `story` is the story to run psdd next on for something else to do,
+ * Why shepherd will not do what was asked, with the facts a front end needs to
+ * say so. `story` is the story to run shepherd next on for something else to do,
  * when there is one. Claim times (`since`) are ISO timestamps.
  */
 export type Refusal =

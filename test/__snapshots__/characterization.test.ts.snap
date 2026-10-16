@@ -43,41 +43,41 @@ exports[`output of every command, text and --json > add-slice without a mode > j
 "exit 1
 {
   "ok": false,
-  "refusal": "add-slice needs a title and a mode. Run:\\n  psdd add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <issue>]..."
+  "refusal": "add-slice needs a title and a mode. Run:\\n  shepherd add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <issue>]..."
 }"
 `;
 
 exports[`output of every command, text and --json > add-slice without a mode > text 1`] = `
 "exit 1
 add-slice needs a title and a mode. Run:
-  psdd add-slice 50 "title" --mode afk|hil [--blocked-by <issue>]..."
+  shepherd add-slice 50 "title" --mode afk|hil [--blocked-by <issue>]..."
 `;
 
 exports[`output of every command, text and --json > add-slice without the claim > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "You do not hold #50. Claim it first with: psdd take 50"
+  "refusal": "You do not hold #50. Claim it first with: shepherd take 50"
 }"
 `;
 
 exports[`output of every command, text and --json > add-slice without the claim > text 1`] = `
 "exit 1
-You do not hold #50. Claim it first with: psdd take 50"
+You do not hold #50. Claim it first with: shepherd take 50"
 `;
 
 exports[`output of every command, text and --json > bad config > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "psdd cannot read its configuration:\\n  .agents/psdd.config.json: not valid JSON (Unexpected token 'o', \\"nope\\" is not valid JSON)\\nFix the file and run the command again."
+  "refusal": "shepherd cannot read its configuration:\\n  .agents/shepherd.config.json: not valid JSON (Unexpected token 'o', \\"nope\\" is not valid JSON)\\nFix the file and run the command again."
 }"
 `;
 
 exports[`output of every command, text and --json > bad config > text 1`] = `
 "exit 1
-psdd cannot read its configuration:
-  .agents/psdd.config.json: not valid JSON (Unexpected token 'o', "nope" is not valid JSON)
+shepherd cannot read its configuration:
+  .agents/shepherd.config.json: not valid JSON (Unexpected token 'o', "nope" is not valid JSON)
 Fix the file and run the command again."
 `;
 
@@ -85,17 +85,17 @@ exports[`output of every command, text and --json > config problems > json 1`] =
 "exit 1
 {
   "ok": false,
-  "refusal": "psdd cannot read its configuration:\\n  .agents/psdd.config.json: unknown setting \\"foo\\"\\n  .agents/psdd.config.json: notifications is set per developer in .agents/psdd.config.local.json\\n  .agents/psdd.config.json: deliver.maxParallel must be a whole number above 0\\n  .agents/psdd.config.local.json: worktrees.provider must be one of auto, herdr, claude-code, git\\nFix the file and run the command again."
+  "refusal": "shepherd cannot read its configuration:\\n  .agents/shepherd.config.json: unknown setting \\"foo\\"\\n  .agents/shepherd.config.json: notifications is set per developer in .agents/shepherd.config.local.json\\n  .agents/shepherd.config.json: deliver.maxParallel must be a whole number above 0\\n  .agents/shepherd.config.local.json: worktrees.provider must be one of auto, herdr, claude-code, git\\nFix the file and run the command again."
 }"
 `;
 
 exports[`output of every command, text and --json > config problems > text 1`] = `
 "exit 1
-psdd cannot read its configuration:
-  .agents/psdd.config.json: unknown setting "foo"
-  .agents/psdd.config.json: notifications is set per developer in .agents/psdd.config.local.json
-  .agents/psdd.config.json: deliver.maxParallel must be a whole number above 0
-  .agents/psdd.config.local.json: worktrees.provider must be one of auto, herdr, claude-code, git
+shepherd cannot read its configuration:
+  .agents/shepherd.config.json: unknown setting "foo"
+  .agents/shepherd.config.json: notifications is set per developer in .agents/shepherd.config.local.json
+  .agents/shepherd.config.json: deliver.maxParallel must be a whole number above 0
+  .agents/shepherd.config.local.json: worktrees.provider must be one of auto, herdr, claude-code, git
 Fix the file and run the command again."
 `;
 
@@ -118,17 +118,17 @@ exports[`output of every command, text and --json > config warnings before the a
   "slices": [],
   "message": "Story #1 \\"A story\\": needs-plan · owner none · branch 1-a-story\\nNo slices yet.",
   "warnings": [
-    ".agents/psdd.config.json: claims.staleAfter 1m is below the 10m minimum, so psdd uses 10m; shorter, and live claims get taken over",
-    ".agents/psdd.config.local.json: deliver.maxFixRounds is shared by the team, so psdd ignores it here; set it in .agents/psdd.config.json"
+    ".agents/shepherd.config.json: claims.staleAfter 1m is below the 10m minimum, so shepherd uses 10m; shorter, and live claims get taken over",
+    ".agents/shepherd.config.local.json: deliver.maxFixRounds is shared by the team, so shepherd ignores it here; set it in .agents/shepherd.config.json"
   ]
 }"
 `;
 
 exports[`output of every command, text and --json > config warnings before the answer > text 1`] = `
 "exit 0
-psdd warning:
-  .agents/psdd.config.json: claims.staleAfter 1m is below the 10m minimum, so psdd uses 10m; shorter, and live claims get taken over
-  .agents/psdd.config.local.json: deliver.maxFixRounds is shared by the team, so psdd ignores it here; set it in .agents/psdd.config.json
+shepherd warning:
+  .agents/shepherd.config.json: claims.staleAfter 1m is below the 10m minimum, so shepherd uses 10m; shorter, and live claims get taken over
+  .agents/shepherd.config.local.json: deliver.maxFixRounds is shared by the team, so shepherd ignores it here; set it in .agents/shepherd.config.json
 
 Story #1 "A story": needs-plan · owner none · branch 1-a-story
 No slices yet."
@@ -141,14 +141,14 @@ exports[`output of every command, text and --json > done agent QA pass on a hil 
   "issue": 65,
   "from": "needs-qa",
   "to": "needs-human-qa",
-  "message": "#65 is now in needs-human-qa. The claim is released.\\nA person does the next step, so do not take #65 again. psdd has notified the user."
+  "message": "#65 is now in needs-human-qa. The claim is released.\\nA person does the next step, so do not take #65 again. shepherd has notified the user."
 }"
 `;
 
 exports[`output of every command, text and --json > done agent QA pass on a hil slice notifies > text 1`] = `
 "exit 0
 #65 is now in needs-human-qa. The claim is released.
-A person does the next step, so do not take #65 again. psdd has notified the user."
+A person does the next step, so do not take #65 again. shepherd has notified the user."
 `;
 
 exports[`output of every command, text and --json > done merge of a slice outside a story > json 1`] = `
@@ -188,14 +188,14 @@ exports[`output of every command, text and --json > done merge unblocks and keep
   "issue": 127,
   "from": "merge-queue",
   "to": "closed",
-  "message": "#127 is now closed. The claim is released.\\nIts worktree .agents/worktrees/123-rate-limiting-127 is removed by the next psdd tidy.\\n#131 is now ready-for-agent."
+  "message": "#127 is now closed. The claim is released.\\nIts worktree .agents/worktrees/123-rate-limiting-127 is removed by the next shepherd tidy.\\n#131 is now ready-for-agent."
 }"
 `;
 
 exports[`output of every command, text and --json > done merge unblocks and keeps the worktree for tidy > text 1`] = `
 "exit 0
 #127 is now closed. The claim is released.
-Its worktree .agents/worktrees/123-rate-limiting-127 is removed by the next psdd tidy.
+Its worktree .agents/worktrees/123-rate-limiting-127 is removed by the next shepherd tidy.
 #131 is now ready-for-agent."
 `;
 
@@ -203,55 +203,55 @@ exports[`output of every command, text and --json > done merge with a PR into ma
 "exit 1
 {
   "ok": false,
-  "refusal": "PR #70 from 123-rate-limiting-127 targets main, not the story branch 123-rate-limiting.\\nRetarget it with: gh pr edit 70 --base 123-rate-limiting, then merge it and run psdd done 127."
+  "refusal": "PR #70 from 123-rate-limiting-127 targets main, not the story branch 123-rate-limiting.\\nRetarget it with: gh pr edit 70 --base 123-rate-limiting, then merge it and run shepherd done 127."
 }"
 `;
 
 exports[`output of every command, text and --json > done merge with a PR into main > text 1`] = `
 "exit 1
 PR #70 from 123-rate-limiting-127 targets main, not the story branch 123-rate-limiting.
-Retarget it with: gh pr edit 70 --base 123-rate-limiting, then merge it and run psdd done 127."
+Retarget it with: gh pr edit 70 --base 123-rate-limiting, then merge it and run shepherd done 127."
 `;
 
 exports[`output of every command, text and --json > done merge with a PR merged into main > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "PR #70 from 123-rate-limiting-127 targets main, not the story branch 123-rate-limiting.\\nIts changes are not on 123-rate-limiting, and a person must sort that out. Run: psdd escalate 127 'slice PR #70 was merged into main, not 123-rate-limiting'"
+  "refusal": "PR #70 from 123-rate-limiting-127 targets main, not the story branch 123-rate-limiting.\\nIts changes are not on 123-rate-limiting, and a person must sort that out. Run: shepherd escalate 127 'slice PR #70 was merged into main, not 123-rate-limiting'"
 }"
 `;
 
 exports[`output of every command, text and --json > done merge with a PR merged into main > text 1`] = `
 "exit 1
 PR #70 from 123-rate-limiting-127 targets main, not the story branch 123-rate-limiting.
-Its changes are not on 123-rate-limiting, and a person must sort that out. Run: psdd escalate 127 'slice PR #70 was merged into main, not 123-rate-limiting'"
+Its changes are not on 123-rate-limiting, and a person must sort that out. Run: shepherd escalate 127 'slice PR #70 was merged into main, not 123-rate-limiting'"
 `;
 
 exports[`output of every command, text and --json > done merge with an open PR > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "PR #70 from 123-rate-limiting-127 is not merged yet.\\nMerge it into 123-rate-limiting (resolve conflicts if needed), then run psdd done 127."
+  "refusal": "PR #70 from 123-rate-limiting-127 is not merged yet.\\nMerge it into 123-rate-limiting (resolve conflicts if needed), then run shepherd done 127."
 }"
 `;
 
 exports[`output of every command, text and --json > done merge with an open PR > text 1`] = `
 "exit 1
 PR #70 from 123-rate-limiting-127 is not merged yet.
-Merge it into 123-rate-limiting (resolve conflicts if needed), then run psdd done 127."
+Merge it into 123-rate-limiting (resolve conflicts if needed), then run shepherd done 127."
 `;
 
 exports[`output of every command, text and --json > done merge with no PR > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "No PR from 123-rate-limiting-127 was found. Open and merge it before running psdd done 127."
+  "refusal": "No PR from 123-rate-limiting-127 was found. Open and merge it before running shepherd done 127."
 }"
 `;
 
 exports[`output of every command, text and --json > done merge with no PR > text 1`] = `
 "exit 1
-No PR from 123-rate-limiting-127 was found. Open and merge it before running psdd done 127."
+No PR from 123-rate-limiting-127 was found. Open and merge it before running shepherd done 127."
 `;
 
 exports[`output of every command, text and --json > done on another session's claim > json 1`] = `
@@ -338,28 +338,28 @@ exports[`output of every command, text and --json > done slicing without slices 
 "exit 1
 {
   "ok": false,
-  "refusal": "Story #50 has no slices yet. Create them first, one per slice, with:\\n  psdd add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <issue>]"
+  "refusal": "Story #50 has no slices yet. Create them first, one per slice, with:\\n  shepherd add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <issue>]"
 }"
 `;
 
 exports[`output of every command, text and --json > done slicing without slices > text 1`] = `
 "exit 1
 Story #50 has no slices yet. Create them first, one per slice, with:
-  psdd add-slice 50 "title" --mode afk|hil [--blocked-by <issue>]"
+  shepherd add-slice 50 "title" --mode afk|hil [--blocked-by <issue>]"
 `;
 
 exports[`output of every command, text and --json > done slicing without the base branch > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "The story branch 50-search would start from main, but main does not exist on GitHub.\\nSet baseBranch in .agents/psdd.config.json to the repository's default branch and run the command again."
+  "refusal": "The story branch 50-search would start from main, but main does not exist on GitHub.\\nSet baseBranch in .agents/shepherd.config.json to the repository's default branch and run the command again."
 }"
 `;
 
 exports[`output of every command, text and --json > done slicing without the base branch > text 1`] = `
 "exit 1
 The story branch 50-search would start from main, but main does not exist on GitHub.
-Set baseBranch in .agents/psdd.config.json to the repository's default branch and run the command again."
+Set baseBranch in .agents/shepherd.config.json to the repository's default branch and run the command again."
 `;
 
 exports[`output of every command, text and --json > done triage accept > json 1`] = `
@@ -401,21 +401,21 @@ exports[`output of every command, text and --json > done when a follow-up fails 
   "issue": 41,
   "from": "merge-queue",
   "to": "closed",
-  "message": "#41 is now closed. The claim is released.\\nCould not move the story on: HTTP 502. psdd next 40 will retry this."
+  "message": "#41 is now closed. The claim is released.\\nCould not move the story on: HTTP 502. shepherd next 40 will retry this."
 }"
 `;
 
 exports[`output of every command, text and --json > done when a follow-up fails > text 1`] = `
 "exit 0
 #41 is now closed. The claim is released.
-Could not move the story on: HTTP 502. psdd next 40 will retry this."
+Could not move the story on: HTTP 502. shepherd next 40 will retry this."
 `;
 
 exports[`output of every command, text and --json > done with an unknown outcome > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "\\"maybe\\" is not an outcome of agent QA.\\nFinish with one of:\\n  psdd done 60 pass \\"evidence\\" [--evidence <dir>]   (every criterion passed, moves to the merge queue)\\n  psdd done 60 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)"
+  "refusal": "\\"maybe\\" is not an outcome of agent QA.\\nFinish with one of:\\n  shepherd done 60 pass \\"evidence\\" [--evidence <dir>]   (every criterion passed, moves to the merge queue)\\n  shepherd done 60 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)"
 }"
 `;
 
@@ -423,8 +423,8 @@ exports[`output of every command, text and --json > done with an unknown outcome
 "exit 1
 "maybe" is not an outcome of agent QA.
 Finish with one of:
-  psdd done 60 pass "evidence" [--evidence <dir>]   (every criterion passed, moves to the merge queue)
-  psdd done 60 fail "evidence" [--evidence <dir>]   (put the failures with their repros in the note)"
+  shepherd done 60 pass "evidence" [--evidence <dir>]   (every criterion passed, moves to the merge queue)
+  shepherd done 60 fail "evidence" [--evidence <dir>]   (put the failures with their repros in the note)"
 `;
 
 exports[`output of every command, text and --json > done with evidence > json 1`] = `
@@ -435,36 +435,36 @@ exports[`output of every command, text and --json > done with evidence > json 1`
   "from": "needs-qa",
   "to": "merge-queue",
   "evidence": {
-    "branch": "psdd/qa/60",
+    "branch": "shepherd/qa/60",
     "sha": "evidence10000000000000000000000000000000",
     "files": [
       "shot.png",
       "run.log"
     ]
   },
-  "message": "#60 is now in merge-queue. The claim is released.\\nPushed 2 evidence files to psdd/qa/60 and embedded them in the comment."
+  "message": "#60 is now in merge-queue. The claim is released.\\nPushed 2 evidence files to shepherd/qa/60 and embedded them in the comment."
 }"
 `;
 
 exports[`output of every command, text and --json > done with evidence > text 1`] = `
 "exit 0
 #60 is now in merge-queue. The claim is released.
-Pushed 2 evidence files to psdd/qa/60 and embedded them in the comment."
+Pushed 2 evidence files to shepherd/qa/60 and embedded them in the comment."
 `;
 
 exports[`output of every command, text and --json > done with evidence on a step that takes none > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "--evidence is for QA steps; triage takes none. Finish without it:\\n  psdd done 7 accept            (accepted, moves to refinement)\\n  psdd done 7 reject \\"reason\\"   (closed as not planned; give the reason)"
+  "refusal": "--evidence is for QA steps; triage takes none. Finish without it:\\n  shepherd done 7 accept            (accepted, moves to refinement)\\n  shepherd done 7 reject \\"reason\\"   (closed as not planned; give the reason)"
 }"
 `;
 
 exports[`output of every command, text and --json > done with evidence on a step that takes none > text 1`] = `
 "exit 1
 --evidence is for QA steps; triage takes none. Finish without it:
-  psdd done 7 accept            (accepted, moves to refinement)
-  psdd done 7 reject "reason"   (closed as not planned; give the reason)"
+  shepherd done 7 accept            (accepted, moves to refinement)
+  shepherd done 7 reject "reason"   (closed as not planned; give the reason)"
 `;
 
 exports[`output of every command, text and --json > done with evidence that is big > json 1`] = `
@@ -511,7 +511,7 @@ exports[`output of every command, text and --json > done without an outcome > js
 "exit 1
 {
   "ok": false,
-  "refusal": "triage can end more than one way. Say which.\\nFinish with one of:\\n  psdd done 7 accept            (accepted, moves to refinement)\\n  psdd done 7 reject \\"reason\\"   (closed as not planned; give the reason)"
+  "refusal": "triage can end more than one way. Say which.\\nFinish with one of:\\n  shepherd done 7 accept            (accepted, moves to refinement)\\n  shepherd done 7 reject \\"reason\\"   (closed as not planned; give the reason)"
 }"
 `;
 
@@ -519,35 +519,35 @@ exports[`output of every command, text and --json > done without an outcome > te
 "exit 1
 triage can end more than one way. Say which.
 Finish with one of:
-  psdd done 7 accept            (accepted, moves to refinement)
-  psdd done 7 reject "reason"   (closed as not planned; give the reason)"
+  shepherd done 7 accept            (accepted, moves to refinement)
+  shepherd done 7 reject "reason"   (closed as not planned; give the reason)"
 `;
 
 exports[`output of every command, text and --json > done without the claim > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "You do not hold #50. Claim it first with: psdd take 50"
+  "refusal": "You do not hold #50. Claim it first with: shepherd take 50"
 }"
 `;
 
 exports[`output of every command, text and --json > done without the claim > text 1`] = `
 "exit 1
-You do not hold #50. Claim it first with: psdd take 50"
+You do not hold #50. Claim it first with: shepherd take 50"
 `;
 
 exports[`output of every command, text and --json > done without the note > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "This outcome needs a evidence. Run:\\n  psdd done 60 fail \\"evidence\\" [--evidence <dir>]"
+  "refusal": "This outcome needs a evidence. Run:\\n  shepherd done 60 fail \\"evidence\\" [--evidence <dir>]"
 }"
 `;
 
 exports[`output of every command, text and --json > done without the note > text 1`] = `
 "exit 1
 This outcome needs a evidence. Run:
-  psdd done 60 fail "evidence" [--evidence <dir>]"
+  shepherd done 60 fail "evidence" [--evidence <dir>]"
 `;
 
 exports[`output of every command, text and --json > escalate > json 1`] = `
@@ -568,46 +568,46 @@ exports[`output of every command, text and --json > escalate without a reason > 
 "exit 1
 {
   "ok": false,
-  "refusal": "Say why a human is needed. Run:\\n  psdd escalate 50 \\"reason\\""
+  "refusal": "Say why a human is needed. Run:\\n  shepherd escalate 50 \\"reason\\""
 }"
 `;
 
 exports[`output of every command, text and --json > escalate without a reason > text 1`] = `
 "exit 1
 Say why a human is needed. Run:
-  psdd escalate 50 "reason""
+  shepherd escalate 50 "reason""
 `;
 
 exports[`output of every command, text and --json > escalate without the claim > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "You do not hold #50. Claim it first with: psdd take 50"
+  "refusal": "You do not hold #50. Claim it first with: shepherd take 50"
 }"
 `;
 
 exports[`output of every command, text and --json > escalate without the claim > text 1`] = `
 "exit 1
-You do not hold #50. Claim it first with: psdd take 50"
+You do not hold #50. Claim it first with: shepherd take 50"
 `;
 
 exports[`output of every command, text and --json > init > json 1`] = `
 "exit 0
 {
   "ok": true,
-  "message": "psdd is set up in this project:\\n  - 16 skills in skills/, linked into .claude/skills/\\n  - updated to this psdd version: drive (git diff skills/ shows the changes)\\n  - .agents/specs/ for story specs\\n  - .agents/psdd.config.json with the team settings (each developer can override in .agents/psdd.config.local.json)\\n  - .agents/worktrees/ and the local config in .gitignore\\n  - how to work with psdd in AGENTS.md and CLAUDE.md\\n  - 19 labels on the repository\\n\\nCommit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: drive <issue>"
+  "message": "shepherd is set up in this project:\\n  - 16 skills in skills/, linked into .claude/skills/\\n  - updated to this shepherd version: drive (git diff skills/ shows the changes)\\n  - .agents/specs/ for story specs\\n  - .agents/shepherd.config.json with the team settings (each developer can override in .agents/shepherd.config.local.json)\\n  - .agents/worktrees/ and the local config in .gitignore\\n  - how to work with shepherd in AGENTS.md and CLAUDE.md\\n  - 19 labels on the repository\\n\\nCommit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: drive <issue>"
 }"
 `;
 
 exports[`output of every command, text and --json > init > text 1`] = `
 "exit 0
-psdd is set up in this project:
+shepherd is set up in this project:
   - 16 skills in skills/, linked into .claude/skills/
-  - updated to this psdd version: drive (git diff skills/ shows the changes)
+  - updated to this shepherd version: drive (git diff skills/ shows the changes)
   - .agents/specs/ for story specs
-  - .agents/psdd.config.json with the team settings (each developer can override in .agents/psdd.config.local.json)
+  - .agents/shepherd.config.json with the team settings (each developer can override in .agents/shepherd.config.local.json)
   - .agents/worktrees/ and the local config in .gitignore
-  - how to work with psdd in AGENTS.md and CLAUDE.md
+  - how to work with shepherd in AGENTS.md and CLAUDE.md
   - 19 labels on the repository
 
 Commit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: drive <issue>"
@@ -617,28 +617,28 @@ exports[`output of every command, text and --json > init with missing skills > j
 "exit 1
 {
   "ok": false,
-  "refusal": "Missing skills: triage, refine, clarify, plan, slice, implement, review, auto-qa, qa, merge, resolve, drive, deliver, tdd, interview, codebase-design. The skill install did not provide them into skills/.\\nFix the install and run psdd init again."
+  "refusal": "Missing skills: triage, refine, clarify, plan, slice, implement, review, auto-qa, qa, merge, resolve, drive, deliver, tdd, interview, codebase-design. The skill install did not provide them into skills/.\\nFix the install and run shepherd init again."
 }"
 `;
 
 exports[`output of every command, text and --json > init with missing skills > text 1`] = `
 "exit 1
 Missing skills: triage, refine, clarify, plan, slice, implement, review, auto-qa, qa, merge, resolve, drive, deliver, tdd, interview, codebase-design. The skill install did not provide them into skills/.
-Fix the install and run psdd init again."
+Fix the install and run shepherd init again."
 `;
 
 exports[`output of every command, text and --json > missing issue number > json 1`] = `
 "exit 2
 {
   "ok": false,
-  "refusal": "Give the issue number explicitly:\\n  psdd take <issue>"
+  "refusal": "Give the issue number explicitly:\\n  shepherd take <issue>"
 }"
 `;
 
 exports[`output of every command, text and --json > missing issue number > text 1`] = `
 "exit 2
 Give the issue number explicitly:
-  psdd take <issue>"
+  shepherd take <issue>"
 `;
 
 exports[`output of every command, text and --json > next closes a merged story > json 1`] = `
@@ -705,7 +705,7 @@ exports[`output of every command, text and --json > next creates the story branc
       "step": "review",
       "skill": "review",
       "attended": false,
-      "command": "psdd take 40"
+      "command": "shepherd take 40"
     }
   ],
   "waiting": [],
@@ -719,7 +719,7 @@ exports[`output of every command, text and --json > next creates the story branc
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Created the story branch 40-all-done.\\nEvery slice is merged. Story #40 is now in needs-review.\\n\\nStory #40 \\"All done\\" is in needs-review. 1 of 1 slices are merged into\\n40-all-done.\\n\\nYou can start 1 item now, in its own fresh subagent, told to work in the item's worktree:\\n\\n  - Story #40 \\"All done\\" needs review.\\n    Worktree: /repo/.agents/worktrees/40-all-done\\n    Start it with: psdd take 40\\n\\nEach phase gets a new agent. When an item is done, run psdd next 40 again."
+  "message": "Created the story branch 40-all-done.\\nEvery slice is merged. Story #40 is now in needs-review.\\n\\nStory #40 \\"All done\\" is in needs-review. 1 of 1 slices are merged into\\n40-all-done.\\n\\nYou can start 1 item now, in its own fresh subagent, told to work in the item's worktree:\\n\\n  - Story #40 \\"All done\\" needs review.\\n    Worktree: /repo/.agents/worktrees/40-all-done\\n    Start it with: shepherd take 40\\n\\nEach phase gets a new agent. When an item is done, run shepherd next 40 again."
 }"
 `;
 
@@ -735,35 +735,35 @@ You can start 1 item now, in its own fresh subagent, told to work in the item's 
 
   - Story #40 "All done" needs review.
     Worktree: /repo/.agents/worktrees/40-all-done
-    Start it with: psdd take 40
+    Start it with: shepherd take 40
 
-Each phase gets a new agent. When an item is done, run psdd next 40 again."
+Each phase gets a new agent. When an item is done, run shepherd next 40 again."
 `;
 
 exports[`output of every command, text and --json > next on a new issue > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "#5 is not a story yet. Triage it first with: psdd take 5"
+  "refusal": "#5 is not a story yet. Triage it first with: shepherd take 5"
 }"
 `;
 
 exports[`output of every command, text and --json > next on a new issue > text 1`] = `
 "exit 1
-#5 is not a story yet. Triage it first with: psdd take 5"
+#5 is not a story yet. Triage it first with: shepherd take 5"
 `;
 
 exports[`output of every command, text and --json > next on a slice > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "#127 is a slice of story #123. Run psdd next 123 instead."
+  "refusal": "#127 is a slice of story #123. Run shepherd next 123 instead."
 }"
 `;
 
 exports[`output of every command, text and --json > next on a slice > text 1`] = `
 "exit 1
-#127 is a slice of story #123. Run psdd next 123 instead."
+#127 is a slice of story #123. Run shepherd next 123 instead."
 `;
 
 exports[`output of every command, text and --json > next on a story closed as not planned > json 1`] = `
@@ -827,7 +827,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "step": "merge",
       "skill": "merge",
       "attended": false,
-      "command": "psdd take 127"
+      "command": "shepherd take 127"
     },
     {
       "issue": 128,
@@ -843,7 +843,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "step": "review",
       "skill": "review",
       "attended": false,
-      "command": "psdd take 128"
+      "command": "shepherd take 128"
     },
     {
       "issue": 132,
@@ -859,7 +859,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "step": "implementation",
       "skill": "implement",
       "attended": false,
-      "command": "psdd take 132"
+      "command": "shepherd take 132"
     }
   ],
   "waiting": [
@@ -881,7 +881,7 @@ exports[`output of every command, text and --json > next on a story in implement
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each in its own fresh subagent, told to work in the item's\\nworktree:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Start it with: psdd take 127\\n  - Slice #128 \\"Limit headers\\" needs review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Start it with: psdd take 128\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start it with: psdd take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run psdd next 123 again."
+  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each in its own fresh subagent, told to work in the item's\\nworktree:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Start it with: shepherd take 127\\n  - Slice #128 \\"Limit headers\\" needs review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Start it with: shepherd take 128\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start it with: shepherd take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run shepherd next 123 again."
 }"
 `;
 
@@ -896,19 +896,19 @@ worktree:
 
   - Slice #127 "Redis store" is in merge-queue.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-127
-    Start it with: psdd take 127
+    Start it with: shepherd take 127
   - Slice #128 "Limit headers" needs review.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-128
-    Start it with: psdd take 128
+    Start it with: shepherd take 128
   - Slice #132 "Docs" is ready-for-agent.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-132
-    Start it with: psdd take 132
+    Start it with: shepherd take 132
 
 Waiting, nothing to do for you:
   - #131 is blocked by #127.
   - #133 needs human QA (mode:hil). Do not take it.
 
-Each phase gets a new agent. When an item is done, run psdd next 123 again."
+Each phase gets a new agent. When an item is done, run shepherd next 123 again."
 `;
 
 exports[`output of every command, text and --json > next on a story in implementation (git) > json 1`] = `
@@ -933,14 +933,14 @@ exports[`output of every command, text and --json > next on a story in implement
       "createWorktree": "git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting",
       "checkedOutAt": null,
       "here": false,
-      "session": "psdd-127-n1",
+      "session": "shepherd-127-n1",
       "kind": "slice",
       "title": "Redis store",
       "state": "merge-queue",
       "step": "merge",
       "skill": "merge",
       "attended": false,
-      "command": "psdd take 127"
+      "command": "shepherd take 127"
     },
     {
       "issue": 132,
@@ -949,14 +949,14 @@ exports[`output of every command, text and --json > next on a story in implement
       "createWorktree": "git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting",
       "checkedOutAt": null,
       "here": false,
-      "session": "psdd-132-n2",
+      "session": "shepherd-132-n2",
       "kind": "slice",
       "title": "Docs",
       "state": "ready-for-agent",
       "step": "implementation",
       "skill": "implement",
       "attended": false,
-      "command": "psdd take 132"
+      "command": "shepherd take 132"
     }
   ],
   "waiting": [
@@ -984,7 +984,7 @@ exports[`output of every command, text and --json > next on a story in implement
   "notified": true,
   "running": 1,
   "slots": 1,
-  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 2 items now. They are independent, so run them in parallel, at\\nmost 1 at a time (1 of your agents is running, the limit is 2), each in a\\nnew agent session started in the item's worktree:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n    Start an agent in /repo/.agents/worktrees/123-rate-limiting-127 with PSDD_SESSION=psdd-127-n1 set.\\n    Start it with: psdd take 127\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting\\n    Start an agent in /repo/.agents/worktrees/123-rate-limiting-132 with PSDD_SESSION=psdd-132-n2 set.\\n    Start it with: psdd take 132\\n\\nWaiting, nothing to do for you:\\n  - #128 is held by another session of yours (since 11:00).\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run psdd next 123 again."
+  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 2 items now. They are independent, so run them in parallel, at\\nmost 1 at a time (1 of your agents is running, the limit is 2), each in a\\nnew agent session started in the item's worktree:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n    Start an agent in /repo/.agents/worktrees/123-rate-limiting-127 with SHEPHERD_SESSION=shepherd-127-n1 set.\\n    Start it with: shepherd take 127\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting\\n    Start an agent in /repo/.agents/worktrees/123-rate-limiting-132 with SHEPHERD_SESSION=shepherd-132-n2 set.\\n    Start it with: shepherd take 132\\n\\nWaiting, nothing to do for you:\\n  - #128 is held by another session of yours (since 11:00).\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run shepherd next 123 again."
 }"
 `;
 
@@ -1000,20 +1000,20 @@ new agent session started in the item's worktree:
   - Slice #127 "Redis store" is in merge-queue.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-127
     Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting
-    Start an agent in /repo/.agents/worktrees/123-rate-limiting-127 with PSDD_SESSION=psdd-127-n1 set.
-    Start it with: psdd take 127
+    Start an agent in /repo/.agents/worktrees/123-rate-limiting-127 with SHEPHERD_SESSION=shepherd-127-n1 set.
+    Start it with: shepherd take 127
   - Slice #132 "Docs" is ready-for-agent.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-132
     Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting
-    Start an agent in /repo/.agents/worktrees/123-rate-limiting-132 with PSDD_SESSION=psdd-132-n2 set.
-    Start it with: psdd take 132
+    Start an agent in /repo/.agents/worktrees/123-rate-limiting-132 with SHEPHERD_SESSION=shepherd-132-n2 set.
+    Start it with: shepherd take 132
 
 Waiting, nothing to do for you:
   - #128 is held by another session of yours (since 11:00).
   - #131 is blocked by #127.
   - #133 needs human QA (mode:hil). Do not take it.
 
-Each phase gets a new agent. When an item is done, run psdd next 123 again."
+Each phase gets a new agent. When an item is done, run shepherd next 123 again."
 `;
 
 exports[`output of every command, text and --json > next on a story in implementation (herdr) > json 1`] = `
@@ -1045,7 +1045,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "step": "merge",
       "skill": "merge",
       "attended": false,
-      "command": "psdd take 127"
+      "command": "shepherd take 127"
     },
     {
       "issue": 128,
@@ -1061,7 +1061,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "step": "review",
       "skill": "review",
       "attended": false,
-      "command": "psdd take 128"
+      "command": "shepherd take 128"
     },
     {
       "issue": 132,
@@ -1077,7 +1077,7 @@ exports[`output of every command, text and --json > next on a story in implement
       "step": "implementation",
       "skill": "implement",
       "attended": false,
-      "command": "psdd take 132"
+      "command": "shepherd take 132"
     }
   ],
   "waiting": [
@@ -1104,7 +1104,7 @@ exports[`output of every command, text and --json > next on a story in implement
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each as a new herdr agent in the item's worktree pane:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n    Start an agent: herdr agent start psdd-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>\\n    Then prompt it: herdr agent prompt psdd-127 \\"Work in /repo/.agents/worktrees/123-rate-limiting-127. Run psdd take 127, follow its briefing to the end, and finish with the psdd command it gives.\\"\\n    Start it with: psdd take 127\\n  - Slice #128 \\"Limit headers\\" needs review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus\\n    Start an agent: herdr agent start psdd-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>\\n    Then prompt it: herdr agent prompt psdd-128 \\"Work in /repo/.agents/worktrees/123-rate-limiting-128. Run psdd take 128, follow its briefing to the end, and finish with the psdd command it gives.\\"\\n    Start it with: psdd take 128\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start an agent: herdr agent start psdd-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>\\n    Then prompt it: herdr agent prompt psdd-132 \\"Work in /repo/.agents/worktrees/123-rate-limiting-132. Run psdd take 132, follow its briefing to the end, and finish with the psdd command it gives.\\"\\n    Start it with: psdd take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus\\n      herdr agent start psdd-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>\\n      herdr agent prompt psdd-133 \\"drive 133\\"\\n      herdr agent focus psdd-133\\n\\nEach phase gets a new agent. When an item is done, run psdd next 123 again."
+  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each as a new herdr agent in the item's worktree pane:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n    Start an agent: herdr agent start shepherd-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>\\n    Then prompt it: herdr agent prompt shepherd-127 \\"Work in /repo/.agents/worktrees/123-rate-limiting-127. Run shepherd take 127, follow its briefing to the end, and finish with the shepherd command it gives.\\"\\n    Start it with: shepherd take 127\\n  - Slice #128 \\"Limit headers\\" needs review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus\\n    Start an agent: herdr agent start shepherd-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>\\n    Then prompt it: herdr agent prompt shepherd-128 \\"Work in /repo/.agents/worktrees/123-rate-limiting-128. Run shepherd take 128, follow its briefing to the end, and finish with the shepherd command it gives.\\"\\n    Start it with: shepherd take 128\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start an agent: herdr agent start shepherd-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>\\n    Then prompt it: herdr agent prompt shepherd-132 \\"Work in /repo/.agents/worktrees/123-rate-limiting-132. Run shepherd take 132, follow its briefing to the end, and finish with the shepherd command it gives.\\"\\n    Start it with: shepherd take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus\\n      herdr agent start shepherd-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>\\n      herdr agent prompt shepherd-133 \\"drive 133\\"\\n      herdr agent focus shepherd-133\\n\\nEach phase gets a new agent. When an item is done, run shepherd next 123 again."
 }"
 `;
 
@@ -1119,31 +1119,31 @@ most 2 at a time, each as a new herdr agent in the item's worktree pane:
   - Slice #127 "Redis store" is in merge-queue.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-127
     Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.
-    Start an agent: herdr agent start psdd-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>
-    Then prompt it: herdr agent prompt psdd-127 "Work in /repo/.agents/worktrees/123-rate-limiting-127. Run psdd take 127, follow its briefing to the end, and finish with the psdd command it gives."
-    Start it with: psdd take 127
+    Start an agent: herdr agent start shepherd-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>
+    Then prompt it: herdr agent prompt shepherd-127 "Work in /repo/.agents/worktrees/123-rate-limiting-127. Run shepherd take 127, follow its briefing to the end, and finish with the shepherd command it gives."
+    Start it with: shepherd take 127
   - Slice #128 "Limit headers" needs review.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-128
     Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus
-    Start an agent: herdr agent start psdd-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>
-    Then prompt it: herdr agent prompt psdd-128 "Work in /repo/.agents/worktrees/123-rate-limiting-128. Run psdd take 128, follow its briefing to the end, and finish with the psdd command it gives."
-    Start it with: psdd take 128
+    Start an agent: herdr agent start shepherd-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>
+    Then prompt it: herdr agent prompt shepherd-128 "Work in /repo/.agents/worktrees/123-rate-limiting-128. Run shepherd take 128, follow its briefing to the end, and finish with the shepherd command it gives."
+    Start it with: shepherd take 128
   - Slice #132 "Docs" is ready-for-agent.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-132
-    Start an agent: herdr agent start psdd-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>
-    Then prompt it: herdr agent prompt psdd-132 "Work in /repo/.agents/worktrees/123-rate-limiting-132. Run psdd take 132, follow its briefing to the end, and finish with the psdd command it gives."
-    Start it with: psdd take 132
+    Start an agent: herdr agent start shepherd-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>
+    Then prompt it: herdr agent prompt shepherd-132 "Work in /repo/.agents/worktrees/123-rate-limiting-132. Run shepherd take 132, follow its briefing to the end, and finish with the shepherd command it gives."
+    Start it with: shepherd take 132
 
 Waiting, nothing to do for you:
   - #131 is blocked by #127.
   - #133 needs human QA (mode:hil). Do not take it.
     If the user does it now, hand it to an agent in its worktree:
       Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus
-      herdr agent start psdd-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>
-      herdr agent prompt psdd-133 "drive 133"
-      herdr agent focus psdd-133
+      herdr agent start shepherd-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>
+      herdr agent prompt shepherd-133 "drive 133"
+      herdr agent focus shepherd-133
 
-Each phase gets a new agent. When an item is done, run psdd next 123 again."
+Each phase gets a new agent. When an item is done, run shepherd next 123 again."
 `;
 
 exports[`output of every command, text and --json > next on a story in merge-queue > json 1`] = `
@@ -1175,7 +1175,7 @@ exports[`output of every command, text and --json > next on a story in merge-que
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #30 \\"Ship\\": nothing left that you can do.\\nWaiting for a human:\\n  - #30 waits for its owner (@alice) to merge the story PR into main.\\nStop here and report to the user. psdd has already notified them."
+  "message": "Story #30 \\"Ship\\": nothing left that you can do.\\nWaiting for a human:\\n  - #30 waits for its owner (@alice) to merge the story PR into main.\\nStop here and report to the user. shepherd has already notified them."
 }"
 `;
 
@@ -1184,7 +1184,7 @@ exports[`output of every command, text and --json > next on a story in merge-que
 Story #30 "Ship": nothing left that you can do.
 Waiting for a human:
   - #30 waits for its owner (@alice) to merge the story PR into main.
-Stop here and report to the user. psdd has already notified them."
+Stop here and report to the user. shepherd has already notified them."
 `;
 
 exports[`output of every command, text and --json > next on a story in refinement > json 1`] = `
@@ -1216,7 +1216,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
       "step": "refinement",
       "skill": "refine",
       "attended": true,
-      "command": "psdd take 32"
+      "command": "shepherd take 32"
     }
   ],
   "waiting": [],
@@ -1227,7 +1227,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #32 \\"Refine me\\" is in needs-refinement.\\n\\nYou can start 1 item now, with the user:\\n\\n  - Story #32 \\"Refine me\\" is in needs-refinement: refinement (attended: the user takes part).\\n    Worktree: /repo/.agents/worktrees/32-refine-me\\n    Start it with: psdd take 32"
+  "message": "Story #32 \\"Refine me\\" is in needs-refinement.\\n\\nYou can start 1 item now, with the user:\\n\\n  - Story #32 \\"Refine me\\" is in needs-refinement: refinement (attended: the user takes part).\\n    Worktree: /repo/.agents/worktrees/32-refine-me\\n    Start it with: shepherd take 32"
 }"
 `;
 
@@ -1239,7 +1239,7 @@ You can start 1 item now, with the user:
 
   - Story #32 "Refine me" is in needs-refinement: refinement (attended: the user takes part).
     Worktree: /repo/.agents/worktrees/32-refine-me
-    Start it with: psdd take 32"
+    Start it with: shepherd take 32"
 `;
 
 exports[`output of every command, text and --json > next on a story in refinement under herdr > json 1`] = `
@@ -1271,7 +1271,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
       "step": "refinement",
       "skill": "refine",
       "attended": true,
-      "command": "psdd take 32"
+      "command": "shepherd take 32"
     }
   ],
   "waiting": [],
@@ -1282,7 +1282,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #32 \\"Refine me\\" is in needs-refinement.\\n\\nYou can start 1 item now, with the user:\\n\\n  - Story #32 \\"Refine me\\" is in needs-refinement: refinement (attended: the user takes part).\\n    Worktree: /repo/.agents/worktrees/32-refine-me\\n    Create the worktree: git -C /repo fetch origin main && git -C /repo branch --no-track 32-refine-me origin/main && herdr worktree create --cwd /repo --branch 32-refine-me --path /repo/.agents/worktrees/32-refine-me --no-focus\\n    Hand the story to an agent in its worktree, which drives it on with the user:\\n      herdr agent start psdd-32 --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>\\n      herdr agent prompt psdd-32 \\"drive 32\\"\\n      herdr agent focus psdd-32\\n    Start it with: psdd take 32"
+  "message": "Story #32 \\"Refine me\\" is in needs-refinement.\\n\\nYou can start 1 item now, with the user:\\n\\n  - Story #32 \\"Refine me\\" is in needs-refinement: refinement (attended: the user takes part).\\n    Worktree: /repo/.agents/worktrees/32-refine-me\\n    Create the worktree: git -C /repo fetch origin main && git -C /repo branch --no-track 32-refine-me origin/main && herdr worktree create --cwd /repo --branch 32-refine-me --path /repo/.agents/worktrees/32-refine-me --no-focus\\n    Hand the story to an agent in its worktree, which drives it on with the user:\\n      herdr agent start shepherd-32 --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>\\n      herdr agent prompt shepherd-32 \\"drive 32\\"\\n      herdr agent focus shepherd-32\\n    Start it with: shepherd take 32"
 }"
 `;
 
@@ -1296,10 +1296,10 @@ You can start 1 item now, with the user:
     Worktree: /repo/.agents/worktrees/32-refine-me
     Create the worktree: git -C /repo fetch origin main && git -C /repo branch --no-track 32-refine-me origin/main && herdr worktree create --cwd /repo --branch 32-refine-me --path /repo/.agents/worktrees/32-refine-me --no-focus
     Hand the story to an agent in its worktree, which drives it on with the user:
-      herdr agent start psdd-32 --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>
-      herdr agent prompt psdd-32 "drive 32"
-      herdr agent focus psdd-32
-    Start it with: psdd take 32"
+      herdr agent start shepherd-32 --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>
+      herdr agent prompt shepherd-32 "drive 32"
+      herdr agent focus shepherd-32
+    Start it with: shepherd take 32"
 `;
 
 exports[`output of every command, text and --json > next when the story branch cannot be made > json 1`] = `
@@ -1320,7 +1320,7 @@ exports[`output of every command, text and --json > next when the story branch c
   "waiting": [],
   "notes": [
     "The story branch 40-no-base would start from main, but main does not exist on GitHub.",
-    "Set baseBranch in .agents/psdd.config.json to the repository's default branch and run the command again."
+    "Set baseBranch in .agents/shepherd.config.json to the repository's default branch and run the command again."
   ],
   "nothingLeft": true,
   "closed": false,
@@ -1328,16 +1328,16 @@ exports[`output of every command, text and --json > next when the story branch c
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "The story branch 40-no-base would start from main, but main does not exist on GitHub.\\nSet baseBranch in .agents/psdd.config.json to the repository's default branch and run the command again.\\nStory #40 \\"No base\\": nothing left that you can do.\\nStop here and report to the user. psdd has already notified them."
+  "message": "The story branch 40-no-base would start from main, but main does not exist on GitHub.\\nSet baseBranch in .agents/shepherd.config.json to the repository's default branch and run the command again.\\nStory #40 \\"No base\\": nothing left that you can do.\\nStop here and report to the user. shepherd has already notified them."
 }"
 `;
 
 exports[`output of every command, text and --json > next when the story branch cannot be made > text 1`] = `
 "exit 0
 The story branch 40-no-base would start from main, but main does not exist on GitHub.
-Set baseBranch in .agents/psdd.config.json to the repository's default branch and run the command again.
+Set baseBranch in .agents/shepherd.config.json to the repository's default branch and run the command again.
 Story #40 "No base": nothing left that you can do.
-Stop here and report to the user. psdd has already notified them."
+Stop here and report to the user. shepherd has already notified them."
 `;
 
 exports[`output of every command, text and --json > next with every slot taken > json 1`] = `
@@ -1369,7 +1369,7 @@ exports[`output of every command, text and --json > next with every slot taken >
       "step": "merge",
       "skill": "merge",
       "attended": false,
-      "command": "psdd take 127"
+      "command": "shepherd take 127"
     },
     {
       "issue": 132,
@@ -1385,7 +1385,7 @@ exports[`output of every command, text and --json > next with every slot taken >
       "step": "implementation",
       "skill": "implement",
       "attended": false,
-      "command": "psdd take 132"
+      "command": "shepherd take 132"
     }
   ],
   "waiting": [
@@ -1413,7 +1413,7 @@ exports[`output of every command, text and --json > next with every slot taken >
   "notified": true,
   "running": 1,
   "slots": 0,
-  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\n2 items are ready, but 1 of your agents are running, the limit of\\ndeliver.maxParallel. Wait for one to finish, then run psdd next 123 again.\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n\\nWaiting, nothing to do for you:\\n  - #128 is held by another session of yours (since 11:00).\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run psdd next 123 again."
+  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\n2 items are ready, but 1 of your agents are running, the limit of\\ndeliver.maxParallel. Wait for one to finish, then run shepherd next 123\\nagain.\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue.\\n  - Slice #132 \\"Docs\\" is ready-for-agent.\\n\\nWaiting, nothing to do for you:\\n  - #128 is held by another session of yours (since 11:00).\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run shepherd next 123 again."
 }"
 `;
 
@@ -1423,7 +1423,8 @@ Story #123 "Rate limiting" is in implementation. 1 of 6 slices are merged
 into 123-rate-limiting.
 
 2 items are ready, but 1 of your agents are running, the limit of
-deliver.maxParallel. Wait for one to finish, then run psdd next 123 again.
+deliver.maxParallel. Wait for one to finish, then run shepherd next 123
+again.
 
   - Slice #127 "Redis store" is in merge-queue.
   - Slice #132 "Docs" is ready-for-agent.
@@ -1433,7 +1434,7 @@ Waiting, nothing to do for you:
   - #131 is blocked by #127.
   - #133 needs human QA (mode:hil). Do not take it.
 
-Each phase gets a new agent. When an item is done, run psdd next 123 again."
+Each phase gets a new agent. When an item is done, run shepherd next 123 again."
 `;
 
 exports[`output of every command, text and --json > next with nothing left > json 1`] = `
@@ -1475,7 +1476,7 @@ exports[`output of every command, text and --json > next with nothing left > jso
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #20 \\"Waits\\": nothing left that you can do.\\nWaiting for a human:\\n  - #21 escalated: \\"flaky\\".\\n  - #23 needs human QA (mode:hil).\\nBlocked until then:\\n  - #22 is blocked by #21.\\nStop here and report to the user. psdd has already notified them."
+  "message": "Story #20 \\"Waits\\": nothing left that you can do.\\nWaiting for a human:\\n  - #21 escalated: \\"flaky\\".\\n  - #23 needs human QA (mode:hil).\\nBlocked until then:\\n  - #22 is blocked by #21.\\nStop here and report to the user. shepherd has already notified them."
 }"
 `;
 
@@ -1487,7 +1488,7 @@ Waiting for a human:
   - #23 needs human QA (mode:hil).
 Blocked until then:
   - #22 is blocked by #21.
-Stop here and report to the user. psdd has already notified them."
+Stop here and report to the user. shepherd has already notified them."
 `;
 
 exports[`output of every command, text and --json > next with nothing left under herdr > json 1`] = `
@@ -1530,7 +1531,7 @@ exports[`output of every command, text and --json > next with nothing left under
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #20 \\"Waits\\": nothing left that you can do.\\nWaiting for a human:\\n  - #23 needs human QA (mode:hil).\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 20-waits && git -C /repo branch --no-track 20-waits-23 origin/20-waits && herdr worktree create --cwd /repo --branch 20-waits-23 --path /repo/.agents/worktrees/20-waits-23 --no-focus\\n      herdr agent start psdd-23 --kind claude --pane <pane of /repo/.agents/worktrees/20-waits-23>\\n      herdr agent prompt psdd-23 \\"drive 23\\"\\n      herdr agent focus psdd-23\\n  - #24 needs human QA (mode:hil), held by another session (since 11:00).\\nStop here and report to the user. psdd has already notified them."
+  "message": "Story #20 \\"Waits\\": nothing left that you can do.\\nWaiting for a human:\\n  - #23 needs human QA (mode:hil).\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 20-waits && git -C /repo branch --no-track 20-waits-23 origin/20-waits && herdr worktree create --cwd /repo --branch 20-waits-23 --path /repo/.agents/worktrees/20-waits-23 --no-focus\\n      herdr agent start shepherd-23 --kind claude --pane <pane of /repo/.agents/worktrees/20-waits-23>\\n      herdr agent prompt shepherd-23 \\"drive 23\\"\\n      herdr agent focus shepherd-23\\n  - #24 needs human QA (mode:hil), held by another session (since 11:00).\\nStop here and report to the user. shepherd has already notified them."
 }"
 `;
 
@@ -1541,25 +1542,25 @@ Waiting for a human:
   - #23 needs human QA (mode:hil).
     If the user does it now, hand it to an agent in its worktree:
       Create the worktree: git -C /repo fetch origin 20-waits && git -C /repo branch --no-track 20-waits-23 origin/20-waits && herdr worktree create --cwd /repo --branch 20-waits-23 --path /repo/.agents/worktrees/20-waits-23 --no-focus
-      herdr agent start psdd-23 --kind claude --pane <pane of /repo/.agents/worktrees/20-waits-23>
-      herdr agent prompt psdd-23 "drive 23"
-      herdr agent focus psdd-23
+      herdr agent start shepherd-23 --kind claude --pane <pane of /repo/.agents/worktrees/20-waits-23>
+      herdr agent prompt shepherd-23 "drive 23"
+      herdr agent focus shepherd-23
   - #24 needs human QA (mode:hil), held by another session (since 11:00).
-Stop here and report to the user. psdd has already notified them."
+Stop here and report to the user. shepherd has already notified them."
 `;
 
 exports[`output of every command, text and --json > provider refusal > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "The worktree provider is herdr, but HERDR_ENV is not set.\\nStart from a herdr pane, or switch the provider in .agents/psdd.config.local.json."
+  "refusal": "The worktree provider is herdr, but HERDR_ENV is not set.\\nStart from a herdr pane, or switch the provider in .agents/shepherd.config.local.json."
 }"
 `;
 
 exports[`output of every command, text and --json > provider refusal > text 1`] = `
 "exit 1
 The worktree provider is herdr, but HERDR_ENV is not set.
-Start from a herdr pane, or switch the provider in .agents/psdd.config.local.json."
+Start from a herdr pane, or switch the provider in .agents/shepherd.config.local.json."
 `;
 
 exports[`output of every command, text and --json > release > json 1`] = `
@@ -1579,13 +1580,13 @@ exports[`output of every command, text and --json > release without the claim > 
 "exit 1
 {
   "ok": false,
-  "refusal": "You do not hold #50. Claim it first with: psdd take 50"
+  "refusal": "You do not hold #50. Claim it first with: shepherd take 50"
 }"
 `;
 
 exports[`output of every command, text and --json > release without the claim > text 1`] = `
 "exit 1
-You do not hold #50. Claim it first with: psdd take 50"
+You do not hold #50. Claim it first with: shepherd take 50"
 `;
 
 exports[`output of every command, text and --json > status of a story with slices > json 1`] = `
@@ -1742,14 +1743,14 @@ exports[`output of every command, text and --json > take a blocked slice > json 
 "exit 1
 {
   "ok": false,
-  "refusal": "#131 is blocked by #127. Do not work on it yet.\\nRun psdd next 123 and pick a different item."
+  "refusal": "#131 is blocked by #127. Do not work on it yet.\\nRun shepherd next 123 and pick a different item."
 }"
 `;
 
 exports[`output of every command, text and --json > take a blocked slice > text 1`] = `
 "exit 1
 #131 is blocked by #127. Do not work on it yet.
-Run psdd next 123 and pick a different item."
+Run shepherd next 123 and pick a different item."
 `;
 
 exports[`output of every command, text and --json > take a closed issue > json 1`] = `
@@ -1778,7 +1779,7 @@ exports[`output of every command, text and --json > take a new issue > json 1`] 
     "accept",
     "reject"
   ],
-  "message": "You now hold issue #7 \\"Rate limiting\\". Its step is triage. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nInvoke the skill: triage\\nRead the issue: gh issue view 7 --comments\\nOn accept, post what triage established on the issue first: gh issue comment 7\\n\\nWhen the user agrees triage is finished, run one of:\\n  psdd done 7 accept            (accepted, moves to refinement)\\n  psdd done 7 reject \\"reason\\"   (closed as not planned; give the reason)\\n\\nOn a long step, run psdd take 7 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 7\\nIf something is wrong and a person is needed, run: psdd escalate 7 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold issue #7 \\"Rate limiting\\". Its step is triage. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nInvoke the skill: triage\\nRead the issue: gh issue view 7 --comments\\nOn accept, post what triage established on the issue first: gh issue comment 7\\n\\nWhen the user agrees triage is finished, run one of:\\n  shepherd done 7 accept            (accepted, moves to refinement)\\n  shepherd done 7 reject \\"reason\\"   (closed as not planned; give the reason)\\n\\nOn a long step, run shepherd take 7 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 7\\nIf something is wrong and a person is needed, run: shepherd escalate 7 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -1792,14 +1793,14 @@ Read the issue: gh issue view 7 --comments
 On accept, post what triage established on the issue first: gh issue comment 7
 
 When the user agrees triage is finished, run one of:
-  psdd done 7 accept            (accepted, moves to refinement)
-  psdd done 7 reject "reason"   (closed as not planned; give the reason)
+  shepherd done 7 accept            (accepted, moves to refinement)
+  shepherd done 7 reject "reason"   (closed as not planned; give the reason)
 
-On a long step, run psdd take 7 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 7
-If something is wrong and a person is needed, run: psdd escalate 7 "reason"
+On a long step, run shepherd take 7 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 7
+If something is wrong and a person is needed, run: shepherd escalate 7 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take a ready slice > json 1`] = `
@@ -1812,7 +1813,7 @@ exports[`output of every command, text and --json > take a ready slice > json 1`
   "skill": "implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting\\n\\nInvoke the skill: implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  psdd done 132\\n\\nOn a long step, run psdd take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 132\\nIf something is wrong and a person is needed, run: psdd escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting\\n\\nInvoke the skill: implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  shepherd done 132\\n\\nOn a long step, run shepherd take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 132\\nIf something is wrong and a person is needed, run: shepherd escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -1831,13 +1832,13 @@ Commit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132
   gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'
 
 When implementation is finished, run:
-  psdd done 132
+  shepherd done 132
 
-On a long step, run psdd take 132 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 132
-If something is wrong and a person is needed, run: psdd escalate 132 "reason"
+On a long step, run shepherd take 132 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 132
+If something is wrong and a person is needed, run: shepherd escalate 132 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take a slice checked out elsewhere > json 1`] = `
@@ -1850,7 +1851,7 @@ exports[`output of every command, text and --json > take a slice checked out els
   "skill": "implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nBranch 123-rate-limiting-132 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n\\nInvoke the skill: implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  psdd done 132\\n\\nOn a long step, run psdd take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 132\\nIf something is wrong and a person is needed, run: psdd escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nBranch 123-rate-limiting-132 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n\\nInvoke the skill: implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  shepherd done 132\\n\\nOn a long step, run shepherd take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 132\\nIf something is wrong and a person is needed, run: shepherd escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -1868,13 +1869,13 @@ Commit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132
   gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'
 
 When implementation is finished, run:
-  psdd done 132
+  shepherd done 132
 
-On a long step, run psdd take 132 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 132
-If something is wrong and a person is needed, run: psdd escalate 132 "reason"
+On a long step, run shepherd take 132 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 132
+If something is wrong and a person is needed, run: shepherd escalate 132 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take a slice for agent QA (afk) > json 1`] = `
@@ -1890,7 +1891,7 @@ exports[`output of every command, text and --json > take a slice for agent QA (a
     "pass",
     "fail"
   ],
-  "message": "You now hold slice #60 \\"QA me\\". Its step is agent QA.\\n\\nInvoke the skill: auto-qa\\n\\nWhen agent QA is finished, run one of:\\n  psdd done 60 pass \\"evidence\\" [--evidence <dir>]   (every criterion passed, moves to the merge queue)\\n  psdd done 60 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run psdd take 60 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 60\\nIf something is wrong and a person is needed, run: psdd escalate 60 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold slice #60 \\"QA me\\". Its step is agent QA.\\n\\nInvoke the skill: auto-qa\\n\\nWhen agent QA is finished, run one of:\\n  shepherd done 60 pass \\"evidence\\" [--evidence <dir>]   (every criterion passed, moves to the merge queue)\\n  shepherd done 60 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run shepherd take 60 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 60\\nIf something is wrong and a person is needed, run: shepherd escalate 60 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -1901,14 +1902,14 @@ You now hold slice #60 "QA me". Its step is agent QA.
 Invoke the skill: auto-qa
 
 When agent QA is finished, run one of:
-  psdd done 60 pass "evidence" [--evidence <dir>]   (every criterion passed, moves to the merge queue)
-  psdd done 60 fail "evidence" [--evidence <dir>]   (put the failures with their repros in the note)
+  shepherd done 60 pass "evidence" [--evidence <dir>]   (every criterion passed, moves to the merge queue)
+  shepherd done 60 fail "evidence" [--evidence <dir>]   (put the failures with their repros in the note)
 
-On a long step, run psdd take 60 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 60
-If something is wrong and a person is needed, run: psdd escalate 60 "reason"
+On a long step, run shepherd take 60 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 60
+If something is wrong and a person is needed, run: shepherd escalate 60 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take a slice for human QA > json 1`] = `
@@ -1924,7 +1925,7 @@ exports[`output of every command, text and --json > take a slice for human QA > 
     "pass",
     "fail"
   ],
-  "message": "You now hold slice #133 \\"Metrics\\". Its step is human QA. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-133 (branch 123-rate-limiting-133)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-133 -b 123-rate-limiting-133 origin/123-rate-limiting\\n\\nInvoke the skill: qa\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 133 --comments\\nSlice PR: 123-rate-limiting-133 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\nStart from the agent's QA comment on #133: its evidence, and what it left for a person. Read the issue: gh issue view 133 --comments\\nRun the app from 123-rate-limiting-133 on this machine and walk the user through what is left, plus anything in the evidence they question.\\nTie each remark the user brings to a criterion; a remark on a criterion fails it. For a remark outside the criteria, the user decides:\\n  follow up (the default): gh issue create --title \\"<remark>\\" --body \\"From QA of #133: <remark>\\" (it goes through triage)\\n  pull it in: it fails this item, like a criterion\\n  drop it: say so in the note\\nEvery failure needs a repro. Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: psdd pushes the files and embeds them in the comment. Do not commit them.\\n\\nWhen the user agrees human QA is finished, run one of:\\n  psdd done 133 pass [--evidence <dir>]              (the person passes QA, moves to the merge queue)\\n  psdd done 133 fail \\"problems\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run psdd take 133 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 133\\nIf something is wrong and a person is needed, run: psdd escalate 133 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold slice #133 \\"Metrics\\". Its step is human QA. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-133 (branch 123-rate-limiting-133)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-133 -b 123-rate-limiting-133 origin/123-rate-limiting\\n\\nInvoke the skill: qa\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 133 --comments\\nSlice PR: 123-rate-limiting-133 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\nStart from the agent's QA comment on #133: its evidence, and what it left for a person. Read the issue: gh issue view 133 --comments\\nRun the app from 123-rate-limiting-133 on this machine and walk the user through what is left, plus anything in the evidence they question.\\nTie each remark the user brings to a criterion; a remark on a criterion fails it. For a remark outside the criteria, the user decides:\\n  follow up (the default): gh issue create --title \\"<remark>\\" --body \\"From QA of #133: <remark>\\" (it goes through triage)\\n  pull it in: it fails this item, like a criterion\\n  drop it: say so in the note\\nEvery failure needs a repro. Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: shepherd pushes the files and embeds them in the comment. Do not commit them.\\n\\nWhen the user agrees human QA is finished, run one of:\\n  shepherd done 133 pass [--evidence <dir>]              (the person passes QA, moves to the merge queue)\\n  shepherd done 133 fail \\"problems\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run shepherd take 133 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 133\\nIf something is wrong and a person is needed, run: shepherd escalate 133 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -1947,17 +1948,17 @@ Tie each remark the user brings to a criterion; a remark on a criterion fails it
   follow up (the default): gh issue create --title "<remark>" --body "From QA of #133: <remark>" (it goes through triage)
   pull it in: it fails this item, like a criterion
   drop it: say so in the note
-Every failure needs a repro. Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: psdd pushes the files and embeds them in the comment. Do not commit them.
+Every failure needs a repro. Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: shepherd pushes the files and embeds them in the comment. Do not commit them.
 
 When the user agrees human QA is finished, run one of:
-  psdd done 133 pass [--evidence <dir>]              (the person passes QA, moves to the merge queue)
-  psdd done 133 fail "problems" [--evidence <dir>]   (put the failures with their repros in the note)
+  shepherd done 133 pass [--evidence <dir>]              (the person passes QA, moves to the merge queue)
+  shepherd done 133 fail "problems" [--evidence <dir>]   (put the failures with their repros in the note)
 
-On a long step, run psdd take 133 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 133
-If something is wrong and a person is needed, run: psdd escalate 133 "reason"
+On a long step, run shepherd take 133 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 133
+If something is wrong and a person is needed, run: shepherd escalate 133 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take a slice for merge > json 1`] = `
@@ -1970,7 +1971,7 @@ exports[`output of every command, text and --json > take a slice for merge > jso
   "skill": "merge",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #127 \\"Redis store\\". Its step is merge.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-127 (branch 123-rate-limiting-127)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n\\nInvoke the skill: merge\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 127 --comments\\nMerge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.\\nThen merge the PR: gh pr merge 123-rate-limiting-127 --merge\\n\\nWhen merge is finished, run:\\n  psdd done 127\\n\\nOn a long step, run psdd take 127 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 127\\nIf something is wrong and a person is needed, run: psdd escalate 127 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold slice #127 \\"Redis store\\". Its step is merge.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-127 (branch 123-rate-limiting-127)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n\\nInvoke the skill: merge\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 127 --comments\\nMerge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.\\nThen merge the PR: gh pr merge 123-rate-limiting-127 --merge\\n\\nWhen merge is finished, run:\\n  shepherd done 127\\n\\nOn a long step, run shepherd take 127 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 127\\nIf something is wrong and a person is needed, run: shepherd escalate 127 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -1989,13 +1990,13 @@ Merge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts i
 Then merge the PR: gh pr merge 123-rate-limiting-127 --merge
 
 When merge is finished, run:
-  psdd done 127
+  shepherd done 127
 
-On a long step, run psdd take 127 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 127
-If something is wrong and a person is needed, run: psdd escalate 127 "reason"
+On a long step, run shepherd take 127 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 127
+If something is wrong and a person is needed, run: shepherd escalate 127 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take a slice for review > json 1`] = `
@@ -2011,7 +2012,7 @@ exports[`output of every command, text and --json > take a slice for review > js
     "approve",
     "request-changes"
   ],
-  "message": "You now hold slice #128 \\"Limit headers\\". Its step is review.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-128 (branch 123-rate-limiting-128)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-128 -b 123-rate-limiting-128 origin/123-rate-limiting\\n\\nInvoke the skill: review\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 128 --comments\\nSlice PR: 123-rate-limiting-128 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\n\\nWhen review is finished, run one of:\\n  psdd done 128 approve                      (no requests, moves on to QA by an agent)\\n  psdd done 128 request-changes \\"requests\\"   (put the requests in the note)\\n\\nOn a long step, run psdd take 128 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 128\\nIf something is wrong and a person is needed, run: psdd escalate 128 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold slice #128 \\"Limit headers\\". Its step is review.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-128 (branch 123-rate-limiting-128)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-128 -b 123-rate-limiting-128 origin/123-rate-limiting\\n\\nInvoke the skill: review\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 128 --comments\\nSlice PR: 123-rate-limiting-128 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\n\\nWhen review is finished, run one of:\\n  shepherd done 128 approve                      (no requests, moves on to QA by an agent)\\n  shepherd done 128 request-changes \\"requests\\"   (put the requests in the note)\\n\\nOn a long step, run shepherd take 128 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 128\\nIf something is wrong and a person is needed, run: shepherd escalate 128 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -2029,28 +2030,28 @@ Read the issue: gh issue view 128 --comments
 Slice PR: 123-rate-limiting-128 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD
 
 When review is finished, run one of:
-  psdd done 128 approve                      (no requests, moves on to QA by an agent)
-  psdd done 128 request-changes "requests"   (put the requests in the note)
+  shepherd done 128 approve                      (no requests, moves on to QA by an agent)
+  shepherd done 128 request-changes "requests"   (put the requests in the note)
 
-On a long step, run psdd take 128 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 128
-If something is wrong and a person is needed, run: psdd escalate 128 "reason"
+On a long step, run shepherd take 128 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 128
+If something is wrong and a person is needed, run: shepherd escalate 128 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take a slice held by another session > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "Slice #132 is already held by another session (since 11:30).\\nDo not work on it. Run psdd next 123 and pick a different item."
+  "refusal": "Slice #132 is already held by another session (since 11:30).\\nDo not work on it. Run shepherd next 123 and pick a different item."
 }"
 `;
 
 exports[`output of every command, text and --json > take a slice held by another session > text 1`] = `
 "exit 1
 Slice #132 is already held by another session (since 11:30).
-Do not work on it. Run psdd next 123 and pick a different item."
+Do not work on it. Run shepherd next 123 and pick a different item."
 `;
 
 exports[`output of every command, text and --json > take a slice with a dirty worktree > json 1`] = `
@@ -2063,7 +2064,7 @@ exports[`output of every command, text and --json > take a slice with a dirty wo
   "skill": "implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt has uncommitted changes, e.g. from an earlier session. Check git status there before you start.\\nBring it up to date first:\\n  git -C /repo/.agents/worktrees/123-rate-limiting-132 fetch origin 123-rate-limiting-132 && git -C /repo/.agents/worktrees/123-rate-limiting-132 merge --ff-only origin/123-rate-limiting-132\\n\\nInvoke the skill: implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  psdd done 132\\n\\nOn a long step, run psdd take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 132\\nIf something is wrong and a person is needed, run: psdd escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt has uncommitted changes, e.g. from an earlier session. Check git status there before you start.\\nBring it up to date first:\\n  git -C /repo/.agents/worktrees/123-rate-limiting-132 fetch origin 123-rate-limiting-132 && git -C /repo/.agents/worktrees/123-rate-limiting-132 merge --ff-only origin/123-rate-limiting-132\\n\\nInvoke the skill: implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  shepherd done 132\\n\\nOn a long step, run shepherd take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 132\\nIf something is wrong and a person is needed, run: shepherd escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -2083,13 +2084,13 @@ Commit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132
   gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'
 
 When implementation is finished, run:
-  psdd done 132
+  shepherd done 132
 
-On a long step, run psdd take 132 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 132
-If something is wrong and a person is needed, run: psdd escalate 132 "reason"
+On a long step, run shepherd take 132 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 132
+If something is wrong and a person is needed, run: shepherd escalate 132 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take a story for agent QA > json 1`] = `
@@ -2105,7 +2106,7 @@ exports[`output of every command, text and --json > take a story for agent QA > 
     "pass",
     "fail"
   ],
-  "message": "You now hold story #61 \\"QA story\\". Its step is agent QA.\\n\\nWork in: /repo/.agents/worktrees/61-qa-story (branch 61-qa-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/61-qa-story -b 61-qa-story origin/main\\n\\nInvoke the skill: auto-qa\\nSpec to work on: .agents/specs/61-qa-story/spec.md\\nStory PR: 61-qa-story into main. Diff: git diff origin/main...HEAD\\nYour note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.\\nKeep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: psdd pushes the files and embeds them in the comment. Do not commit them.\\nA person QAs this after you. For what only a person can check (the slice's verifier reason), list it in the note\\nwith what you could prepare: how to run it, a URL, screenshots up to where you had to stop. Then pass.\\n\\nWhen agent QA is finished, run one of:\\n  psdd done 61 pass \\"evidence\\" [--evidence <dir>]   (every criterion you could check passed; moves on to QA by a person)\\n  psdd done 61 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run psdd take 61 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 61\\nIf something is wrong and a person is needed, run: psdd escalate 61 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold story #61 \\"QA story\\". Its step is agent QA.\\n\\nWork in: /repo/.agents/worktrees/61-qa-story (branch 61-qa-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/61-qa-story -b 61-qa-story origin/main\\n\\nInvoke the skill: auto-qa\\nSpec to work on: .agents/specs/61-qa-story/spec.md\\nStory PR: 61-qa-story into main. Diff: git diff origin/main...HEAD\\nYour note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.\\nKeep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: shepherd pushes the files and embeds them in the comment. Do not commit them.\\nA person QAs this after you. For what only a person can check (the slice's verifier reason), list it in the note\\nwith what you could prepare: how to run it, a URL, screenshots up to where you had to stop. Then pass.\\n\\nWhen agent QA is finished, run one of:\\n  shepherd done 61 pass \\"evidence\\" [--evidence <dir>]   (every criterion you could check passed; moves on to QA by a person)\\n  shepherd done 61 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run shepherd take 61 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 61\\nIf something is wrong and a person is needed, run: shepherd escalate 61 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -2121,19 +2122,19 @@ Invoke the skill: auto-qa
 Spec to work on: .agents/specs/61-qa-story/spec.md
 Story PR: 61-qa-story into main. Diff: git diff origin/main...HEAD
 Your note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.
-Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: psdd pushes the files and embeds them in the comment. Do not commit them.
+Keep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: shepherd pushes the files and embeds them in the comment. Do not commit them.
 A person QAs this after you. For what only a person can check (the slice's verifier reason), list it in the note
 with what you could prepare: how to run it, a URL, screenshots up to where you had to stop. Then pass.
 
 When agent QA is finished, run one of:
-  psdd done 61 pass "evidence" [--evidence <dir>]   (every criterion you could check passed; moves on to QA by a person)
-  psdd done 61 fail "evidence" [--evidence <dir>]   (put the failures with their repros in the note)
+  shepherd done 61 pass "evidence" [--evidence <dir>]   (every criterion you could check passed; moves on to QA by a person)
+  shepherd done 61 fail "evidence" [--evidence <dir>]   (put the failures with their repros in the note)
 
-On a long step, run psdd take 61 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 61
-If something is wrong and a person is needed, run: psdd escalate 61 "reason"
+On a long step, run shepherd take 61 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 61
+If something is wrong and a person is needed, run: shepherd escalate 61 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take a story for planning under git > json 1`] = `
@@ -2146,7 +2147,7 @@ exports[`output of every command, text and --json > take a story for planning un
   "skill": "plan",
   "attended": true,
   "outcomes": [],
-  "message": "You now hold story #63 \\"Plan it\\". Its step is planning. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/63-plan-it (branch 63-plan-it)\\nIt does not exist yet. Create it first:\\n  git -C /repo worktree add /repo/.agents/worktrees/63-plan-it 63-plan-it\\n\\nInvoke the skill: plan\\nSpec to work on: .agents/specs/63-plan-it/spec.md\\nCommit the spec on 63-plan-it and push it, so the link psdd posts resolves.\\n\\nWhen the user agrees planning is finished, run:\\n  psdd done 63\\n\\nOn a long step, run psdd take 63 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 63\\nIf something is wrong and a person is needed, run: psdd escalate 63 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold story #63 \\"Plan it\\". Its step is planning. This step is\\nattended: the user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/63-plan-it (branch 63-plan-it)\\nIt does not exist yet. Create it first:\\n  git -C /repo worktree add /repo/.agents/worktrees/63-plan-it 63-plan-it\\n\\nInvoke the skill: plan\\nSpec to work on: .agents/specs/63-plan-it/spec.md\\nCommit the spec on 63-plan-it and push it, so the link shepherd posts resolves.\\n\\nWhen the user agrees planning is finished, run:\\n  shepherd done 63\\n\\nOn a long step, run shepherd take 63 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 63\\nIf something is wrong and a person is needed, run: shepherd escalate 63 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -2161,16 +2162,16 @@ It does not exist yet. Create it first:
 
 Invoke the skill: plan
 Spec to work on: .agents/specs/63-plan-it/spec.md
-Commit the spec on 63-plan-it and push it, so the link psdd posts resolves.
+Commit the spec on 63-plan-it and push it, so the link shepherd posts resolves.
 
 When the user agrees planning is finished, run:
-  psdd done 63
+  shepherd done 63
 
-On a long step, run psdd take 63 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 63
-If something is wrong and a person is needed, run: psdd escalate 63 "reason"
+On a long step, run shepherd take 63 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 63
+If something is wrong and a person is needed, run: shepherd escalate 63 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take a story for slicing > json 1`] = `
@@ -2183,7 +2184,7 @@ exports[`output of every command, text and --json > take a story for slicing > j
   "skill": "slice",
   "attended": true,
   "outcomes": [],
-  "message": "You now hold story #50 \\"Search\\". Its step is slicing. This step is attended:\\nthe user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/50-search (branch 50-search)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/50-search -b 50-search origin/main\\n\\nInvoke the skill: slice\\nSpec to work on: .agents/specs/50-search/spec.md\\nCreate the slices in dependency order, blockers first, one command per slice:\\n  psdd add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <slice>]...\\n  --mode afk when an agent can verify every criterion, hil when a person must also look at it.\\nThen give each slice its body: gh issue edit <slice> --body-file <file>\\nPush 50-search once the slices exist, so slice PRs can target it.\\n\\nWhen the user agrees slicing is finished, run:\\n  psdd done 50\\n\\nOn a long step, run psdd take 50 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 50\\nIf something is wrong and a person is needed, run: psdd escalate 50 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold story #50 \\"Search\\". Its step is slicing. This step is attended:\\nthe user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/50-search (branch 50-search)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/50-search -b 50-search origin/main\\n\\nInvoke the skill: slice\\nSpec to work on: .agents/specs/50-search/spec.md\\nCreate the slices in dependency order, blockers first, one command per slice:\\n  shepherd add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <slice>]...\\n  --mode afk when an agent can verify every criterion, hil when a person must also look at it.\\nThen give each slice its body: gh issue edit <slice> --body-file <file>\\nPush 50-search once the slices exist, so slice PRs can target it.\\n\\nWhen the user agrees slicing is finished, run:\\n  shepherd done 50\\n\\nOn a long step, run shepherd take 50 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 50\\nIf something is wrong and a person is needed, run: shepherd escalate 50 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -2199,47 +2200,47 @@ It does not exist yet. Create it first:
 Invoke the skill: slice
 Spec to work on: .agents/specs/50-search/spec.md
 Create the slices in dependency order, blockers first, one command per slice:
-  psdd add-slice 50 "title" --mode afk|hil [--blocked-by <slice>]...
+  shepherd add-slice 50 "title" --mode afk|hil [--blocked-by <slice>]...
   --mode afk when an agent can verify every criterion, hil when a person must also look at it.
 Then give each slice its body: gh issue edit <slice> --body-file <file>
 Push 50-search once the slices exist, so slice PRs can target it.
 
 When the user agrees slicing is finished, run:
-  psdd done 50
+  shepherd done 50
 
-On a long step, run psdd take 50 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 50
-If something is wrong and a person is needed, run: psdd escalate 50 "reason"
+On a long step, run shepherd take 50 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 50
+If something is wrong and a person is needed, run: shepherd escalate 50 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take a story in implementation > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "Story #123 is in implementation. Its label follows its slices; there is no step to take on the story itself.\\nRun psdd next 123 to see its slices."
+  "refusal": "Story #123 is in implementation. Its label follows its slices; there is no step to take on the story itself.\\nRun shepherd next 123 to see its slices."
 }"
 `;
 
 exports[`output of every command, text and --json > take a story in implementation > text 1`] = `
 "exit 1
 Story #123 is in implementation. Its label follows its slices; there is no step to take on the story itself.
-Run psdd next 123 to see its slices."
+Run shepherd next 123 to see its slices."
 `;
 
 exports[`output of every command, text and --json > take a story in merge-queue > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "Story #30 is in merge-queue. Only the story owner (@alice) merges the story PR;\\nonce it is merged, psdd next 30 closes the story if GitHub has not. Do not merge it yourself."
+  "refusal": "Story #30 is in merge-queue. Only the story owner (@alice) merges the story PR;\\nonce it is merged, shepherd next 30 closes the story if GitHub has not. Do not merge it yourself."
 }"
 `;
 
 exports[`output of every command, text and --json > take a story in merge-queue > text 1`] = `
 "exit 1
 Story #30 is in merge-queue. Only the story owner (@alice) merges the story PR;
-once it is merged, psdd next 30 closes the story if GitHub has not. Do not merge it yourself."
+once it is merged, shepherd next 30 closes the story if GitHub has not. Do not merge it yourself."
 `;
 
 exports[`output of every command, text and --json > take a story in rework > json 1`] = `
@@ -2252,7 +2253,7 @@ exports[`output of every command, text and --json > take a story in rework > jso
   "skill": "implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold story #62 \\"Fix story\\". Its step is fixing.\\n\\nWork in: /repo/.agents/worktrees/62-fix-story (branch 62-fix-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/62-fix-story -b 62-fix-story origin/main\\n\\nInvoke the skill: implement\\nSpec to work on: .agents/specs/62-fix-story/spec.md\\nThis is rework: the latest review or QA comment on #62 lists what to fix. Read the issue: gh issue view 62 --comments\\nCommit the fixes straight onto the story branch 62-fix-story and push them.\\n\\nWhen fixing is finished, run:\\n  psdd done 62\\n\\nOn a long step, run psdd take 62 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 62\\nIf something is wrong and a person is needed, run: psdd escalate 62 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold story #62 \\"Fix story\\". Its step is fixing.\\n\\nWork in: /repo/.agents/worktrees/62-fix-story (branch 62-fix-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/62-fix-story -b 62-fix-story origin/main\\n\\nInvoke the skill: implement\\nSpec to work on: .agents/specs/62-fix-story/spec.md\\nThis is rework: the latest review or QA comment on #62 lists what to fix. Read the issue: gh issue view 62 --comments\\nCommit the fixes straight onto the story branch 62-fix-story and push them.\\n\\nWhen fixing is finished, run:\\n  shepherd done 62\\n\\nOn a long step, run shepherd take 62 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 62\\nIf something is wrong and a person is needed, run: shepherd escalate 62 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -2270,13 +2271,13 @@ This is rework: the latest review or QA comment on #62 lists what to fix. Read t
 Commit the fixes straight onto the story branch 62-fix-story and push them.
 
 When fixing is finished, run:
-  psdd done 62
+  shepherd done 62
 
-On a long step, run psdd take 62 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 62
-If something is wrong and a person is needed, run: psdd escalate 62 "reason"
+On a long step, run shepherd take 62 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 62
+If something is wrong and a person is needed, run: shepherd escalate 62 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take a story needing a human > json 1`] = `
@@ -2289,7 +2290,7 @@ exports[`output of every command, text and --json > take a story needing a human
   "skill": "resolve",
   "attended": true,
   "outcomes": [],
-  "message": "You now hold story #64 \\"Stuck\\". Its step is resolving needs-human. This step\\nis attended: the user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/64-stuck (branch 64-stuck)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/64-stuck -b 64-stuck origin/main\\n\\nInvoke the skill: resolve\\nThe latest needs-human comment gives the reason. Read the issue: gh issue view 64 --comments\\nRecord the outcome on the issue: gh issue comment 64\\nSpec changes go in .agents/specs/64-stuck/spec.md; commit and push them on 64-stuck.\\n\\nWhen the user agrees resolving needs-human is finished, run:\\n  psdd done 64\\n\\nOn a long step, run psdd take 64 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 64\\nIf something is wrong and a person is needed, run: psdd escalate 64 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold story #64 \\"Stuck\\". Its step is resolving needs-human. This step\\nis attended: the user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/64-stuck (branch 64-stuck)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/64-stuck -b 64-stuck origin/main\\n\\nInvoke the skill: resolve\\nThe latest needs-human comment gives the reason. Read the issue: gh issue view 64 --comments\\nRecord the outcome on the issue: gh issue comment 64\\nSpec changes go in .agents/specs/64-stuck/spec.md; commit and push them on 64-stuck.\\n\\nWhen the user agrees resolving needs-human is finished, run:\\n  shepherd done 64\\n\\nOn a long step, run shepherd take 64 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 64\\nIf something is wrong and a person is needed, run: shepherd escalate 64 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -2308,13 +2309,13 @@ Record the outcome on the issue: gh issue comment 64
 Spec changes go in .agents/specs/64-stuck/spec.md; commit and push them on 64-stuck.
 
 When the user agrees resolving needs-human is finished, run:
-  psdd done 64
+  shepherd done 64
 
-On a long step, run psdd take 64 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 64
-If something is wrong and a person is needed, run: psdd escalate 64 "reason"
+On a long step, run shepherd take 64 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 64
+If something is wrong and a person is needed, run: shepherd escalate 64 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take again while holding > json 1`] = `
@@ -2327,7 +2328,7 @@ exports[`output of every command, text and --json > take again while holding > j
   "skill": "slice",
   "attended": true,
   "outcomes": [],
-  "message": "You already held #50; the claim is refreshed. Here is its briefing again.\\n\\nYou now hold story #50 \\"Search\\". Its step is slicing. This step is attended:\\nthe user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/50-search (branch 50-search)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/50-search -b 50-search origin/main\\n\\nInvoke the skill: slice\\nSpec to work on: .agents/specs/50-search/spec.md\\nCreate the slices in dependency order, blockers first, one command per slice:\\n  psdd add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <slice>]...\\n  --mode afk when an agent can verify every criterion, hil when a person must also look at it.\\nThen give each slice its body: gh issue edit <slice> --body-file <file>\\nPush 50-search once the slices exist, so slice PRs can target it.\\n\\nWhen the user agrees slicing is finished, run:\\n  psdd done 50\\n\\nOn a long step, run psdd take 50 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 50\\nIf something is wrong and a person is needed, run: psdd escalate 50 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You already held #50; the claim is refreshed. Here is its briefing again.\\n\\nYou now hold story #50 \\"Search\\". Its step is slicing. This step is attended:\\nthe user takes part, and you do not decide on your own.\\n\\nWork in: /repo/.agents/worktrees/50-search (branch 50-search)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/50-search -b 50-search origin/main\\n\\nInvoke the skill: slice\\nSpec to work on: .agents/specs/50-search/spec.md\\nCreate the slices in dependency order, blockers first, one command per slice:\\n  shepherd add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <slice>]...\\n  --mode afk when an agent can verify every criterion, hil when a person must also look at it.\\nThen give each slice its body: gh issue edit <slice> --body-file <file>\\nPush 50-search once the slices exist, so slice PRs can target it.\\n\\nWhen the user agrees slicing is finished, run:\\n  shepherd done 50\\n\\nOn a long step, run shepherd take 50 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 50\\nIf something is wrong and a person is needed, run: shepherd escalate 50 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -2345,33 +2346,33 @@ It does not exist yet. Create it first:
 Invoke the skill: slice
 Spec to work on: .agents/specs/50-search/spec.md
 Create the slices in dependency order, blockers first, one command per slice:
-  psdd add-slice 50 "title" --mode afk|hil [--blocked-by <slice>]...
+  shepherd add-slice 50 "title" --mode afk|hil [--blocked-by <slice>]...
   --mode afk when an agent can verify every criterion, hil when a person must also look at it.
 Then give each slice its body: gh issue edit <slice> --body-file <file>
 Push 50-search once the slices exist, so slice PRs can target it.
 
 When the user agrees slicing is finished, run:
-  psdd done 50
+  shepherd done 50
 
-On a long step, run psdd take 50 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 50
-If something is wrong and a person is needed, run: psdd escalate 50 "reason"
+On a long step, run shepherd take 50 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 50
+If something is wrong and a person is needed, run: shepherd escalate 50 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take an issue held by another session of yours > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "#50 is held by another session of yours (since 11:30).\\nIf that session has stopped, take it over here: psdd take 50 --takeover\\nIf it is still running, do not work on it."
+  "refusal": "#50 is held by another session of yours (since 11:30).\\nIf that session has stopped, take it over here: shepherd take 50 --takeover\\nIf it is still running, do not work on it."
 }"
 `;
 
 exports[`output of every command, text and --json > take an issue held by another session of yours > text 1`] = `
 "exit 1
 #50 is held by another session of yours (since 11:30).
-If that session has stopped, take it over here: psdd take 50 --takeover
+If that session has stopped, take it over here: shepherd take 50 --takeover
 If it is still running, do not work on it."
 `;
 
@@ -2379,14 +2380,14 @@ exports[`output of every command, text and --json > take an issue with two state
 "exit 1
 {
   "ok": false,
-  "refusal": "#9 has more than one state label (needs-plan, needs-slicing); a person must remove the stale one.\\nRun psdd next 9 and pick a different item."
+  "refusal": "#9 has more than one state label (needs-plan, needs-slicing); a person must remove the stale one.\\nRun shepherd next 9 and pick a different item."
 }"
 `;
 
 exports[`output of every command, text and --json > take an issue with two states > text 1`] = `
 "exit 1
 #9 has more than one state label (needs-plan, needs-slicing); a person must remove the stale one.
-Run psdd next 9 and pick a different item."
+Run shepherd next 9 and pick a different item."
 `;
 
 exports[`output of every command, text and --json > take over a stale claim > json 1`] = `
@@ -2399,7 +2400,7 @@ exports[`output of every command, text and --json > take over a stale claim > js
   "skill": "slice",
   "attended": true,
   "outcomes": [],
-  "message": "You now hold story #50 \\"Search\\". Its step is slicing. This step is attended:\\nthe user takes part, and you do not decide on your own.\\n\\nThe previous holder's claim was stale (since 08:00); its worktree is kept with what it left. Check git status there before you start.\\n\\nWork in: /repo/.agents/worktrees/50-search (branch 50-search)\\n\\nInvoke the skill: slice\\nSpec to work on: .agents/specs/50-search/spec.md\\nCreate the slices in dependency order, blockers first, one command per slice:\\n  psdd add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <slice>]...\\n  --mode afk when an agent can verify every criterion, hil when a person must also look at it.\\nThen give each slice its body: gh issue edit <slice> --body-file <file>\\nPush 50-search once the slices exist, so slice PRs can target it.\\n\\nWhen the user agrees slicing is finished, run:\\n  psdd done 50\\n\\nOn a long step, run psdd take 50 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: psdd release 50\\nIf something is wrong and a person is needed, run: psdd escalate 50 \\"reason\\"\\n\\nDo not change labels yourself. Only psdd changes them."
+  "message": "You now hold story #50 \\"Search\\". Its step is slicing. This step is attended:\\nthe user takes part, and you do not decide on your own.\\n\\nThe previous holder's claim was stale (since 08:00); its worktree is kept with what it left. Check git status there before you start.\\n\\nWork in: /repo/.agents/worktrees/50-search (branch 50-search)\\n\\nInvoke the skill: slice\\nSpec to work on: .agents/specs/50-search/spec.md\\nCreate the slices in dependency order, blockers first, one command per slice:\\n  shepherd add-slice 50 \\"title\\" --mode afk|hil [--blocked-by <slice>]...\\n  --mode afk when an agent can verify every criterion, hil when a person must also look at it.\\nThen give each slice its body: gh issue edit <slice> --body-file <file>\\nPush 50-search once the slices exist, so slice PRs can target it.\\n\\nWhen the user agrees slicing is finished, run:\\n  shepherd done 50\\n\\nOn a long step, run shepherd take 50 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: shepherd release 50\\nIf something is wrong and a person is needed, run: shepherd escalate 50 \\"reason\\"\\n\\nDo not change labels yourself. Only shepherd changes them."
 }"
 `;
 
@@ -2415,19 +2416,19 @@ Work in: /repo/.agents/worktrees/50-search (branch 50-search)
 Invoke the skill: slice
 Spec to work on: .agents/specs/50-search/spec.md
 Create the slices in dependency order, blockers first, one command per slice:
-  psdd add-slice 50 "title" --mode afk|hil [--blocked-by <slice>]...
+  shepherd add-slice 50 "title" --mode afk|hil [--blocked-by <slice>]...
   --mode afk when an agent can verify every criterion, hil when a person must also look at it.
 Then give each slice its body: gh issue edit <slice> --body-file <file>
 Push 50-search once the slices exist, so slice PRs can target it.
 
 When the user agrees slicing is finished, run:
-  psdd done 50
+  shepherd done 50
 
-On a long step, run psdd take 50 again now and then: it keeps your claim fresh.
-If you have to stop, run: psdd release 50
-If something is wrong and a person is needed, run: psdd escalate 50 "reason"
+On a long step, run shepherd take 50 again now and then: it keeps your claim fresh.
+If you have to stop, run: shepherd release 50
+If something is wrong and a person is needed, run: shepherd escalate 50 "reason"
 
-Do not change labels yourself. Only psdd changes them."
+Do not change labels yourself. Only shepherd changes them."
 `;
 
 exports[`output of every command, text and --json > take over a teammate's issue > json 1`] = `
@@ -2459,19 +2460,19 @@ exports[`output of every command, text and --json > tidy > json 1`] = `
     "/repo/.agents/worktrees/123-rate-limiting-128: it has uncommitted changes. Commit and push them, or remove it by hand when done."
   ],
   "failed": [
-    "QA evidence branch psdd/qa/127 (#127 is closed): protected"
+    "QA evidence branch shepherd/qa/127 (#127 is closed): protected"
   ],
   "notes": [
     "Could not fetch from GitHub, so work pushed since the last fetch counts as unpushed and is kept: offline"
   ],
-  "message": "Could not fetch from GitHub, so work pushed since the last fetch counts as unpushed and is kept: offline\\npsdd tidy removed:\\n  - worktree .agents/worktrees/123-rate-limiting-127 (slice #127 is closed)\\n  - local branch 123-rate-limiting-127 (merged into 123-rate-limiting)\\n  - branch 123-rate-limiting-127 on GitHub (merged into 123-rate-limiting)\\n  - claim on #127 (#127 is closed)\\nKept, so no work is lost:\\n  - /repo/.agents/worktrees/123-rate-limiting-128: it has uncommitted changes. Commit and push them, or remove it by hand when done.\\nCould not remove, the rest still ran:\\n  - QA evidence branch psdd/qa/127 (#127 is closed): protected"
+  "message": "Could not fetch from GitHub, so work pushed since the last fetch counts as unpushed and is kept: offline\\nshepherd tidy removed:\\n  - worktree .agents/worktrees/123-rate-limiting-127 (slice #127 is closed)\\n  - local branch 123-rate-limiting-127 (merged into 123-rate-limiting)\\n  - branch 123-rate-limiting-127 on GitHub (merged into 123-rate-limiting)\\n  - claim on #127 (#127 is closed)\\nKept, so no work is lost:\\n  - /repo/.agents/worktrees/123-rate-limiting-128: it has uncommitted changes. Commit and push them, or remove it by hand when done.\\nCould not remove, the rest still ran:\\n  - QA evidence branch shepherd/qa/127 (#127 is closed): protected"
 }"
 `;
 
 exports[`output of every command, text and --json > tidy > text 1`] = `
 "exit 0
 Could not fetch from GitHub, so work pushed since the last fetch counts as unpushed and is kept: offline
-psdd tidy removed:
+shepherd tidy removed:
   - worktree .agents/worktrees/123-rate-limiting-127 (slice #127 is closed)
   - local branch 123-rate-limiting-127 (merged into 123-rate-limiting)
   - branch 123-rate-limiting-127 on GitHub (merged into 123-rate-limiting)
@@ -2479,7 +2480,7 @@ psdd tidy removed:
 Kept, so no work is lost:
   - /repo/.agents/worktrees/123-rate-limiting-128: it has uncommitted changes. Commit and push them, or remove it by hand when done.
 Could not remove, the rest still ran:
-  - QA evidence branch psdd/qa/127 (#127 is closed): protected"
+  - QA evidence branch shepherd/qa/127 (#127 is closed): protected"
 `;
 
 exports[`output of every command, text and --json > tidy dry run > json 1`] = `
@@ -2493,13 +2494,13 @@ exports[`output of every command, text and --json > tidy dry run > json 1`] = `
   "kept": [],
   "failed": [],
   "notes": [],
-  "message": "psdd tidy would remove (dry run, nothing was changed):\\n  - branch 123-rate-limiting-127 on GitHub (merged into 123-rate-limiting)"
+  "message": "shepherd tidy would remove (dry run, nothing was changed):\\n  - branch 123-rate-limiting-127 on GitHub (merged into 123-rate-limiting)"
 }"
 `;
 
 exports[`output of every command, text and --json > tidy dry run > text 1`] = `
 "exit 0
-psdd tidy would remove (dry run, nothing was changed):
+shepherd tidy would remove (dry run, nothing was changed):
   - branch 123-rate-limiting-127 on GitHub (merged into 123-rate-limiting)"
 `;
 
@@ -2525,27 +2526,27 @@ exports[`output of every command, text and --json > unknown command > json 1`] =
 "exit 2
 {
   "ok": false,
-  "refusal": "psdd runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  psdd init                          Set up this project: skills, .agents/specs/, labels\\n  psdd next <story>                  What can be done on the story now\\n  psdd take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  psdd done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; psdd makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  psdd add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  psdd escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  psdd release <issue>               Give up the claim without a transition\\n  psdd status <story>                Read-only overview of the story and its slices\\n  psdd tidy [--dry-run]              Remove what belongs to closed issues\\n  psdd dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n\\nAdd --json for machine-readable output."
+  "refusal": "shepherd runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  shepherd init                          Set up this project: skills, .agents/specs/, labels\\n  shepherd next <story>                  What can be done on the story now\\n  shepherd take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  shepherd done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; shepherd makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  shepherd add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  shepherd escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  shepherd release <issue>               Give up the claim without a transition\\n  shepherd status <story>                Read-only overview of the story and its slices\\n  shepherd tidy [--dry-run]              Remove what belongs to closed issues\\n  shepherd dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
 exports[`output of every command, text and --json > unknown command > text 1`] = `
 "exit 2
-psdd runs work through the SDD process. Commands on an issue take its number explicitly.
+shepherd runs work through the SDD process. Commands on an issue take its number explicitly.
 
-  psdd init                          Set up this project: skills, .agents/specs/, labels
-  psdd next <story>                  What can be done on the story now
-  psdd take <issue> [--takeover]     Claim the issue and get the briefing for its step;
+  shepherd init                          Set up this project: skills, .agents/specs/, labels
+  shepherd next <story>                  What can be done on the story now
+  shepherd take <issue> [--takeover]     Claim the issue and get the briefing for its step;
                                      --takeover takes it from a stopped session of yours
-  psdd done <issue> [outcome] ["note"] [--evidence <dir>]
-                                     Finish the step; psdd makes the transition.
+  shepherd done <issue> [outcome] ["note"] [--evidence <dir>]
+                                     Finish the step; shepherd makes the transition.
                                      --evidence attaches the QA files in <dir>
-  psdd add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...
-  psdd escalate <issue> "reason"     Set needs-human and release the claim
-  psdd release <issue>               Give up the claim without a transition
-  psdd status <story>                Read-only overview of the story and its slices
-  psdd tidy [--dry-run]              Remove what belongs to closed issues
-  psdd dashboard [--port <n>] [--interval <duration>] [--no-open]
+  shepherd add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...
+  shepherd escalate <issue> "reason"     Set needs-human and release the claim
+  shepherd release <issue>               Give up the claim without a transition
+  shepherd status <story>                Read-only overview of the story and its slices
+  shepherd tidy [--dry-run]              Remove what belongs to closed issues
+  shepherd dashboard [--port <n>] [--interval <duration>] [--no-open]
                                      Watch your work in the browser; Ctrl-C stops it
 
 Add --json for machine-readable output."
@@ -2555,27 +2556,27 @@ exports[`output of every command, text and --json > usage > json 1`] = `
 "exit 2
 {
   "ok": false,
-  "refusal": "psdd runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  psdd init                          Set up this project: skills, .agents/specs/, labels\\n  psdd next <story>                  What can be done on the story now\\n  psdd take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  psdd done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; psdd makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  psdd add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  psdd escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  psdd release <issue>               Give up the claim without a transition\\n  psdd status <story>                Read-only overview of the story and its slices\\n  psdd tidy [--dry-run]              Remove what belongs to closed issues\\n  psdd dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n\\nAdd --json for machine-readable output."
+  "refusal": "shepherd runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  shepherd init                          Set up this project: skills, .agents/specs/, labels\\n  shepherd next <story>                  What can be done on the story now\\n  shepherd take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  shepherd done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; shepherd makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  shepherd add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  shepherd escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  shepherd release <issue>               Give up the claim without a transition\\n  shepherd status <story>                Read-only overview of the story and its slices\\n  shepherd tidy [--dry-run]              Remove what belongs to closed issues\\n  shepherd dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
 exports[`output of every command, text and --json > usage > text 1`] = `
 "exit 2
-psdd runs work through the SDD process. Commands on an issue take its number explicitly.
+shepherd runs work through the SDD process. Commands on an issue take its number explicitly.
 
-  psdd init                          Set up this project: skills, .agents/specs/, labels
-  psdd next <story>                  What can be done on the story now
-  psdd take <issue> [--takeover]     Claim the issue and get the briefing for its step;
+  shepherd init                          Set up this project: skills, .agents/specs/, labels
+  shepherd next <story>                  What can be done on the story now
+  shepherd take <issue> [--takeover]     Claim the issue and get the briefing for its step;
                                      --takeover takes it from a stopped session of yours
-  psdd done <issue> [outcome] ["note"] [--evidence <dir>]
-                                     Finish the step; psdd makes the transition.
+  shepherd done <issue> [outcome] ["note"] [--evidence <dir>]
+                                     Finish the step; shepherd makes the transition.
                                      --evidence attaches the QA files in <dir>
-  psdd add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...
-  psdd escalate <issue> "reason"     Set needs-human and release the claim
-  psdd release <issue>               Give up the claim without a transition
-  psdd status <story>                Read-only overview of the story and its slices
-  psdd tidy [--dry-run]              Remove what belongs to closed issues
-  psdd dashboard [--port <n>] [--interval <duration>] [--no-open]
+  shepherd add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...
+  shepherd escalate <issue> "reason"     Set needs-human and release the claim
+  shepherd release <issue>               Give up the claim without a transition
+  shepherd status <story>                Read-only overview of the story and its slices
+  shepherd tidy [--dry-run]              Remove what belongs to closed issues
+  shepherd dashboard [--port <n>] [--interval <duration>] [--no-open]
                                      Watch your work in the browser; Ctrl-C stops it
 
 Add --json for machine-readable output."

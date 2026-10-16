@@ -8,7 +8,7 @@ import { isWithin, samePath } from "./workspace.js";
 
 /** The branch QA evidence of an issue is pushed to. */
 export function qaBranch(n: number) {
-  return `psdd/qa/${n}`;
+  return `shepherd/qa/${n}`;
 }
 
 /** Something tidy removes. `into` is where a branch was merged. */
@@ -40,7 +40,7 @@ export interface TidyResult {
   fetchFailed: string | null;
 }
 
-/** A psdd branch and the issue it belongs to. */
+/** A shepherd branch and the issue it belongs to. */
 interface Owned {
   branch: string;
   issue: Issue;
@@ -70,7 +70,7 @@ export async function tidy(ctx: Ctx, dryRun: boolean): Promise<TidyResult> {
   };
 
   const issues = new Map<number, Promise<Issue | null>>();
-  // A number with no issue behind it, e.g. a branch someone named by hand, is not psdd's.
+  // A number with no issue behind it, e.g. a branch someone named by hand, is not shepherd's.
   const issue = (n: number) => {
     let found = issues.get(n);
     if (!found) {
@@ -87,8 +87,8 @@ export async function tidy(ctx: Ctx, dryRun: boolean): Promise<TidyResult> {
     report.fetchFailed = (e as Error).message;
   }
 
-  for (const branch of await github.listBranches("psdd/qa/")) {
-    const n = Number(branch.slice("psdd/qa/".length));
+  for (const branch of await github.listBranches("shepherd/qa/")) {
+    const n = Number(branch.slice("shepherd/qa/".length));
     if (Number.isInteger(n) && (await closed(n))) await attempt({ kind: "qa-branch", branch, issue: n }, () => github.deleteBranch(branch));
   }
 
@@ -149,7 +149,7 @@ async function mergedHead(ctx: Ctx, branch: string, pr: PullRequest | null) {
 
 /**
  * The story or slice a branch belongs to, from the story's recorded slug and
- * its slices. Anything else, e.g. a branch named by hand, is not psdd's.
+ * its slices. Anything else, e.g. a branch named by hand, is not shepherd's.
  */
 async function ownerOf(ctx: Ctx, branch: string, issue: (n: number) => Promise<Issue | null>, slices: Map<number, Promise<Issue[]>>): Promise<Owned | null> {
   const m = /^(\d+)-/.exec(branch);

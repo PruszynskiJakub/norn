@@ -2,8 +2,8 @@ import { detectProvider } from "./location.js";
 import type { Channel } from "./notify.js";
 import type { Provider, Workspace } from "./workspace.js";
 
-export const TEAM_CONFIG = ".agents/psdd.config.json";
-export const LOCAL_CONFIG = ".agents/psdd.config.local.json";
+export const TEAM_CONFIG = ".agents/shepherd.config.json";
+export const LOCAL_CONFIG = ".agents/shepherd.config.local.json";
 
 export const DEFAULT_TEAM_CONFIG = {
   baseBranch: "main",
@@ -49,7 +49,7 @@ interface Raw {
   dashboard?: { port?: number; interval?: string };
 }
 
-/** A setting psdd cannot use, so it refuses until the file is fixed. */
+/** A setting shepherd cannot use, so it refuses until the file is fixed. */
 export type ConfigProblem =
   | { kind: "not-an-object"; file: string }
   | { kind: "invalid-json"; file: string; detail: string }
@@ -63,13 +63,13 @@ export type ConfigProblem =
   | { kind: "dashboard-in-team-file"; file: string; local: string }
   | { kind: "bad-dashboard-setting"; file: string; key: "port" | "interval" };
 
-/** A setting psdd ignores or clamps, and says so. */
+/** A setting shepherd ignores or clamps, and says so. */
 export type ConfigWarning =
   | { kind: "stale-after-clamped"; file: string; value: string; minimum: string }
   | { kind: "team-setting-in-local-file"; file: string; setting: string; team: string };
 
 /**
- * Checks one file's settings. Problems make psdd refuse; warnings are
+ * Checks one file's settings. Problems make shepherd refuse; warnings are
  * printed and the setting is ignored or clamped.
  */
 function check(file: string, raw: unknown): { problems: ConfigProblem[]; warnings: ConfigWarning[] } {

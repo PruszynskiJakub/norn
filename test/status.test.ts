@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "@psdd/testing";
+import { setup } from "@shepherd/testing";
 
 function story() {
   const w = setup();
@@ -14,14 +14,14 @@ function story() {
   return w;
 }
 
-describe("psdd status", () => {
+describe("shepherd status", () => {
   test("is a read-only overview of the story and its slices", async () => {
     const w = story();
     w.setNow("2026-10-13T14:02:00Z");
     await w.as("other")("take", "131");
     const before = JSON.stringify([...w.github.issues.values()]);
 
-    const res = await w.psdd("status", "123");
+    const res = await w.shepherd("status", "123");
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toBe(
@@ -38,7 +38,7 @@ describe("psdd status", () => {
 
   test("status --json", async () => {
     const w = story();
-    const data = JSON.parse((await w.psdd("status", "123", "--json")).stdout);
+    const data = JSON.parse((await w.shepherd("status", "123", "--json")).stdout);
     expect(data.story).toMatchObject({ number: 123, state: "implementation", owner: "alice" });
     expect(data.slices[2]).toMatchObject({ number: 132, state: "blocked", mode: "afk", blockedBy: [131] });
   });
@@ -47,16 +47,16 @@ describe("psdd status", () => {
 describe("usage", () => {
   test("an unknown command prints usage", async () => {
     const w = setup();
-    const res = await w.psdd("frobnicate");
+    const res = await w.shepherd("frobnicate");
     expect(res.exitCode).toBe(2);
-    expect(res.stdout).toContain("psdd next <story>");
-    expect(res.stdout).toContain("psdd take <issue>");
+    expect(res.stdout).toContain("shepherd next <story>");
+    expect(res.stdout).toContain("shepherd take <issue>");
   });
 
   test("a missing issue number is refused with the right form", async () => {
     const w = setup();
-    const res = await w.psdd("take");
+    const res = await w.shepherd("take");
     expect(res.exitCode).toBe(2);
-    expect(res.stdout).toContain("psdd take <issue>");
+    expect(res.stdout).toContain("shepherd take <issue>");
   });
 });

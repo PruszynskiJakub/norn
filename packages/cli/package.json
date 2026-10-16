@@ -1,16 +1,16 @@
 {
-  "name": "@psdd/cli",
+  "name": "@shepherd/cli",
   "version": "0.0.0",
   "private": true,
-  "description": "The psdd command line: argument parsing, init, the renderers and the executable.",
+  "description": "The shepherd command line: argument parsing, init, the renderers and the executable.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@psdd/core": "0.0.0",
-    "@psdd/github-gh": "0.0.0",
-    "@psdd/workspace-local": "0.0.0",
-    "@psdd/web": "0.0.0"
+    "@shepherd/core": "0.0.0",
+    "@shepherd/github-gh": "0.0.0",
+    "@shepherd/workspace-local": "0.0.0",
+    "@shepherd/web": "0.0.0"
   }
 }

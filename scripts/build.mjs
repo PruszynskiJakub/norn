@@ -14,7 +14,7 @@ function readUi() {
   const files = ["app.js", "app.css"].map((f) => resolve(uiDist, f));
   const missing = files.filter((f) => !existsSync(f));
   if (missing.length) {
-    console.error(`The dashboard UI is not built: ${missing.join(", ")} missing. Run npm run build:ui -w @psdd/web first (npm run build does).`);
+    console.error(`The dashboard UI is not built: ${missing.join(", ")} missing. Run npm run build:ui -w @shepherd/web first (npm run build does).`);
     process.exit(1);
   }
   const [js, css] = files.map((f) => readFileSync(f, "utf8"));

@@ -1,6 +1,6 @@
-import { type Deps, renderNotification, run } from "@psdd/cli";
-import type { DashboardLaunch, DashboardOptions } from "@psdd/web";
-import { type Ctx, loadConfig } from "@psdd/core";
+import { type Deps, renderNotification, run } from "@shepherd/cli";
+import type { DashboardLaunch, DashboardOptions } from "@shepherd/web";
+import { type Ctx, loadConfig } from "@shepherd/core";
 import { FakeGitHub } from "./fake-github.js";
 import { FakeWorkspace } from "./fake-workspace.js";
 
@@ -13,7 +13,7 @@ export function setup(opts: { now?: string; session?: string; user?: string } = 
   /** Nonces handed out in turn; tests push the ones they expect. */
   const nonces: string[] = [];
   let made = 0;
-  /** What psdd dashboard asked to start, and what the start answers. */
+  /** What shepherd dashboard asked to start, and what the start answers. */
   const launches: DashboardOptions[] = [];
   const dashboard = { answer: null as DashboardLaunch | null };
   const deps: Deps = {
@@ -47,13 +47,13 @@ export function setup(opts: { now?: string; session?: string; user?: string } = 
     setNow(iso: string) {
       now = new Date(iso);
     },
-    /** What core operations are called with: the deps plus the configuration psdd would load. */
+    /** What core operations are called with: the deps plus the configuration shepherd would load. */
     async ctx(): Promise<Ctx> {
       const loaded = await loadConfig(workspace);
       if (!loaded.ok) throw new Error("the test's configuration does not load");
       return { ...deps, config: loaded.config, slugs: new Map() };
     },
-    async psdd(...argv: string[]) {
+    async shepherd(...argv: string[]) {
       return run(argv, deps);
     },
     withProject(cwd: string, installSkills: (cwd: string) => Promise<string[]>) {

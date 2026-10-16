@@ -1,4 +1,4 @@
-import type { Evidence } from "@psdd/core";
+import type { Evidence } from "@shepherd/core";
 import type { ReactNode } from "react";
 import { links } from "../model.ts";
 import { useView } from "../view.ts";

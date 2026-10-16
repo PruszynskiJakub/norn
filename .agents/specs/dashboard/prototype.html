@@ -2,7 +2,7 @@
 <!--
   PROTOTYPE — throwaway. Not production code. Do not import, do not ship.
 
-  Question: what should `psdd dashboard` (spec.md in this folder) look like?
+  Question: what should `shepherd dashboard` (spec.md in this folder) look like?
 
   Round 1 (settled): three layouts — A board + feed, B three-pane inbox, C ops table + log.
   Verdict: B. A and C are dropped from this file.
@@ -18,10 +18,10 @@
 
   Spec impact if adopted: the outcome FeedEvent carries the outcome's note (the comment body,
   markdown) and the implement step's "done" becomes an outcome event too. The port method
-  already reads comments; it now returns their bodies for psdd outcome comments.
+  already reads comments; it now returns their bodies for shepherd outcome comments.
 
-  QA remarks and QA-evidence events link to the issue's evidence branch `psdd/qa/<n>` at the
-  commit psdd pushed (src/tidy.ts qaBranch, `psdd done --evidence`), and to each file there.
+  QA remarks and QA-evidence events link to the issue's evidence branch `shepherd/qa/<n>` at the
+  commit shepherd pushed (src/tidy.ts qaBranch, `shepherd done --evidence`), and to each file there.
   Spec impact: outcome and qa-evidence events carry `evidence: { branch, sha, files }`.
 
   Round 3: "looks good but too dense, nothing steers the eye". Same three variants, calmer:
@@ -38,7 +38,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>psdd dashboard prototype</title>
+<title>shepherd dashboard prototype</title>
 <style>
   /* Round 3: calm. Neutral by default; colour only where the developer is needed or something is stuck. */
   :root {
@@ -275,20 +275,20 @@ const STATE = {
   repo: REPO, me: ME, lastUpdated: min(0.6), pollIntervalMs: 120000, lastError: null,
   board: [
     {
-      number: 71, title: "Local dashboard: observe your psdd work on GitHub", state: "implementation", owner: ME,
-      branch: "psdd/71-local-dashboard", closedAt: null, mode: null, needsHuman: false, holder: null, fixRounds: 0, maxFixRounds: MAX_FIX,
+      number: 71, title: "Local dashboard: observe your shepherd work on GitHub", state: "implementation", owner: ME,
+      branch: "shepherd/71-local-dashboard", closedAt: null, mode: null, needsHuman: false, holder: null, fixRounds: 0, maxFixRounds: MAX_FIX,
       slices: [
         { number: 72, title: "Core read model: observe() + FeedEvent union", state: "merged", mode: "afk", blockedBy: [], holder: null, fixRounds: 1, maxFixRounds: MAX_FIX, needsHuman: false },
         { number: 73, title: "github-gh: one GraphQL query + ls-remote claims", state: "needs-review", mode: "afk", blockedBy: [], holder: { session: "s-3f2a", since: min(9), stale: false }, fixRounds: 1, maxFixRounds: MAX_FIX, needsHuman: false },
-        { number: 74, title: "@psdd/web server: poller, cache, /api/state", state: "implementation", mode: "afk", blockedBy: [], holder: { session: "s-9c41", since: min(97), stale: true }, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
+        { number: 74, title: "@shepherd/web server: poller, cache, /api/state", state: "implementation", mode: "afk", blockedBy: [], holder: { session: "s-9c41", since: min(97), stale: true }, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
         { number: 75, title: "Dashboard UI: board, waiting strip, feed", state: "blocked", mode: "hil", blockedBy: [73, 74], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
-        { number: 76, title: "psdd dashboard command: ports, interval, --no-open", state: "needs-human-qa", mode: "hil", blockedBy: [], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
+        { number: 76, title: "shepherd dashboard command: ports, interval, --no-open", state: "needs-human-qa", mode: "hil", blockedBy: [], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
         { number: 77, title: "Release: Vite build + embed + smoke test", state: "ready-for-agent", mode: "afk", blockedBy: [], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
       ],
     },
     {
-      number: 58, title: "Claims as refs under refs/psdd/claims", state: "implementation", owner: ME,
-      branch: "psdd/58-claims-as-refs", closedAt: null, mode: null, needsHuman: false, holder: null, fixRounds: 0, maxFixRounds: MAX_FIX,
+      number: 58, title: "Claims as refs under refs/shepherd/claims", state: "implementation", owner: ME,
+      branch: "shepherd/58-claims-as-refs", closedAt: null, mode: null, needsHuman: false, holder: null, fixRounds: 0, maxFixRounds: MAX_FIX,
       slices: [
         { number: 61, title: "take/release write and delete the claim ref", state: "changes-requested", mode: "afk", blockedBy: [], holder: null, fixRounds: 3, maxFixRounds: MAX_FIX, needsHuman: true },
         { number: 62, title: "tidy removes stale claim refs", state: "qa-failed", mode: "afk", blockedBy: [], holder: { session: "s-71be", since: min(4), stale: false }, fixRounds: 2, maxFixRounds: MAX_FIX, needsHuman: false },
@@ -297,7 +297,7 @@ const STATE = {
     },
     {
       number: 53, title: "Typed results from core operations", state: "needs-human-qa", owner: ME,
-      branch: "psdd/53-typed-results", closedAt: null, mode: null, needsHuman: false, holder: null, fixRounds: 1, maxFixRounds: MAX_FIX,
+      branch: "shepherd/53-typed-results", closedAt: null, mode: null, needsHuman: false, holder: null, fixRounds: 1, maxFixRounds: MAX_FIX,
       slices: [
         { number: 66, title: "next/done return typed results", state: "merged", mode: "afk", blockedBy: [], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
         { number: 67, title: "Renderers produce all wording", state: "merged", mode: "afk", blockedBy: [], holder: null, fixRounds: 2, maxFixRounds: MAX_FIX, needsHuman: false },
@@ -305,7 +305,7 @@ const STATE = {
     },
     {
       number: 52, title: "Package layout: core / adapters / front ends", state: "closed", owner: ME,
-      branch: "psdd/52-package-layout", closedAt: min(60 * 52), mode: null, needsHuman: false, holder: null, fixRounds: 0, maxFixRounds: MAX_FIX,
+      branch: "shepherd/52-package-layout", closedAt: min(60 * 52), mode: null, needsHuman: false, holder: null, fixRounds: 0, maxFixRounds: MAX_FIX,
       slices: [
         { number: 54, title: "Boundary test", state: "merged", mode: "afk", blockedBy: [], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
         { number: 55, title: "Move adapters", state: "merged", mode: "afk", blockedBy: [], holder: null, fixRounds: 0, maxFixRounds: MAX_FIX, needsHuman: false },
@@ -316,7 +316,7 @@ const STATE = {
 const R61 = "fix rounds exhausted (3/3); review keeps flagging the race on concurrent take";
 STATE.waitingForMe = [
   { number: 61, story: 58, kind: "needs-human", title: "take/release write and delete the claim ref", reason: R61, since: min(22), command: "drive 61" },
-  { number: 76, story: 71, kind: "needs-human-qa", title: "psdd dashboard command: ports, interval, --no-open", reason: "mode:hil — agent QA passed, your QA is next", since: min(41), command: "drive 76" },
+  { number: 76, story: 71, kind: "needs-human-qa", title: "shepherd dashboard command: ports, interval, --no-open", reason: "mode:hil — agent QA passed, your QA is next", since: min(41), command: "drive 76" },
   { number: 53, story: 53, kind: "needs-human-qa", title: "Typed results from core operations", reason: "story QA — every slice merged, agent QA passed", since: min(185), command: "drive 53" },
 ];
 
@@ -346,10 +346,10 @@ Evidence: 4 files (terminal captures, api log).`),
 
 #### Repro
 \`\`\`
-psdd take 62 --session s-a
+shepherd take 62 --session s-a
 # wait > staleAfter, label stays in-progress
-psdd tidy
-git ls-remote origin 'refs/psdd/claims/*'   # empty
+shepherd tidy
+git ls-remote origin 'refs/shepherd/claims/*'   # empty
 gh issue view 62 --json labels               # still in-progress
 \`\`\`
 Expected: \`tidy\` clears \`in-progress\` in the same pass, or leaves the ref.`, 2),
@@ -357,7 +357,7 @@ Expected: \`tidy\` clears \`in-progress\` in the same pass, or leaves the ref.`,
   oc(73, 71, 9, "s-3f2a", "implement", "done", `Fix round 1: addressed all three review requests.
 
 - pagination now follows \`pageInfo.endCursor\` for sub-issues **and** timeline items (was sub-issues only)
-- \`ls-remote\` parsing ignores refs outside \`refs/psdd/claims/\` and tolerates a trailing newline
+- \`ls-remote\` parsing ignores refs outside \`refs/shepherd/claims/\` and tolerates a trailing newline
 - moved the GraphQL document into \`queries/observe.graphql\`; tests load the same file
 
 Not done: did not add retry on 502, out of scope for this slice (noted on #74).`, 1),
@@ -378,7 +378,7 @@ Escalating: three rounds have not converged on the push semantics; a person shou
   oc(61, 58, 105, "s-2b07", "implement", "done", `Fix round 1: \`take\` now re-reads the ref after writing it and backs off if another session's id is there.`, 1),
   oc(61, 58, 130, "s-8811", "review", "changes-requested", `1. **Race on concurrent take**: \`take\` reads with \`ls-remote\` then writes; two sessions can interleave.
 2. Nit: \`claimRef()\` builds the ref name in two places; use the one in \`claims.ts\`.`, 1),
-  oc(61, 58, 160, "s-2b07", "implement", "done", `Claim is now a ref \`refs/psdd/claims/<n>\` whose message carries session and time. \`take\` creates it, \`release\` deletes it. Tests cover take, release and stale.`),
+  oc(61, 58, 160, "s-2b07", "implement", "done", `Claim is now a ref \`refs/shepherd/claims/<n>\` whose message carries session and time. \`take\` creates it, \`release\` deletes it. Tests cover take, release and stale.`),
   { kind: "claim", action: "stale", issue: 74, story: 71, at: min(37), actor: agent("s-9c41"), url: gh(74) },
   oc(76, 71, 41, "s-0d3e", "agent QA", "pass", `Every criterion I could check passed. Moving to human QA (mode:hil).
 
@@ -398,7 +398,7 @@ Minor, not blocking: \`--interval 10\` warns "raised to 30s" — consider printi
   oc(73, 71, 66, "s-5a10", "review", "changes-requested", `Three requests.
 
 1. **Pagination is partial** — only \`subIssues\` follows \`endCursor\`; \`timelineItems\` stops at 100. A story with a long history silently loses events.
-2. \`parseLsRemote\` will treat any ref as a claim. Filter to \`refs/psdd/claims/\`.
+2. \`parseLsRemote\` will treat any ref as a claim. Filter to \`refs/shepherd/claims/\`.
 3. The GraphQL query is a template string in the adapter and a copy in the test. Keep one source.`, 1),
   oc(73, 71, 78, "s-3f2a", "implement", "done", `\`observe\` implemented in github-gh: one \`gh api graphql\` call (stories, sub-issues, labels, blockers, PRs, timeline since), claims via \`git ls-remote\`. Adapter tests against scripted \`gh\`.`),
   { kind: "pr", action: "opened", issue: 73, story: 71, at: min(80), actor: agent("s-3f2a"), prNumber: 82, target: "slice", url: pr(82) },
@@ -418,7 +418,7 @@ Minor, not blocking: \`--interval 10\` warns "raised to 30s" — consider printi
   { kind: "pr", action: "merged", issue: 52, story: 52, at: min(60 * 52), actor: mate, prNumber: 74, target: "story", url: pr(74) },
 ].sort((a, b) => b.at.localeCompare(a.at));
 
-/** QA evidence as psdd pushes it: files on psdd/qa/<n>, embedded at the commit (see `psdd done --evidence`). */
+/** QA evidence as shepherd pushes it: files on shepherd/qa/<n>, embedded at the commit (see `shepherd done --evidence`). */
 const EVIDENCE = {
   63: { sha: "4be19c2a7d", files: ["status-58.txt", "stale-claim.txt", "gh-debug-api.log", "closed-slices.txt"] },
   62: { sha: "a03f7e51b9", files: ["repro.sh", "tidy-output.txt", "ls-remote-after.txt"] },
@@ -427,7 +427,7 @@ const EVIDENCE = {
 };
 for (const e of STATE.feed) {
   const ev = EVIDENCE[e.issue];
-  if (ev && (e.kind === "qa-evidence" || (e.kind === "outcome" && e.step === "agent QA"))) e.evidence = { branch: `psdd/qa/${e.issue}`, ...ev };
+  if (ev && (e.kind === "qa-evidence" || (e.kind === "outcome" && e.step === "agent QA"))) e.evidence = { branch: `shepherd/qa/${e.issue}`, ...ev };
 }
 
 /* ------------------------------------------------------------------ *
@@ -555,7 +555,7 @@ function attention(e) {
   if (e.kind === "outcome") return /fail|changes/.test(e.outcome) ? "warn" : e.step === "implement" ? "none" : "ok";
   return "none";
 }
-/** One plain sentence per significant event; routine ones keep psdd's terms. */
+/** One plain sentence per significant event; routine ones keep shepherd's terms. */
 function say(e) {
   if (e.kind === "outcome") {
     if (e.step === "implement") return e.fixRound ? `Fix round ${e.fixRound} pushed` : "Implementation pushed";
@@ -628,7 +628,7 @@ function sidebar(loading) {
   const waiting = STATE.waitingForMe.length;
   const open = STATE.board.filter((s) => s.state !== "closed");
   const closed = STATE.board.filter((s) => s.state === "closed");
-  return `<div class="brand"><b>psdd</b><span>${REPO}</span></div>
+  return `<div class="brand"><b>shepherd</b><span>${REPO}</span></div>
     <div class="nav ${ui.selected == null ? "sel" : ""}" onclick="select(null)"><span class="t">Overview</span>${waiting ? `<span class="count">${waiting}</span>` : ""}</div>
     ${loading ? sk(8, 22) : `
     <div class="grp">Your stories</div>

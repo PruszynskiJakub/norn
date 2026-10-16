@@ -42,7 +42,7 @@ export interface Step {
   enterAs?: State;
   /** Keyed by outcome word; the empty key is the single way to end. */
   outcomes: Record<string, Outcome>;
-  /** The step can attach evidence files with psdd done --evidence <dir>. */
+  /** The step can attach evidence files with shepherd done --evidence <dir>. */
   evidence?: boolean;
 }
 
@@ -69,13 +69,13 @@ export function kindOf(issue: Issue): "story" | "slice" | "new" {
   return "new";
 }
 
-/** The story's slices: its sub-issues labelled type:slice. Anything else a person attached is not psdd's. */
+/** The story's slices: its sub-issues labelled type:slice. Anything else a person attached is not shepherd's. */
 export async function slicesOf(github: { subIssues(parent: number): Promise<Issue[]> }, story: number): Promise<Issue[]> {
   return (await github.subIssues(story)).filter((i) => kindOf(i) === "slice");
 }
 
 export function stepFor(issue: Issue): Step | null {
-  // Two state labels: either could be the real one, so psdd briefs neither.
+  // Two state labels: either could be the real one, so shepherd briefs neither.
   if (hasAmbiguousState(issue)) return null;
   const kind = kindOf(issue);
   const state = stateOf(issue);

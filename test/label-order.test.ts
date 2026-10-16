@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "@psdd/testing";
+import { setup } from "@shepherd/testing";
 
 /** Story #123 in implementation with slice #127 in implementation, held by this session. */
 async function sliceInImplementation() {
@@ -9,7 +9,7 @@ async function sliceInImplementation() {
   gh.seedIssue({ number: 127, title: "Redis store", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
   gh.parents.set(127, 123);
   gh.branches.add("123-rate-limiting");
-  await w.psdd("take", "127");
+  await w.shepherd("take", "127");
   return w;
 }
 
@@ -26,7 +26,7 @@ describe("a failure between label calls never leaves an issue without a state", 
     const w = await sliceInImplementation();
     const restore = failRemovals(w);
 
-    await expect(w.psdd("done", "127")).rejects.toThrow("HTTP 502");
+    await expect(w.shepherd("done", "127")).rejects.toThrow("HTTP 502");
 
     expect(w.github.labels(127)).toContain("needs-review");
     expect(w.github.claim(127)).toBeNull();
@@ -36,17 +36,17 @@ describe("a failure between label calls never leaves an issue without a state", 
   test("an issue left with two state labels is refused and reported, never briefed as its old step", async () => {
     const w = await sliceInImplementation();
     const restore = failRemovals(w);
-    await w.psdd("done", "127").catch(() => {});
+    await w.shepherd("done", "127").catch(() => {});
     restore();
-    // Left with implementation and needs-review: either could be real, so psdd briefs neither.
+    // Left with implementation and needs-review: either could be real, so shepherd briefs neither.
     expect(w.github.labels(127)).toEqual(expect.arrayContaining(["implementation", "needs-review"]));
 
-    const take = await w.psdd("take", "127");
+    const take = await w.shepherd("take", "127");
     expect(take.exitCode).toBe(1);
     expect(take.stdout).toContain("#127 has more than one state label (implementation, needs-review); a person must remove the stale one.");
     expect(w.github.claim(127)).toBeNull();
 
-    const next = JSON.parse((await w.psdd("next", "123", "--json")).stdout);
+    const next = JSON.parse((await w.shepherd("next", "123", "--json")).stdout);
     expect(next.waiting).toContainEqual({
       issue: 127,
       reason: "ambiguous-state",
@@ -55,7 +55,7 @@ describe("a failure between label calls never leaves an issue without a state", 
     expect(next.start.map((s: { issue: number }) => s.issue)).not.toContain(127);
     expect(next.message).toContain("Waiting for a human:");
 
-    const status = await w.psdd("status", "123");
+    const status = await w.shepherd("status", "123");
     expect(status.stdout).toContain("implementation + needs-review (more than one state label)");
   });
 
@@ -66,7 +66,7 @@ describe("a failure between label calls never leaves an issue without a state", 
     w.github.parents.set(127, 123);
     failRemovals(w);
 
-    await expect(w.psdd("take", "127")).rejects.toThrow("HTTP 502");
+    await expect(w.shepherd("take", "127")).rejects.toThrow("HTTP 502");
 
     expect(w.github.labels(127)).toContain("implementation");
   });
@@ -78,16 +78,16 @@ describe("a failure between label calls never leaves an issue without a state", 
     w.github.parents.set(127, 123);
     w.github.branches.add("123-rate-limiting");
     w.github.prs.push({ number: 50, head: "123-rate-limiting-127", base: "123-rate-limiting", state: "merged" });
-    await w.psdd("take", "127");
+    await w.shepherd("take", "127");
     failRemovals(w);
 
-    await expect(w.psdd("done", "127")).rejects.toThrow("HTTP 502");
+    await expect(w.shepherd("done", "127")).rejects.toThrow("HTTP 502");
 
     expect(w.github.issues.get(127)!.state).toBe("closed");
   });
 });
 
-describe("psdd next reports an open item with no state label", () => {
+describe("shepherd next reports an open item with no state label", () => {
   test("it waits for a person instead of being skipped, so nothing left names it", async () => {
     const w = setup();
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
@@ -95,7 +95,7 @@ describe("psdd next reports an open item with no state label", () => {
     w.github.parents.set(127, 123);
     w.github.branches.add("123-rate-limiting");
 
-    const res = await w.psdd("next", "123", "--json");
+    const res = await w.shepherd("next", "123", "--json");
     const report = JSON.parse(res.stdout);
 
     expect(report.waiting).toContainEqual({ issue: 127, reason: "no-state", detail: "has no state label; a person must set one" });

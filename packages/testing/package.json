@@ -1,15 +1,15 @@
 {
-  "name": "@psdd/testing",
+  "name": "@shepherd/testing",
   "version": "0.0.0",
   "private": true,
-  "description": "In-memory fakes of the ports and the harness that runs psdd against them. For tests only.",
+  "description": "In-memory fakes of the ports and the harness that runs shepherd against them. For tests only.",
   "type": "module",
   "exports": {
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@psdd/core": "0.0.0",
-    "@psdd/cli": "0.0.0",
-    "@psdd/web": "0.0.0"
+    "@shepherd/core": "0.0.0",
+    "@shepherd/cli": "0.0.0",
+    "@shepherd/web": "0.0.0"
   }
 }

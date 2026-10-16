@@ -17,7 +17,7 @@ export function specPath(n: number, slug: string) {
 }
 
 /**
- * Quotes a word for a POSIX shell command psdd prints. Plain paths and refs
+ * Quotes a word for a POSIX shell command shepherd prints. Plain paths and refs
  * stay as they are; anything else, e.g. a path with a space, is single-quoted.
  */
 export function sh(word: string) {

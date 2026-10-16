@@ -1,14 +1,14 @@
 import {
   type ClaimRecord,
   type ClaimRef,
-  isPsddComment,
+  isShepherdComment,
   type LinkedPullRequest,
   type ObservedIssue,
   type ObservedStory,
   type TimelineItem,
   type Work,
   type WorkQuery,
-} from "@psdd/core";
+} from "@shepherd/core";
 
 /** Runs one GraphQL request through gh; `vars` go in as -F name=value. */
 export type GraphQl = (query: string, vars: Record<string, string | number | null>) => Promise<unknown>;
@@ -18,8 +18,8 @@ export type LsRemote = () => Promise<string>;
 /*
  * GitHub charges GraphQL by the connections a query could fetch, so every
  * issue carries only three: labels, blockers, and one timeline that holds
- * psdd's comments, label changes and the PRs that mention it. The timeline is
- * read whole, since psdd's comments over the whole history give fix rounds and
+ * shepherd's comments, label changes and the PRs that mention it. The timeline is
+ * read whole, since shepherd's comments over the whole history give fix rounds and
  * the slug, and filtered to `since` here.
  */
 const TIMELINE_TYPES = [
@@ -132,10 +132,10 @@ interface RawItem {
   subIssues?: Page<RawItem>;
 }
 
-/** Claim refs as git ls-remote prints them; anything not under refs/psdd/claims/<number> is not a claim. */
+/** Claim refs as git ls-remote prints them; anything not under refs/shepherd/claims/<number> is not a claim. */
 export function parseLsRemote(out: string): { issue: number; sha: string }[] {
   return out.split("\n").flatMap((line) => {
-    const m = /^([0-9a-f]{40})\s+refs\/psdd\/claims\/(\d+)$/.exec(line.trim());
+    const m = /^([0-9a-f]{40})\s+refs\/shepherd\/claims\/(\d+)$/.exec(line.trim());
     return m ? [{ issue: Number(m[2]), sha: m[1] }] : [];
   });
 }
@@ -239,7 +239,7 @@ async function issue(graphql: GraphQl, raw: RawItem, since: string | null): Prom
     url: raw.url,
     closedAt: raw.closedAt,
     blockedBy: raw.blockedBy.nodes.map((b) => ({ number: b.number, state: b.state === "OPEN" ? "open" : "closed" })),
-    psddComments: timeline.flatMap((t) => (t.kind === "comment" && t.body !== null ? [{ body: t.body, at: t.at, actor: t.actor, url: t.url }] : [])),
+    shepherdComments: timeline.flatMap((t) => (t.kind === "comment" && t.body !== null ? [{ body: t.body, at: t.at, actor: t.actor, url: t.url }] : [])),
     pullRequests: [...pullRequests.values()],
     timeline: timeline.filter((t) => since === null || t.at > since),
   };
@@ -270,8 +270,8 @@ function toItem(e: RawEvent): TimelineItem | null {
     case "UnlabeledEvent":
       return e.label ? { kind: e.__typename === "LabeledEvent" ? "labeled" : "unlabeled", label: e.label.name, at, actor } : null;
     case "IssueComment":
-      // Only psdd's own comments travel with their body; a person's stays theirs.
-      return { kind: "comment", at, actor, url: e.url ?? "", body: e.body !== undefined && isPsddComment(e.body) ? e.body : null };
+      // Only shepherd's own comments travel with their body; a person's stays theirs.
+      return { kind: "comment", at, actor, url: e.url ?? "", body: e.body !== undefined && isShepherdComment(e.body) ? e.body : null };
     case "ClosedEvent":
       return { kind: "closed", at, actor };
     case "ReopenedEvent":

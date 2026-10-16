@@ -1,5 +1,5 @@
 import { runCommand, type Run } from "./local-workspace.js";
-import type { Channel } from "@psdd/core";
+import type { Channel } from "@shepherd/core";
 
 /** A notification as worded by the front end. */
 export interface Message {
@@ -22,11 +22,11 @@ function osCommand(platform: NodeJS.Platform, { title, body }: Message): Command
       "[Windows.UI.Notifications.ToastNotificationManager, Windows.UI.Notifications, ContentType = WindowsRuntime] | Out-Null",
       "$xml = [Windows.UI.Notifications.ToastNotificationManager]::GetTemplateContent([Windows.UI.Notifications.ToastTemplateType]::ToastText02)",
       "$text = $xml.GetElementsByTagName('text')",
-      "$text.Item(0).AppendChild($xml.CreateTextNode($env:PSDD_TITLE)) | Out-Null",
-      "$text.Item(1).AppendChild($xml.CreateTextNode($env:PSDD_BODY)) | Out-Null",
-      "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('psdd').Show([Windows.UI.Notifications.ToastNotification]::new($xml))",
+      "$text.Item(0).AppendChild($xml.CreateTextNode($env:SHEPHERD_TITLE)) | Out-Null",
+      "$text.Item(1).AppendChild($xml.CreateTextNode($env:SHEPHERD_BODY)) | Out-Null",
+      "[Windows.UI.Notifications.ToastNotificationManager]::CreateToastNotifier('shepherd').Show([Windows.UI.Notifications.ToastNotification]::new($xml))",
     ].join("; ");
-    return ["powershell", ["-NoProfile", "-Command", script], { PSDD_TITLE: title, PSDD_BODY: body }];
+    return ["powershell", ["-NoProfile", "-Command", script], { SHEPHERD_TITLE: title, SHEPHERD_BODY: body }];
   }
   return ["notify-send", [title, body]];
 }

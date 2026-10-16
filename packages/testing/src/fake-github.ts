@@ -3,14 +3,14 @@ import {
   type FileToPush,
   type GitHub,
   type Issue,
-  isPsddComment,
+  isShepherdComment,
   type LinkedPullRequest,
   type ObservedIssue,
   type PullRequest,
   type TimelineItem,
   type Work,
   type WorkQuery,
-} from "@psdd/core";
+} from "@shepherd/core";
 
 /** A timeline item as the fake records it: comments keep their body whoever wrote them. */
 type Recorded = TimelineItem extends infer T ? (T extends { kind: "comment" } ? Omit<T, "body"> & { body: string } : T) : never;
@@ -29,7 +29,7 @@ export class FakeGitHub implements GitHub {
 
   /** The time GitHub stamps on what happens; the harness points it at its own clock. */
   clock: () => Date = () => new Date("2026-10-13T12:00:00Z");
-  /** Every issue's timeline, oldest first, recorded as psdd and tests change issues. */
+  /** Every issue's timeline, oldest first, recorded as shepherd and tests change issues. */
   timelines = new Map<number, Recorded[]>();
   closedAt = new Map<number, string>();
   /** What the fake knows of a PR beyond PullRequest: when it opened and merged, and who did it. */
@@ -39,7 +39,7 @@ export class FakeGitHub implements GitHub {
   private at() {
     return this.clock().toISOString();
   }
-  /** Adds an item to an issue's timeline, e.g. activity psdd does not recognise. */
+  /** Adds an item to an issue's timeline, e.g. activity shepherd does not recognise. */
   record(n: number, item: Recorded) {
     this.timelines.set(n, [...(this.timelines.get(n) ?? []), item]);
   }
@@ -269,11 +269,13 @@ export class FakeGitHub implements GitHub {
       url: `${repoUrl}/issues/${n}`,
       closedAt: this.closedAt.get(n) ?? null,
       blockedBy: this.blockerNumbers(n).map((b) => ({ number: b, state: this.mustGet(b).state })),
-      psddComments: timeline.flatMap((t) => (t.kind === "comment" && isPsddComment(t.body) ? [{ body: t.body, at: t.at, actor: t.actor, url: t.url }] : [])),
+      shepherdComments: timeline.flatMap((t) =>
+        t.kind === "comment" && isShepherdComment(t.body) ? [{ body: t.body, at: t.at, actor: t.actor, url: t.url }] : [],
+      ),
       pullRequests,
       timeline: timeline
         .filter((t) => since === null || t.at > since)
-        .map((t) => (t.kind === "comment" ? { ...t, body: isPsddComment(t.body) ? t.body : null } : { ...t })),
+        .map((t) => (t.kind === "comment" ? { ...t, body: isShepherdComment(t.body) ? t.body : null } : { ...t })),
     };
   }
 }

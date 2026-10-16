@@ -1,4 +1,4 @@
-import type { ConfigWarning, Refusal, Row, WaitItem } from "@psdd/core";
+import type { ConfigWarning, Refusal, Row, WaitItem } from "@shepherd/core";
 import {
   type Answer,
   type CliRefusal,

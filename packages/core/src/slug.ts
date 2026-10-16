@@ -2,11 +2,11 @@ import type { GitHub, Issue } from "./github.js";
 import { slugify } from "./text.js";
 
 /**
- * The marker psdd writes once on a story, recording its slug. The story's
+ * The marker shepherd writes once on a story, recording its slug. The story's
  * branch, slice branches, worktrees and spec path all derive from it, so
  * renaming the story on GitHub changes none of them.
  */
-export const SLUG_MARK = "psdd: slug ";
+export const SLUG_MARK = "shepherd: slug ";
 
 /** Slugs read during one command, by story: the recorded slug, or null when none is recorded yet. */
 export type Slugs = Map<number, string | null>;
@@ -28,7 +28,7 @@ async function recorded(ctx: SlugCtx, n: number): Promise<string | null> {
 export function recordedSlug(comments: string[]): string | null {
   let slug: string | null = null;
   for (const body of comments) {
-    // An empty slug leaves "psdd: slug" with nothing after it, and GitHub may drop the trailing space.
+    // An empty slug leaves "shepherd: slug" with nothing after it, and GitHub may drop the trailing space.
     const line = body.split("\n").find((l) => l.startsWith(SLUG_MARK) || l === SLUG_MARK.trimEnd());
     if (line !== undefined) slug = line.slice(SLUG_MARK.length).trim();
   }
@@ -41,7 +41,7 @@ export async function storySlug(ctx: SlugCtx, story: Issue): Promise<string> {
 }
 
 /**
- * The marker line to add to a comment psdd writes on the story while holding
+ * The marker line to add to a comment shepherd writes on the story while holding
  * its claim, or null when the slug is already recorded.
  */
 export async function slugLine(ctx: SlugCtx, story: Issue): Promise<string | null> {

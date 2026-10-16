@@ -6,13 +6,13 @@
 
 ## Supported agents
 
-psdd is tested on Claude Code. Other agents are supported but not tested.
+shepherd is tested on Claude Code. Other agents are supported but not tested.
 
-## psdd
+## shepherd
 
 CLI for the SDD process. The developer's LLM calls it to run work through the process; GitHub labels, native relations, comments and branches are the only state. See `PRD.html` for the vision and [`CONTEXT.md`](CONTEXT.md) for the terms.
 
-psdd is not on npm. Install it from this repository (you need read access to it) by a release tag, which carries the built CLI, so nothing is built on install:
+shepherd is not on npm. Install it from this repository (you need read access to it) by a release tag, which carries the built CLI, so nothing is built on install:
 
 ```sh
 npm install -D github:PruszynskiJakub/ai-engine#v0.5.1
@@ -21,32 +21,32 @@ npm install -D github:PruszynskiJakub/ai-engine#v0.5.1
 Only release tags can be installed: a branch or commit of the repository has no built CLI.
 
 ```sh
-npx psdd init            # skills, agent instructions, .agents/specs/, team config, .gitignore, labels
-npx psdd next 123        # what can be done on story #123 now
-npx psdd take 131        # claim #131 and get its briefing
-npx psdd done 131 [outcome] ["note"] [--evidence <dir>]
-npx psdd tidy            # remove what belongs to closed issues (--dry-run to list)
-npx psdd dashboard       # watch your work in the browser at http://127.0.0.1:4477
+npx shepherd init            # skills, agent instructions, .agents/specs/, team config, .gitignore, labels
+npx shepherd next 123        # what can be done on story #123 now
+npx shepherd take 131        # claim #131 and get its briefing
+npx shepherd done 131 [outcome] ["note"] [--evidence <dir>]
+npx shepherd tidy            # remove what belongs to closed issues (--dry-run to list)
+npx shepherd dashboard       # watch your work in the browser at http://127.0.0.1:4477
 ```
 
-Run `psdd` with no arguments for every command. Add `--json` for scripts.
+Run `shepherd` with no arguments for every command. Add `--json` for scripts.
 
 - Uses your own `gh` (any version with `gh api --paginate --jq`); every change is made as you.
-- Claims are git refs `refs/psdd/claims/<issue>`. Running `psdd take` again on an issue you hold re-briefs you and refreshes the claim; long steps do this to stay fresh. A stale claim (default 2h) is taken over by one session only, and its worktree is kept: check `git status` there before starting. To pick up your own session that stopped before its claim went stale, run `psdd take <issue> --takeover`; `drive` asks you and does it. It never takes a teammate's claim.
-- Each story and slice works in its own worktree under `.agents/worktrees/<branch>`. The briefing gives its absolute path and, if it is missing, the command to create it for herdr, Claude Code or plain git: it fetches first, starts new branches from `origin/<base>`, and fast-forwards an existing branch from GitHub. If the branch is checked out elsewhere, psdd says where instead.
-- `psdd done` makes only the transition and releases the claim; the follow-ups (story branch, unblocking slices, story PR, needs-review) are best effort. `psdd next` catches up on any that failed. It closes a story whose PR is merged if GitHub did not (PRs into a non-default `baseBranch`).
-- `psdd tidy` removes what belongs to closed issues (QA evidence, worktrees, merged branches, claims), keeping anything unpushed. `deliver` and `drive` run it for you.
-- `psdd dashboard [--port <n>] [--interval <duration>] [--no-open]` serves a read-only page on localhost over your psdd work in this repository: what needs you (needs-human and needs-human-qa, each with its `drive` command), stale claims and items one fix round from the limit, and a feed of what happened with the agents' implement, review and QA remarks and links to their evidence. It reads GitHub as you every 2 minutes (30s at the least), with one GraphQL query plus `git ls-remote` per read, changes nothing and keeps no state. It runs until Ctrl-C. Port 4477 moves to the next free one when taken, unless you gave `--port`; a second launch for the same checkout prints the running one's URL. Set `dashboard.port` and `dashboard.interval` in your local config.
-- Branch, worktree and spec names come from a slug psdd records once on the story (`psdd: slug <slug>`), so renaming a story is safe. A story's slices are its `type:slice` sub-issues in this repository.
-- `psdd next` counts your agents already running against `deliver.maxParallel` and offers only the free slots. An item for a person that a session holds is listed as held by it, with no hand-off, and psdd does not notify about it.
-- Team settings: `.agents/psdd.config.json` (`baseBranch`, `worktrees.provider`, `claims.staleAfter`, `deliver.maxParallel`, `deliver.maxFixRounds`). Each developer can override in the gitignored `.agents/psdd.config.local.json`, which also picks `notifications` (`auto`, `herdr`, `os`, `none`), except `claims.staleAfter` and `deliver.maxFixRounds`, which bind the whole team and are read from the team file only: in the local file psdd ignores them with a warning, and a team `staleAfter` below `10m` is raised to `10m` with a warning.
+- Claims are git refs `refs/shepherd/claims/<issue>`. Running `shepherd take` again on an issue you hold re-briefs you and refreshes the claim; long steps do this to stay fresh. A stale claim (default 2h) is taken over by one session only, and its worktree is kept: check `git status` there before starting. To pick up your own session that stopped before its claim went stale, run `shepherd take <issue> --takeover`; `drive` asks you and does it. It never takes a teammate's claim.
+- Each story and slice works in its own worktree under `.agents/worktrees/<branch>`. The briefing gives its absolute path and, if it is missing, the command to create it for herdr, Claude Code or plain git: it fetches first, starts new branches from `origin/<base>`, and fast-forwards an existing branch from GitHub. If the branch is checked out elsewhere, shepherd says where instead.
+- `shepherd done` makes only the transition and releases the claim; the follow-ups (story branch, unblocking slices, story PR, needs-review) are best effort. `shepherd next` catches up on any that failed. It closes a story whose PR is merged if GitHub did not (PRs into a non-default `baseBranch`).
+- `shepherd tidy` removes what belongs to closed issues (QA evidence, worktrees, merged branches, claims), keeping anything unpushed. `deliver` and `drive` run it for you.
+- `shepherd dashboard [--port <n>] [--interval <duration>] [--no-open]` serves a read-only page on localhost over your shepherd work in this repository: what needs you (needs-human and needs-human-qa, each with its `drive` command), stale claims and items one fix round from the limit, and a feed of what happened with the agents' implement, review and QA remarks and links to their evidence. It reads GitHub as you every 2 minutes (30s at the least), with one GraphQL query plus `git ls-remote` per read, changes nothing and keeps no state. It runs until Ctrl-C. Port 4477 moves to the next free one when taken, unless you gave `--port`; a second launch for the same checkout prints the running one's URL. Set `dashboard.port` and `dashboard.interval` in your local config.
+- Branch, worktree and spec names come from a slug shepherd records once on the story (`shepherd: slug <slug>`), so renaming a story is safe. A story's slices are its `type:slice` sub-issues in this repository.
+- `shepherd next` counts your agents already running against `deliver.maxParallel` and offers only the free slots. An item for a person that a session holds is listed as held by it, with no hand-off, and shepherd does not notify about it.
+- Team settings: `.agents/shepherd.config.json` (`baseBranch`, `worktrees.provider`, `claims.staleAfter`, `deliver.maxParallel`, `deliver.maxFixRounds`). Each developer can override in the gitignored `.agents/shepherd.config.local.json`, which also picks `notifications` (`auto`, `herdr`, `os`, `none`), except `claims.staleAfter` and `deliver.maxFixRounds`, which bind the whole team and are read from the team file only: in the local file shepherd ignores them with a warning, and a team `staleAfter` below `10m` is raised to `10m` with a warning.
 - Once slicing is done, the `deliver` skill runs the story unattended until it needs a human. After `deliver.maxFixRounds` rounds of changes-requested or qa-failed, an issue gets needs-human instead of another round; once a person resolves it, it gets a fresh budget.
 - QA: an agent always goes first (`needs-qa`, `auto-qa`) and posts evidence on the issue; `mode:hil` slices and stories then get a person's QA (`needs-human-qa`, `qa`).
-- psdd notifies you locally whenever it sets needs-human or an item reaches `needs-human-qa`, and when `psdd next` finds nothing left to do.
-- The session holding a claim is `PSDD_SESSION`, else `CLAUDE_CODE_SESSION_ID`, else the herdr pane (`HERDR_PANE_ID`), else host and repository root. Under the git provider, `psdd next` gives each agent its own `PSDD_SESSION` to start with. Known limit: Claude Code subagents share their parent's session id, so under the claude-code provider the deliver orchestrator and its subagents are one session; use herdr for per-agent isolation.
-- Skills carry the craft and know nothing of psdd; the `take` briefing carries the process around them (what to read, where to commit and push, how to create slices and PRs, and which finish command each result maps to). `drive` and `deliver` are the exceptions: they run psdd. `drive <issue>` takes an issue through the attended steps with you, from triage to slicing, then offers `deliver`; under herdr it hands the story to a new agent in the story's worktree, which drives it on from there, and an item you do yourself (QA by a person, or a `needs-human` resolve) to a new agent in that item's worktree; `deliver <story>` runs the rest unattended.
-- `psdd init` writes a short psdd section between `<!-- psdd:start -->` and `<!-- psdd:end -->` into `AGENTS.md` and `CLAUDE.md`, whichever exist (with neither, it creates `AGENTS.md` and a `CLAUDE.md` that imports it), so any agent in the project finds the process. Running `init` again refreshes that section.
-- `psdd init` copies the skills bundled in `skills/`: one per step (triage, refine, clarify, plan, slice, implement, review, auto-qa, qa, merge, resolve), the process skills (drive, deliver) and the reference skills they use (`interview`, `codebase-design`, `tdd`). `codebase-design`, `tdd` and the step skills' approach are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). Set `PSDD_SKILLS_SOURCE=<repo>` to install with `npx skills add <repo>` first. After upgrading psdd, run `npx psdd init` again: it replaces any bundled skill that differs from the new version and names them; `git diff skills/` shows the changes. With `PSDD_SKILLS_SOURCE` set, the skills already in place are that source's and are kept.
+- shepherd notifies you locally whenever it sets needs-human or an item reaches `needs-human-qa`, and when `shepherd next` finds nothing left to do.
+- The session holding a claim is `SHEPHERD_SESSION`, else `CLAUDE_CODE_SESSION_ID`, else the herdr pane (`HERDR_PANE_ID`), else host and repository root. Under the git provider, `shepherd next` gives each agent its own `SHEPHERD_SESSION` to start with. Known limit: Claude Code subagents share their parent's session id, so under the claude-code provider the deliver orchestrator and its subagents are one session; use herdr for per-agent isolation.
+- Skills carry the craft and know nothing of shepherd; the `take` briefing carries the process around them (what to read, where to commit and push, how to create slices and PRs, and which finish command each result maps to). `drive` and `deliver` are the exceptions: they run shepherd. `drive <issue>` takes an issue through the attended steps with you, from triage to slicing, then offers `deliver`; under herdr it hands the story to a new agent in the story's worktree, which drives it on from there, and an item you do yourself (QA by a person, or a `needs-human` resolve) to a new agent in that item's worktree; `deliver <story>` runs the rest unattended.
+- `shepherd init` writes a short shepherd section between `<!-- shepherd:start -->` and `<!-- shepherd:end -->` into `AGENTS.md` and `CLAUDE.md`, whichever exist (with neither, it creates `AGENTS.md` and a `CLAUDE.md` that imports it), so any agent in the project finds the process. Running `init` again refreshes that section.
+- `shepherd init` copies the skills bundled in `skills/`: one per step (triage, refine, clarify, plan, slice, implement, review, auto-qa, qa, merge, resolve), the process skills (drive, deliver) and the reference skills they use (`interview`, `codebase-design`, `tdd`). `codebase-design`, `tdd` and the step skills' approach are adapted from [mattpocock/skills](https://github.com/mattpocock/skills) (MIT). Set `SHEPHERD_SKILLS_SOURCE=<repo>` to install with `npx skills add <repo>` first. After upgrading shepherd, run `npx shepherd init` again: it replaces any bundled skill that differs from the new version and names them; `git diff skills/` shows the changes. With `SHEPHERD_SKILLS_SOURCE` set, the skills already in place are that source's and are kept.
 
 ### Try it in a sandbox
 
@@ -54,21 +54,21 @@ You need Node 20+, git, Claude Code, `gh` logged in (`gh auth status`) and read 
 
 1. Create a throwaway repository with a first commit on `main`:
    ```sh
-   gh repo create psdd-sandbox --private --clone --add-readme && cd psdd-sandbox
+   gh repo create shepherd-sandbox --private --clone --add-readme && cd shepherd-sandbox
    npm init -y && echo node_modules >> .gitignore
    ```
-2. Install psdd and set it up. `init` installs the skills into `skills/` (linked into `.claude/skills/`), writes the psdd section into `AGENTS.md` and `CLAUDE.md`, creates `.agents/specs/` and `.agents/psdd.config.json`, gitignores `.agents/worktrees/` and the local config, and creates the labels on the repository.
+2. Install shepherd and set it up. `init` installs the skills into `skills/` (linked into `.claude/skills/`), writes the shepherd section into `AGENTS.md` and `CLAUDE.md`, creates `.agents/specs/` and `.agents/shepherd.config.json`, gitignores `.agents/worktrees/` and the local config, and creates the labels on the repository.
    ```sh
    npm install -D github:PruszynskiJakub/ai-engine#v0.5.1
-   npx psdd init
-   git add -A && git commit -m "Set up psdd" && git push
+   npx shepherd init
+   git add -A && git commit -m "Set up shepherd" && git push
    ```
 3. Open an issue for something small, for example `gh issue create --title "Add a greet command" --body "Print Hello, <name>"`.
-4. Start Claude Code in the sandbox and ask: `drive <issue>`. Triage, refine, clarify, plan and slice are attended: the agent prepares each call and you decide. Each step ends with the `psdd done <issue> <outcome>` the briefing gives (triage `accept`, refine `clear` or `questions`), and drive moves on to the next step. Slicing creates the slices as sub-issues and moves the story to implementation.
-5. When drive offers it, agree to start `deliver <story>` (or ask for it yourself). It implements, reviews, QAs and merges the slices into the story branch in fresh subagents, then reviews and QAs the story. It stops when the story reaches `needs-human-qa`, which is always yours, or when only items waiting for a person are left; `psdd status <story>` shows them. For a `needs-human` issue or an item in `needs-human-qa`, ask your agent `drive <issue>`.
-6. After story QA passes, merge the story PR into `main` yourself (`gh pr merge`). The next `psdd tidy` removes the worktrees, branches and QA evidence.
+4. Start Claude Code in the sandbox and ask: `drive <issue>`. Triage, refine, clarify, plan and slice are attended: the agent prepares each call and you decide. Each step ends with the `shepherd done <issue> <outcome>` the briefing gives (triage `accept`, refine `clear` or `questions`), and drive moves on to the next step. Slicing creates the slices as sub-issues and moves the story to implementation.
+5. When drive offers it, agree to start `deliver <story>` (or ask for it yourself). It implements, reviews, QAs and merges the slices into the story branch in fresh subagents, then reviews and QAs the story. It stops when the story reaches `needs-human-qa`, which is always yours, or when only items waiting for a person are left; `shepherd status <story>` shows them. For a `needs-human` issue or an item in `needs-human-qa`, ask your agent `drive <issue>`.
+6. After story QA passes, merge the story PR into `main` yourself (`gh pr merge`). The next `shepherd tidy` removes the worktrees, branches and QA evidence.
 
-To start over, delete the repository: `gh repo delete psdd-sandbox --yes` (needs `gh auth refresh -s delete_repo` once).
+To start over, delete the repository: `gh repo delete shepherd-sandbox --yes` (needs `gh auth refresh -s delete_repo` once).
 
 ### Develop
 

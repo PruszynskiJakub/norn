@@ -5,7 +5,7 @@ export type Channel = "herdr" | "os";
 
 /** Something a person must act on, sent as a local notification. `url` is the issue's page. */
 export type Notification =
-  /** `reason` is the needs-human reason psdd recorded on the issue, as written there. */
+  /** `reason` is the needs-human reason shepherd recorded on the issue, as written there. */
   | { kind: "needs-human"; issue: number; reason: string; url: string }
   | { kind: "needs-human-qa"; issue: number; of: "story" | "mode:hil"; url: string }
   /** Delivery stopped: what waits for a person that no session holds; empty when nothing does. */

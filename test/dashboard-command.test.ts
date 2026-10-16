@@ -1,16 +1,16 @@
 import { describe, expect, test } from "vitest";
-import { setup } from "@psdd/testing";
+import { setup } from "@shepherd/testing";
 
-describe("psdd dashboard", () => {
+describe("shepherd dashboard", () => {
   test("starts the dashboard on the default port and interval, opens the browser and says where", async () => {
     const w = setup();
 
-    const res = await w.psdd("dashboard");
+    const res = await w.shepherd("dashboard");
 
     expect(res.exitCode).toBe(0);
     expect(w.launches).toEqual([{ root: "/repo", port: 4477, explicitPort: false, intervalMs: 120_000, open: true }]);
     expect(res.stdout).toBe(
-      ["psdd dashboard is running at http://127.0.0.1:4477 and reads GitHub every 2m.", "Opened it in your browser. Stop it with Ctrl-C."].join("\n"),
+      ["shepherd dashboard is running at http://127.0.0.1:4477 and reads GitHub every 2m.", "Opened it in your browser. Stop it with Ctrl-C."].join("\n"),
     );
   });
 
@@ -18,73 +18,73 @@ describe("psdd dashboard", () => {
     const w = setup();
     w.launchAnswer = { kind: "started", url: "http://127.0.0.1:5000", port: 5000, opened: false };
 
-    const res = await w.psdd("dashboard", "--port", "5000", "--interval", "45s", "--no-open");
+    const res = await w.shepherd("dashboard", "--port", "5000", "--interval", "45s", "--no-open");
 
     expect(w.launches).toEqual([{ root: "/repo", port: 5000, explicitPort: true, intervalMs: 45_000, open: false }]);
     expect(res.stdout).toBe(
-      ["psdd dashboard is running at http://127.0.0.1:5000 and reads GitHub every 45s.", "Open it in your browser. Stop it with Ctrl-C."].join("\n"),
+      ["shepherd dashboard is running at http://127.0.0.1:5000 and reads GitHub every 45s.", "Open it in your browser. Stop it with Ctrl-C."].join("\n"),
     );
   });
 
   test("takes my preferred port and interval from my local config, not the team's", async () => {
     const w = setup();
-    w.workspace.files.set(".agents/psdd.config.local.json", JSON.stringify({ dashboard: { port: 4600, interval: "1m" } }));
+    w.workspace.files.set(".agents/shepherd.config.local.json", JSON.stringify({ dashboard: { port: 4600, interval: "1m" } }));
 
-    await w.psdd("dashboard");
+    await w.shepherd("dashboard");
 
     expect(w.launches).toEqual([{ root: "/repo", port: 4600, explicitPort: false, intervalMs: 60_000, open: true }]);
 
-    w.workspace.files.set(".agents/psdd.config.json", JSON.stringify({ dashboard: { port: 4600 } }));
-    const res = await w.psdd("dashboard");
+    w.workspace.files.set(".agents/shepherd.config.json", JSON.stringify({ dashboard: { port: 4600 } }));
+    const res = await w.shepherd("dashboard");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain(".agents/psdd.config.json: dashboard is each developer's own; set it in .agents/psdd.config.local.json");
+    expect(res.stdout).toContain(".agents/shepherd.config.json: dashboard is each developer's own; set it in .agents/shepherd.config.local.json");
     expect(w.launches).toHaveLength(1);
   });
 
   test("an interval below 30s is raised to 30s, with a warning", async () => {
     const w = setup();
 
-    const res = await w.psdd("dashboard", "--interval", "10s");
+    const res = await w.shepherd("dashboard", "--interval", "10s");
 
     expect(w.launches[0].intervalMs).toBe(30_000);
-    expect(res.stdout.split("\n")[0]).toBe("psdd warning: --interval 10s is below the 30s floor, so the dashboard reads GitHub every 30s.");
+    expect(res.stdout.split("\n")[0]).toBe("shepherd warning: --interval 10s is below the 30s floor, so the dashboard reads GitHub every 30s.");
   });
 
   test("a taken default port moves on and says so", async () => {
     const w = setup();
     w.launchAnswer = { kind: "started", url: "http://127.0.0.1:4479", port: 4479, opened: true };
 
-    const res = await w.psdd("dashboard");
+    const res = await w.shepherd("dashboard");
 
-    expect(res.stdout.split("\n")[0]).toBe("Port 4477 is taken, so psdd dashboard is running at http://127.0.0.1:4479 and reads GitHub every 2m.");
+    expect(res.stdout.split("\n")[0]).toBe("Port 4477 is taken, so shepherd dashboard is running at http://127.0.0.1:4479 and reads GitHub every 2m.");
   });
 
   test("a second dashboard of the same repository points at the first", async () => {
     const w = setup();
     w.launchAnswer = { kind: "already-running", url: "http://127.0.0.1:4477" };
 
-    const res = await w.psdd("dashboard");
+    const res = await w.shepherd("dashboard");
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toBe("psdd dashboard is already running for this repository at http://127.0.0.1:4477.");
+    expect(res.stdout).toBe("shepherd dashboard is already running for this repository at http://127.0.0.1:4477.");
   });
 
   test("an explicit port that is taken fails", async () => {
     const w = setup();
     w.launchAnswer = { kind: "port-taken", port: 5000 };
 
-    const res = await w.psdd("dashboard", "--port", "5000");
+    const res = await w.shepherd("dashboard", "--port", "5000");
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toBe("Port 5000 is taken. Pick another with --port, or leave it out to use the next free one.");
   });
 
-  test("a port or interval psdd cannot read is a usage error", async () => {
+  test("a port or interval shepherd cannot read is a usage error", async () => {
     const w = setup();
 
-    expect((await w.psdd("dashboard", "--port", "http")).exitCode).toBe(2);
-    expect((await w.psdd("dashboard", "--interval", "soon")).stdout).toBe("--interval takes a duration such as 30s, 2m or 1h.");
+    expect((await w.shepherd("dashboard", "--port", "http")).exitCode).toBe(2);
+    expect((await w.shepherd("dashboard", "--interval", "soon")).stdout).toBe("--interval takes a duration such as 30s, 2m or 1h.");
     expect(w.launches).toEqual([]);
   });
 });

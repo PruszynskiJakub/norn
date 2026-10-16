@@ -1,6 +1,6 @@
 import { describe, expect, test } from "vitest";
-import { done, next, take, tidy } from "@psdd/core";
-import { setup } from "@psdd/testing";
+import { done, next, take, tidy } from "@shepherd/core";
+import { setup } from "@shepherd/testing";
 
 /**
  * Core operations return typed results with no wording: what a front end other
@@ -30,7 +30,7 @@ describe("done", () => {
     expect(res.ok && res.followUps).toEqual([{ kind: "story-promoted", story: 40 }]);
   });
 
-  test("a follow-up that fails is an event saying what failed and which psdd next retries it", async () => {
+  test("a follow-up that fails is an event saying what failed and which shepherd next retries it", async () => {
     const w = lastSlice();
     const ctx = await w.ctx();
     await take(ctx, 41, { takeover: false });
@@ -128,7 +128,7 @@ describe("next", () => {
     w.github.blockers.set(42, [43]);
     w.github.seedIssue({ number: 43, title: "Stuck", labels: ["type:slice", "mode:afk", "needs-review", "needs-human"] });
     w.github.parents.set(43, 40);
-    w.github.commentsByIssue.set(43, ['psdd: needs-review → needs-review\n\npsdd: needs-human — escalated: "flaky"']);
+    w.github.commentsByIssue.set(43, ['shepherd: needs-review → needs-review\n\nshepherd: needs-human — escalated: "flaky"']);
 
     const res = await next(await w.ctx(), 40);
 

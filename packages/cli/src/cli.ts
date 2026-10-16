@@ -14,7 +14,7 @@ import {
   status,
   take,
   tidy,
-} from "@psdd/core";
+} from "@shepherd/core";
 import { dashboard, type StartDashboard } from "./dashboard.js";
 import { init } from "./init.js";
 import { renderJson } from "./render-json.js";
@@ -22,7 +22,7 @@ import { type Answer, type CliRefusal, NEEDS_NUMBER, renderAnswer, renderRefusal
 
 export type Deps = Omit<Ctx, "config" | "slugs"> & {
   cwd: string;
-  /** Installs the psdd skills into <cwd>/skills/. */
+  /** Installs the shepherd skills into <cwd>/skills/. */
   installSkills: (cwd: string) => Promise<string[]>;
   /** Starts the dashboard server; the CLI only works out how. */
   dashboard: StartDashboard;
@@ -46,7 +46,7 @@ export async function run(argv: string[], deps: Deps): Promise<Result> {
   const { answer, warnings } = await dispatch(argv, deps);
   const usage = ["usage", "needs-number", "bad-dashboard-flag"];
   const exitCode = answer.ok ? 0 : usage.includes(answer.refusal.kind) ? 2 : 1;
-  const head = warnings.length ? ["psdd warning:", ...warnings.map((w) => `  ${renderWarning(w)}`), ""] : [];
+  const head = warnings.length ? ["shepherd warning:", ...warnings.map((w) => `  ${renderWarning(w)}`), ""] : [];
   const body = answer.ok ? renderAnswer(answer) : renderRefusal(answer.refusal);
   if (bools.has("json")) return { exitCode, stdout: renderJson(answer, warnings) };
   return { exitCode, stdout: [...head, ...body].join("\n") };

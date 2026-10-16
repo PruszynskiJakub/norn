@@ -1,5 +1,5 @@
-import { type Ctx, durationMs } from "@psdd/core";
-import type { DashboardLaunch, DashboardOptions } from "@psdd/web";
+import { type Ctx, durationMs } from "@shepherd/core";
+import type { DashboardLaunch, DashboardOptions } from "@shepherd/web";
 
 export const DEFAULT_DASHBOARD_PORT = 4477;
 export const DEFAULT_DASHBOARD_INTERVAL_MS = 2 * 60_000;
@@ -22,7 +22,7 @@ export interface DashboardResult {
 
 export type DashboardRefusal = { kind: "port-taken"; port: number } | { kind: "bad-dashboard-flag"; flag: "port" | "interval" };
 
-/** psdd dashboard: works out port and interval from the flags and the local config, then starts it. */
+/** shepherd dashboard: works out port and interval from the flags and the local config, then starts it. */
 export async function dashboard(
   ctx: Ctx & { dashboard: StartDashboard },
   flags: Record<string, string[]>,

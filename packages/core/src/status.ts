@@ -10,7 +10,7 @@ export interface Row {
   title: string;
   /** Closed issues: merged, or closed without merging. */
   status: "open" | "merged" | "closed";
-  /** The state labels of an open issue. More than one means psdd cannot tell which is real; none, that it is untriaged. */
+  /** The state labels of an open issue. More than one means shepherd cannot tell which is real; none, that it is untriaged. */
   states: State[];
   mode: "afk" | "hil" | null;
   blockedBy: number[];
