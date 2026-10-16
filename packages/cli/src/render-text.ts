@@ -243,12 +243,12 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       return [`#${r.issue} has more than one state label (${r.states.join(", ")}); a person must remove the stale one.`, pick(r.story)];
     case "story-in-implementation":
       return [
-        `Story #${r.issue} is in implementation. Its label follows its slices; there is no step to take on the story itself.`,
+        `Story #${r.issue} is in ${r.state}. Its label follows its slices; there is no step to take on the story itself.`,
         `Run norn next ${r.issue} to see its slices.`,
       ];
     case "story-in-merge-queue":
       return [
-        `Story #${r.issue} is in merge-queue. Only the story owner (${r.owner ? `@${r.owner}` : "unassigned"}) merges the story PR;`,
+        `Story #${r.issue} is in ${r.state}. Only the story owner (${r.owner ? `@${r.owner}` : "unassigned"}) merges the story PR;`,
         `once it is merged, norn next ${r.issue} closes the story if GitHub has not. Do not merge it yourself.`,
       ];
     case "blocked":
@@ -331,7 +331,11 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
     case "add-slice-usage":
       return ["add-slice needs a title and a mode. Run:", `  norn add-slice ${r.story} "title" --mode afk|hil [--blocked-by <issue>]...`];
     case "story-not-slicing":
-      return [`Story #${r.story} is in ${r.state ?? "no state"}, not needs-slicing. Slices are only added while slicing.`];
+      return [
+        r.slicing
+          ? `Story #${r.story} is in ${r.state ?? "no state"}, not ${r.slicing}. Slices are only added while slicing.`
+          : `#${r.story} cannot have slices: its flow has no state that adds them.`,
+      ];
     case "is-a-slice":
       return [`#${r.issue} is a slice${r.story ? ` of story #${r.story}. Run norn next ${r.story}` : ""} instead.`];
     case "not-a-story":

@@ -39,7 +39,7 @@ norn is built for a team that works in a particular way. It checks some of these
 | **Stories merge into one base branch** (`baseBranch`, the repository's default branch unless configured). | Yes. |
 | **Labels are changed only through norn.** A label changed by hand can leave an issue with two states, which norn refuses to brief until a person fixes it. | Yes, it detects the mess but does not prevent it. |
 | **Everyone works through their own `gh`**, logged in with write access to the repository. | Yes, every command fails without it. |
-| **Stories and slices run norn's built-in process**, so every repository that uses norn works the same way for them. | Yes. Slices run the built-in `slice` flow, written like a [repository flow](#repository-flows). Other kinds of work run the repository's own flows. |
+| **Stories and slices run norn's built-in process**, so every repository that uses norn works the same way for them. | Yes. Stories and slices run the built-in `story` and `slice` flows, written like a [repository flow](#repository-flows). Other kinds of work run the repository's own flows. |
 
 ## Labels and flags
 
@@ -100,6 +100,8 @@ flowchart LR
     slicing
   end
 ```
+
+This process is norn's built-in `story` flow, in the same format as a [repository flow](#repository-flows): `"workspace": "own"`, `writesSpec` in refinement, clarification and planning, `slices` (of type `slice`) in `needs-slicing`, `waitsForSlices` releasing `implementation` to `needs-review`, `countsFixRounds` in both failure states, `needs-human-qa` as an unconditional `humanGate`, and `waitsForMerge` in `merge-queue`. Its description, `a story: moves to refinement`, is what triage says of its `story` outcome.
 
 Triage either makes an issue a story in `needs-refinement`, gives it one of the [repository flows](#repository-flows), or closes it as not planned, with the reason in a comment. Clarification only happens when refinement turns up questions. Once slice issues exist, the story's label follows its slices. When every slice PR is merged into the story branch, the story branch is reviewed and QA'd, by an agent and then by a person. Failed review or QA is fixed straight on the story branch with the `norn-implement` skill and goes back to `needs-review`. Finally the owner merges the story PR, and GitHub closes the story through the PR link.
 
@@ -189,6 +191,10 @@ A state opts into norn's built-in mechanics by naming its behaviours, each with 
 | `humanGate` | A person does this state's step. An outcome into it notifies the user and tells the agent to stop; `norn next` lists the issue as waiting for a person, for its type, or for its mode when the gate has `when`. The briefing carries the QA wording: run the app, tie remarks to criteria, a repro for every failure, and evidence with `--evidence <dir>`. |
 | `mergesSlice` | The state's briefing says to merge the parent's branch into the issue's and merge its PR. `norn done` refuses until that PR is merged into the parent's branch. Once the issue closes, its worktree waits for `norn tidy`, the issues it blocked are released (see `syncsBlocked`), and a story whose slices are all merged moves on. It needs `"workspace": "parent"`. |
 | `syncsBlocked` | `{ "to": "<state>" }`. An issue in the state has no step: it waits for its blockers, GitHub's native "blocked by" relations. Once every blocker is closed, norn moves it to the state `to` names, and back when a blocker reopens before it is taken; `norn next` on its parent and merging a sibling do this. `to` must be a state of the flow. |
+| `writesSpec` | `{ "readsIssue": true }` or `{}`. The issue has a spec of its own, `.agents/specs/<n>-<slug>/spec.md` on its branch: every step's briefing names it instead of the issue, transition comments link it, and resolving `needs-human` says spec changes go there. The state's own briefing says to commit and push the spec, and with `readsIssue` to read the issue first. It needs `"workspace": "own"`. |
+| `slices` | `{ "type": "<flow>" }`. The state's briefing says how to create the slices with `norn add-slice`, which works only in this state: each slice is a sub-issue labelled `type:<flow>`, in that flow's start state (or the state its `syncsBlocked` holds blocked issues in). `norn done` refuses to leave the state before there is a slice. The issue's slices are its sub-issues of that type; `norn next` on the issue runs them too. `type` must be a flow. |
+| `waitsForSlices` | `{ "to": "<state>" }`. An issue in the state has no step: it waits for its slices. Entering it creates the issue's own branch on GitHub, for the slices to branch off. Once every slice is merged, norn opens the issue's PR into the base branch and moves it to the state `to` names; merging the last slice and `norn next` do this. The states after that briefing the PR and its diff, and a state with `countsFixRounds` there commits fixes straight onto the branch. It needs `"workspace": "own"`. |
+| `waitsForMerge` | An issue in the state has no step: its owner merges its PR into the base branch, and `norn take` says so. `norn next` lists it as waiting for the owner, and closes it once the PR is merged, as GitHub does not for a base branch other than the default one. It needs `"workspace": "own"`. |
 
 A state can run in one mode only: `"when": "hil"` or `"when": "afk"`, with `passThrough` naming one of its outcomes, e.g. `"when": "hil", "passThrough": "verified"` on a state where a person verifies the fix. When an outcome leads into it and the issue carries the other mode's label, norn never enters the state: it follows the pass-through outcome at once, through any further such states, and writes one transition comment straight to where the issue lands, e.g. `norn: fixing → closed (fixed)` followed by `Skipped verifying in mode:afk: it runs in mode:hil only.` In the state's own mode the state runs as usual, and so it does for an issue with no `mode:` label.
 
@@ -200,7 +206,7 @@ norn checks a flow strictly before it runs it:
 
 - the fields have the right types, the start state exists, every target is a state, `closed` or `not-planned`, and every `renamed` target is a state;
 - every state with `when` names one of its outcomes as `passThrough`;
-- every state can reach `closed` or `not-planned` through its outcomes, or the state its behaviour moves it to (`syncsBlocked`), so no issue can be stuck in a loop, in either mode: in `mode:afk` the states for `hil` are passed through, and the other way round;
+- every state can reach `closed` or `not-planned` through its outcomes, or where its behaviour moves it (`syncsBlocked`, `waitsForSlices`, `waitsForMerge`), so no issue can be stuck in a loop, in either mode: in `mode:afk` the states for `hil` are passed through, and the other way round;
 - each state's `behaviours` are ones this norn knows, each with an object of parameters (`{}` for none), allowed together and with what they need, e.g. `opensPR` needs `"workspace": "own"` or `"parent"`, any flow they name exists, and any state they name is a state of the flow. A flow written for a newer norn fails here, which is what the `nornVersion` pin protects against;
 - no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`), and no flow is named `reject`, triage's outcome.
 
@@ -292,15 +298,15 @@ A claim is a git ref, `refs/norn/claims/<issue>`, created on GitHub in one step 
 
 ## Unattended delivery
 
-`norn-deliver <story>` runs a story unattended from implementation until it needs a person. You start it once slicing is done (`norn-drive` offers it).
+`norn-deliver <story>` runs a story's unattended steps, its slices first, until it needs a person. You start it once slicing is done (`norn-drive` offers it).
 
 1. Run `norn tidy` once, then ask `norn next <story>` for work.
 2. Start a fresh subagent per actionable item, in its worktree, up to the free slots `norn next` gives.
 3. Wait for the subagents to finish, then go back to step 1.
 4. Once every slice is merged into the story branch, run story review and story QA the same way, plus fixes if either asks for changes.
-5. Stop when the story reaches `needs-human-qa` (always a person) or only items waiting for a person remain. Run `norn tidy` and report what is done, what is waiting and who needs to act.
+5. Stop when the story reaches a human gate (for the built-in story, `needs-human-qa`, always a person) or only items waiting for a person remain. Run `norn tidy` and report what is done, what is waiting and who needs to act.
 
-The orchestrator never does a step's work itself, never touches labels, branches or PRs, and never takes an item flagged `needs-human` or in `needs-human-qa`.
+The orchestrator never does a step's work itself, never touches labels, branches or PRs, and never takes an item flagged `needs-human` or at a human gate.
 
 ## Limits
 

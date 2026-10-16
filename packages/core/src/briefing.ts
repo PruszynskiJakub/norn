@@ -1,14 +1,16 @@
-import { behaviourLines, EVIDENCE_FILES, humanQaLines, readIssue as readIssueLine, uses } from "./behaviours.js";
-import { type Flow, flowNameOf, flowStatesOf, gateAhead } from "./flow.js";
+import { behaviourLines, EVIDENCE_FILES, hasSpec, readIssue as readIssueLine, usedIn, uses } from "./behaviours.js";
+import { type Flow, flowNameOf, flowOf, flowStatesOf, gateAhead } from "./flow.js";
 import type { Issue } from "./github.js";
 import { locate, workIn, type Location, type WorkIn } from "./location.js";
-import { FIX_STATES, kindOf, type State, type Step } from "./machine.js";
-import { sh, specPath } from "./text.js";
-import { fixRounds, type Ctx } from "./transitions.js";
+import type { Step } from "./machine.js";
+import { specPath } from "./text.js";
+import type { Ctx } from "./transitions.js";
 
-export function noun(issue: Issue): "issue" | "story" | "slice" {
-  const kind = kindOf(issue);
-  return kind === "new" ? "issue" : kind;
+/** What an issue of the flow is called: a story when it has slices, a slice when it works in its parent's branch, else an issue. */
+export function noun(flow: Flow | null): "issue" | "story" | "slice" {
+  if (!flow) return "issue";
+  if (usedIn(flow, "slices")) return "story";
+  return flow.workspace === "parent" ? "slice" : "issue";
 }
 
 /** One way to finish a step: `norn done <issue> <word> ["<note>"] [--evidence <dir>]`. */
@@ -44,16 +46,13 @@ export interface Briefing {
 export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: string | null, flow: Flow | null = null): Promise<Briefing> {
   const n = issue.number;
   const loc = await locate(issue, ctx, flow);
-  // `from` and the history say whether this is rework.
-  const rework =
-    !flow && step.skill === "norn-implement" && ((from !== null && FIX_STATES.includes(from as State)) || fixRounds(await ctx.github.listComments(n)) > 0);
   return {
     issue: n,
-    noun: noun(issue),
+    noun: noun(flow),
     title: issue.title,
     step: { name: step.name, skill: step.skill, attended: step.attended },
     workIn: loc ? await workIn(loc, ctx.workspace, ctx.github, ctx.config.provider) : null,
-    instructions: flow ? await flowLines(issue, step, ctx, from, flow, loc) : processLines(issue, step, loc, rework),
+    instructions: flow ? await flowLines(issue, step, ctx, from, flow, loc) : triageLines(n),
     finish: finishCommands(n, step),
   };
 }
@@ -68,65 +67,38 @@ export function finishCommands(n: number, step: Step): FinishCommand[] {
   }));
 }
 
-/**
- * Everything about the process around the skill: what to read, where its work
- * goes, and the commands for it. The skills themselves know none of this.
- */
-function processLines(issue: Issue, step: Step, loc: Location | null, isRework: boolean): string[] {
-  const n = issue.number;
-  const readIssue = readIssueLine(n);
-  if (step.skill === "norn-triage") {
-    return [readIssue, `Unless you reject it, post what triage established on the issue first: gh issue comment ${n}`];
-  }
-  if (!loc) return [];
-  const story = loc.story;
-  const spec = specPath(story.number, loc.slug);
-  const pushSpec = `Commit the spec on ${loc.branch} and push it, so the link norn posts resolves.`;
-  const rework = isRework ? [`This is rework: the latest review or QA comment on #${n} lists what to fix. ${readIssue}`] : [];
-  if (step.skill === "norn-resolve") {
-    const lines = [`The latest needs-human comment gives the reason. ${readIssue}`, `Record the outcome on the issue: gh issue comment ${n}`];
-    if (kindOf(issue) === "story") lines.push(`Spec changes go in ${spec}; commit and push them on ${loc.branch}.`);
-    return lines;
-  }
-  if (kindOf(issue) === "story") {
-    const lines = [`Spec to work on: ${spec}`];
-    if (step.skill === "norn-refine" || step.skill === "norn-clarify") lines.push(readIssue, pushSpec);
-    if (step.skill === "norn-plan") lines.push(pushSpec);
-    if (step.skill === "norn-slice") {
-      lines.push(
-        "Create the slices in dependency order, blockers first, one command per slice:",
-        `  norn add-slice ${n} "title" --mode afk|hil [--blocked-by <slice>]...`,
-        "  --mode afk when an agent can verify every criterion, hil when a person must also look at it.",
-        "Then give each slice its body: gh issue edit <slice> --body-file <file>",
-        `Push ${loc.branch} once the slices exist, so slice PRs can target it.`,
-      );
-    }
-    if (step.skill === "norn-implement") lines.push(...rework, `Commit the fixes straight onto the story branch ${loc.branch} and push them.`);
-    if (step.skill === "norn-review" || step.skill === "norn-auto-qa" || step.skill === "norn-qa") {
-      lines.push(`Story PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`);
-    }
-    lines.push(...qaLines(step, loc, readIssue));
-    return lines;
-  }
-  return [];
+/** Triage, before the issue has a flow: read it, and record what triage found before choosing its type. */
+function triageLines(n: number): string[] {
+  return [readIssueLine(n), `Unless you reject it, post what triage established on the issue first: gh issue comment ${n}`];
 }
 
-/** The process around a step of a flow: the issue, then what the behaviours of its flow add, then how QA evidence reaches it. */
+/**
+ * Everything about the process around the skill, for a step of a flow: the
+ * spec or the issue, then what the behaviours of its flow add, then how QA
+ * evidence reaches it. The skills themselves know none of this.
+ */
 async function flowLines(issue: Issue, step: Step, ctx: Ctx, from: string | null, flow: Flow, loc: Location | null): Promise<string[]> {
   const n = issue.number;
   const readIssue = readIssueLine(n);
   // Without the branch its workspace names, e.g. a parent, norn has nothing to say about the work.
   if (flow.workspace !== "none" && !loc) return [];
-  if (step.skill === "norn-resolve")
-    return [`The latest needs-human comment gives the reason. ${readIssue}`, `Record the outcome on the issue: gh issue comment ${n}`];
+  // An issue with a spec of its own works from the spec; the states that write it say when to read the issue.
+  const ownSpec = loc && hasSpec(flow) ? specPath(n, loc.slug) : null;
+  if (step.skill === "norn-resolve") {
+    const lines = [`The latest needs-human comment gives the reason. ${readIssue}`, `Record the outcome on the issue: gh issue comment ${n}`];
+    if (loc && ownSpec) lines.push(`Spec changes go in ${ownSpec}; commit and push them on ${loc.branch}.`);
+    return lines;
+  }
   const state = flowStatesOf(issue, flow)[0] ?? null;
   // Work in the parent's branch follows the parent's spec.
-  const spec = loc && flow.workspace === "parent" ? [`Spec: ${specPath(loc.story.number, loc.slug)} (${noun(loc.story)} #${loc.story.number})`] : [];
+  const parentFlow = loc && flow.workspace === "parent" ? await flowOf(ctx, loc.story) : null;
+  const what = noun(parentFlow?.ok ? parentFlow.flow : null);
+  const spec = loc && flow.workspace === "parent" ? [`Spec: ${specPath(loc.story.number, loc.slug)} (${what} #${loc.story.number})`] : [];
   const flowName = flowNameOf(issue) ?? "";
-  const lines = [...spec, readIssue, ...(await behaviourLines({ ctx, issue, flow, flowName, state, from, step, loc }))];
+  const lines = [...spec, ...(ownSpec ? [] : [readIssue]), ...(await behaviourLines({ ctx, issue, flow, flowName, state, from, step, loc }))];
   // An agent's step with evidence is QA: its note is the evidence pack.
   if (state !== null && flow.states[state].evidence && !uses(flow, state, "humanGate"))
-    lines.push(...agentQaLines(n, noun(issue), gateAhead(flow, issue, state)));
+    lines.push(...agentQaLines(n, noun(flow), gateAhead(flow, issue, state)));
   return lines;
 }
 
@@ -142,14 +114,4 @@ function agentQaLines(n: number, noun: string, personAfter: boolean): string[] {
         ]
       : [`No person checks this ${noun} after you. A criterion you cannot check is never passed: run norn escalate ${n} "reason".`]),
   ];
-}
-
-/** How a story's QA results reach it: the note, evidence files, and for a person, remarks. */
-function qaLines(step: Step, loc: Location, readIssue: string): string[] {
-  const n = loc.story.number;
-  if (step.skill === "norn-auto-qa") return agentQaLines(n, "story", true);
-  if (step.skill === "norn-qa") {
-    return [`Start from the agent's QA comment on #${n}: its evidence, and what it left for a person. ${readIssue}`, ...humanQaLines(n, loc.branch)];
-  }
-  return [];
 }

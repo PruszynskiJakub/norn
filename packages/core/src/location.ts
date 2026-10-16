@@ -1,7 +1,7 @@
 import { join } from "node:path";
 import type { Flow } from "./flow.js";
 import type { GitHub, Issue } from "./github.js";
-import { kindOf } from "./machine.js";
+
 import { storySlug, type Slugs } from "./slug.js";
 import { sh, sliceBranch, storyBranch, worktreePath } from "./text.js";
 import type { Provider, Workspace } from "./workspace.js";
@@ -17,15 +17,15 @@ export interface Location {
   slug: string;
 }
 
-/** `flow` is the issue's flow, when it runs one: its workspace decides. */
+/** `flow` is the issue's flow, when it runs one: its workspace decides. An issue with no flow has no workspace. */
 export async function locate(
   issue: Issue,
   ctx: { github: GitHub; slugs: Slugs; config: { baseBranch: string } },
   flow: Flow | null = null,
 ): Promise<Location | null> {
   if (flow?.workspace === "none") return null;
-  // An own workspace is named like a story's: a branch and a PR into the base branch.
-  if (flow?.workspace === "own" || (!flow && kindOf(issue) === "story")) {
+  // An own workspace: a branch named after the issue, with a PR into the base branch.
+  if (flow?.workspace === "own") {
     const slug = await storySlug(ctx, issue);
     const branch = storyBranch(issue.number, slug);
     return { branch, base: ctx.config.baseBranch, worktree: worktreePath(branch), story: issue, slug };
