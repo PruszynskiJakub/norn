@@ -55,6 +55,10 @@ export class FakeWorkspace implements Workspace {
     this.localBranches.delete(branch);
     this.deletedBranches.push(branch);
   }
+  origin: string | null = "git@github.com:acme/app.git";
+  async originUrl() {
+    return this.origin;
+  }
   fetched = 0;
   async fetchRemote() {
     this.fetched++;

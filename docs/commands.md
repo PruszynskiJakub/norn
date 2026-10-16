@@ -13,9 +13,12 @@ norn answers in prose written as instructions to the agent, always in the same o
 | [`norn status <story>`](#norn-status) | Read-only overview of the story and its slices |
 | [`norn tidy`](#norn-tidy) | Remove what belongs to closed issues |
 | [`norn dashboard`](#norn-dashboard) | Watch your work in the browser |
+| [`norn doctor`](#norn-doctor) | Check the whole setup and say what to fix |
 | [`norn add-slice <story> "title"`](#norn-add-slice) | Create a slice (used by the `norn-slice` skill) |
 | [`norn escalate <issue> "reason"`](#norn-escalate) | Set `needs-human` and release the claim |
 | [`norn release <issue>`](#norn-release) | Give up the claim without a transition |
+
+`norn --version` prints the running norn's version.
 
 ## norn init
 
@@ -28,7 +31,10 @@ Sets norn up in the current repository. Running it again is safe and refreshes w
 - **Skills.** Copies the bundled skills into `skills/` and links them into `.claude/skills/`: one per step (`norn-triage`, `norn-refine`, `norn-clarify`, `norn-plan`, `norn-slice`, `norn-implement`, `norn-review`, `norn-auto-qa`, `norn-qa`, `norn-merge`, `norn-resolve`), the process skills (`norn-drive`, `norn-deliver`) and the reference skills they use (`norn-interview`, `norn-codebase-design`, `norn-tdd`). After upgrading norn, run `init` again: it replaces any bundled skill that differs from the new version and names them; `git diff skills/` shows the changes. Set `NORN_SKILLS_SOURCE=<repo>` to install the skills with `npx skills add <repo>` instead; skills from that source already in place are kept.
 - **Agent instructions.** Writes a short norn section between `<!-- norn:start -->` and `<!-- norn:end -->` into `AGENTS.md` and `CLAUDE.md`, whichever exist. With neither, it creates `AGENTS.md` and a `CLAUDE.md` that imports it.
 - **Files.** Creates `.agents/specs/` and the team config `.agents/norn.config.json`, taking `baseBranch` from the repository's default branch. Adds `.agents/worktrees/` and `.agents/norn.config.local.json` to `.gitignore`.
+- **Version.** Records the running norn's version as [`nornVersion`](configuration.md#the-norn-version) in the team config. On a repository set up before, it changes `nornVersion` and no other setting, and reports the change next to the skills it updated, so the two are committed together. It refuses when the repository's `nornVersion` is newer than your norn: upgrade norn instead of rolling the team's skills back.
 - **Labels.** Creates norn's labels on the GitHub repository.
+
+It ends by suggesting `norn doctor`, which checks what `init` cannot set up.
 
 ## norn next
 
@@ -151,6 +157,31 @@ It reads GitHub as you every 2 minutes (30s at the least), with one GraphQL quer
 - A second launch for the same checkout prints the running one's URL.
 - `--interval` takes a duration such as `30s`, `2m` or `1h`.
 - Set defaults in your local config: see [configuration](configuration.md#dashboard).
+
+## norn doctor
+
+```sh
+npx norn doctor [--json]
+```
+
+Checks the whole setup at once and lists every check, each with the exact command that fixes it:
+
+| Check | Passes when |
+| --- | --- |
+| `gh` | `gh` is installed and logged in to the host of `origin` |
+| `git` | You are in a git checkout whose `origin` is on GitHub |
+| `base-branch` | `baseBranch` exists on GitHub |
+| `permission` | You have write access or higher to the repository |
+| `labels` | All of norn's labels exist |
+| `config` | The team and local config are valid; their warnings show as a warning |
+| `version` | `nornVersion` is set and compatible with your norn; a compatible difference warns |
+| `skills` | Every skill the briefings name is in `skills/` and linked from `.claude/skills/`; a skill that differs from the bundled copy warns, except under `NORN_SKILLS_SOURCE` |
+| `agent-instructions` | The norn block is in `AGENTS.md` or `CLAUDE.md` |
+| `provider` | The worktree provider matches the environment, as `take` requires |
+
+Each check shows as `✓` ok, `!` warning, `✗` fail, or `-` skipped when a check it needs did not pass, e.g. `skipped, needs gh`. It exits 1 only when a check fails, so CI can run it without failing on a warning. `--json` gives `{ ok, checks: [{ id, level, message, fix }] }`.
+
+`doctor` changes nothing and never refuses: an invalid config, an incompatible version or a run outside a checkout are reported as checks.
 
 ## norn add-slice
 

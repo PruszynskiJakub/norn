@@ -1,5 +1,5 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
-import { DEFAULT_TEAM_CONFIG, FLAGS, type GitHub, LOCAL_CONFIG, STATES, TEAM_CONFIG } from "@norn/core";
+import { compareVersions, type ConfigProblem, DEFAULT_TEAM_CONFIG, FLAGS, type GitHub, isVersion, LOCAL_CONFIG, STATES, TEAM_CONFIG } from "@norn/core";
 import { join } from "node:path";
 
 /** Skills norn briefings name. */
@@ -53,6 +53,8 @@ export interface InitDeps {
   cwd: string;
   /** Returns the names of the skills it updated. */
   installSkills: (cwd: string) => Promise<string[]>;
+  /** The running norn's version, recorded as the team's nornVersion. */
+  version: string;
 }
 
 export interface InitResult {
@@ -64,6 +66,8 @@ export interface InitResult {
   /** The files given the agent instructions: AGENTS.md, CLAUDE.md or both. */
   instructed: string[];
   labels: number;
+  /** How this run changed the team's nornVersion; null when it was already the running version. */
+  version: { from: string | null; to: string } | null;
 }
 
 /** The skill install left out skills norn briefings name. */
@@ -72,7 +76,25 @@ export interface MissingSkills {
   missing: string[];
 }
 
-export async function init({ github, cwd, installSkills }: InitDeps): Promise<InitResult | { ok: false; refusal: MissingSkills }> {
+/** The repository was set up with a newer norn than the one running init. */
+export interface InitWouldDowngrade {
+  kind: "init-would-downgrade";
+  running: string;
+  repo: string;
+}
+
+type InitRefusal = MissingSkills | InitWouldDowngrade | { kind: "config-invalid"; problems: ConfigProblem[] };
+
+export async function init({ github, cwd, installSkills, version }: InitDeps): Promise<InitResult | { ok: false; refusal: InitRefusal }> {
+  const teamConfig = join(cwd, TEAM_CONFIG);
+  const team = readTeamConfig(teamConfig);
+  if (!team.ok) return team;
+  const from = typeof team.settings?.nornVersion === "string" ? team.settings.nornVersion : null;
+  // Older skills over newer ones would quietly roll the whole team back.
+  if (from !== null && isVersion(from) && compareVersions(from, version) > 0) {
+    return { ok: false, refusal: { kind: "init-would-downgrade", running: version, repo: from } };
+  }
+
   const updated = await installSkills(cwd);
   const skillsDir = join(cwd, "skills");
   const installed = existsSync(skillsDir) ? readdirSync(skillsDir).filter((d) => existsSync(join(skillsDir, d, "SKILL.md"))) : [];
@@ -91,9 +113,12 @@ export async function init({ github, cwd, installSkills }: InitDeps): Promise<In
   mkdirSync(specs, { recursive: true });
   if (readdirSync(specs).length === 0) writeFileSync(join(specs, ".gitkeep"), "");
 
-  const teamConfig = join(cwd, TEAM_CONFIG);
-  if (!existsSync(teamConfig)) {
-    const config = { ...DEFAULT_TEAM_CONFIG, baseBranch: await github.defaultBranch() };
+  if (team.settings === null) {
+    const config = { nornVersion: version, ...DEFAULT_TEAM_CONFIG, baseBranch: await github.defaultBranch() };
+    writeFileSync(teamConfig, `${JSON.stringify(config, null, 2)}\n`);
+  } else if (from !== version) {
+    // Only the version changes; an existing key keeps its place, a new one goes first.
+    const config = "nornVersion" in team.settings ? { ...team.settings, nornVersion: version } : { nornVersion: version, ...team.settings };
     writeFileSync(teamConfig, `${JSON.stringify(config, null, 2)}\n`);
   }
   ensureGitignored(cwd, [".agents/worktrees/", LOCAL_CONFIG]);
@@ -101,7 +126,32 @@ export async function init({ github, cwd, installSkills }: InitDeps): Promise<In
 
   await github.ensureLabels(labelDefinitions());
 
-  return { ok: true, kind: "initialized", skills: installed.length, updated, instructed, labels: labelDefinitions().length };
+  return {
+    ok: true,
+    kind: "initialized",
+    skills: installed.length,
+    updated,
+    instructed,
+    labels: labelDefinitions().length,
+    version: from === version ? null : { from, to: version },
+  };
+}
+
+/** The team file's settings, null when there is none; refused when init could not rewrite it safely. */
+function readTeamConfig(
+  file: string,
+): { ok: true; settings: Record<string, unknown> | null } | { ok: false; refusal: { kind: "config-invalid"; problems: ConfigProblem[] } } {
+  if (!existsSync(file)) return { ok: true, settings: null };
+  let raw: unknown;
+  try {
+    raw = JSON.parse(readFileSync(file, "utf8"));
+  } catch (e) {
+    return { ok: false, refusal: { kind: "config-invalid", problems: [{ kind: "invalid-json", file: TEAM_CONFIG, detail: (e as Error).message }] } };
+  }
+  if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
+    return { ok: false, refusal: { kind: "config-invalid", problems: [{ kind: "not-an-object", file: TEAM_CONFIG }] } };
+  }
+  return { ok: true, settings: raw as Record<string, unknown> };
 }
 
 function exists(p: string) {
@@ -139,6 +189,14 @@ export const AGENT_INSTRUCTIONS = [
   "- Never change norn's labels, claims or branches by hand.",
   END,
 ].join("\n");
+
+/** Which of AGENTS.md and CLAUDE.md hold the norn block. */
+export function filesWithAgentInstructions(cwd: string): string[] {
+  return ["AGENTS.md", "CLAUDE.md"].filter((name) => {
+    const file = join(cwd, name);
+    return existsSync(file) && readFileSync(file, "utf8").includes(START);
+  });
+}
 
 /**
  * Writes AGENT_INSTRUCTIONS into each of AGENTS.md and CLAUDE.md that exists,

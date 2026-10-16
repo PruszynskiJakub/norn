@@ -61,9 +61,10 @@ Only release tags can be installed: a branch or commit has no built CLI.
 
 ```sh
 npx norn init      # skills, agent instructions, .agents/, labels
+npx norn doctor    # checks gh, your access, labels, config, version, skills and provider
 ```
 
-Commit what `init` wrote, then ask your agent:
+`doctor` lists every problem with the command that fixes it. Commit what `init` wrote, then ask your agent:
 
 ```text
 norn-drive <issue>
@@ -82,6 +83,7 @@ For a guided first run in a throwaway repository, follow the [sandbox tutorial](
 | `norn status <story>` | Read-only overview of the story and its slices |
 | `norn tidy` | Remove what belongs to closed issues |
 | `norn dashboard` | Watch your work in the browser |
+| `norn doctor` | Check the whole setup and say what to fix |
 
 Your agent runs most of these for you. Add `--json` for scripts. See [commands](docs/commands.md) for every command and flag.
 

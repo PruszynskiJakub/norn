@@ -110,6 +110,17 @@ describe("LocalWorkspace", () => {
     expect(calls.at(-1)).toBe("git -C /repo worktree remove --force /repo/.agents/worktrees/123-x");
   });
 
+  test("originUrl is the origin remote's URL; none without one", async () => {
+    let has = true;
+    const { run, calls } = scripted(() => (has ? { stdout: "git@github.com:acme/app.git\n" } : { code: 2 }));
+    const ws = new LocalWorkspace("/repo", {}, run);
+
+    expect(await ws.originUrl()).toBe("git@github.com:acme/app.git");
+    expect(calls[0]).toBe("git -C /repo remote get-url origin");
+    has = false;
+    expect(await ws.originUrl()).toBeNull();
+  });
+
   test("readFile reads relative to the repository root; missing files are null", async () => {
     const root = mkdtempSync(join(tmpdir(), "norn-ws-"));
     mkdirSync(join(root, ".agents"));

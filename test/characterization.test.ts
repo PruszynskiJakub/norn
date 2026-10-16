@@ -63,7 +63,7 @@ const scenarios: Scenario[] = [
     name: "config warnings before the answer",
     arrange: (w) => {
       w.github.seedIssue({ number: 1, title: "A story", labels: ["type:story", "needs-plan"] });
-      w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ claims: { staleAfter: "1m" } }));
+      w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ nornVersion: "1.4.2", claims: { staleAfter: "1m" } }));
       w.workspace.files.set(".agents/norn.config.local.json", JSON.stringify({ deliver: { maxFixRounds: 2 } }));
     },
     argv: ["status", "1"],
@@ -89,6 +89,15 @@ const scenarios: Scenario[] = [
       });
     },
   },
+  // doctor and the version
+  { name: "doctor with problems", argv: ["doctor"] },
+  { name: "doctor without gh", arrange: (w) => (w.github.ghAuthState = { kind: "missing" }), argv: ["doctor"] },
+  {
+    name: "incompatible version",
+    arrange: (w) => w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ nornVersion: "2.0.0" })),
+    argv: ["status", "1"],
+  },
+  { name: "version", argv: ["--version"] },
   {
     name: "init with missing skills",
     argv: ["init"],
@@ -140,7 +149,7 @@ const scenarios: Scenario[] = [
     name: "next with every slot taken",
     arrange: (w) => {
       story(w);
-      w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ deliver: { maxParallel: 1 } }));
+      w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ nornVersion: "1.4.2", deliver: { maxParallel: 1 } }));
       w.github.claims.set(128, { holder: "alice", session: "other", since: "2026-10-13T11:00:00Z" });
     },
     argv: ["next", "123"],

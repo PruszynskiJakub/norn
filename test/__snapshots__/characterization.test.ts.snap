@@ -134,6 +134,184 @@ Story #1 "A story": needs-plan · owner none · branch 1-a-story
 No slices yet."
 `;
 
+exports[`output of every command, text and --json > doctor with problems > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "checks": [
+    {
+      "id": "gh",
+      "level": "ok",
+      "message": "logged in to github.com",
+      "fix": null
+    },
+    {
+      "id": "git",
+      "level": "ok",
+      "message": "origin is git@github.com:acme/app.git",
+      "fix": null
+    },
+    {
+      "id": "base-branch",
+      "level": "ok",
+      "message": "main exists on GitHub",
+      "fix": null
+    },
+    {
+      "id": "permission",
+      "level": "ok",
+      "message": "you have write access to the repository",
+      "fix": null
+    },
+    {
+      "id": "labels",
+      "level": "fail",
+      "message": "19 of norn's labels are missing: needs-refinement, needs-clarification, needs-plan, needs-slicing, blocked, ready-for-agent, implementation, needs-review, changes-requested, needs-qa, needs-human-qa, qa-failed, merge-queue, type:story, type:slice, in-progress, needs-human, mode:afk, mode:hil",
+      "fix": "norn init"
+    },
+    {
+      "id": "config",
+      "level": "ok",
+      "message": "the team and local config are valid",
+      "fix": null
+    },
+    {
+      "id": "version",
+      "level": "warning",
+      "message": "norn 1.4.2, repo has no nornVersion",
+      "fix": "norn init"
+    },
+    {
+      "id": "skills",
+      "level": "fail",
+      "message": "missing from skills/: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design",
+      "fix": "norn init"
+    },
+    {
+      "id": "agent-instructions",
+      "level": "fail",
+      "message": "neither AGENTS.md nor CLAUDE.md has the norn block",
+      "fix": "norn init"
+    },
+    {
+      "id": "provider",
+      "level": "ok",
+      "message": "claude-code matches the environment",
+      "fix": null
+    }
+  ]
+}"
+`;
+
+exports[`output of every command, text and --json > doctor with problems > text 1`] = `
+"exit 1
+✓ gh: logged in to github.com
+✓ git: origin is git@github.com:acme/app.git
+✓ base-branch: main exists on GitHub
+✓ permission: you have write access to the repository
+✗ labels: 19 of norn's labels are missing: needs-refinement, needs-clarification, needs-plan, needs-slicing, blocked, ready-for-agent, implementation, needs-review, changes-requested, needs-qa, needs-human-qa, qa-failed, merge-queue, type:story, type:slice, in-progress, needs-human, mode:afk, mode:hil
+  fix: norn init
+✓ config: the team and local config are valid
+! version: norn 1.4.2, repo has no nornVersion
+  fix: norn init
+✗ skills: missing from skills/: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design
+  fix: norn init
+✗ agent-instructions: neither AGENTS.md nor CLAUDE.md has the norn block
+  fix: norn init
+✓ provider: claude-code matches the environment
+
+3 checks failed and 1 warned. Run the fixes above, then norn doctor again."
+`;
+
+exports[`output of every command, text and --json > doctor without gh > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "checks": [
+    {
+      "id": "gh",
+      "level": "fail",
+      "message": "gh is not installed",
+      "fix": "install gh from https://cli.github.com, then run gh auth login"
+    },
+    {
+      "id": "git",
+      "level": "ok",
+      "message": "origin is git@github.com:acme/app.git",
+      "fix": null
+    },
+    {
+      "id": "base-branch",
+      "level": "skipped",
+      "message": "skipped, needs gh",
+      "fix": null
+    },
+    {
+      "id": "permission",
+      "level": "skipped",
+      "message": "skipped, needs gh",
+      "fix": null
+    },
+    {
+      "id": "labels",
+      "level": "skipped",
+      "message": "skipped, needs gh",
+      "fix": null
+    },
+    {
+      "id": "config",
+      "level": "ok",
+      "message": "the team and local config are valid",
+      "fix": null
+    },
+    {
+      "id": "version",
+      "level": "warning",
+      "message": "norn 1.4.2, repo has no nornVersion",
+      "fix": "norn init"
+    },
+    {
+      "id": "skills",
+      "level": "fail",
+      "message": "missing from skills/: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design",
+      "fix": "norn init"
+    },
+    {
+      "id": "agent-instructions",
+      "level": "fail",
+      "message": "neither AGENTS.md nor CLAUDE.md has the norn block",
+      "fix": "norn init"
+    },
+    {
+      "id": "provider",
+      "level": "ok",
+      "message": "claude-code matches the environment",
+      "fix": null
+    }
+  ]
+}"
+`;
+
+exports[`output of every command, text and --json > doctor without gh > text 1`] = `
+"exit 1
+✗ gh: gh is not installed
+  fix: install gh from https://cli.github.com, then run gh auth login
+✓ git: origin is git@github.com:acme/app.git
+- base-branch: skipped, needs gh
+- permission: skipped, needs gh
+- labels: skipped, needs gh
+✓ config: the team and local config are valid
+! version: norn 1.4.2, repo has no nornVersion
+  fix: norn init
+✗ skills: missing from skills/: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design
+  fix: norn init
+✗ agent-instructions: neither AGENTS.md nor CLAUDE.md has the norn block
+  fix: norn init
+✓ provider: claude-code matches the environment
+
+3 checks failed and 1 warned. Run the fixes above, then norn doctor again."
+`;
+
 exports[`output of every command, text and --json > done agent QA pass on a hil slice notifies > json 1`] = `
 "exit 0
 {
@@ -591,11 +769,26 @@ exports[`output of every command, text and --json > escalate without the claim >
 You do not hold #50. Claim it first with: norn take 50"
 `;
 
+exports[`output of every command, text and --json > incompatible version > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "This repository uses norn 2.0.0, which your norn 1.4.2 cannot work with.\\nUpgrade norn: npm install -D github:PruszynskiJakub/norn#v2.0.0\\nThen run norn doctor for a full check of the setup."
+}"
+`;
+
+exports[`output of every command, text and --json > incompatible version > text 1`] = `
+"exit 1
+This repository uses norn 2.0.0, which your norn 1.4.2 cannot work with.
+Upgrade norn: npm install -D github:PruszynskiJakub/norn#v2.0.0
+Then run norn doctor for a full check of the setup."
+`;
+
 exports[`output of every command, text and --json > init > json 1`] = `
 "exit 0
 {
   "ok": true,
-  "message": "norn is set up in this project:\\n  - 16 skills in skills/, linked into .claude/skills/\\n  - updated to this norn version: norn-drive (git diff skills/ shows the changes)\\n  - .agents/specs/ for story specs\\n  - .agents/norn.config.json with the team settings (each developer can override in .agents/norn.config.local.json)\\n  - .agents/worktrees/ and the local config in .gitignore\\n  - how to work with norn in AGENTS.md and CLAUDE.md\\n  - 19 labels on the repository\\n\\nCommit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>"
+  "message": "norn is set up in this project:\\n  - 16 skills in skills/, linked into .claude/skills/\\n  - updated to this norn version: norn-drive (git diff skills/ shows the changes)\\n  - nornVersion set to 1.4.2 in .agents/norn.config.json\\n  - .agents/specs/ for story specs\\n  - .agents/norn.config.json with the team settings (each developer can override in .agents/norn.config.local.json)\\n  - .agents/worktrees/ and the local config in .gitignore\\n  - how to work with norn in AGENTS.md and CLAUDE.md\\n  - 19 labels on the repository\\n\\nCommit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>\\nRun norn doctor to check what init cannot set up: gh, your access to the repository, the worktree provider."
 }"
 `;
 
@@ -604,13 +797,15 @@ exports[`output of every command, text and --json > init > text 1`] = `
 norn is set up in this project:
   - 16 skills in skills/, linked into .claude/skills/
   - updated to this norn version: norn-drive (git diff skills/ shows the changes)
+  - nornVersion set to 1.4.2 in .agents/norn.config.json
   - .agents/specs/ for story specs
   - .agents/norn.config.json with the team settings (each developer can override in .agents/norn.config.local.json)
   - .agents/worktrees/ and the local config in .gitignore
   - how to work with norn in AGENTS.md and CLAUDE.md
   - 19 labels on the repository
 
-Commit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>"
+Commit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>
+Run norn doctor to check what init cannot set up: gh, your access to the repository, the worktree provider."
 `;
 
 exports[`output of every command, text and --json > init with missing skills > json 1`] = `
@@ -2525,7 +2720,7 @@ exports[`output of every command, text and --json > unknown command > json 1`] =
 "exit 2
 {
   "ok": false,
-  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n\\nAdd --json for machine-readable output."
+  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn --version                     Print the running norn's version\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -2547,6 +2742,8 @@ norn runs work through the SDD process. Commands on an issue take its number exp
   norn tidy [--dry-run]              Remove what belongs to closed issues
   norn dashboard [--port <n>] [--interval <duration>] [--no-open]
                                      Watch your work in the browser; Ctrl-C stops it
+  norn doctor                        Check the whole setup and say what to fix
+  norn --version                     Print the running norn's version
 
 Add --json for machine-readable output."
 `;
@@ -2555,7 +2752,7 @@ exports[`output of every command, text and --json > usage > json 1`] = `
 "exit 2
 {
   "ok": false,
-  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n\\nAdd --json for machine-readable output."
+  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn --version                     Print the running norn's version\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -2577,6 +2774,18 @@ norn runs work through the SDD process. Commands on an issue take its number exp
   norn tidy [--dry-run]              Remove what belongs to closed issues
   norn dashboard [--port <n>] [--interval <duration>] [--no-open]
                                      Watch your work in the browser; Ctrl-C stops it
+  norn doctor                        Check the whole setup and say what to fix
+  norn --version                     Print the running norn's version
 
 Add --json for machine-readable output."
+`;
+
+exports[`output of every command, text and --json > version > json 1`] = `
+"exit 0
+1.4.2"
+`;
+
+exports[`output of every command, text and --json > version > text 1`] = `
+"exit 0
+1.4.2"
 `;

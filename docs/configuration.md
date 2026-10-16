@@ -9,11 +9,12 @@ norn reads two files at the repository root. Both are optional; `norn init` crea
 
 The local file wins over the team file, except for `claims.staleAfter` and `deliver.maxFixRounds`. Those bind everyone's claims and fix rounds, so norn reads them from the team file only; in the local file they are ignored with a warning.
 
-An unknown key or an invalid value makes norn refuse every command and name the problem, until the file is fixed.
+An unknown key or an invalid value makes norn refuse every command and name the problem, until the file is fixed. `norn doctor` reports these, and every other setup problem, at once.
 
 ```jsonc
 // .agents/norn.config.json (committed)
 {
+  "nornVersion": "0.7.0",
   "baseBranch": "main",
   "worktrees": { "provider": "auto" },
   "claims": { "staleAfter": "2h" },
@@ -34,6 +35,7 @@ An unknown key or an invalid value makes norn refuse every command and name the 
 
 | Setting | Default | Where | Meaning |
 | --- | --- | --- | --- |
+| `nornVersion` | written by `norn init` | team only | The norn version that last set the repository up; see [the norn version](#the-norn-version) |
 | `baseBranch` | the repository's default branch | team or local | The branch stories merge into |
 | `worktrees.provider` | `auto` | team or local | `auto`, `herdr`, `claude-code` or `git`; see [providers](#worktree-providers) |
 | `claims.staleAfter` | `2h` | team only | Age after which a claim counts as abandoned. A duration such as `30m` or `2h`; below `10m` it is raised to `10m` with a warning |
@@ -44,6 +46,22 @@ An unknown key or an invalid value makes norn refuse every command and name the 
 | `dashboard.interval` | `2m` | local only | How often the dashboard reads GitHub; at least `30s` |
 
 Durations are a number followed by `s`, `m`, `h` or `d`.
+
+## The norn version
+
+`nornVersion` records the norn version the committed skills and labels belong to. `norn init` writes it, and on an upgrade changes it and nothing else. It is a plain version such as `0.7.0`; anything else, or `nornVersion` in the local file, is a config problem.
+
+Every command except `init` and `doctor` compares it with the norn that runs:
+
+| Your norn against `nornVersion` | norn |
+| --- | --- |
+| The same, or only the patch version differs | Says nothing |
+| Newer, but compatible | Warns: run `norn init` to update the skills and `nornVersion` for the team |
+| Older, but compatible | Warns: upgrade norn |
+| Not compatible | Refuses, naming both versions and the fix |
+| `nornVersion` missing from the team file | Warns: run `norn init` |
+
+Compatible means the same major version, or, while the major version is 0, the same minor version. A repository without a team file is not flagged. `norn init` refuses to run when `nornVersion` is newer than your norn, so it never rolls the team's skills back.
 
 ## Worktree providers
 

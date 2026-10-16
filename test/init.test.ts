@@ -83,6 +83,7 @@ describe("norn init: configuration and worktrees", () => {
     await norn("init");
 
     expect(JSON.parse(readFileSync(join(cwd, ".agents", "norn.config.json"), "utf8"))).toEqual({
+      nornVersion: "1.4.2",
       baseBranch: "main",
       worktrees: { provider: "auto" },
       claims: { staleAfter: "2h" },
@@ -100,15 +101,15 @@ describe("norn init: configuration and worktrees", () => {
     expect(JSON.parse(readFileSync(join(cwd, ".agents", "norn.config.json"), "utf8")).baseBranch).toBe("master");
   });
 
-  test("keeps an existing team config and does not repeat gitignore entries", async () => {
+  test("keeps an existing team config, only recording the norn version, and does not repeat gitignore entries", async () => {
     const { cwd, norn } = project();
     mkdirSync(join(cwd, ".agents"), { recursive: true });
-    writeFileSync(join(cwd, ".agents", "norn.config.json"), '{ "baseBranch": "develop" }\n');
+    writeFileSync(join(cwd, ".agents", "norn.config.json"), '{ "nornVersion": "1.4.2", "baseBranch": "develop" }\n');
 
     await norn("init");
     await norn("init");
 
-    expect(readFileSync(join(cwd, ".agents", "norn.config.json"), "utf8")).toBe('{ "baseBranch": "develop" }\n');
+    expect(readFileSync(join(cwd, ".agents", "norn.config.json"), "utf8")).toBe('{ "nornVersion": "1.4.2", "baseBranch": "develop" }\n');
     expect(readFileSync(join(cwd, ".gitignore"), "utf8")).toBe(".agents/worktrees/\n.agents/norn.config.local.json\n");
   });
 });
