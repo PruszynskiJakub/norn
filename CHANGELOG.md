@@ -4,6 +4,8 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-10-16
+
 ### Changed
 
 - The README is rewritten for someone new to norn, and the reference moves to `docs/`: how norn works (principles, assumptions, labels, flows as Mermaid diagrams, claims and delivery), commands, configuration and a sandbox tutorial. `PRD.html` is folded into these pages and removed. `CONTRIBUTING.md` and `SECURITY.md` are new.
@@ -147,7 +149,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.6.1...HEAD
+[0.6.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.6.0...v0.6.1
 [0.6.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.5.1...v0.6.0
 [0.5.1]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.5.0...v0.5.1
 [0.5.0]: https://github.com/PruszynskiJakub/ai-engine/compare/v0.4.0...v0.5.0
