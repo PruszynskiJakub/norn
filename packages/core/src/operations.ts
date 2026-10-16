@@ -1,3 +1,4 @@
+import { behaviourFollowUps, entering, leaveRefusal, type OutcomeInput } from "./behaviours.js";
 import { briefing, type Briefing, finishCommands } from "./briefing.js";
 import { acquire } from "./claims.js";
 import type { Event } from "./events.js";
@@ -220,6 +221,11 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     const r = await sliceMergeRefusal(ctx, issue);
     if (r) return refuse(r);
   }
+  const inFlow: OutcomeInput | null = flow ? { ctx, issue, flow, flowName: flowNameOf(issue) ?? "", from: stateIn(issue, flow), outcome, note } : null;
+  if (inFlow) {
+    const r = await leaveRefusal(inFlow);
+    if (r) return refuse(r);
+  }
   const files = evidenceDir === undefined ? undefined : await ctx.workspace.readEvidence(evidenceDir);
   if (evidenceDir !== undefined) {
     if (!files) return refuse({ kind: "evidence-not-a-directory", dir: evidenceDir });
@@ -246,7 +252,8 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   let applied = outcome;
   let fixLimit: number | null = null;
   // A round starts when review or QA sends the issue back; resolving needs-human stays put and is no round.
-  if (!flow && FIX_STATES.includes(outcome.to as State) && stateOf(issue) !== outcome.to) {
+  if (inFlow) ({ outcome: applied, fixLimit } = await entering(inFlow));
+  else if (FIX_STATES.includes(outcome.to as State) && stateOf(issue) !== outcome.to) {
     const rounds = fixRounds(await github.listComments(n)) + 1;
     if (rounds > ctx.config.maxFixRounds) {
       fixLimit = ctx.config.maxFixRounds;
@@ -267,7 +274,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     ...(evidence ? { evidence } : {}),
     fixLimit,
     storyBranchCreated,
-    followUps: await followUps(ctx, issue, applied),
+    followUps: inFlow ? await behaviourFollowUps(inFlow, { outcome: applied, fixLimit }) : await followUps(ctx, issue, applied),
     deliverable: kindOf(issue) === "story" && outcome.to === "implementation",
     personNext: !!outcome.notify && !applied.needsHuman,
   };

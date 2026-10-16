@@ -1,9 +1,11 @@
 import type { BehaviourName, Flow } from "./flow.js";
 import type { Issue } from "./github.js";
 import type { Location } from "./location.js";
-import type { Step } from "./machine.js";
+import type { Event } from "./events.js";
+import type { Outcome, Step } from "./machine.js";
+import type { Refusal } from "./refusals.js";
 import { sh } from "./text.js";
-import type { Ctx } from "./transitions.js";
+import { type Ctx, fixLimitReason, fixRounds, oneLine } from "./transitions.js";
 
 /**
  * Behaviours are norn's built-in mechanics that a state of a flow opts into by
@@ -27,9 +29,35 @@ export interface BriefingInput {
   loc: Location | null;
 }
 
+/** What a behaviour sees of an outcome done applies in a flow. */
+export interface OutcomeInput {
+  ctx: Ctx;
+  issue: Issue;
+  flow: Flow;
+  /** The flow's name, the issue's type. */
+  flowName: string;
+  /** The state the issue leaves; null with none. */
+  from: string | null;
+  /** The outcome as the flow declares it. */
+  outcome: Outcome;
+  note?: string;
+}
+
+/** The outcome done applies once behaviours had their say, and the fix-round limit it reached, if any. */
+export interface Applied {
+  outcome: Outcome;
+  fixLimit: number | null;
+}
+
 export interface Behaviour {
   /** Briefing lines, for a step in any state of a flow that uses the behaviour: the behaviour decides which states it speaks for. */
   briefing?(b: BriefingInput): Promise<string[]>;
+  /** Checked by done before an issue leaves a state with the behaviour, before anything changes; a refusal stops done. */
+  leave?(o: OutcomeInput): Promise<Refusal | null>;
+  /** Run by done for an outcome into a state with the behaviour, before it is applied: may change what is applied. */
+  enter?(o: OutcomeInput, applied: Applied): Promise<Applied>;
+  /** Run once done applied an outcome into or out of a state with the behaviour; best effort, see bestEffort. */
+  followUps?(o: OutcomeInput, applied: Applied): Promise<Event[]>;
 }
 
 /** Whether the state of the flow opts into the behaviour. */
@@ -60,10 +88,36 @@ const opensPR: Behaviour = {
   },
 };
 
+/** The states of the flow that count fix rounds. */
+function fixStatesOf(flow: Flow): string[] {
+  return Object.keys(flow.states).filter((s) => uses(flow, s, "countsFixRounds"));
+}
+
+const countsFixRounds: Behaviour = {
+  /**
+   * Rework is a step taken from a state that counts fix rounds, or one taken
+   * again in the state such a state enters as, once a round has been counted.
+   */
+  async briefing({ ctx, issue, flow, state, from }) {
+    const fixStates = fixStatesOf(flow);
+    const entered = fixStates.some((s) => flow.states[s].enterAs === state);
+    const rework = (from !== null && fixStates.includes(from)) || (entered && fixRounds(await ctx.github.listComments(issue.number), fixStates) > 0);
+    return rework ? [`This is rework: the latest comment that sent #${issue.number} back lists what to fix.`] : [];
+  },
+  /** A round starts when an outcome sends the issue into the state from another; past the limit, a person decides instead. */
+  async enter({ ctx, issue, flow, from, outcome, note }, applied) {
+    if (from === outcome.to) return applied;
+    const rounds = fixRounds(await ctx.github.listComments(issue.number), fixStatesOf(flow)) + 1;
+    if (rounds <= ctx.config.maxFixRounds) return applied;
+    const fixLimit = ctx.config.maxFixRounds;
+    return { outcome: { ...applied.outcome, needsHuman: `${note ? `escalated: "${oneLine(note)}" ` : ""}${fixLimitReason(fixLimit)}` }, fixLimit };
+  },
+};
+
 /** Every behaviour norn knows, in the order their briefing lines appear. */
 const REGISTRY: Record<BehaviourName, Behaviour> = {
+  countsFixRounds,
   opensPR,
-  countsFixRounds: {},
   humanGate: {},
 };
 
@@ -77,4 +131,33 @@ export async function behaviourLines(b: BriefingInput): Promise<string[]> {
   const lines: string[] = [];
   for (const behaviour of inFlow(b.flow)) if (behaviour.briefing) lines.push(...(await behaviour.briefing(b)));
   return lines;
+}
+
+/** The behaviours of one state of the flow, in registry order. */
+function inState(flow: Flow, state: string | null): Behaviour[] {
+  return (Object.entries(REGISTRY) as [BehaviourName, Behaviour][]).filter(([name]) => uses(flow, state, name)).map(([, b]) => b);
+}
+
+/** Why the behaviours of the state the issue leaves stop the outcome; null when none does. */
+export async function leaveRefusal(o: OutcomeInput): Promise<Refusal | null> {
+  for (const behaviour of inState(o.flow, o.from)) {
+    const refusal = await behaviour.leave?.(o);
+    if (refusal) return refusal;
+  }
+  return null;
+}
+
+/** The outcome as the behaviours of the state it enters change it. */
+export async function entering(o: OutcomeInput): Promise<Applied> {
+  let applied: Applied = { outcome: o.outcome, fixLimit: null };
+  for (const behaviour of inState(o.flow, o.outcome.to)) if (behaviour.enter) applied = await behaviour.enter(o, applied);
+  return applied;
+}
+
+/** The follow-ups of the behaviours of the states the outcome left and entered, each behaviour once. */
+export async function behaviourFollowUps(o: OutcomeInput, applied: Applied): Promise<Event[]> {
+  const behaviours = new Set([...inState(o.flow, o.from), ...inState(o.flow, o.outcome.to)]);
+  const events: Event[] = [];
+  for (const behaviour of behaviours) if (behaviour.followUps) events.push(...(await behaviour.followUps(o, applied)));
+  return events;
 }

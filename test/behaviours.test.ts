@@ -98,3 +98,69 @@ describe("opensPR", () => {
     expect(out).not.toContain("Diff:");
   });
 });
+
+describe("countsFixRounds", () => {
+  /** Review sends #40 back: the issue is in changes-requested, one round in. */
+  async function sentBack(w: ReturnType<typeof setup>) {
+    await w.norn("take", "40");
+    return w.norn("done", "40", "request-changes", "Missing a test for empty arrays");
+  }
+
+  test("rework is detected and briefed, and the step runs in the state it enters as", async () => {
+    const w = bugAt("reviewing");
+    await sentBack(w);
+
+    const res = await w.norn("take", "40");
+
+    expect(w.github.labels(40).sort()).toEqual(["fixing", "in-progress", "type:bug"]);
+    expect(res.stdout).toContain("This is rework: the latest comment that sent #40 back lists what to fix.");
+  });
+
+  test("rework stays briefed when the issue is taken again in the state it entered as", async () => {
+    const w = bugAt("reviewing");
+    await sentBack(w);
+    await w.norn("take", "40");
+    await w.norn("release", "40");
+
+    const out = (await w.norn("take", "40")).stdout;
+
+    expect(out).toContain("This is rework:");
+  });
+
+  test("the first time through is not rework", async () => {
+    const w = bugAt("fixing");
+
+    const out = (await w.norn("take", "40")).stdout;
+
+    expect(out).not.toContain("This is rework");
+  });
+
+  test("reaching maxFixRounds turns the issue into needs-human instead of another round", async () => {
+    const w = bugAt("reviewing");
+    w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ deliver: { maxFixRounds: 1 } }));
+    await sentBack(w);
+    await w.norn("take", "40");
+    await w.norn("done", "40", "fixed");
+
+    const res = await sentBack(w);
+
+    expect(w.github.labels(40).sort()).toEqual(["changes-requested", "needs-human", "type:bug"]);
+    expect(w.github.comments(40).at(-1)).toContain('norn: needs-human — escalated: "Missing a test for empty arrays" (1 fix rounds reached)');
+    expect(res.stdout).toContain("#40 has reached 1 fix rounds, so it now needs a human");
+  });
+
+  test("every state that counts fix rounds counts toward the same limit", async () => {
+    const w = bugAt("reviewing");
+    w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ deliver: { maxFixRounds: 1 } }));
+    await sentBack(w);
+    await w.norn("take", "40");
+    await w.norn("done", "40", "fixed");
+    await w.norn("take", "40");
+    await w.norn("done", "40", "approve");
+
+    await w.norn("take", "40");
+    await w.norn("done", "40", "fail", "still crashes on []");
+
+    expect(w.github.labels(40)).toContain("needs-human");
+  });
+});
