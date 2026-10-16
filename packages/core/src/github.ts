@@ -53,6 +53,8 @@ export interface GitHub {
   /** The repository's default branch, e.g. main. */
   defaultBranch(): Promise<string>;
   getIssue(number: number): Promise<Issue>;
+  /** The open issues with the label, pull requests left out. */
+  openIssues(label: string): Promise<Issue[]>;
   addLabels(number: number, labels: string[]): Promise<void>;
   removeLabels(number: number, labels: string[]): Promise<void>;
   assign(number: number, users: string[]): Promise<void>;

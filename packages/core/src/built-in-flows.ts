@@ -1,5 +1,4 @@
 import type { Flow } from "./flow.js";
-import { ENGINE_FLAGS } from "./machine.js";
 
 /**
  * The flows norn ships, written in the format of a repository's flow files and
@@ -210,7 +209,7 @@ export const STORY_FLOW: Flow = {
 /** The built-in flows, by name, in the order triage offers them. */
 export const BUILT_IN: Record<string, Flow> = { story: STORY_FLOW, slice: SLICE_FLOW };
 
-/** The states of the built-in flows, in the order norn init creates their labels. */
+/** The states of the built-in flows. */
 export const STATES = [
   "needs-refinement",
   "needs-clarification",
@@ -231,6 +230,3 @@ export type State = (typeof STATES)[number];
 
 /** A built-in state, or one of the ends every flow has. */
 export type Target = State | "closed" | "not-planned";
-
-/** The labels norn sets besides states: the built-in flows' types, then the engine's own flags. */
-export const FLAGS = ["type:story", "type:slice", ...ENGINE_FLAGS] as const;

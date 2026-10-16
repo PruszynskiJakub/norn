@@ -1,7 +1,16 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   type Config,
+  checkFlowsNamed,
+  FLOWS_DIR,
+  type FlowError,
+  flowFileNames,
+  flowStatesOf,
+  repositoryFlows,
+  parseFlow,
+  type LoadedFlow,
+  STATES,
   type ConfigProblem,
   type ConfigWarning,
   type GhAuth,
@@ -18,7 +27,7 @@ import { filesWithAgentInstructions, labelDefinitions, SKILLS } from "./init.js"
 import { sameTree } from "./install-skills.js";
 
 /** The checks norn doctor makes, in the order it reports them. */
-export type CheckId = "gh" | "git" | "base-branch" | "permission" | "labels" | "config" | "version" | "skills" | "agent-instructions" | "provider";
+export type CheckId = "gh" | "git" | "base-branch" | "permission" | "labels" | "flows" | "config" | "version" | "skills" | "agent-instructions" | "provider";
 
 /** Only `fail` makes doctor exit 1; `skipped` means a check it depends on did not pass. */
 export type CheckLevel = "ok" | "warning" | "fail" | "skipped";
@@ -35,13 +44,29 @@ export type CheckFact =
   | { kind: "origin"; origin: string; host: string | null; onGitHub: boolean }
   | { kind: "base-branch"; branch: string; exists: boolean; defaultBranch: string | null }
   | { kind: "permission"; permission: Permission }
-  | { kind: "labels"; total: number; missing: string[] }
+  /** `unused` are labels that look like norn's, a type or a state some flow had, that no flow in effect uses. */
+  | { kind: "labels"; total: number; missing: string[]; unused: string[] }
+  | FlowsFact
   | { kind: "config"; problems: ConfigProblem[]; warnings: ConfigWarning[] }
   | { kind: "version"; running: string; repo: string | null; match: VersionMatch | null }
   /** `drifted` is null when the skills come from NORN_SKILLS_SOURCE and are not compared. */
   | { kind: "skills"; total: number; missing: string[]; unlinked: string[]; drifted: string[] | null }
   | { kind: "agent-instructions"; files: string[] }
   | { kind: "provider"; provider: Provider; unsetVariable: string | null };
+
+/**
+ * What the flows check found: the flows in effect by name; the invalid ones on the base branch, and in the checkout's
+ * working copy where it differs; skills a valid flow names that are not installed; and the open issues the working
+ * copy's flows would orphan, in a state they drop without renaming it.
+ */
+export interface FlowsFact {
+  kind: "flows";
+  baseBranch: string;
+  names: string[];
+  invalid: { flow: string; local: boolean; errors: FlowError[] }[];
+  missingSkills: { skill: string; flow: string; local: boolean; state: string }[];
+  orphans: { flow: string; issue: number; state: string }[];
+}
 
 export interface DoctorCheck {
   id: CheckId;
@@ -155,15 +180,28 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
     else add("permission", WRITE.includes(permission.value) ? "ok" : "fail", { kind: "permission", permission: permission.value });
   }
 
-  if (needsForGitHub) skip("labels", needsForGitHub);
+  // The flows in effect, read from the base branch on GitHub, as norn commands read them.
+  const inEffect = needsForGitHub || needsForConfig ? null : await attempt(() => repositoryFlows({ github: d.github, config: config as Config }));
+
+  if (needsForGitHub || needsForConfig) skip("labels", (needsForGitHub ?? needsForConfig) as CheckId);
   else {
     const names = await attempt(() => d.github.labelNames());
     if (!names.ok) add("labels", "fail", names.fact);
+    else if (!inEffect?.ok) add("labels", "fail", (inEffect as { fact: CheckFact }).fact);
     else {
-      const wanted = labelDefinitions().map((l) => l.name);
+      const wanted = labelDefinitions(inEffect.value).map((l) => l.name);
       const missing = wanted.filter((l) => !names.value.includes(l));
-      add("labels", missing.length ? "fail" : "ok", { kind: "labels", total: wanted.length, missing });
+      const unused = names.value.filter((l) => !wanted.includes(l) && looksLikeNorns(l, inEffect.value));
+      add("labels", missing.length ? "fail" : unused.length ? "warning" : "ok", { kind: "labels", total: wanted.length, missing, unused });
     }
+  }
+
+  if (needsForGitHub || needsForConfig) skip("flows", (needsForGitHub ?? needsForConfig) as CheckId);
+  else if (!inEffect?.ok) add("flows", "fail", (inEffect as { fact: CheckFact }).fact);
+  else {
+    const fact = await attempt(() => flows(d, config as Config, inEffect.value));
+    if (!fact.ok) add("flows", "fail", fact.fact);
+    else add("flows", fact.value.invalid.length || fact.value.missingSkills.length ? "fail" : fact.value.orphans.length ? "warning" : "ok", fact.value);
   }
 
   if (!loaded) skip("config", "git");
@@ -198,6 +236,63 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
   }
 
   return { ok: true, kind: "doctor", checks };
+}
+
+/**
+ * Checks the flows in effect and the checkout's flow files that differ from the base branch, as the team would have
+ * them once merged. Reads only: the files, and the open issues of a flow whose working copy drops states.
+ */
+async function flows(d: DoctorDeps, config: Config, inEffect: LoadedFlow[]): Promise<FlowsFact> {
+  const remoteText = (name: string) => d.github.readFileAt(`${FLOWS_DIR}/${name}.json`, config.baseBranch);
+  const dir = join(d.cwd, FLOWS_DIR);
+  const localNames = existsSync(dir) ? flowFileNames(readdirSync(dir)) : [];
+  const local: LoadedFlow[] = [];
+  for (const name of localNames) {
+    const text = readFileSync(join(dir, `${name}.json`), "utf8");
+    if (text === (await remoteText(name))) continue;
+    // Once merged, a flow the working copy names may come from the working copy or the base branch.
+    const exists = async (other: string) => localNames.includes(other) || (await remoteText(other)) !== null;
+    local.push(await checkFlowsNamed(parseFlow(name, text), exists));
+  }
+  const all = [...inEffect.map((l) => ({ l, local: false })), ...local.map((l) => ({ l, local: true }))];
+
+  const invalid = all.flatMap(({ l, local }) => (l.ok ? [] : [{ flow: l.name, local, errors: l.errors }]));
+
+  // norn's own skills are the skills check's.
+  const installed = (skill: string) =>
+    (SKILLS as readonly string[]).includes(skill) ||
+    existsSync(join(d.cwd, "skills", skill, "SKILL.md")) ||
+    existsSync(join(d.cwd, ".claude", "skills", skill, "SKILL.md"));
+  const missingSkills: FlowsFact["missingSkills"] = [];
+  for (const { l, local } of all) {
+    if (!l.ok) continue;
+    for (const [state, s] of Object.entries(l.flow.states)) {
+      const named = missingSkills.some((m) => m.skill === s.skill && m.flow === l.name && m.local === local);
+      if (!installed(s.skill) && !named) missingSkills.push({ skill: s.skill, flow: l.name, local, state });
+    }
+  }
+
+  const orphans: FlowsFact["orphans"] = [];
+  for (const after of local) {
+    const before = inEffect.find((l) => l.name === after.name);
+    if (!after.ok || !before?.ok) continue;
+    // As take would: a state renamed is followed, any other state the flow dropped sends the issue to needs-human.
+    const kept = (state: string) => Object.hasOwn(after.flow.states, state) || Object.hasOwn(after.flow.renamed ?? {}, state);
+    const removed = Object.keys(before.flow.states).filter((state) => !kept(state));
+    if (!removed.length) continue;
+    for (const issue of await d.github.openIssues(`type:${after.name}`)) {
+      const state = removed.find((s) => issue.labels.includes(s));
+      if (state && flowStatesOf(issue, after.flow).length === 0) orphans.push({ flow: after.name, issue: issue.number, state });
+    }
+  }
+
+  return { kind: "flows", baseBranch: config.baseBranch, names: inEffect.map((l) => l.name), invalid, missingSkills, orphans };
+}
+
+/** Whether a label is one norn may have made: a type, a state of a built-in flow, or a state a flow renamed. */
+function looksLikeNorns(label: string, flows: LoadedFlow[]): boolean {
+  if (label.startsWith("type:") || (STATES as readonly string[]).includes(label)) return true;
+  return flows.some((l) => l.ok && Object.hasOwn(l.flow.renamed ?? {}, label));
 }
 
 /** The skills norn briefings name: in skills/, linked from .claude/skills/, and the same as the bundled ones. */
