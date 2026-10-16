@@ -15,7 +15,7 @@ CLI for the SDD process. The developer's LLM calls it to run work through the pr
 norn is not on npm. Install it from this repository (you need read access to it) by a release tag, which carries the built CLI, so nothing is built on install:
 
 ```sh
-npm install -D github:PruszynskiJakub/ai-engine#v0.5.1
+npm install -D github:PruszynskiJakub/ai-engine#v0.6.0
 ```
 
 Only release tags can be installed: a branch or commit of the repository has no built CLI.
@@ -59,7 +59,7 @@ You need Node 20+, git, Claude Code, `gh` logged in (`gh auth status`) and read 
    ```
 2. Install norn and set it up. `init` installs the skills into `skills/` (linked into `.claude/skills/`), writes the norn section into `AGENTS.md` and `CLAUDE.md`, creates `.agents/specs/` and `.agents/norn.config.json`, gitignores `.agents/worktrees/` and the local config, and creates the labels on the repository.
    ```sh
-   npm install -D github:PruszynskiJakub/ai-engine#v0.5.1
+   npm install -D github:PruszynskiJakub/ai-engine#v0.6.0
    npx norn init
    git add -A && git commit -m "Set up norn" && git push
    ```
