@@ -11,16 +11,33 @@ export function qaBranch(n: number) {
   return `psdd/qa/${n}`;
 }
 
-export interface TidyReport {
+/** Something tidy removes. `into` is where a branch was merged. */
+export type Removal =
+  | { kind: "qa-branch"; branch: string; issue: number }
+  | { kind: "worktree"; path: string; of: "story" | "slice" | "new"; issue: number }
+  | { kind: "local-branch"; branch: string; into: string }
+  | { kind: "remote-branch"; branch: string; into: string }
+  | { kind: "claim"; issue: number };
+
+/** Something tidy leaves because removing it could lose work. Paths are absolute. */
+export type Kept =
+  | { kind: "worktree-in-use"; path: string }
+  | { kind: "worktree-dirty"; path: string }
+  | { kind: "worktree-unpushed"; path: string; branch: string }
+  | { kind: "branch-checked-out"; branch: string; at: string }
+  | { kind: "branch-unpushed"; branch: string };
+
+export interface TidyResult {
+  ok: true;
+  kind: "tidy";
   dryRun: boolean;
   /** What was removed, or with --dry-run what would be. */
-  removed: string[];
-  /** What was left because removing it could lose work, and why. */
-  kept: string[];
-  /** Removals that failed; the rest still ran. */
-  failed: string[];
-  /** Anything that makes the checks less sure, e.g. a fetch that failed. */
-  notes: string[];
+  removed: Removal[];
+  kept: Kept[];
+  /** Removals that failed, with the error; the rest still ran. */
+  failed: { removal: Removal; detail: string }[];
+  /** The fetch failed, so work pushed since the last fetch counts as unpushed and is kept; the error. */
+  fetchFailed: string | null;
 }
 
 /** A psdd branch and the issue it belongs to. */
@@ -37,17 +54,17 @@ interface Owned {
  * so it is safe to run at any time. Never removes a worktree or branch with
  * uncommitted or unpushed work, nor the worktree it runs in: those are named.
  */
-export async function tidy(ctx: Ctx, dryRun: boolean): Promise<TidyReport> {
+export async function tidy(ctx: Ctx, dryRun: boolean): Promise<TidyResult> {
   const { github, workspace } = ctx;
-  const report: TidyReport = { dryRun, removed: [], kept: [], failed: [], notes: [] };
+  const report: TidyResult = { ok: true, kind: "tidy", dryRun, removed: [], kept: [], failed: [], fetchFailed: null };
   /** Removes one thing, or with --dry-run only lists it. A failure is reported and the rest still runs. */
-  const attempt = async (what: string, fn: () => Promise<void>) => {
+  const attempt = async (removal: Removal, fn: () => Promise<void>) => {
     try {
       if (!dryRun) await fn();
-      report.removed.push(what);
+      report.removed.push(removal);
       return true;
     } catch (e) {
-      report.failed.push(`${what}: ${(e as Error).message}`);
+      report.failed.push({ removal, detail: (e as Error).message });
       return false;
     }
   };
@@ -67,12 +84,12 @@ export async function tidy(ctx: Ctx, dryRun: boolean): Promise<TidyReport> {
   try {
     await workspace.fetchRemote();
   } catch (e) {
-    report.notes.push(`Could not fetch from GitHub, so work pushed since the last fetch counts as unpushed and is kept: ${(e as Error).message}`);
+    report.fetchFailed = (e as Error).message;
   }
 
   for (const branch of await github.listBranches("psdd/qa/")) {
     const n = Number(branch.slice("psdd/qa/".length));
-    if (Number.isInteger(n) && (await closed(n))) await attempt(`QA evidence branch ${branch} (#${n} is closed)`, () => github.deleteBranch(branch));
+    if (Number.isInteger(n) && (await closed(n))) await attempt({ kind: "qa-branch", branch, issue: n }, () => github.deleteBranch(branch));
   }
 
   const worktrees = await workspace.listWorktrees();
@@ -86,7 +103,6 @@ export async function tidy(ctx: Ctx, dryRun: boolean): Promise<TidyReport> {
     const pr = await github.findPullRequest(branch);
     const merged = pr?.state === "merged" && pr.base === owned.into;
     const n = owned.issue.number;
-    const who = `${kindOf(owned.issue)} #${n}`;
     // Commits that are on no remote branch were never pushed, unless they are what the PR merged.
     const unpushed = async () => local.has(branch) && (await workspace.hasUnpushedCommits(branch)) && !(await mergedHead(ctx, branch, pr));
 
@@ -95,33 +111,32 @@ export async function tidy(ctx: Ctx, dryRun: boolean): Promise<TidyReport> {
     let localFree = !checkedOut;
     if (checkedOut && samePath(checkedOut.path, wtAbs)) {
       const rel = relative(workspace.root, wtAbs);
-      let keep: string | null = null;
-      if (isWithin(workspace.cwd, wtAbs)) keep = "psdd is running inside it. Run psdd tidy from another directory to remove it.";
-      else if (await workspace.worktreeDirty(rel)) keep = "it has uncommitted changes. Commit and push them, or remove it by hand when done.";
-      else if (await unpushed()) keep = `branch ${branch} has commits that are not on GitHub. Push them, or remove it by hand when done.`;
+      let keep: Kept | null = null;
+      if (isWithin(workspace.cwd, wtAbs)) keep = { kind: "worktree-in-use", path: wtAbs };
+      else if (await workspace.worktreeDirty(rel)) keep = { kind: "worktree-dirty", path: wtAbs };
+      else if (await unpushed()) keep = { kind: "worktree-unpushed", path: wtAbs, branch };
       // A kept worktree keeps its branch too, here and on GitHub, so its work can still be pushed.
       if (keep) {
-        report.kept.push(`${wtAbs}: ${keep}`);
+        report.kept.push(keep);
         continue;
       }
-      localFree = await attempt(`worktree ${rel} (${who} is closed)`, () => workspace.removeWorktree(rel, ctx.config.provider));
+      localFree = await attempt({ kind: "worktree", path: rel, of: kindOf(owned.issue), issue: n }, () => workspace.removeWorktree(rel, ctx.config.provider));
     } else if (checkedOut && merged && local.has(branch)) {
-      report.kept.push(`branch ${branch}: it is checked out at ${checkedOut.path}. Switch that checkout to another branch to let psdd tidy remove it.`);
+      report.kept.push({ kind: "branch-checked-out", branch, at: checkedOut.path });
     }
     if (!merged) continue;
-    const where = `merged into ${owned.into}`;
     if (local.has(branch) && localFree) {
       if (await unpushed()) {
-        report.kept.push(`branch ${branch}: it has commits that are not on GitHub. Push them, or delete it by hand.`);
+        report.kept.push({ kind: "branch-unpushed", branch });
         continue;
       }
-      await attempt(`local branch ${branch} (${where})`, () => workspace.deleteLocalBranch(branch));
+      await attempt({ kind: "local-branch", branch, into: owned.into }, () => workspace.deleteLocalBranch(branch));
     }
-    if (remote.has(branch)) await attempt(`branch ${branch} on GitHub (${where})`, () => github.deleteBranch(branch));
+    if (remote.has(branch)) await attempt({ kind: "remote-branch", branch, into: owned.into }, () => github.deleteBranch(branch));
   }
 
   for (const n of (await github.listClaims()).sort((a, b) => a - b)) {
-    if (await closed(n)) await attempt(`claim on #${n} (#${n} is closed)`, () => github.deleteClaim(n));
+    if (await closed(n)) await attempt({ kind: "claim", issue: n }, () => github.deleteClaim(n));
   }
   return report;
 }
@@ -147,15 +162,4 @@ async function ownerOf(ctx: Ctx, branch: string, issue: (n: number) => Promise<I
   if (!slices.has(story.number)) slices.set(story.number, slicesOf(ctx.github, story.number));
   const slice = (await slices.get(story.number)!).find((s) => sliceBranch(story.number, own.slice(`${story.number}-`.length), s.number) === branch);
   return slice ? { branch, issue: slice, into: own } : null;
-}
-
-export function renderTidy(r: TidyReport): string {
-  const out: string[] = [...r.notes];
-  if (r.removed.length) {
-    out.push(r.dryRun ? "psdd tidy would remove (dry run, nothing was changed):" : "psdd tidy removed:", ...r.removed.map((x) => `  - ${x}`));
-  }
-  if (r.kept.length) out.push("Kept, so no work is lost:", ...r.kept.map((x) => `  - ${x}`));
-  if (r.failed.length) out.push("Could not remove, the rest still ran:", ...r.failed.map((x) => `  - ${x}`));
-  if (out.length === r.notes.length) out.push("Nothing to tidy: nothing is left of closed issues.");
-  return out.join("\n");
 }

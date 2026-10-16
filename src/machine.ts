@@ -29,8 +29,8 @@ export interface Outcome {
   note?: string;
   /** After the transition, set needs-human; this is who must do what, e.g. an escalation's reason. */
   needsHuman?: string;
-  /** After the transition, a person is needed without the needs-human flag; this is what for, e.g. "needs human QA (mode:hil)". */
-  notify?: string;
+  /** After the transition, a person does QA without the needs-human flag: for a story, or for a slice in mode:hil. */
+  notify?: "story" | "mode:hil";
 }
 
 export interface Step {
@@ -58,10 +58,9 @@ export function statesOf(issue: Issue): State[] {
   return STATES.filter((s) => issue.labels.includes(s));
 }
 
-/** Why an issue with more than one state label cannot be acted on; null when it has at most one. */
-export function ambiguousStates(issue: Issue): string | null {
-  const states = statesOf(issue);
-  return states.length > 1 ? `has more than one state label (${states.join(", ")}); a person must remove the stale one` : null;
+/** More than one state label: a label change failed halfway, and either could be the real one. */
+export function hasAmbiguousState(issue: Issue): boolean {
+  return statesOf(issue).length > 1;
 }
 
 export function kindOf(issue: Issue): "story" | "slice" | "new" {
@@ -77,7 +76,7 @@ export async function slicesOf(github: { subIssues(parent: number): Promise<Issu
 
 export function stepFor(issue: Issue): Step | null {
   // Two state labels: either could be the real one, so psdd briefs neither.
-  if (ambiguousStates(issue)) return null;
+  if (hasAmbiguousState(issue)) return null;
   const kind = kindOf(issue);
   const state = stateOf(issue);
   // A story always gets a person's QA after the agent's; a slice only in mode:hil.
@@ -113,7 +112,7 @@ export function stepFor(issue: Issue): Step | null {
               to: "needs-human-qa",
               means: "every criterion you could check passed; moves on to QA by a person",
               note: "evidence",
-              notify: humanQaReason(issue),
+              notify: kind === "story" ? "story" : "mode:hil",
             }
           : { to: "merge-queue", means: "every criterion passed, moves to the merge queue", note: "evidence" },
         fail: { to: "qa-failed", means: "put the failures with their repros in the note", note: "evidence" },
@@ -204,9 +203,4 @@ export function stepFor(issue: Issue): Step | null {
     };
   }
   return null;
-}
-
-/** Why an issue in needs-human-qa waits for a person. */
-export function humanQaReason(issue: Issue) {
-  return kindOf(issue) === "story" ? "needs human QA (story)" : "needs human QA (mode:hil)";
 }

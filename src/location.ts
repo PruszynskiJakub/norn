@@ -80,36 +80,35 @@ export function detectProvider(env: Record<string, string | undefined>): Provide
   return "git";
 }
 
-/** "Work in" lines of a briefing. */
-export async function workInLines(loc: Location, workspace: Workspace, github: GitHub, provider: Provider): Promise<string[]> {
-  const lines = [`Work in: ${join(workspace.root, loc.worktree)} (branch ${loc.branch})`];
+/** Where a briefing says to work: the worktree, and what to do about it first. */
+export interface WorkIn {
+  /** Absolute path of the worktree. */
+  path: string;
+  branch: string;
+  worktree:
+    | { kind: "missing"; create: string }
+    /** git checks a branch out in one worktree only, so no create command can work. */
+    | { kind: "checked-out-elsewhere"; at: string }
+    /** `dirty`: an earlier session may have stopped partway and left its work here. `update`: the command that catches it up with GitHub, when the branch is there. */
+    | { kind: "exists"; dirty: boolean; update: string | null };
+}
+
+export async function workIn(loc: Location, workspace: Workspace, github: GitHub, provider: Provider): Promise<WorkIn> {
+  const where = { path: join(workspace.root, loc.worktree), branch: loc.branch };
   if (!(await workspace.worktreeExists(loc.worktree))) {
     const elsewhere = await workspace.branchCheckedOutAt(loc.branch);
-    if (elsewhere) {
-      lines.push(checkedOutElsewhere(loc.branch, elsewhere));
-      return lines;
-    }
+    if (elsewhere) return { ...where, worktree: { kind: "checked-out-elsewhere", at: elsewhere } };
     const at = await branchAt(loc, workspace, github);
-    lines.push("It does not exist yet. Create it first:", `  ${createWorktreeCommand(provider, loc, workspace.root, at)}`);
-    return lines;
+    return { ...where, worktree: { kind: "missing", create: createWorktreeCommand(provider, loc, workspace.root, at) } };
   }
-  // An earlier session may have stopped partway and left its work here.
-  if (await workspace.worktreeDirty(loc.worktree))
-    lines.push("It has uncommitted changes, e.g. from an earlier session. Check git status there before you start.");
-  if (await github.branchExists(loc.branch)) {
-    // Others push here too, e.g. slices merged into the story branch; catch up before starting.
-    lines.push("Bring it up to date first:", `  ${updateWorktreeCommand(loc, workspace.root)}`);
-  }
-  return lines;
+  const dirty = await workspace.worktreeDirty(loc.worktree);
+  // Others push here too, e.g. slices merged into the story branch; catch up before starting.
+  const update = (await github.branchExists(loc.branch)) ? updateWorktreeCommand(loc, workspace.root) : null;
+  return { ...where, worktree: { kind: "exists", dirty, update } };
 }
 
 /** Fast-forwards an existing worktree to its branch on GitHub; a diverged branch fails and says so. */
 export function updateWorktreeCommand(loc: Location, absRoot: string): string {
   const wt = `git -C ${sh(join(absRoot, loc.worktree))}`;
   return `${wt} fetch origin ${sh(loc.branch)} && ${wt} merge --ff-only origin/${sh(loc.branch)}`;
-}
-
-/** git checks a branch out in one worktree only, so no create command can work. */
-export function checkedOutElsewhere(branch: string, path: string) {
-  return `Branch ${branch} is checked out at ${path}; work there or switch that checkout to another branch.`;
 }

@@ -1,4 +1,7 @@
 import { run, type Deps } from "../src/cli.js";
+import { loadConfig } from "../src/config.js";
+import { renderNotification } from "../src/render-text.js";
+import type { Ctx } from "../src/transitions.js";
 import { FakeGitHub } from "./fake-github.js";
 import { FakeWorkspace } from "./fake-workspace.js";
 
@@ -16,8 +19,9 @@ export function setup(opts: { now?: string; session?: string; user?: string } = 
     now: () => now,
     session: opts.session ?? "session-1",
     nonce: () => nonces.shift() ?? `n${++made}`,
-    notify: async (channel, message) => {
-      notifications.push({ channel, ...message });
+    // Recorded as the CLI words them, as the user would see them.
+    notify: async (channel, notification) => {
+      notifications.push({ channel, ...renderNotification(notification) });
     },
     cwd: "/nonexistent",
     installSkills: async () => {
@@ -31,6 +35,12 @@ export function setup(opts: { now?: string; session?: string; user?: string } = 
     nonces,
     setNow(iso: string) {
       now = new Date(iso);
+    },
+    /** What core operations are called with: the deps plus the configuration psdd would load. */
+    async ctx(): Promise<Ctx> {
+      const loaded = await loadConfig(workspace);
+      if (!loaded.ok) throw new Error("the test's configuration does not load");
+      return { ...deps, config: loaded.config, slugs: new Map() };
     },
     async psdd(...argv: string[]) {
       return run(argv, deps);

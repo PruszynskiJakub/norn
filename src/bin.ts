@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { randomBytes } from "node:crypto";
 import { hostname } from "node:os";
-import { ghFailureMessage, run } from "./cli.js";
+import { run } from "./cli.js";
+import { ghFailureMessage, renderNotification } from "./render-text.js";
 import { sessionId } from "./env.js";
 import { GhError, GhGitHub } from "./gh.js";
 import { installSkills } from "./install-skills.js";
@@ -10,13 +11,14 @@ import { makeNotifier } from "./notifier.js";
 
 try {
   const root = await LocalWorkspace.findRoot(process.cwd());
+  const show = makeNotifier();
   const res = await run(process.argv.slice(2), {
     github: new GhGitHub(),
     workspace: new LocalWorkspace(root, process.env, runCommand, process.cwd()),
     now: () => new Date(),
     session: sessionId(process.env, hostname(), root),
     nonce: () => randomBytes(2).toString("hex"),
-    notify: makeNotifier(),
+    notify: (channel, notification) => show(channel, renderNotification(notification)),
     cwd: root,
     installSkills,
   });

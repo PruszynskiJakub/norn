@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest";
-import { ghFailureMessage } from "../src/cli.js";
+import { ghFailureMessage } from "../src/render-text.js";
 
 describe("the message when a gh call fails partway", () => {
   test("says changes may be applied, and how to check and retry the command on its issue", () => {

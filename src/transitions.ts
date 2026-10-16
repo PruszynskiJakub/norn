@@ -3,10 +3,11 @@ import type { GitHub, Issue } from "./github.js";
 import { FIX_STATES, STATES, kindOf, slicesOf, stateOf, type Outcome, type State } from "./machine.js";
 import { locate } from "./location.js";
 import { slugLine, storySlug, type Slugs } from "./slug.js";
-import { sh, sliceBranch, specPath, storyBranch } from "./text.js";
+import { sliceBranch, specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
-import { notifyNeedsHuman, type Notify } from "./notify.js";
+import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
+import { notifyHumanQa, notifyNeedsHuman, type Notify } from "./notify.js";
 
 /** The marker psdd writes when it sets needs-human; psdd next reads the reason back from it. */
 export const NEEDS_HUMAN_MARK = "psdd: needs-human — ";
@@ -130,7 +131,7 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
     await github.comment(n, comment.join("\n"));
     await github.removeLabels(n, remove);
     if (outcome.needsHuman) await notifyNeedsHuman(ctx, n, outcome.needsHuman);
-    else if (outcome.notify) await notifyNeedsHuman(ctx, n, outcome.notify);
+    else if (outcome.notify) await notifyHumanQa(ctx, n, outcome.notify);
   }
 }
 
@@ -138,45 +139,35 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, wor
  * The automatic transitions after an outcome, run once its claim is released.
  * Each is best effort: psdd next repeats them, so a failure is only reported.
  */
-export async function followUps(ctx: Ctx, issue: Issue, outcome: Outcome): Promise<string[]> {
+export async function followUps(ctx: Ctx, issue: Issue, outcome: Outcome): Promise<Event[]> {
   if (kindOf(issue) !== "slice" || outcome.to !== "closed") return [];
   const story = await ctx.github.parentOf(issue.number);
   if (!story) return [];
-  const lines: string[] = [];
+  const events: Event[] = [];
   const loc = await locate(issue, ctx);
-  if (loc && (await ctx.workspace.worktreeExists(loc.worktree))) {
-    lines.push(`Its worktree ${loc.worktree} is removed by the next psdd tidy.`);
-  }
-  lines.push(...(await bestEffort("unblock the slices waiting on it", story, () => syncBlocked(ctx, story))));
-  lines.push(...(await bestEffort("move the story on", story, () => promoteStory(ctx, story))));
-  return lines;
+  if (loc && (await ctx.workspace.worktreeExists(loc.worktree))) events.push({ kind: "worktree-left-for-tidy", worktree: loc.worktree });
+  events.push(...(await bestEffort("unblock-slices", story, story, () => syncBlocked(ctx, story))));
+  events.push(...(await bestEffort("move-story-on", story, story, () => promoteStory(ctx, story))));
+  return events;
 }
 
-/** Runs fn; a failure becomes a report line instead of an error. */
-export async function bestEffort(what: string, story: number, fn: () => Promise<string[]>): Promise<string[]> {
+/** Runs fn; a failure becomes an event instead of an error. `retry` is the story whose psdd next retries it. */
+export async function bestEffort(what: FollowUpTask, issue: number, retry: number, fn: () => Promise<Event[]>): Promise<Event[]> {
   try {
     return await fn();
   } catch (e) {
-    return [`Could not ${what}: ${(e as Error).message}. psdd next ${story} will retry this.`];
+    return [{ kind: "follow-up-failed", what, issue, retry, detail: (e as Error).message }];
   }
 }
 
-export type Ensured = { ok: true; created: boolean; branch: string } | { ok: false; lines: string[] };
+export type Ensured = { ok: true; created: boolean; branch: string } | { ok: false; refusal: BaseBranchMissing };
 
 /** Creates the story branch from the base branch unless it is already on GitHub. */
 export async function ensureStoryBranch(ctx: Ctx, story: Issue): Promise<Ensured> {
   const branch = storyBranch(story.number, await storySlug(ctx, story));
   if (await ctx.github.branchExists(branch)) return { ok: true, created: false, branch };
   const base = ctx.config.baseBranch;
-  if (!(await ctx.github.branchExists(base))) {
-    return {
-      ok: false,
-      lines: [
-        `The story branch ${branch} would start from ${base}, but ${base} does not exist on GitHub.`,
-        `Set baseBranch in .agents/psdd.config.json to the repository's default branch and run the command again.`,
-      ],
-    };
-  }
+  if (!(await ctx.github.branchExists(base))) return { ok: false, refusal: { kind: "base-branch-missing", branch, base } };
   await ctx.github.createBranch(branch, base);
   return { ok: true, created: true, branch };
 }
@@ -253,10 +244,10 @@ export async function clearClosedState(ctx: Ctx, issue: Issue): Promise<boolean>
 
 /**
  * Brings blocked / ready-for-agent in line with native blocked-by relations
- * for the open slices of a story. Returns lines describing changes.
+ * for the open slices of a story. Returns what changed.
  */
-export async function syncBlocked(ctx: Ctx, story: number): Promise<string[]> {
-  const lines: string[] = [];
+export async function syncBlocked(ctx: Ctx, story: number): Promise<Event[]> {
+  const events: Event[] = [];
   for (const slice of await slicesOf(ctx.github, story)) {
     const state = stateOf(slice);
     if (slice.state !== "open" || (state !== "blocked" && state !== "ready-for-agent")) continue;
@@ -265,16 +256,16 @@ export async function syncBlocked(ctx: Ctx, story: number): Promise<string[]> {
     if (want === state) continue;
     const why = open.length ? `Blocked by ${open.map((b) => `#${b.number}`).join(", ")}.` : "All blockers are closed.";
     if (await withShortClaim(ctx, slice.number, () => setState(ctx, slice, want, why))) {
-      lines.push(`#${slice.number} is now ${want}.`);
+      events.push({ kind: "slice-state-changed", issue: slice.number, state: want });
     }
   }
-  return lines;
+  return events;
 }
 
 /** Once every slice is merged, opens the story PR and moves the story to needs-review. */
-export async function promoteStory(ctx: Ctx, storyNumber: number): Promise<string[]> {
+export async function promoteStory(ctx: Ctx, storyNumber: number): Promise<Event[]> {
   const { github } = ctx;
-  const lines: string[] = [];
+  const events: Event[] = [];
   const slices = await slicesOf(github, storyNumber);
   const story = await github.getIssue(storyNumber);
   if (story.state === "open" && slices.length && slices.every((s) => s.state === "closed") && stateOf(story) === "implementation") {
@@ -292,33 +283,32 @@ export async function promoteStory(ctx: Ctx, storyNumber: number): Promise<strin
         }));
       await setState(ctx, story, "needs-review", `Every slice is merged into ${branch}. Story PR: #${pr.number}.`);
     });
-    if (moved) lines.push(`Every slice is merged. Story #${storyNumber} is now in needs-review.`);
+    if (moved) events.push({ kind: "story-promoted", story: storyNumber });
   }
-  return lines;
+  return events;
 }
 
-/** Precondition for finishing a merge: the slice PR is merged. */
-export async function sliceMergeRefusal(ctx: Ctx, slice: Issue): Promise<string[] | null> {
+/** Why a slice's merge cannot finish yet. */
+export type MergeRefusal =
+  | { kind: "not-in-story"; issue: number }
+  | { kind: "no-slice-pr"; issue: number; head: string }
+  /** A slice PR into anything but the story branch skips story review and misses the story PR. */
+  | { kind: "slice-pr-wrong-base"; issue: number; pr: number; head: string; base: string; storyBranch: string; merged: boolean }
+  | { kind: "slice-pr-not-merged"; issue: number; pr: number; head: string; base: string };
+
+/** Precondition for finishing a merge: the slice PR is merged into the story branch. */
+export async function sliceMergeRefusal(ctx: Ctx, slice: Issue): Promise<MergeRefusal | null> {
   const { github } = ctx;
-  const storyNumber = await github.parentOf(slice.number);
-  if (!storyNumber) return [`#${slice.number} is not a sub-issue of a story.`];
+  const n = slice.number;
+  const storyNumber = await github.parentOf(n);
+  if (!storyNumber) return { kind: "not-in-story", issue: n };
   const story = await github.getIssue(storyNumber);
   const slug = await storySlug(ctx, story);
-  const head = sliceBranch(story.number, slug, slice.number);
+  const head = sliceBranch(story.number, slug, n);
   const base = storyBranch(story.number, slug);
   const pr = await github.findPullRequest(head);
-  if (!pr) return [`No PR from ${head} was found. Open and merge it before running psdd done ${slice.number}.`];
-  // A slice PR into anything but the story branch skips story review and misses the story PR.
-  if (pr.base !== base) {
-    return [
-      `PR #${pr.number} from ${head} targets ${pr.base}, not the story branch ${base}.`,
-      pr.state === "merged"
-        ? `Its changes are not on ${base}, and a person must sort that out. Run: psdd escalate ${slice.number} ${sh(`slice PR #${pr.number} was merged into ${pr.base}, not ${base}`)}`
-        : `Retarget it with: gh pr edit ${pr.number} --base ${sh(base)}, then merge it and run psdd done ${slice.number}.`,
-    ];
-  }
-  if (pr.state !== "merged") {
-    return [`PR #${pr.number} from ${head} is not merged yet.`, `Merge it into ${pr.base} (resolve conflicts if needed), then run psdd done ${slice.number}.`];
-  }
+  if (!pr) return { kind: "no-slice-pr", issue: n, head };
+  if (pr.base !== base) return { kind: "slice-pr-wrong-base", issue: n, pr: pr.number, head, base: pr.base, storyBranch: base, merged: pr.state === "merged" };
+  if (pr.state !== "merged") return { kind: "slice-pr-not-merged", issue: n, pr: pr.number, head, base: pr.base };
   return null;
 }
