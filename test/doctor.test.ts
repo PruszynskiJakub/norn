@@ -396,3 +396,17 @@ describe("pointers to norn doctor", () => {
     expect(stdout).toContain("norn --version");
   });
 });
+
+describe("norn doctor: one root cause, one failure", () => {
+  test("without gh, an Enterprise origin is not also called off GitHub", async () => {
+    const { w, norn } = await healthy();
+    w.workspace.origin = "git@github.example.com:acme/app.git";
+    w.github.ghAuthState = { kind: "missing" };
+
+    const body = await json(norn);
+
+    expect(body.checks.find((c) => c.id === "gh")?.level).toBe("fail");
+    expect(body.checks.find((c) => c.id === "git")?.level).toBe("ok");
+    expect(body.checks.filter((c) => c.level === "fail")).toHaveLength(1);
+  });
+});

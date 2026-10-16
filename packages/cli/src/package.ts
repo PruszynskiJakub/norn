@@ -28,4 +28,9 @@ const found = findPackage(here);
 export const BUNDLED_SKILLS = found ? join(found.dir, "skills") : join(here, "..", "skills");
 
 /** The running norn's version, from the package that is running. */
-export const NORN_VERSION: string = found?.version ?? "0.0.0";
+export const NORN_VERSION: string = found ? found.version : missingManifest();
+
+// A made-up version would refuse every repository as incompatible, naming a version that never existed.
+function missingManifest(): never {
+  throw new Error(`norn cannot find its own package.json above ${here}; reinstall norn.`);
+}

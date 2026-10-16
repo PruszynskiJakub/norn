@@ -115,7 +115,8 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
   let auth = await attempt(() => d.github.ghAuth(ghHost));
   let onGitHub = host === "github.com";
   if (host !== null && host !== "github.com") {
-    onGitHub = auth.ok && auth.value.kind === "logged-in";
+    // Without a working gh there is no telling, and the gh check already fails for it.
+    onGitHub = !auth.ok || auth.value.kind !== "logged-out";
     if (!onGitHub && auth.ok && auth.value.kind === "logged-out") {
       ghHost = "github.com";
       auth = await attempt(() => d.github.ghAuth(ghHost));

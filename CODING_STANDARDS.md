@@ -25,8 +25,8 @@ Rules 2–5 are enforced by `test/boundaries.test.ts`.
 ## The CLI
 
 13. The CLI prints one answer to stdout: configuration warnings first, then the result or refusal. Prose is written as instructions to the agent.
-14. Exit codes: 0 for a result, 1 for a refusal, 2 for a usage error.
-15. The `--json` shape is fixed: `{ ok: true, ...data, message }` or `{ ok: false, refusal }`, plus `warnings`. New front ends use the core's result types as a library instead of growing it.
+14. Exit codes: 0 for a result, 1 for a refusal, 2 for a usage error. The one exception is `norn doctor`, which always answers but exits 1 when a check fails, so CI notices.
+15. The `--json` shape is fixed: `{ ok: true, ...data, message }` or `{ ok: false, refusal }`, plus `warnings`. New front ends use the core's result types as a library instead of growing it. The exceptions: `norn doctor --json` gives `{ ok, checks }`, with the config warnings as a check, and `norn --version` prints the bare version.
 
 ## Testing
 
