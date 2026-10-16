@@ -18,8 +18,8 @@ export interface Pkg {
 const CORE = "@psdd/core";
 const TESTING = "@psdd/testing";
 const ADAPTERS = ["@psdd/github-gh", "@psdd/workspace-local"];
-/** Packages that wire adapters to the core: the CLI now, later the runner, dispatcher, web and MCP server. */
-const FRONT_ENDS = ["@psdd/cli"];
+/** Packages that wire adapters to the core: the CLI and the dashboard now, later the runner, dispatcher and MCP server. */
+const FRONT_ENDS = ["@psdd/cli", "@psdd/web"];
 
 const ROOT = join(import.meta.dirname, "..");
 

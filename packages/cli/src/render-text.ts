@@ -28,6 +28,7 @@ import {
   type TidyResult,
   type WaitItem,
 } from "@psdd/core";
+import type { DashboardRefusal, DashboardResult } from "./dashboard.js";
 import type { InitResult, MissingSkills } from "./init.js";
 
 /**
@@ -36,10 +37,20 @@ import type { InitResult, MissingSkills } from "./init.js";
  */
 
 /** What a command can answer with. */
-export type Answer = TakeResult | DoneResult | EscalateResult | ReleaseResult | AddSliceResult | NextResult | StatusResult | TidyResult | InitResult;
+export type Answer =
+  | TakeResult
+  | DoneResult
+  | EscalateResult
+  | ReleaseResult
+  | AddSliceResult
+  | NextResult
+  | StatusResult
+  | TidyResult
+  | InitResult
+  | DashboardResult;
 
 /** Refusals only the CLI makes: how it was called, and init's skill install. */
-export type CliRefusal = { kind: "usage" } | { kind: "needs-number"; command: string } | MissingSkills;
+export type CliRefusal = { kind: "usage" } | { kind: "needs-number"; command: string } | MissingSkills | DashboardRefusal;
 
 export function unreachable(x: never): never {
   throw new Error(`no wording for ${JSON.stringify(x)}`);
@@ -86,6 +97,8 @@ export const USAGE = [
   "  psdd release <issue>               Give up the claim without a transition",
   "  psdd status <story>                Read-only overview of the story and its slices",
   "  psdd tidy [--dry-run]              Remove what belongs to closed issues",
+  "  psdd dashboard [--port <n>] [--interval <duration>] [--no-open]",
+  "                                     Watch your work in the browser; Ctrl-C stops it",
   "",
   "Add --json for machine-readable output.",
 ].join("\n");
@@ -142,6 +155,10 @@ function problem(p: ConfigProblem): string {
       return `${p.file}: notifications must be one of ${p.allowed.join(", ")}`;
     case "bad-deliver-number":
       return `${p.file}: deliver.${p.key} must be a whole number above 0`;
+    case "dashboard-in-team-file":
+      return `${p.file}: dashboard is each developer's own; set it in ${p.local}`;
+    case "bad-dashboard-setting":
+      return p.key === "port" ? `${p.file}: dashboard.port must be a port number` : `${p.file}: dashboard.interval must be a duration like 30s or 2m`;
     default:
       return unreachable(p);
   }
@@ -176,6 +193,10 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       return [USAGE];
     case "needs-number":
       return ["Give the issue number explicitly:", `  ${NEEDS_NUMBER[r.command]}`];
+    case "port-taken":
+      return [`Port ${r.port} is taken. Pick another with --port, or leave it out to use the next free one.`];
+    case "bad-dashboard-flag":
+      return [r.flag === "port" ? "--port takes a port number, e.g. 4477." : "--interval takes a duration such as 30s, 2m or 1h."];
     case "missing-skills":
       return [`Missing skills: ${r.missing.join(", ")}. The skill install did not provide them into skills/.`, "Fix the install and run psdd init again."];
     case "config-invalid":
@@ -335,6 +356,8 @@ export function renderAnswer(a: Answer): string[] {
       return renderStatus(a);
     case "tidy":
       return [renderTidy(a)];
+    case "dashboard":
+      return renderDashboard(a);
     case "initialized":
       return [
         "psdd is set up in this project:",
@@ -351,6 +374,26 @@ export function renderAnswer(a: Answer): string[] {
     default:
       return unreachable(a);
   }
+}
+
+/** A duration in the largest unit that divides it, e.g. 2m, 45s. */
+function duration(ms: number) {
+  if (ms % 3_600_000 === 0) return `${ms / 3_600_000}h`;
+  if (ms % 60_000 === 0) return `${ms / 60_000}m`;
+  return `${Math.round(ms / 1000)}s`;
+}
+
+function renderDashboard(a: DashboardResult): string[] {
+  const raised = a.raisedFrom
+    ? [`psdd warning: --interval ${a.raisedFrom} is below the 30s floor, so the dashboard reads GitHub every ${duration(a.intervalMs)}.`]
+    : [];
+  if (a.launch.kind === "already-running") return [...raised, `psdd dashboard is already running for this repository at ${a.launch.url}.`];
+  const where = `psdd dashboard is running at ${a.launch.url} and reads GitHub every ${duration(a.intervalMs)}.`;
+  return [
+    ...raised,
+    a.launch.port === a.port ? where : `Port ${a.port} is taken, so ${where}`,
+    `${a.launch.opened ? "Opened it" : "Open it"} in your browser. Stop it with Ctrl-C.`,
+  ];
 }
 
 /** git checks a branch out in one worktree only, so no create command can work. */

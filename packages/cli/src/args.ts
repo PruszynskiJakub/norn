@@ -4,9 +4,9 @@ export interface Parsed {
   bools: Set<string>;
 }
 
-const BOOLEAN = new Set(["json", "takeover", "dry-run"]);
+const BOOLEAN = new Set(["json", "takeover", "dry-run", "no-open"]);
 
-/** Minimal parser: `--name value` (repeatable) and boolean `--json`, `--takeover`, `--dry-run`. */
+/** Minimal parser: `--name value` (repeatable) and boolean `--json`, `--takeover`, `--dry-run`, `--no-open`. */
 export function parseArgs(argv: string[]): Parsed {
   const out: Parsed = { positionals: [], flags: {}, bools: new Set() };
   for (let i = 0; i < argv.length; i++) {

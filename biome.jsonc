@@ -4,6 +4,8 @@
   // skills/ and the specs are content for agents, not code.
   "files": { "includes": ["**", "!skills", "!.agents", "!.claude", "!PRD.html"] },
   "formatter": { "indentStyle": "space", "indentWidth": 2, "lineWidth": 160 },
+  // The dashboard UI's stylesheet uses Tailwind v4 directives (@theme, @custom-variant).
+  "css": { "parser": { "tailwindDirectives": true } },
   "javascript": {
     "formatter": { "quoteStyle": "double", "semicolons": "always", "trailingCommas": "all", "arrowParentheses": "always" }
   },

@@ -14,7 +14,7 @@
     "packages/*"
   ],
   "scripts": {
-    "build": "node scripts/build.mjs",
+    "build": "npm run build:ui -w @psdd/web && node scripts/build.mjs",
     "test": "vitest run",
     "typecheck": "tsc -b",
     "lint": "biome check --error-on-warnings .",

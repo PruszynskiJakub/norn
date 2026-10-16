@@ -18,6 +18,9 @@
     },
     {
       "path": "./test"
+    },
+    {
+      "path": "./packages/web/ui"
     }
   ]
 }

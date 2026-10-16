@@ -2,7 +2,7 @@ import { acquire } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
 import { FIX_STATES, STATES, kindOf, slicesOf, stateOf, type Outcome, type State } from "./machine.js";
 import { locate } from "./location.js";
-import { slugLine, storySlug, type Slugs } from "./slug.js";
+import { SLUG_MARK, slugLine, storySlug, type Slugs } from "./slug.js";
 import { sliceBranch, specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
@@ -23,12 +23,27 @@ export function oneLine(text: string) {
 
 /** The reason psdd last gave for needs-human on an issue, read back from its comments. */
 export async function needsHumanReason(github: GitHub, n: number): Promise<string | null> {
-  const comments = await github.listComments(n);
-  for (const body of comments.reverse()) {
-    const line = body.split("\n").find((l) => l.startsWith(NEEDS_HUMAN_MARK));
-    if (line) return line.slice(NEEDS_HUMAN_MARK.length);
+  return lastNeedsHumanReason(await github.listComments(n));
+}
+
+/** The reason in the latest needs-human marker among comments, oldest first. */
+export function lastNeedsHumanReason(comments: string[]): string | null {
+  for (const body of [...comments].reverse()) {
+    const reason = needsHumanIn(body);
+    if (reason !== null) return reason;
   }
   return null;
+}
+
+/** The reason of the needs-human marker in one comment, or null. */
+export function needsHumanIn(body: string): string | null {
+  const line = body.split("\n").find((l) => l.startsWith(NEEDS_HUMAN_MARK));
+  return line === undefined ? null : line.slice(NEEDS_HUMAN_MARK.length);
+}
+
+/** Every comment psdd writes starts so; anything else is a person's. */
+export function isPsddComment(body: string) {
+  return body.startsWith("psdd: ");
 }
 
 export function fixLimitReason(max: number) {
@@ -78,6 +93,59 @@ export interface Evidence {
 }
 
 const IMAGE = /\.(png|jpe?g|gif|webp|svg)$/i;
+const EVIDENCE_HEAD = /^Evidence \((\S+) at (\S+)\):$/;
+/** An evidence file line as evidenceLines writes it: an embedded image or a link, at its commit. */
+const EVIDENCE_FILE = /^(?:!\[(.*)\]\((\S+?)\?raw=true\)|- \[(.*)\]\((\S+)\))$/;
+
+/** A transition comment psdd wrote, read back: what applyOutcome, setState and closeMergedStory put in it. */
+export interface TransitionComment {
+  /** The state before; "triage" for a new issue. */
+  from: string;
+  /** The state after, "closed", or "closed as not planned". */
+  to: string;
+  /** What is in the brackets: the outcome word, "automatic" or "needs-human resolved"; null for none. */
+  why: string | null;
+  /** The note after the markers, as written; null for none. */
+  note: string | null;
+  evidence: Evidence | null;
+  /** The reason of the needs-human marker the comment sets, or null. */
+  needsHuman: string | null;
+}
+
+/**
+ * Reads back a comment psdd wrote on a transition; null for any other. The
+ * inverse of applyOutcome's comment, kept beside it so the two change together.
+ */
+export function parseTransitionComment(body: string): TransitionComment | null {
+  const lines = body.split("\n");
+  const head = /^psdd: (\S+) → (closed as not planned|\S+)(?: \((.+)\))?$/.exec(lines[0]);
+  if (!head) return null;
+  let rest = lines.slice(1);
+  const needsHuman = needsHumanIn(body);
+  if (needsHuman !== null) rest = rest.filter((l) => !l.startsWith(NEEDS_HUMAN_MARK));
+  // The markers come first, each in its own paragraph: the spec link, then the slug.
+  for (const marker of ["Spec: ", SLUG_MARK]) {
+    if (rest[0] === "" && rest[1]?.startsWith(marker)) rest = rest.slice(2);
+  }
+  let evidence: Evidence | null = null;
+  let at = rest.length - 1;
+  while (at >= 0 && !EVIDENCE_HEAD.test(rest[at])) at--;
+  if (at >= 0 && rest.slice(at + 1).every((l) => l === "" || EVIDENCE_FILE.test(l))) {
+    const [, branch] = EVIDENCE_HEAD.exec(rest[at])!;
+    const files: string[] = [];
+    let sha = "";
+    for (const l of rest.slice(at + 1)) {
+      const m = EVIDENCE_FILE.exec(l);
+      if (!m) continue;
+      files.push(m[1] ?? m[3]);
+      sha ||= /\/blob\/([^/]+)\//.exec(m[2] ?? m[4])?.[1] ?? "";
+    }
+    evidence = { branch, sha: sha || EVIDENCE_HEAD.exec(rest[at])![2], files };
+    rest = rest.slice(0, at);
+  }
+  const note = rest.join("\n").trim();
+  return { from: head[1], to: head[2], why: head[3] ?? null, note: note || null, evidence, needsHuman };
+}
 
 /** Markdown that embeds the evidence at its commit: images inline, other files as links. */
 export function evidenceLines(repoUrl: string, e: Evidence): string[] {

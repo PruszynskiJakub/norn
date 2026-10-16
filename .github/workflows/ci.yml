@@ -30,3 +30,24 @@ jobs:
           echo "$out"
           test "$code" -eq 2
           echo "$out" | grep -q "psdd runs work through the SDD process"
+      - name: Serve the dashboard from the installed package
+        working-directory: ${{ runner.temp }}/app
+        run: |
+          # GitHub reads fail in the throwaway project, but the page and its assets are served regardless.
+          npx psdd dashboard --no-open --port 4477 > dashboard.log 2>&1 &
+          pid=$!
+          trap 'kill "$pid" 2>/dev/null || true; cat dashboard.log' EXIT
+          for _ in $(seq 1 30); do
+            curl -sf -o /dev/null http://127.0.0.1:4477/ && break
+            sleep 1
+          done
+          curl -sf http://127.0.0.1:4477/ | tee page.html | grep -q '/assets/app.js'
+          grep -qi '<html' page.html
+          check() {
+            ctype=$(curl -sf -o body -w '%{content_type}' "http://127.0.0.1:4477/assets/$1")
+            echo "$1: $ctype, $(wc -c < body) bytes"
+            echo "$ctype" | grep -q "$2"
+            test -s body
+          }
+          check app.js javascript
+          check app.css text/css
