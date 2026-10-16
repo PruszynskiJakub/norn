@@ -11,6 +11,7 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 - Flows changed under issues in progress: `norn take` moves an issue in a state the flow's `renamed` map names to its new state, with a transition comment, and hands an issue in a state its flow no longer has to a person through `needs-human`, with a comment naming the state and the flow; resolving it moves the issue into the state the person picks.
 - Behaviours in flows: a state opts into `opensPR` (the briefing opens or updates the issue's PR, later states see the PR and its diff), `countsFixRounds` (rework is briefed, and `deliver.maxFixRounds` turns the issue into `needs-human`) and `humanGate` (a person QAs it, with the QA evidence and remarks wording, and is notified). A state naming an unknown behaviour makes its flow invalid.
 - `norn next <issue>` works on an issue of a repository flow: a human gate waits for a person, any other state is offered to start, attended or not as the state says.
+- Mode-conditional states in flows: a state with `"when": "hil"` (or `"afk"`) and a `passThrough` outcome runs only in that mode. For an issue in the other mode, `norn done` follows the pass-through at once and writes one transition comment to where the issue lands, saying which states were skipped and why. A `when` state without a valid `passThrough` makes its flow invalid.
 
 ### Changed
 

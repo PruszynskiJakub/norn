@@ -73,7 +73,7 @@ An automatic transition after an outcome, such as unblocking slices or opening t
 norn's answer when it will not do what was asked: why, and what to do instead.
 
 **Mode**:
-Whether a slice is checked by an agent only (`afk`) or by an agent then a person (`hil`).
+Whether a slice is checked by an agent only (`afk`) or by an agent then a person (`hil`), from its `mode:afk` or `mode:hil` label. A flow's state with `when` runs in that mode only; in the other mode norn passes through it by its `passThrough` outcome.
 
 **Agent QA**:
 QA by an agent that runs the app as a user would and collects evidence per criterion. Every slice and story gets it.

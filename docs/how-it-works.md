@@ -187,11 +187,13 @@ A state opts into norn's built-in mechanics by naming its behaviours. Each one a
 
 A state naming a behaviour norn does not know makes the flow invalid, e.g. a flow written for a newer norn.
 
+A state can run in one mode only: `"when": "hil"` or `"when": "afk"`, with `passThrough` naming one of its outcomes, e.g. `"when": "hil", "passThrough": "verified"` on a state where a person verifies the fix. When an outcome leads into it and the issue carries the other mode's label, norn never enters the state: it follows the pass-through outcome at once, through any further such states, and writes one transition comment straight to where the issue lands, e.g. `norn: fixing → closed (fixed)` followed by `Skipped verifying in mode:afk: it runs in mode:hil only.` In the state's own mode the state runs as usual, and so it does for an issue with no `mode:` label.
+
 `norn next <issue>` works on an issue of a flow too: a human gate or `needs-human` waits for a person, and any other state is offered to start, with the user when it is attended.
 
 Triage chooses the type. Its briefing offers `story`, then one outcome per flow named after the flow, with the flow's `description` as what it means, then `reject`. `norn done <issue> bug` adds `type:bug`, moves the issue to the flow's `start` and assigns it to you, with a transition comment. A flow with `"triage": false` is not offered, and neither is a broken one.
 
-norn checks a flow before it runs it: the start state exists, every target is a state, `closed` or `not-planned`, every `renamed` target is a state, every behaviour is one norn knows, and no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`). A broken flow is refused, with what is wrong, only for the issues of its own type.
+norn checks a flow before it runs it: the start state exists, every target is a state, `closed` or `not-planned`, every `renamed` target is a state, every behaviour is one norn knows, every state with `when` names one of its outcomes as `passThrough`, and no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`). A broken flow is refused, with what is wrong, only for the issues of its own type.
 
 Flows have no versions: an issue in progress follows the current flow from its next step. When `norn take` finds an issue in a state its flow no longer has (the state norn last moved it to, by its transition comments):
 
