@@ -75,6 +75,8 @@ interface RestIssue {
   assignees: { login: string }[];
   /** API URL of the issue's repository, e.g. https://api.github.com/repos/acme/app. */
   repository_url?: string;
+  /** Set when the issue is a pull request. */
+  pull_request?: unknown;
 }
 
 function toIssue(r: RestIssue): Issue {
@@ -149,6 +151,10 @@ export class GhGitHub implements GitHub {
   }
   async getIssue(n: number) {
     return toIssue(await this.rawIssue(n));
+  }
+  async openIssues(label: string) {
+    const all = await this.paginate<RestIssue>(`${REPO}/issues?state=open&labels=${encodeURIComponent(label)}&per_page=100`);
+    return all.filter((r) => r.pull_request === undefined).map(toIssue);
   }
   async addLabels(n: number, labels: string[]) {
     await this.api("POST", `${REPO}/issues/${n}/labels`, { labels });

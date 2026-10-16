@@ -7,7 +7,7 @@ import { specPath, storyBranch } from "./text.js";
 import type { Workspace } from "./workspace.js";
 import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
-import { type Flow, type FlowCache, type Mode, flowStatesOf, loadFlow } from "./flow.js";
+import { type Flow, type FlowCache, type Mode, flowStatesOf, loadFlow, stateLabel } from "./flow.js";
 import { hasSpec } from "./behaviours.js";
 import { notifyHumanQa, notifyNeedsHuman, type Notify } from "./notify.js";
 
@@ -340,22 +340,14 @@ export function stateLabels(issue: Issue, keep?: string, flow: Flow | null = nul
   return (flow ? Object.keys(flow.states) : []).filter((s) => s !== keep && issue.labels.includes(s));
 }
 
-/** A state's label colour and description when the state names none, by its kind. */
-export const DEFAULT_STATE_LABEL = {
-  attended: { color: "c5def5", description: "a person takes part in this step" },
-  agent: { color: "bfd4f2", description: "an agent runs this step unattended" },
-} as const;
-
 /**
  * Creates the label of a state of a flow when the repository lacks it, so a
  * merged flow works without norn init. The colour and description come from the
  * state, or a default by kind; a built-in flow's match what norn init makes.
  */
 export async function ensureStateLabel(ctx: Ctx, flow: Flow, state: string): Promise<void> {
-  const s = flow.states[state];
-  if (!s || (await ctx.github.labelNames()).includes(state)) return;
-  const fallback = s.attended ? DEFAULT_STATE_LABEL.attended : DEFAULT_STATE_LABEL.agent;
-  await ctx.github.ensureLabels([{ name: state, color: s.color ?? fallback.color, description: s.description ?? fallback.description }]);
+  if (!flow.states[state] || (await ctx.github.labelNames()).includes(state)) return;
+  await ctx.github.ensureLabels([stateLabel(flow, state)]);
 }
 
 /**

@@ -66,9 +66,17 @@ export interface Applied {
   fixLimit: number | null;
 }
 
+/** A parameter of a behaviour: its JSON type, whether a state must give it, and what it is, for the error. */
+export interface BehaviourParam {
+  type: "string" | "boolean";
+  required: boolean;
+  /** What it must be, e.g. "a state of the flow". */
+  expected: string;
+}
+
 export interface Behaviour {
-  /** What is wrong with its parameters: the parameter's name and what it must be. */
-  params?(params: BehaviourParams): { param: string; expected: string }[];
+  /** The parameters it takes, by name; none when missing. The validator and the flow JSON Schema both follow these. */
+  params?: Record<string, BehaviourParam>;
   /** Behaviours the same state cannot also have. */
   excludes?: readonly string[];
   /** What the flow must be like for the behaviour to work, e.g. a workspace; the field and what it must be. */
@@ -121,7 +129,7 @@ export function hasSpec(flow: Flow): boolean {
 }
 
 const writesSpec: Behaviour = {
-  params: (p) => (p.readsIssue === undefined || typeof p.readsIssue === "boolean" ? [] : [{ param: "readsIssue", expected: "true or false" }]),
+  params: { readsIssue: { type: "boolean", required: false, expected: "true or false" } },
   /** The spec lives on the issue's own branch. */
   requires: (flow) => (flow.workspace === "own" ? null : { field: "workspace", expected: '"own", for the spec\'s branch' }),
   /** Every step works on the spec; in its state, the step writes it, from the issue's discussion when readsIssue says so, and pushes it. */
@@ -163,7 +171,7 @@ export async function slicesOf(github: Pick<GitHub, "subIssues">, parent: number
 }
 
 const slices: Behaviour = {
-  params: (p) => (typeof p.type === "string" ? [] : [{ param: "type", expected: "a flow's name" }]),
+  params: { type: { type: "string", required: true, expected: "a flow's name" } },
   /** The slices get the type it names, which must be a flow. */
   flowsNamed: (p) => (typeof p.type === "string" ? [p.type] : []),
   /** In its state, how to create the slices with norn add-slice and give them bodies. */
@@ -205,7 +213,7 @@ function waitState(flow: Flow): { held: string; to: string } | null {
 }
 
 const waitsForSlices: Behaviour = {
-  params: (p) => (typeof p.to === "string" ? [] : [{ param: "to", expected: "a state of the flow" }]),
+  params: { to: { type: "string", required: true, expected: "a state of the flow" } },
   leadsTo: (p) => (typeof p.to === "string" ? [{ param: "to", to: p.to }] : []),
   /** The slices' PRs go into the issue's own branch, and its own PR into the base branch. */
   requires: (flow) => (flow.workspace === "own" ? null : { field: "workspace", expected: '"own", for the branch its slices merge into' }),
@@ -433,7 +441,7 @@ const mergesSlice: Behaviour = {
 };
 
 const syncsBlocked: Behaviour = {
-  params: (p) => (typeof p.to === "string" ? [] : [{ param: "to", expected: "a state of the flow" }]),
+  params: { to: { type: "string", required: true, expected: "a state of the flow" } },
   leadsTo: (p) => (typeof p.to === "string" ? [{ param: "to", to: p.to }] : []),
   holds: true,
   async held({ ctx, issue }, story) {

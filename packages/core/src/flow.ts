@@ -62,6 +62,8 @@ export type FlowError =
   | { kind: "not-json"; detail: string }
   /** A field is missing or has the wrong type; `path` is e.g. "states.fixing.outcomes.fixed.to". */
   | { kind: "field-invalid"; path: string; expected: string }
+  /** A field the format does not have, e.g. a misspelt one, which norn would otherwise ignore. */
+  | { kind: "field-unknown"; path: string }
   | { kind: "start-unknown"; start: string }
   | { kind: "target-unknown"; state: string; word: string; to: string }
   /** `renamed` moves the old state `from` to `to`, which is not a state of the flow. */
@@ -85,6 +87,11 @@ export type FlowError =
   | { kind: "behaviour-needs"; state: string; behaviour: string; field: string; expected: string }
   /** The flow's name is one norn keeps for itself, e.g. reject, triage's outcome. */
   | { kind: "flow-reserved"; flow: string };
+
+/** The fields of a flow file, of a state and of an outcome; $schema lets an editor find the flow JSON Schema. */
+const FLOW_FIELDS = ["$schema", "description", "start", "workspace", "triage", "states", "renamed"];
+const STATE_FIELDS = ["skill", "attended", "name", "enterAs", "description", "color", "evidence", "when", "passThrough", "behaviours", "outcomes"];
+const OUTCOME_FIELDS = ["to", "means", "meansSkipped", "note", "needsHuman", "notify"];
 
 /** Ends every flow can lead to; no state may take these names. */
 export const RESERVED_TARGETS = ["closed", "not-planned"] as const;
@@ -120,6 +127,10 @@ export function validateFlow(data: unknown): FlowError[] {
     field("", "an object");
     return errors;
   }
+  const unknown = (at: string, value: Record<string, unknown>, fields: string[]) => {
+    for (const key of Object.keys(value)) if (!fields.includes(key)) errors.push({ kind: "field-unknown", path: at ? `${at}.${key}` : key });
+  };
+  unknown("", data, FLOW_FIELDS);
   if (typeof data.description !== "string") field("description", "a string");
   if (typeof data.start !== "string") field("start", "a string");
   if (data.workspace !== "none" && data.workspace !== "own" && data.workspace !== "parent") field("workspace", '"none", "own" or "parent"');
@@ -136,9 +147,11 @@ export function validateFlow(data: unknown): FlowError[] {
       field(at, "an object");
       continue;
     }
+    unknown(at, state, STATE_FIELDS);
     if (typeof state.skill !== "string") field(`${at}.skill`, "a string");
     if (typeof state.attended !== "boolean") field(`${at}.attended`, "true or false");
     for (const key of ["name", "description", "color"]) if (state[key] !== undefined && typeof state[key] !== "string") field(`${at}.${key}`, "a string");
+    if (typeof state.color === "string" && !/^[0-9a-fA-F]{6}$/.test(state.color)) field(`${at}.color`, "a hex colour without the #, e.g. 1d76db");
     if (state.evidence !== undefined && typeof state.evidence !== "boolean") field(`${at}.evidence`, "true or false");
     if (state.behaviours !== undefined) checkBehaviours(data, name, state.behaviours, errors);
     if (state.enterAs !== undefined && (typeof state.enterAs !== "string" || !Object.hasOwn(states, state.enterAs))) {
@@ -159,6 +172,7 @@ export function validateFlow(data: unknown): FlowError[] {
         field(o, "an object");
         continue;
       }
+      unknown(o, outcome, OUTCOME_FIELDS);
       if (typeof outcome.means !== "string") field(`${o}.means`, "a string");
       for (const key of ["note", "needsHuman", "meansSkipped"])
         if (outcome[key] !== undefined && typeof outcome[key] !== "string") field(`${o}.${key}`, "a string");
@@ -204,7 +218,13 @@ function checkBehaviours(flow: Record<string, unknown>, state: string, behaviour
     const rule: Behaviour = BEHAVIOURS[behaviour];
     if (!isObject(params)) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}`, expected: "an object of parameters, {} for none" });
     else {
-      for (const p of rule.params?.(params) ?? []) errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${p.param}`, expected: p.expected });
+      const declared = rule.params ?? {};
+      for (const [name, p] of Object.entries(declared)) {
+        const value = params[name];
+        if ((value === undefined && p.required) || (value !== undefined && typeof value !== p.type))
+          errors.push({ kind: "field-invalid", path: `${at}.${behaviour}.${name}`, expected: p.expected });
+      }
+      for (const name of Object.keys(params)) if (!Object.hasOwn(declared, name)) errors.push({ kind: "field-unknown", path: `${at}.${behaviour}.${name}` });
       const states = isObject(flow.states) ? flow.states : {};
       for (const l of rule.leadsTo?.(params) ?? []) {
         if (!Object.hasOwn(states, l.to) && !(RESERVED_TARGETS as readonly string[]).includes(l.to))
@@ -342,14 +362,24 @@ export function repositoryFlow(
   if (!flow) {
     flow = ctx.github
       .readFileAt(`${FLOWS_DIR}/${name}.json`, ctx.config.baseBranch)
-      .then((text) => (text === null ? null : checkFlowsNamed(ctx, parseFlow(name, text))));
+      .then((text) =>
+        text === null
+          ? null
+          : checkFlowsNamed(
+              parseFlow(name, text),
+              async (other) => (await ctx.github.readFileAt(`${FLOWS_DIR}/${other}.json`, ctx.config.baseBranch)) !== null,
+            ),
+      );
     ctx.flows.set(name, flow);
   }
   return flow;
 }
 
-/** A valid flow whose behaviours name flows the repository does not have is kept with those errors. */
-async function checkFlowsNamed(ctx: Parameters<typeof repositoryFlow>[0], loaded: LoadedFlow): Promise<LoadedFlow> {
+/**
+ * A valid flow whose behaviours name flows that do not exist is kept with those errors. `exists` says whether a flow
+ * that is not built in exists, e.g. on the base branch.
+ */
+export async function checkFlowsNamed(loaded: LoadedFlow, exists: (flow: string) => Promise<boolean>): Promise<LoadedFlow> {
   if (!loaded.ok) return loaded;
   const named = Object.entries(loaded.flow.states).flatMap(([state, s]) =>
     Object.entries(s.behaviours ?? {}).flatMap(([behaviour, params]) => {
@@ -357,11 +387,21 @@ async function checkFlowsNamed(ctx: Parameters<typeof repositoryFlow>[0], loaded
       return (rule.flowsNamed?.(params ?? {}) ?? []).map((flow) => ({ state, behaviour, flow }));
     }),
   );
-  const exists = async (flow: string) =>
-    BUILT_IN_FLOWS.includes(flow) || (await ctx.github.readFileAt(`${FLOWS_DIR}/${flow}.json`, ctx.config.baseBranch)) !== null;
   const errors: FlowError[] = [];
-  for (const n of named) if (!(await exists(n.flow))) errors.push({ kind: "flow-unknown", ...n });
+  for (const n of named) if (!BUILT_IN_FLOWS.includes(n.flow) && !(await exists(n.flow))) errors.push({ kind: "flow-unknown", ...n });
   return errors.length ? { ok: false, name: loaded.name, errors } : loaded;
+}
+
+/** A flow file's name is a type name. */
+const FLOW_NAME = /^[a-z0-9][a-z0-9_-]*$/;
+
+/** The flow names of the files in a list of a flows directory, sorted; files that cannot name a type are left out. */
+export function flowFileNames(files: string[]): string[] {
+  return files
+    .filter((file) => file.endsWith(".json"))
+    .map((file) => file.slice(0, -".json".length))
+    .filter((name) => FLOW_NAME.test(name))
+    .sort();
 }
 
 /**
@@ -373,11 +413,7 @@ async function checkFlowsNamed(ctx: Parameters<typeof repositoryFlow>[0], loaded
 export async function repositoryFlows(
   ctx: Parameters<typeof repositoryFlow>[0] & { github: { listFilesAt(dir: string, ref: string): Promise<string[]> } },
 ): Promise<SourcedFlow[]> {
-  const names = (await ctx.github.listFilesAt(FLOWS_DIR, ctx.config.baseBranch))
-    .filter((file) => file.endsWith(".json"))
-    .map((file) => file.slice(0, -".json".length))
-    .filter((name) => /^[a-z0-9][a-z0-9_-]*$/.test(name) && !BUILT_IN_FLOWS.includes(name))
-    .sort();
+  const names = flowFileNames(await ctx.github.listFilesAt(FLOWS_DIR, ctx.config.baseBranch)).filter((name) => !BUILT_IN_FLOWS.includes(name));
   const loaded = await Promise.all(
     [...BUILT_IN_FLOWS, ...names].map(async (name): Promise<SourcedFlow | null> => {
       const own = await repositoryFlow(ctx, name);
@@ -394,6 +430,42 @@ export async function triageFlows(ctx: Parameters<typeof repositoryFlows>[0]): P
   return (await repositoryFlows(ctx)).flatMap((l) =>
     l.ok && !RESERVED_FLOWS.includes(l.name) && l.flow.triage !== false ? [{ name: l.name, flow: l.flow }] : [],
   );
+}
+
+/** A GitHub label as norn creates it. */
+export interface LabelDefinition {
+  name: string;
+  /** Hex without the #. */
+  color: string;
+  description: string;
+}
+
+/** The colour and description of a state's label when the flow gives none, by the state's kind. */
+export const DEFAULT_STATE_LABEL = {
+  attended: { color: "c5def5", description: "a person takes part in this step" },
+  agent: { color: "bfd4f2", description: "an agent runs this step unattended" },
+} as const;
+
+/** The label of a state of the flow: the state's colour and description, or the defaults of its kind. */
+export function stateLabel(flow: Flow, state: string): LabelDefinition {
+  const s = flow.states[state];
+  const fallback = s.attended ? DEFAULT_STATE_LABEL.attended : DEFAULT_STATE_LABEL.agent;
+  return { name: state, color: s.color ?? fallback.color, description: s.description ?? fallback.description };
+}
+
+/** The label of the type that runs the flow. */
+export function typeLabel(name: string): LabelDefinition {
+  return { name: `type:${name}`, color: "ededed", description: `norn ${name} flow` };
+}
+
+/**
+ * The labels the flows need: every state, each once, as the first flow that has it defines it, then type:<flow> for
+ * each flow, in the flows' order.
+ */
+export function flowLabels(flows: { name: string; flow: Flow }[]): LabelDefinition[] {
+  const states = new Map<string, LabelDefinition>();
+  for (const { flow } of flows) for (const state of Object.keys(flow.states)) if (!states.has(state)) states.set(state, stateLabel(flow, state));
+  return [...states.values(), ...flows.map(({ name }) => typeLabel(name))];
 }
 
 /** Triage's step with an outcome for each offered flow, before reject. */

@@ -78,4 +78,5 @@ This needs the `delete_repo` scope once: `gh auth refresh -s delete_repo`.
 ## Next steps
 
 - [How norn works](how-it-works.md): the process, labels, claims and delivery in detail.
+- [Flows](flows.md): how a repository defines its own process.
 - [Commands](commands.md) and [configuration](configuration.md).

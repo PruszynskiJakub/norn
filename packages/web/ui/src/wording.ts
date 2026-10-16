@@ -413,6 +413,8 @@ export function flowErrorText(e: FlowError): string {
       return `The file isn't JSON: ${e.detail}`;
     case "field-invalid":
       return e.path ? `${e.path} must be ${e.expected}.` : `The flow must be ${e.expected}.`;
+    case "field-unknown":
+      return `${e.path} is no field of the flow format.`;
     case "start-unknown":
       return `start names ${e.start}, which is no state of the flow.`;
     case "target-unknown":

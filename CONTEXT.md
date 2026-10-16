@@ -28,10 +28,10 @@ The person a story is assigned to. They own its slices too, and only they merge 
 ## Process
 
 **Flow**:
-The process for one issue, as data: its states, the skill and outcomes of each, where it starts and its workspace. A repository defines a flow in `.agents/flows/<name>.json`, read from the base branch on GitHub. norn ships the built-in `story` and `slice` flows in the same format.
+The process for one issue, as data: its states, the skill and outcomes of each, where it starts and its workspace. A repository defines a flow in `.agents/flows/<name>.json`, read from the base branch on GitHub. norn ships the built-in `story` and `slice` flows in the same format, and publishes the format as a JSON Schema. See [`docs/flows.md`](docs/flows.md).
 
 **Type**:
-The flow an issue runs, carried as its `type:<name>` label, e.g. `type:bug` runs the flow `bug`.
+The flow an issue runs, carried as its `type:<name>` label, e.g. `type:bug` runs the flow `bug`. Triage gives an issue its type; an issue with none is new.
 
 **Behaviour**:
 A built-in mechanic a state of a flow opts into by name, e.g. `slices`, `waitsForSlices`, `opensPR`, `humanGate` or `syncsBlocked`. It adds its lines to the briefing, its checks and changes to `norn done`, what an issue it holds waits for, and its follow-ups. The set is closed: a flow names behaviours, it cannot define them.
