@@ -342,16 +342,51 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
     case "not-in-story":
       return [`#${r.issue} is not a sub-issue of another issue.`];
     case "no-slice-pr":
-      return [`No PR from ${r.head} was found. Open and merge it before running norn done ${r.issue}.`];
+      return [`No PR from ${r.head} was found. Open it, then run norn done ${r.issue} again.`];
     case "slice-pr-wrong-base":
       return [
         `PR #${r.pr} from ${r.head} targets ${r.base}, not the parent's branch ${r.storyBranch}.`,
         r.merged
           ? `Its changes are not on ${r.storyBranch}, and a person must sort that out. Run: norn escalate ${r.issue} ${sh(`PR #${r.pr} was merged into ${r.base}, not ${r.storyBranch}`)}`
-          : `Retarget it with: gh pr edit ${r.pr} --base ${sh(r.storyBranch)}, then merge it and run norn done ${r.issue}.`,
+          : `Retarget it with: gh pr edit ${r.pr} --base ${sh(r.storyBranch)}, then run norn done ${r.issue} again.`,
       ];
-    case "slice-pr-not-merged":
-      return [`PR #${r.pr} from ${r.head} is not merged yet.`, `Merge it into ${r.base} (resolve conflicts if needed), then run norn done ${r.issue}.`];
+    case "slice-pr-closed":
+      return [
+        `PR #${r.pr} from ${r.head} is closed without being merged.`,
+        `Reopen it with gh pr reopen ${r.pr}, or open a new one into ${r.base}, then run norn done ${r.issue} again.`,
+      ];
+    case "slice-pr-conflicts":
+      return [
+        `#${r.issue}: PR #${r.pr} has conflicts with ${r.base}.`,
+        `Merge origin/${r.base} into ${r.head}, resolve them, run the checks and push, then run norn done ${r.issue} again.`,
+      ];
+    case "slice-pr-behind":
+      return [
+        `#${r.issue}: PR #${r.pr} is behind ${r.base}, so its checks did not run on what the merge would make.`,
+        `Merge origin/${r.base} into ${r.head}, run the checks and push, then run norn done ${r.issue} again.`,
+      ];
+    case "slice-pr-mergeability-unknown":
+      return [`#${r.issue}: GitHub is still working out whether PR #${r.pr} can merge. Run norn done ${r.issue} again in a minute.`];
+    case "slice-pr-checks-failed": {
+      const names = r.checks.map((c) => `"${c}"`).join(", ");
+      return [
+        `#${r.issue}: ${r.checks.length === 1 ? "check" : "checks"} ${names} failed on PR #${r.pr}. Fix it and push, then run norn done ${r.issue} again.`,
+      ];
+    }
+    case "slice-pr-checks-pending":
+      return [
+        `#${r.issue}: ${r.pending} ${r.pending === 1 ? "check" : "checks"} on PR #${r.pr} ${r.pending === 1 ? "is" : "are"} still running. Run norn done ${r.issue} again when they finish.`,
+      ];
+    case "slice-pr-head-moved":
+      return [
+        `#${r.issue}: PR #${r.pr} moved to a new commit while norn read its checks, so norn did not merge it.`,
+        `Bring ${r.head} up to date with origin/${r.base} and origin/${r.head}, run the checks and push, then run norn done ${r.issue} again.`,
+      ];
+    case "slice-pr-merge-refused":
+      return [
+        `#${r.issue}: GitHub refused to merge PR #${r.pr}: ${r.detail}`,
+        `A person must sort that out. Run: norn escalate ${r.issue} ${sh(`GitHub refused to merge PR #${r.pr}: ${r.detail}`)}`,
+      ];
     case "base-branch-missing":
       return [
         `The branch ${r.branch} would start from ${r.base}, but ${r.base} does not exist on GitHub.`,

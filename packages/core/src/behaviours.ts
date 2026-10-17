@@ -9,7 +9,7 @@ import type { Gate } from "./notify.js";
 import type { Refusal } from "./refusals.js";
 import type { WaitItem } from "./waiting.js";
 import { sh, specPath } from "./text.js";
-import { bestEffort, type Ctx, fixLimitReason, fixRounds, mergeRefusal, oneLine, setState, stateLabels, withShortClaim } from "./transitions.js";
+import { bestEffort, type Ctx, fixLimitReason, fixRounds, mergeRefusal, mergeSlicePr, oneLine, setState, stateLabels, withShortClaim } from "./transitions.js";
 
 /**
  * Behaviours are norn's built-in mechanics that a state of a flow opts into by
@@ -104,6 +104,11 @@ export interface Behaviour {
   briefing?(b: BriefingInput): Promise<string[]>;
   /** Checked by done before an issue leaves a state with the behaviour, before anything changes; a refusal stops done. */
   leave?(o: OutcomeInput): Promise<Refusal | null>;
+  /**
+   * The work the step leaves to norn, done by done once every leave check of the state passed and before the outcome is
+   * applied, e.g. merging the slice PR. A refusal stops done; the work either happened or changed nothing.
+   */
+  onLeave?(o: OutcomeInput): Promise<Refusal | null>;
   /** Checked by done before an outcome closes an issue of a flow that uses the behaviour in any state, as leave is. */
   close?(o: OutcomeInput): Promise<Refusal | null>;
   /** Run by done for an outcome into a state with the behaviour, before it is applied: may change what is applied. */
@@ -418,17 +423,23 @@ const countsFixRounds: Behaviour = {
 const mergesSlice: Behaviour = {
   /** The PR it merges goes into the parent's branch. */
   workspaces: ["parent"],
-  /** In its state, how to bring the branch up to date and merge its PR. */
-  async briefing({ flow, state, loc }) {
+  /** In its state, how to make the branch ready to merge; norn done merges the PR. */
+  async briefing({ issue, flow, state, loc }) {
     if (!loc || !uses(flow, state, "mergesSlice")) return [];
     return [
-      `Merge origin/${loc.base} into ${loc.branch}, resolving conflicts if needed, and push.`,
-      `Then merge the PR: gh pr merge ${sh(loc.branch)} --merge`,
+      `Bring ${loc.branch} up to date: merge origin/${loc.base} into it, resolving conflicts if needed.`,
+      "Run the repository's checks, fix what the merge broke, and push.",
+      `Then finish with norn done ${issue.number}: norn merges the PR into ${loc.base} once its checks pass on the commit you pushed.`,
+      `Do not merge the PR yourself, with gh pr merge or otherwise.`,
     ];
   },
-  /** The issue moves on only once its PR is merged into the parent's branch; resolving needs-human stays put and needs none. */
+  /** The issue moves on only from a PR into the parent's branch, open or merged; resolving needs-human stays put and needs none. */
   async leave({ ctx, issue, flow, from, outcome }) {
     return from === outcome.to ? null : mergeRefusal(ctx, issue, flow);
+  },
+  /** norn merges the PR into the parent's branch, so an agent needs no permission to merge. */
+  async onLeave({ ctx, issue, flow, from, outcome }) {
+    return from === outcome.to ? null : mergeSlicePr(ctx, issue, flow);
   },
   /**
    * Once merged and closed, its worktree waits for norn tidy, and the parent moves on: the issues the merge unblocked
@@ -499,6 +510,15 @@ function inState(flow: Flow, state: string | null): Behaviour[] {
 export async function leaveRefusal(o: OutcomeInput): Promise<Refusal | null> {
   for (const behaviour of inState(o.flow, o.from)) {
     const refusal = await behaviour.leave?.(o);
+    if (refusal) return refusal;
+  }
+  return null;
+}
+
+/** The work the behaviours of the state the issue leaves do before it leaves; the refusal of the first that cannot. */
+export async function leaveWork(o: OutcomeInput): Promise<Refusal | null> {
+  for (const behaviour of inState(o.flow, o.from)) {
+    const refusal = await behaviour.onLeave?.(o);
     if (refusal) return refusal;
   }
   return null;

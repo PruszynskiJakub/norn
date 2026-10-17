@@ -393,25 +393,77 @@ export async function clearClosedState(ctx: Ctx, issue: Issue, flow: Flow | null
   return withShortClaim(ctx, issue.number, () => ctx.github.removeLabels(issue.number, left));
 }
 
-/** Why a slice's merge cannot finish yet. */
+/** Why a slice's merge cannot finish yet. `pr` is the slice PR, `head` its branch and `base` the parent's branch it goes into. */
 export type MergeRefusal =
   | { kind: "not-in-story"; issue: number }
   | { kind: "no-slice-pr"; issue: number; head: string }
   /** A slice PR into anything but the story branch skips story review and misses the story PR. */
   | { kind: "slice-pr-wrong-base"; issue: number; pr: number; head: string; base: string; storyBranch: string; merged: boolean }
-  | { kind: "slice-pr-not-merged"; issue: number; pr: number; head: string; base: string };
+  /** The PR was closed without being merged. */
+  | { kind: "slice-pr-closed"; issue: number; pr: number; head: string; base: string }
+  | { kind: "slice-pr-conflicts"; issue: number; pr: number; head: string; base: string }
+  /** The PR lacks commits of the parent's branch, so its checks did not run on what the merge makes. */
+  | { kind: "slice-pr-behind"; issue: number; pr: number; head: string; base: string }
+  /** GitHub is still working out whether the PR merges cleanly. */
+  | { kind: "slice-pr-mergeability-unknown"; issue: number; pr: number }
+  /** `checks` are the names of the failed ones. */
+  | { kind: "slice-pr-checks-failed"; issue: number; pr: number; checks: string[] }
+  /** `pending` is how many are still running. */
+  | { kind: "slice-pr-checks-pending"; issue: number; pr: number; pending: number }
+  /** The PR's head moved after norn read its checks, so the commit merged would be one nobody checked. */
+  | { kind: "slice-pr-head-moved"; issue: number; pr: number; head: string; base: string }
+  /** GitHub refused the merge, e.g. for branch protection on the parent's branch; `detail` is its reason. */
+  | { kind: "slice-pr-merge-refused"; issue: number; pr: number; detail: string };
 
-/** Precondition for finishing a merge: the PR from the issue's branch is merged into its parent's branch. */
-export async function mergeRefusal(ctx: Ctx, issue: Issue, flow: Flow): Promise<MergeRefusal | null> {
-  const { github } = ctx;
+/** The slice PR from the issue's branch, where it must go, and why there is none to merge; see mergeRefusal. */
+async function slicePr(ctx: Ctx, issue: Issue, flow: Flow) {
   const n = issue.number;
   const loc = await locate(issue, ctx, flow);
-  if (!loc) return { kind: "not-in-story", issue: n };
+  if (!loc) return { refusal: { kind: "not-in-story", issue: n } as MergeRefusal };
   const head = loc.branch;
   const base = loc.base;
-  const pr = await github.findPullRequest(head);
-  if (!pr) return { kind: "no-slice-pr", issue: n, head };
-  if (pr.base !== base) return { kind: "slice-pr-wrong-base", issue: n, pr: pr.number, head, base: pr.base, storyBranch: base, merged: pr.state === "merged" };
-  if (pr.state !== "merged") return { kind: "slice-pr-not-merged", issue: n, pr: pr.number, head, base: pr.base };
-  return null;
+  const pr = await ctx.github.findPullRequest(head);
+  if (!pr) return { refusal: { kind: "no-slice-pr", issue: n, head } as MergeRefusal };
+  // Never the base branch: the story PR into it stays its owner's to merge.
+  if (pr.base !== base || base === ctx.config.baseBranch) {
+    return {
+      refusal: { kind: "slice-pr-wrong-base", issue: n, pr: pr.number, head, base: pr.base, storyBranch: base, merged: pr.state === "merged" } as MergeRefusal,
+    };
+  }
+  if (pr.state === "closed") return { refusal: { kind: "slice-pr-closed", issue: n, pr: pr.number, head, base } as MergeRefusal };
+  return { pr, head, base };
+}
+
+/** Precondition for finishing a merge: the PR from the issue's branch goes into its parent's branch, and is open or merged there. */
+export async function mergeRefusal(ctx: Ctx, issue: Issue, flow: Flow): Promise<MergeRefusal | null> {
+  return (await slicePr(ctx, issue, flow)).refusal ?? null;
+}
+
+/**
+ * Merges the slice PR into its parent's branch, with a merge commit, once it is ready: no conflicts, up to date with the
+ * parent's branch, and every check on its head passed (a repository without checks merges once it is mergeable). Only
+ * the head whose checks were read is merged. A PR a person already merged needs nothing. A refusal changes nothing.
+ */
+export async function mergeSlicePr(ctx: Ctx, issue: Issue, flow: Flow): Promise<MergeRefusal | null> {
+  const found = await slicePr(ctx, issue, flow);
+  if (found.refusal) return found.refusal;
+  const { pr, head, base } = found;
+  if (pr.state === "merged") return null;
+  const n = issue.number;
+  const at = { issue: n, pr: pr.number };
+  const ready = await ctx.github.pullRequestReadiness(pr.number);
+  if (ready.mergeable === "conflicting") return { kind: "slice-pr-conflicts", ...at, head, base };
+  if (ready.mergeable === "unknown") return { kind: "slice-pr-mergeability-unknown", ...at };
+  if (ready.behind) return { kind: "slice-pr-behind", ...at, head, base };
+  const failed = ready.checks.filter((c) => c.state === "failed").map((c) => c.name);
+  if (failed.length) return { kind: "slice-pr-checks-failed", ...at, checks: failed };
+  const pending = ready.checks.filter((c) => c.state === "pending").length;
+  if (pending) return { kind: "slice-pr-checks-pending", ...at, pending };
+  const merge = await ctx.github.mergeAtHead(pr.number, ready.headSha);
+  if (merge.merged) return null;
+  // GitHub's words are not parsed: the head is read again to tell a push in between from any other refusal.
+  const now = await ctx.github.findPullRequest(head);
+  if (now?.state === "merged") return null;
+  if ((await ctx.github.pullRequestReadiness(pr.number)).headSha !== ready.headSha) return { kind: "slice-pr-head-moved", ...at, head, base };
+  return { kind: "slice-pr-merge-refused", ...at, detail: merge.detail };
 }

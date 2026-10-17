@@ -587,21 +587,25 @@ describe("mergesSlice", () => {
 
     const out = (await w.norn("take", "140")).stdout;
 
-    expect(out).toContain("Merge origin/123-rate-limiting into 123-rate-limiting-140, resolving conflicts if needed, and push.");
-    expect(out).toContain("Then merge the PR: gh pr merge 123-rate-limiting-140 --merge");
+    expect(out).toContain("Bring 123-rate-limiting-140 up to date: merge origin/123-rate-limiting into it, resolving conflicts if needed.");
+    expect(out).toContain("Then finish with norn done 140: norn merges the PR into 123-rate-limiting once its checks pass on the commit you pushed.");
     expect(out).not.toContain("Task PR:");
   });
 
-  test("done is refused until the PR is merged into the parent's branch", async () => {
+  test("done merges the PR into the parent's branch once its checks pass, and is refused until then", async () => {
     const w = taskAt("merging");
     w.github.prs.push({ number: 50, head: "123-rate-limiting-140", base: "123-rate-limiting", state: "open" });
+    w.github.readiness.set(50, { checks: [{ name: "test", state: "pending" }] });
     await w.norn("take", "140");
 
-    const res = await w.norn("done", "140");
-
-    expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("PR #50 from 123-rate-limiting-140 is not merged yet");
+    const refused = await w.norn("done", "140");
+    expect(refused.exitCode).toBe(1);
+    expect(refused.stdout).toContain("#140: 1 check on PR #50 is still running. Run norn done 140 again when they finish.");
     expect(w.github.issues.get(140)!.state).toBe("open");
+
+    w.github.readiness.set(50, { checks: [{ name: "test", state: "passed" }] });
+    expect((await w.norn("done", "140")).exitCode).toBe(0);
+    expect(w.github.merges.map((m) => m.number)).toEqual([50]);
   });
 
   test("resolving needs-human in the state needs no merged PR", async () => {

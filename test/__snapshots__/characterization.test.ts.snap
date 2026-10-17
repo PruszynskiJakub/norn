@@ -357,6 +357,20 @@ exports[`output of every command, text and --json > done agent QA pass on a hil 
 A person does the next step, so do not take #65 again. norn has notified the user."
 `;
 
+exports[`output of every command, text and --json > done merge GitHub refuses > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "#127: GitHub refused to merge PR #70: At least 1 approving review is required by reviewers with write access.\\nA person must sort that out. Run: norn escalate 127 'GitHub refused to merge PR #70: At least 1 approving review is required by reviewers with write access.'"
+}"
+`;
+
+exports[`output of every command, text and --json > done merge GitHub refuses > text 1`] = `
+"exit 1
+#127: GitHub refused to merge PR #70: At least 1 approving review is required by reviewers with write access.
+A person must sort that out. Run: norn escalate 127 'GitHub refused to merge PR #70: At least 1 approving review is required by reviewers with write access.'"
+`;
+
 exports[`output of every command, text and --json > done merge of a slice outside a story > json 1`] = `
 "exit 1
 {
@@ -405,18 +419,46 @@ Its worktree .agents/worktrees/123-rate-limiting-127 is removed by the next norn
 #131 is now ready-for-agent."
 `;
 
+exports[`output of every command, text and --json > done merge with a PR behind the story branch > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "#127: PR #70 is behind 123-rate-limiting, so its checks did not run on what the merge would make.\\nMerge origin/123-rate-limiting into 123-rate-limiting-127, run the checks and push, then run norn done 127 again."
+}"
+`;
+
+exports[`output of every command, text and --json > done merge with a PR behind the story branch > text 1`] = `
+"exit 1
+#127: PR #70 is behind 123-rate-limiting, so its checks did not run on what the merge would make.
+Merge origin/123-rate-limiting into 123-rate-limiting-127, run the checks and push, then run norn done 127 again."
+`;
+
+exports[`output of every command, text and --json > done merge with a PR closed unmerged > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "PR #70 from 123-rate-limiting-127 is closed without being merged.\\nReopen it with gh pr reopen 70, or open a new one into 123-rate-limiting, then run norn done 127 again."
+}"
+`;
+
+exports[`output of every command, text and --json > done merge with a PR closed unmerged > text 1`] = `
+"exit 1
+PR #70 from 123-rate-limiting-127 is closed without being merged.
+Reopen it with gh pr reopen 70, or open a new one into 123-rate-limiting, then run norn done 127 again."
+`;
+
 exports[`output of every command, text and --json > done merge with a PR into main > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "PR #70 from 123-rate-limiting-127 targets main, not the parent's branch 123-rate-limiting.\\nRetarget it with: gh pr edit 70 --base 123-rate-limiting, then merge it and run norn done 127."
+  "refusal": "PR #70 from 123-rate-limiting-127 targets main, not the parent's branch 123-rate-limiting.\\nRetarget it with: gh pr edit 70 --base 123-rate-limiting, then run norn done 127 again."
 }"
 `;
 
 exports[`output of every command, text and --json > done merge with a PR into main > text 1`] = `
 "exit 1
 PR #70 from 123-rate-limiting-127 targets main, not the parent's branch 123-rate-limiting.
-Retarget it with: gh pr edit 70 --base 123-rate-limiting, then merge it and run norn done 127."
+Retarget it with: gh pr edit 70 --base 123-rate-limiting, then run norn done 127 again."
 `;
 
 exports[`output of every command, text and --json > done merge with a PR merged into main > json 1`] = `
@@ -433,31 +475,101 @@ PR #70 from 123-rate-limiting-127 targets main, not the parent's branch 123-rate
 Its changes are not on 123-rate-limiting, and a person must sort that out. Run: norn escalate 127 'PR #70 was merged into main, not 123-rate-limiting'"
 `;
 
-exports[`output of every command, text and --json > done merge with an open PR > json 1`] = `
+exports[`output of every command, text and --json > done merge with a failed check > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "PR #70 from 123-rate-limiting-127 is not merged yet.\\nMerge it into 123-rate-limiting (resolve conflicts if needed), then run norn done 127."
+  "refusal": "#127: check \\"test\\" failed on PR #70. Fix it and push, then run norn done 127 again."
+}"
+`;
+
+exports[`output of every command, text and --json > done merge with a failed check > text 1`] = `
+"exit 1
+#127: check "test" failed on PR #70. Fix it and push, then run norn done 127 again."
+`;
+
+exports[`output of every command, text and --json > done merge with a push after the checks were read > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "#127: PR #70 moved to a new commit while norn read its checks, so norn did not merge it.\\nBring 123-rate-limiting-127 up to date with origin/123-rate-limiting and origin/123-rate-limiting-127, run the checks and push, then run norn done 127 again."
+}"
+`;
+
+exports[`output of every command, text and --json > done merge with a push after the checks were read > text 1`] = `
+"exit 1
+#127: PR #70 moved to a new commit while norn read its checks, so norn did not merge it.
+Bring 123-rate-limiting-127 up to date with origin/123-rate-limiting and origin/123-rate-limiting-127, run the checks and push, then run norn done 127 again."
+`;
+
+exports[`output of every command, text and --json > done merge with an open PR > json 1`] = `
+"exit 0
+{
+  "ok": true,
+  "issue": 127,
+  "from": "merge-queue",
+  "to": "closed",
+  "message": "#127 is now closed. The claim is released.\\n#131 is now ready-for-agent."
 }"
 `;
 
 exports[`output of every command, text and --json > done merge with an open PR > text 1`] = `
+"exit 0
+#127 is now closed. The claim is released.
+#131 is now ready-for-agent."
+`;
+
+exports[`output of every command, text and --json > done merge with checks running > json 1`] = `
 "exit 1
-PR #70 from 123-rate-limiting-127 is not merged yet.
-Merge it into 123-rate-limiting (resolve conflicts if needed), then run norn done 127."
+{
+  "ok": false,
+  "refusal": "#127: 2 checks on PR #70 are still running. Run norn done 127 again when they finish."
+}"
+`;
+
+exports[`output of every command, text and --json > done merge with checks running > text 1`] = `
+"exit 1
+#127: 2 checks on PR #70 are still running. Run norn done 127 again when they finish."
+`;
+
+exports[`output of every command, text and --json > done merge with conflicts > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "#127: PR #70 has conflicts with 123-rate-limiting.\\nMerge origin/123-rate-limiting into 123-rate-limiting-127, resolve them, run the checks and push, then run norn done 127 again."
+}"
+`;
+
+exports[`output of every command, text and --json > done merge with conflicts > text 1`] = `
+"exit 1
+#127: PR #70 has conflicts with 123-rate-limiting.
+Merge origin/123-rate-limiting into 123-rate-limiting-127, resolve them, run the checks and push, then run norn done 127 again."
+`;
+
+exports[`output of every command, text and --json > done merge with mergeability unknown > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "#127: GitHub is still working out whether PR #70 can merge. Run norn done 127 again in a minute."
+}"
+`;
+
+exports[`output of every command, text and --json > done merge with mergeability unknown > text 1`] = `
+"exit 1
+#127: GitHub is still working out whether PR #70 can merge. Run norn done 127 again in a minute."
 `;
 
 exports[`output of every command, text and --json > done merge with no PR > json 1`] = `
 "exit 1
 {
   "ok": false,
-  "refusal": "No PR from 123-rate-limiting-127 was found. Open and merge it before running norn done 127."
+  "refusal": "No PR from 123-rate-limiting-127 was found. Open it, then run norn done 127 again."
 }"
 `;
 
 exports[`output of every command, text and --json > done merge with no PR > text 1`] = `
 "exit 1
-No PR from 123-rate-limiting-127 was found. Open and merge it before running norn done 127."
+No PR from 123-rate-limiting-127 was found. Open it, then run norn done 127 again."
 `;
 
 exports[`output of every command, text and --json > done on another session's claim > json 1`] = `
@@ -2304,7 +2416,7 @@ exports[`output of every command, text and --json > take a slice for merge > jso
   "skill": "norn-merge",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #127 \\"Redis store\\". Its step is merge.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-127 (branch 123-rate-limiting-127)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n\\nInvoke the skill: norn-merge\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 127 --comments\\nMerge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.\\nThen merge the PR: gh pr merge 123-rate-limiting-127 --merge\\n\\nWhen merge is finished, run:\\n  norn done 127\\n\\nOn a long step, run norn take 127 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 127\\nIf something is wrong and a person is needed, run: norn escalate 127 \\"reason\\"\\nThat covers a permission or a tool error that blocks you, a decision only a person can make, and a skill telling\\nyou to stop and hand it to a person. Say what blocked you, e.g. norn escalate 127 \\"auto mode refused: gh pr merge 13\\"\\n\\nDo not change labels yourself. Only norn changes them.\\nNever end your turn while you hold #127: finish with a command above, norn release 127, or norn escalate 127 \\"reason\\"."
+  "message": "You now hold slice #127 \\"Redis store\\". Its step is merge.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-127 (branch 123-rate-limiting-127)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n\\nInvoke the skill: norn-merge\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 127 --comments\\nBring 123-rate-limiting-127 up to date: merge origin/123-rate-limiting into it, resolving conflicts if needed.\\nRun the repository's checks, fix what the merge broke, and push.\\nThen finish with norn done 127: norn merges the PR into 123-rate-limiting once its checks pass on the commit you pushed.\\nDo not merge the PR yourself, with gh pr merge or otherwise.\\n\\nWhen merge is finished, run:\\n  norn done 127\\n\\nOn a long step, run norn take 127 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 127\\nIf something is wrong and a person is needed, run: norn escalate 127 \\"reason\\"\\nThat covers a permission or a tool error that blocks you, a decision only a person can make, and a skill telling\\nyou to stop and hand it to a person. Say what blocked you, e.g. norn escalate 127 \\"auto mode refused: gh pr merge 13\\"\\n\\nDo not change labels yourself. Only norn changes them.\\nNever end your turn while you hold #127: finish with a command above, norn release 127, or norn escalate 127 \\"reason\\"."
 }"
 `;
 
@@ -2319,8 +2431,10 @@ It does not exist yet. Create it first:
 Invoke the skill: norn-merge
 Spec: .agents/specs/123-rate-limiting/spec.md (story #123)
 Read the issue: gh issue view 127 --comments
-Merge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.
-Then merge the PR: gh pr merge 123-rate-limiting-127 --merge
+Bring 123-rate-limiting-127 up to date: merge origin/123-rate-limiting into it, resolving conflicts if needed.
+Run the repository's checks, fix what the merge broke, and push.
+Then finish with norn done 127: norn merges the PR into 123-rate-limiting once its checks pass on the commit you pushed.
+Do not merge the PR yourself, with gh pr merge or otherwise.
 
 When merge is finished, run:
   norn done 127

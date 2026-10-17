@@ -460,18 +460,57 @@ const scenarios: Scenario[] = [
       ["an open PR", { base: "123-rate-limiting", state: "open" }],
       ["a PR into main", { base: "main", state: "open" }],
       ["a PR merged into main", { base: "main", state: "merged" }],
+      ["a PR closed unmerged", { base: "123-rate-limiting", state: "closed" }],
+      ["conflicts", { base: "123-rate-limiting", state: "open" }, { mergeable: "conflicting" }],
+      ["a PR behind the story branch", { base: "123-rate-limiting", state: "open" }, { behind: true }],
+      ["mergeability unknown", { base: "123-rate-limiting", state: "open" }, { mergeable: "unknown" }],
+      ["a failed check", { base: "123-rate-limiting", state: "open" }, { checks: [{ name: "test", state: "failed" }] }],
+      [
+        "checks running",
+        { base: "123-rate-limiting", state: "open" },
+        {
+          checks: [
+            { name: "test", state: "pending" },
+            { name: "lint", state: "pending" },
+          ],
+        },
+      ],
     ] as const
   ).map(
-    ([what, pr]): Scenario => ({
+    ([what, pr, readiness]): Scenario => ({
       name: `done merge with ${what}`,
       arrange: async (w) => {
         story(w);
         if (pr) w.github.prs.push({ number: 70, head: "123-rate-limiting-127", ...pr });
+        if (readiness) w.github.readiness.set(70, structuredClone(readiness) as never);
         await w.norn("take", "127");
       },
       argv: ["done", "127"],
     }),
   ),
+  {
+    name: "done merge GitHub refuses",
+    arrange: async (w) => {
+      story(w);
+      w.github.prs.push({ number: 70, head: "123-rate-limiting-127", base: "123-rate-limiting", state: "open" });
+      w.github.mergeRefusals.set(70, "At least 1 approving review is required by reviewers with write access.");
+      await w.norn("take", "127");
+    },
+    argv: ["done", "127"],
+  },
+  {
+    name: "done merge with a push after the checks were read",
+    arrange: async (w) => {
+      story(w);
+      w.github.prs.push({ number: 70, head: "123-rate-limiting-127", base: "123-rate-limiting", state: "open" });
+      w.github.afterReadiness = (n) => {
+        w.github.afterReadiness = null;
+        w.github.pushTo(n, "pushed-later");
+      };
+      await w.norn("take", "127");
+    },
+    argv: ["done", "127"],
+  },
   {
     name: "done merge of a slice outside a story",
     arrange: async (w) => {

@@ -6,6 +6,7 @@ import {
   holds,
   inFlowOf,
   leaveRefusal,
+  leaveWork,
   needsBranch,
   type OutcomeInput,
   sliceType,
@@ -261,16 +262,17 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   const skipped = through?.skipped.length && through.mode ? skipLine(through.skipped, through.mode) : null;
   const landed = through?.outcome ?? outcome;
   const inFlow: OutcomeInput | null = named ? { ...inFlowOf(ctx, issue, named), from: stateIn(issue, named), outcome: landed, note } : null;
-  if (inFlow) {
-    const r = (await leaveRefusal(inFlow)) ?? (await closeRefusal(inFlow));
-    if (r) return refuse(r);
-  }
   const files = evidenceDir === undefined ? undefined : await ctx.workspace.readEvidence(evidenceDir);
   if (evidenceDir !== undefined) {
     if (!files) return refuse({ kind: "evidence-not-a-directory", dir: evidenceDir });
     if (!files.length) return refuse({ kind: "evidence-empty", dir: evidenceDir });
     const big = files.filter((f) => f.content.length > MAX_EVIDENCE_BYTES);
     if (big.length) return refuse({ kind: "evidence-too-big", files: big.map((f) => f.path), limitBytes: MAX_EVIDENCE_BYTES });
+  }
+  // Every check comes first; then the work the state leaves to norn, e.g. merging the slice PR, which the close checks see done.
+  if (inFlow) {
+    const r = (await leaveRefusal(inFlow)) ?? (await leaveWork(inFlow)) ?? (await closeRefusal(inFlow));
+    if (r) return refuse(r);
   }
   // The evidence is checked before anything changes on GitHub, the issue's branch included.
   let storyBranchCreated: string | null = null;

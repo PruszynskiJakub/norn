@@ -104,7 +104,7 @@ describe("take", () => {
       workIn: { path: "/repo/.agents/worktrees/40-last-41", branch: "40-last-41", worktree: { kind: "missing" } },
       finish: [{ issue: 41, word: "", evidence: false, means: "slice PR merged into the story branch" }],
     });
-    expect(res.briefing.instructions).toContain("Then merge the PR: gh pr merge 40-last-41 --merge");
+    expect(res.briefing.instructions).toContain("Do not merge the PR yourself, with gh pr merge or otherwise.");
   });
 
   test("a blocked slice is refused with its open blockers and its story", async () => {
