@@ -1,4 +1,5 @@
 import { isStale } from "./claims.js";
+import { type Delivery, heldDelivery } from "./delivery.js";
 import { slicesOf } from "./behaviours.js";
 import { flowNameOf, flowStatesOf, usedIn } from "./flow.js";
 import { flowOf, validFlow } from "./flow-loading.js";
@@ -29,6 +30,8 @@ export interface StatusResult {
    */
   story: Row & { flow: string | null; owner: string | null; branch: string | null; makesSlices: boolean };
   slices: Row[];
+  /** The session delivering the story under its delivery lock; null when none does. */
+  delivery: Delivery | null;
 }
 
 /** Read-only overview. Makes no changes. */
@@ -53,6 +56,7 @@ export async function status(ctx: Ctx, n: number): Promise<StatusResult> {
       makesSlices: flow !== null && usedIn(flow, "slices"),
     },
     slices: rows,
+    delivery: (await heldDelivery(ctx, n))?.delivery ?? null,
   };
 }
 

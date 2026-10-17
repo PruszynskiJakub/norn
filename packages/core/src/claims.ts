@@ -1,4 +1,17 @@
-import type { ClaimRecord, ClaimSpace, GitHub } from "./github.js";
+import type { ClaimRecord, ClaimSpace, GitHub, Pane } from "./github.js";
+import type { Workspace } from "./workspace.js";
+
+/** The herdr pane this session runs in, on this machine; null outside herdr. */
+export function paneOf(ctx: { workspace: Pick<Workspace, "env">; machine: string }): Pane | null {
+  const id = ctx.workspace.env.HERDR_PANE_ID;
+  return ctx.workspace.env.HERDR_ENV === "1" && id ? { id, machine: ctx.machine } : null;
+}
+
+/** A claim of this session's, taken now by `holder`, naming its herdr pane when it runs in one. */
+export function claimRecord(ctx: { session: string; now: () => Date; workspace: Pick<Workspace, "env">; machine: string }, holder: string): ClaimRecord {
+  const pane = paneOf(ctx);
+  return { holder, session: ctx.session, since: ctx.now().toISOString(), ...(pane ? { pane } : {}) };
+}
 
 export type Acquire = { ok: true; tookOver?: ClaimRecord; ownTakeover?: boolean; reacquired?: boolean } | { ok: false; held: ClaimRecord | null };
 

@@ -1,4 +1,4 @@
-import { acquire } from "./claims.js";
+import { acquire, claimRecord } from "./claims.js";
 import type { GitHub, Issue } from "./github.js";
 import type { Outcome } from "./machine.js";
 import { locate } from "./location.js";
@@ -91,6 +91,10 @@ export interface Ctx {
   session: string;
   /** A short random string, e.g. to make each agent's NORN_SESSION unique. */
   nonce: () => string;
+  /** The machine norn runs on, e.g. its host name: a herdr pane is one on this machine only. */
+  machine: string;
+  /** Waits, e.g. between norn wait's reads of GitHub; tests pass one that moves their clock instead. */
+  sleep: (ms: number) => Promise<void>;
   /** Story slugs read during this command; see slug.ts. */
   slugs: Slugs;
   /** Repository flows read during this command; filled on first use, see repositoryFlow. */
@@ -273,7 +277,7 @@ async function specLink(ctx: Ctx, issue: Issue, flow: Flow | null): Promise<stri
 /** Changes labels on an issue this session does not hold, by taking a short claim. */
 export async function withShortClaim(ctx: Ctx, n: number, fn: () => Promise<void>): Promise<boolean> {
   const user = await ctx.github.currentUser();
-  const got = await acquire(ctx.github, n, { holder: user, session: ctx.session, since: ctx.now().toISOString() }, ctx.now(), ctx.config.staleAfterMs);
+  const got = await acquire(ctx.github, n, claimRecord(ctx, user), ctx.now(), ctx.config.staleAfterMs);
   if (!got.ok) return false;
   try {
     await fn();

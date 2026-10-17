@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
 import { randomBytes } from "node:crypto";
+import { hostname } from "node:os";
 import { type Ctx, loadConfig } from "@norn/core";
 import { GhGitHub, ghFailure } from "@norn/github-gh";
 import { LocalWorkspace, runCommand } from "@norn/workspace-local";
@@ -39,6 +40,8 @@ export async function launchDashboard(opts: DashboardOptions): Promise<Dashboard
     // The dashboard reads only: it takes no claims and sends no notifications.
     session: "dashboard",
     nonce: () => randomBytes(2).toString("hex"),
+    machine: hostname(),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     notify: async () => {},
     slugs: new Map(),
   };

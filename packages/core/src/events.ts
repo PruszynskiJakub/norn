@@ -6,7 +6,7 @@ export interface BaseBranchMissing {
 }
 
 /** Best-effort work after a command that norn next repeats until it succeeds. */
-export type FollowUpTask = "unblock-slices" | "move-story-on" | "close-merged-story" | "clear-labels";
+export type FollowUpTask = "unblock-slices" | "move-story-on" | "close-merged-story" | "clear-labels" | "record-offered";
 
 /**
  * Something norn did, or could not do, on its own while running a command:

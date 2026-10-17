@@ -1,4 +1,5 @@
 import { isStale } from "./claims.js";
+import { type Delivery, heldDelivery } from "./delivery.js";
 import type { Event } from "./events.js";
 import { send } from "./notify.js";
 import { join } from "node:path";
@@ -71,6 +72,8 @@ export interface NextReport {
   notPlanned: boolean;
   /** Notifications are on and something no one holds waits for a person, so the user has been told. */
   notified: boolean;
+  /** The session delivering the story under its delivery lock; null when none does. */
+  delivery: Delivery | null;
   /** The user's agents at work on the story, and how many more may start under deliver.maxParallel. */
   running: number;
   slots: number;
@@ -148,6 +151,7 @@ export async function computeNext(ctx: Ctx, n: number, loaded: LoadedFlow): Prom
     notified: ctx.config.notifications !== null,
     running: 0,
     slots: ctx.config.maxParallel,
+    delivery: (await heldDelivery(ctx, n))?.delivery ?? null,
   };
   if (report.closed) {
     report.nothingLeft = true;

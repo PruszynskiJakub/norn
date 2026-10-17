@@ -15,6 +15,10 @@ export function setup(opts: { now?: string; session?: string; user?: string; ver
   let made = 0;
   /** What norn dashboard asked to start, and what the start answers. */
   const launches: DashboardOptions[] = [];
+  /** How long each sleep was, in order: norn wait sleeps between its reads of GitHub. */
+  const sleeps: number[] = [];
+  /** Runs at each sleep, after the clock moved on: what happens on GitHub while norn waits. */
+  let whileSleeping: ((slept: number) => void | Promise<void>) | null = null;
   const dashboard = { answer: null as DashboardLaunch | null };
   const deps: Deps = {
     github,
@@ -22,6 +26,14 @@ export function setup(opts: { now?: string; session?: string; user?: string; ver
     now: () => now,
     session: opts.session ?? "session-1",
     nonce: () => nonces.shift() ?? `n${++made}`,
+    machine: "laptop",
+    // No real time passes: the clock moves on by the sleep.
+    sleep: async (ms) => {
+      sleeps.push(ms);
+      if (sleeps.length > 10_000) throw new Error("fake: slept 10000 times; the wait never ends");
+      now = new Date(now.getTime() + ms);
+      await whileSleeping?.(sleeps.length);
+    },
     // Recorded as the CLI words them, as the user would see them.
     notify: async (channel, notification) => {
       notifications.push({ channel, ...renderNotification(notification) });
@@ -44,6 +56,12 @@ export function setup(opts: { now?: string; session?: string; user?: string; ver
     notifications,
     nonces,
     launches,
+    sleeps,
+    /** Runs `fn` at each sleep with how many sleeps there have been, e.g. to finish an agent's step on the second. */
+    set whileSleeping(fn: ((slept: number) => void | Promise<void>) | null) {
+      whileSleeping = fn;
+    },
+    now: () => now,
     set launchAnswer(a: DashboardLaunch) {
       dashboard.answer = a;
     },

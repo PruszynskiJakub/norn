@@ -14,13 +14,14 @@ import {
   startState,
 } from "./behaviours.js";
 import { briefing, type Briefing, finishCommands } from "./briefing.js";
-import { acquire } from "./claims.js";
+import { acquire, claimRecord } from "./claims.js";
 import type { Event } from "./events.js";
 import { flowStatesOf, flowStep, type NamedFlow, offerFlows, passThrough, usedIn, uses } from "./flow.js";
 import { flowOf, loadFlow, triageFlows } from "./flow-loading.js";
 import type { Issue } from "./github.js";
 import { locate } from "./location.js";
 import { type Step, TRIAGE } from "./machine.js";
+import { heldDelivery, recordOffered } from "./delivery.js";
 import { computeNext, type NextReport, nextRefusal, notifyWaiting } from "./next.js";
 import { notifyNeedsHuman, notifySettled } from "./notify.js";
 import { type Refusal, type Refused, refuse } from "./refusals.js";
@@ -80,7 +81,7 @@ export interface DoneResult {
   /** The issue's own branch, created on GitHub before it entered a state that needs it, e.g. one waiting for its slices. */
   storyBranchCreated: string | null;
   followUps: Event[];
-  /** The issue now waits for its slices, so deliver can run them unattended. */
+  /** The issue now waits for its slices, so deliver can run them unattended; false when a session already delivers it. */
   deliverable: boolean;
   /** A person does the next step and has been notified. */
   personNext: boolean;
@@ -168,7 +169,7 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
   if ((!first.step && !left) || before.state === "closed") return refuse(await noStepRefusal(before, ctx, first.flow));
 
   const user = await github.currentUser();
-  const record = { holder: user, session: ctx.session, since: ctx.now().toISOString() };
+  const record = claimRecord(ctx, user);
   const claim = await acquire(github, n, record, ctx.now(), ctx.config.staleAfterMs, { takeover: opts.takeover });
   if (!claim.ok) {
     const slice = first.flow?.flow.workspace === "parent";
@@ -310,7 +311,8 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     needsHuman: applied.needsHuman ?? null,
     storyBranchCreated,
     followUps: inFlow ? await behaviourFollowUps(inFlow, { outcome: applied, fixLimit }) : [],
-    deliverable: flow !== null && uses(flow, landed.to, "waitsForSlices"),
+    // A story some session already delivers needs no second delivery offered.
+    deliverable: flow !== null && uses(flow, landed.to, "waitsForSlices") && !(await heldDelivery(ctx, n)),
     personNext: !!applied.notify && !applied.needsHuman,
   };
 }
@@ -383,6 +385,7 @@ export async function next(ctx: Ctx, n: number): Promise<NextResult | Refused> {
   const r = await nextRefusal(ctx.github, issue, loaded);
   if (r || !loaded) return refuse(r ?? { kind: "not-a-story", issue: n });
   const report = await computeNext(ctx, n, loaded);
+  report.notes.push(...(await recordOffered(ctx, report)));
   await notifySettled(ctx, report.notes);
   if (report.nothingLeft && !report.closed) await notifyWaiting(ctx, report);
   return { ok: true, kind: "next", report };

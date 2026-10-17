@@ -44,7 +44,7 @@ function data(a: Answer): Record<string, unknown> {
     case "done":
       return { issue: a.issue, from: a.from, to: a.to, ...(a.evidence ? { evidence: a.evidence } : {}) };
     case "status":
-      return { story: { ...row(a.story), owner: a.story.owner, branch: a.story.branch }, slices: a.slices.map(row) };
+      return { story: { ...row(a.story), owner: a.story.owner, branch: a.story.branch }, slices: a.slices.map(row), delivery: a.delivery };
     case "tidy":
       return {
         dryRun: a.dryRun,
@@ -59,6 +59,10 @@ function data(a: Answer): Record<string, unknown> {
       return a.launch.kind === "started"
         ? { url: a.launch.url, port: a.launch.port, intervalMs: a.intervalMs, opened: a.launch.opened }
         : { url: a.launch.url, alreadyRunning: true };
+    case "delivering":
+      return { story: a.story, reacquired: a.reacquired, tookOver: a.tookOver };
+    case "delivery-stopped":
+      return { story: a.story, held: a.held };
     case "escalated":
     case "released":
     case "slice-added":

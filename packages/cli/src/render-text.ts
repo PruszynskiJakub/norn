@@ -5,6 +5,9 @@ import {
   type ConfigProblem,
   type BehaviourName,
   type ConfigWarning,
+  type DeliverResult,
+  type Delivery,
+  type DeliveryStoppedResult,
   type DoneResult,
   type EscalateResult,
   type Event,
@@ -53,6 +56,8 @@ export type Answer =
   | EscalateResult
   | ReleaseResult
   | AddSliceResult
+  | DeliverResult
+  | DeliveryStoppedResult
   | NextResult
   | StatusResult
   | TidyResult
@@ -102,6 +107,9 @@ export const USAGE = [
   "",
   "  norn init                          Set up this project: skills, .agents/specs/, labels",
   "  norn next <story>                  What can be done on the story now",
+  "  norn deliver <story> [--stop] [--takeover]",
+  "                                     Take the story's delivery lock and get the deliver loop;",
+  "                                     --stop releases it, --takeover takes it from a stopped session of yours",
   "  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;",
   "                                     --takeover takes it from a stopped session of yours",
   '  norn done <issue> [outcome] ["note"] [--evidence <dir>]',
@@ -125,6 +133,7 @@ export const USAGE = [
 /** How to call each command that takes an issue number. */
 export const NEEDS_NUMBER: Record<string, string> = {
   next: "norn next <story>",
+  deliver: "norn deliver <story> [--stop] [--takeover]",
   take: "norn take <issue>",
   done: 'norn done <issue> [outcome] ["note"] [--evidence <dir>]',
   "add-slice": 'norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
@@ -404,6 +413,11 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       ];
     case "is-a-slice":
       return [`#${r.issue} is a ${r.flow}${r.story ? ` of #${r.story}. Run norn next ${r.story}` : ""} instead.`];
+    case "delivery-held":
+      return [
+        `${capitalise(r.flow)} #${r.story} is being delivered by session ${r.who} since ${hhmm(r.since)}. Do not start another delivery.`,
+        ...(r.mine ? [`If that session has stopped, take its delivery over with: norn deliver ${r.story} --takeover`] : []),
+      ];
     case "not-a-story":
       return [`#${r.issue} has no type yet. Triage it first with: norn take ${r.issue}`];
     default:
@@ -578,6 +592,7 @@ const TASKS: Record<FollowUpTask, (n: number) => string> = {
   "move-story-on": (n) => `move #${n} on now that its slices are merged`,
   "close-merged-story": (n) => `close #${n}, whose PR is merged`,
   "clear-labels": (n) => `clear the labels of #${n}`,
+  "record-offered": (n) => `record on the delivery lock of #${n} what it offered`,
 };
 
 export function renderEvent(e: Event): string[] {
@@ -629,6 +644,14 @@ export function renderAnswer(a: Answer): string[] {
       const status = a.blockedBy.length ? `blocked by ${issues(a.blockedBy)}` : a.state;
       return [`Created slice #${a.slice} "${a.title}" (mode:${a.mode}, ${status}).`];
     }
+    case "delivering":
+      return renderDelivering(a);
+    case "delivery-stopped":
+      return [
+        a.held
+          ? `Stopped delivering ${a.flow} #${a.story}: its delivery lock is released, and another session may deliver it.`
+          : `Nobody delivers ${a.flow} #${a.story}: there was no delivery lock to release.`,
+      ];
     case "next":
       return [renderNext(a.report)];
     case "status":
@@ -671,6 +694,45 @@ function allowedLine(p: Allowed): string {
     return `  - ${p.file} is not a JSON object with a permissions.allow list, so norn left it: add ${NORN_PERMISSIONS.join(" and ")} to permissions.allow`;
   if (!p.added.length) return `  - norn's commands already allowed for Claude Code in ${CLAUDE_SETTINGS}`;
   return `  - ${p.added.join(" and ")} allowed for Claude Code in ${CLAUDE_SETTINGS}, so agents run norn without a prompt`;
+}
+
+/** The deliver loop, as the orchestrator runs it from here on. */
+function renderDelivering(d: DeliverResult): string[] {
+  const n = d.story;
+  const head = d.reacquired
+    ? `You already deliver ${d.flow} #${n}; the delivery lock is refreshed.`
+    : `You now deliver ${d.flow} #${n} "${d.title}". No other session can deliver it while you do.`;
+  const took = d.tookOver ? [`You took the delivery over from session ${d.tookOver.who} (since ${hhmm(d.tookOver.since)}).`] : [];
+  return [
+    head,
+    ...took,
+    "",
+    "Run this loop, and nothing else, until it says to stop:",
+    "  1. norn tidy",
+    `  2. norn next ${n}: start one fresh agent per item it lists, as it says. Start none of your own.`,
+    `  3. norn wait ${n}, in the background, and act on its exit code when it ends:`,
+    "       0: something new can start. Go back to 1.",
+    `       3: nothing is left that you can do. Run norn tidy, then norn next ${n}, and report to the user. Stop.`,
+    `       4: it timed out. Run norn wait ${n} again.`,
+    "       anything else: it says why. Do what it says, or report to the user and stop.",
+    "",
+    "norn wait does the waiting: never write a monitor, script or sleep loop around norn, and never match its text.",
+    "To read norn's data, add --json. Type into an agent's pane only with herdr agent prompt.",
+    `If you stop delivering before norn wait exits 3, run: norn deliver ${n} --stop`,
+  ];
+}
+
+/** Who delivers a story, after its name, e.g. "is being delivered by this session (since 16:15)". */
+export function deliveryText(d: Delivery) {
+  const who = { this: "this session", yours: `another session of yours, ${d.who},`, other: `another session, ${d.who},` }[d.session];
+  return `is being delivered by ${who} since ${hhmm(d.since)}`;
+}
+
+/** The line next and status give a story being delivered; for another session, not to start a second delivery. */
+function deliveryLine(flow: string, n: number, d: Delivery | null): string[] {
+  if (!d) return [];
+  const line = `${capitalise(flow)} #${n} ${deliveryText(d)}.`;
+  return [d.session === "this" ? line : `${line} Do not start another delivery.`];
 }
 
 // Doctor
@@ -926,7 +988,7 @@ function renderStatus(s: StatusResult): string[] {
     `${capitalise(story.flow ?? "issue")} #${story.number} "${story.title}": ${describe(story)}`,
     `owner ${story.owner ? `@${story.owner}` : "none"}`,
   ];
-  const lines = [[...head, ...(story.branch ? [`branch ${story.branch}`] : [])].join(" · ")];
+  const lines = [[...head, ...(story.branch ? [`branch ${story.branch}`] : [])].join(" · "), ...deliveryLine(story.flow ?? "issue", story.number, s.delivery)];
   if (slices.length) {
     lines.push(`Slices (${slices.filter((r) => r.status === "merged").length} of ${slices.length} merged):`);
     const names = slices.map((r) => `#${r.number} "${r.title}"`);
@@ -1070,7 +1132,7 @@ function waitLine(w: WaitItem) {
 function renderNothingLeft(r: NextReport): string {
   const human = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));
   const blocked = r.waiting.filter((w) => w.reason === "blocked");
-  const out = [...r.notes.flatMap(renderEvent), `${subject(r)}: nothing left that you can do.`];
+  const out = [...r.notes.flatMap(renderEvent), `${subject(r)}: nothing left that you can do.`, ...deliveryLine(r.flow, r.issue, r.delivery)];
   if (human.length) out.push("Waiting for a human:", ...human.flatMap((w) => [`  - ${humanDetail(w)}.`, ...humanHandOff(w)]));
   if (blocked.length) out.push("Blocked until then:", ...blocked.map(waitLine));
   out.push(`Stop here and report to the user.${r.notified ? " norn has already notified them." : ""}`);
@@ -1102,7 +1164,7 @@ export function renderNext(r: NextReport): string {
   if (notes.length) out.push(...notes, "");
   let head = `${subject(r)} is in ${r.state ?? "no state"}.`;
   if (r.slices.total) head += ` ${r.slices.merged} of ${r.slices.total} slices are merged into ${r.branch}.`;
-  out.push(wrap(head), "");
+  out.push(wrap(head), ...deliveryLine(r.flow, r.issue, r.delivery), "");
 
   if (r.start.length === 0) {
     out.push(`Nothing can be started now. Wait for the running items to finish, then run norn next ${r.issue} again.`);

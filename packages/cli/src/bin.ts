@@ -35,6 +35,8 @@ try {
     now: () => new Date(),
     session: sessionId(process.env, hostname(), root),
     nonce: () => randomBytes(2).toString("hex"),
+    machine: hostname(),
+    sleep: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
     notify: (channel, notification) => show(channel, renderNotification(notification)),
     cwd: root,
     installSkills,

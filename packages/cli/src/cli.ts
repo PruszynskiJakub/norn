@@ -3,6 +3,7 @@ import {
   addSlice,
   type ConfigWarning,
   type Ctx,
+  deliver,
   done,
   escalate,
   loadConfig,
@@ -66,7 +67,7 @@ export async function run(argv: string[], deps: Deps): Promise<Result> {
 }
 
 /** Commands that name or touch worktrees, and so need the provider to match the environment. */
-const USES_WORKTREES = new Set(["take", "next", "done", "tidy"]);
+const USES_WORKTREES = new Set(["take", "next", "done", "tidy", "deliver"]);
 
 /** Commands that take no issue number. */
 const NO_NUMBER = new Set(["init", "tidy", "dashboard", "doctor", "flows"]);
@@ -115,6 +116,8 @@ async function command(cmd: string, rest: string[], flags: Record<string, string
       return release(ctx, n);
     case "next":
       return next(ctx, n);
+    case "deliver":
+      return deliver(ctx, n, { takeover: bools.has("takeover"), stop: bools.has("stop") });
     case "add-slice":
       return addSlice(ctx, n, { title: rest[1], mode: flags.mode?.[0], blockedBy: (flags["blocked-by"] ?? []).map(Number) });
   }
