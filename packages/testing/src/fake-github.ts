@@ -7,9 +7,11 @@ import {
   type Issue,
   isNornComment,
   type LinkedPullRequest,
+  type MergeAttempt,
   type ObservedIssue,
   type Permission,
   type PullRequest,
+  type PullRequestReadiness,
   type TimelineItem,
   type Work,
   type WorkQuery,
@@ -231,6 +233,46 @@ export class FakeGitHub implements GitHub {
     this.prMeta.set(pr.number, { createdAt: this.at(), mergedAt: null, author: this.user, mergedBy: null });
     return structuredClone(pr);
   }
+  /** What each PR's readiness reads as beyond its defaults: mergeable, up to date, no checks, head at headSha or head-<number>. */
+  readiness = new Map<number, Partial<PullRequestReadiness>>();
+  /** A refusal GitHub gives when norn merges the PR, e.g. for branch protection. */
+  mergeRefusals = new Map<number, string>();
+  /** Runs when norn reads a PR's readiness, to stage a race: a push landing after the read. */
+  afterReadiness: ((number: number) => void) | null = null;
+  /** The merges norn made: the PR and the head it merged at. */
+  merges: { number: number; headSha: string }[] = [];
+  private headOf(pr: PullRequest) {
+    return this.readiness.get(pr.number)?.headSha ?? pr.headSha ?? `head-${pr.number}`;
+  }
+  async pullRequestReadiness(number: number): Promise<PullRequestReadiness> {
+    const pr = this.prs.find((p) => p.number === number);
+    if (!pr) throw new Error(`fake: no PR #${number}`);
+    const readiness = {
+      mergeable: "mergeable" as const,
+      behind: false,
+      checks: [],
+      ...structuredClone(this.readiness.get(number) ?? {}),
+      headSha: this.headOf(pr),
+    };
+    this.afterReadiness?.(number);
+    return readiness;
+  }
+  async mergeAtHead(number: number, headSha: string): Promise<MergeAttempt> {
+    const pr = this.prs.find((p) => p.number === number);
+    if (!pr) throw new Error(`fake: no PR #${number}`);
+    if (pr.state !== "open") return { merged: false, detail: "Pull request is not open" };
+    if (this.headOf(pr) !== headSha) return { merged: false, detail: "Head branch was modified. Review and try the merge again." };
+    const refusal = this.mergeRefusals.get(number);
+    if (refusal) return { merged: false, detail: refusal };
+    this.merges.push({ number, headSha });
+    this.mergePullRequest(number);
+    return { merged: true };
+  }
+  /** Moves a PR's head to a new commit, as a push does. */
+  pushTo(number: number, headSha: string) {
+    this.readiness.set(number, { ...(this.readiness.get(number) ?? {}), headSha });
+  }
+
   /** The commit each claim ref points at. */
   claimShas = new Map<number, string>();
   /** Delivery locks, refs/norn/deliveries/<story>, and the commit each points at. */

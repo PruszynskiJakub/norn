@@ -17,6 +17,25 @@ export interface PullRequest {
   headSha?: string;
 }
 
+/** A check on a PR's head commit, as GitHub reports it: still running, passed (skipped and neutral count), or failed. */
+export interface PullRequestCheck {
+  name: string;
+  state: "pending" | "passed" | "failed";
+}
+
+/** What GitHub says of an open PR's readiness to merge, at the commit its head points at now. */
+export interface PullRequestReadiness {
+  headSha: string;
+  /** Whether it merges without conflicts; unknown while GitHub is still working it out. */
+  mergeable: "mergeable" | "conflicting" | "unknown";
+  /** The head lacks commits of the base branch, so it is not up to date with it. */
+  behind: boolean;
+  checks: PullRequestCheck[];
+}
+
+/** How a merge went: merged, or GitHub's refusal as it worded it. */
+export type MergeAttempt = { merged: true } | { merged: false; detail: string };
+
 /** A file to push, by its path inside the commit. */
 export interface FileToPush {
   path: string;
@@ -128,6 +147,13 @@ export interface GitHub {
   /** The most recent PR from `head`, if any. */
   findPullRequest(head: string): Promise<PullRequest | null>;
   createPullRequest(input: { head: string; base: string; title: string; body: string }): Promise<PullRequest>;
+  /** An open PR's mergeability, whether it is behind its base, and the checks on its head. Read-only. */
+  pullRequestReadiness(number: number): Promise<PullRequestReadiness>;
+  /**
+   * Merges the PR with a merge commit, but only while its head is still `headSha`, so a push after the checks were read
+   * is never merged unchecked. GitHub refusing, e.g. for branch protection or a moved head, is an attempt that failed.
+   */
+  mergeAtHead(number: number, headSha: string): Promise<MergeAttempt>;
 
   /**
    * Atomically create refs/norn/<space>/<issue>, by default a claim. False when it already exists. The other spaces

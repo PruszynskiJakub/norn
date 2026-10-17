@@ -1,5 +1,18 @@
 import { spawn } from "node:child_process";
-import type { ClaimRecord, ClaimSpace, FileToPush, GhAuth, GitHub, Issue, Permission, PullRequest, WorkQuery } from "@norn/core";
+import type {
+  ClaimRecord,
+  ClaimSpace,
+  FileToPush,
+  GhAuth,
+  GitHub,
+  Issue,
+  MergeAttempt,
+  Permission,
+  PullRequest,
+  PullRequestCheck,
+  PullRequestReadiness,
+  WorkQuery,
+} from "@norn/core";
 import { observeWork } from "./observe-work.js";
 
 export type Exec = (args: string[], input?: string) => Promise<{ code: number; stdout: string; stderr: string }>;
@@ -77,6 +90,29 @@ interface RestIssue {
   repository_url?: string;
   /** Set when the issue is a pull request. */
   pull_request?: unknown;
+}
+
+/** An entry of a PR's statusCheckRollup: a check run of GitHub Actions or an app, or a commit status. */
+interface RollupItem {
+  __typename?: string;
+  name?: string;
+  context?: string;
+  status?: string;
+  conclusion?: string | null;
+  state?: string;
+}
+
+/** Skipped and neutral runs block nothing, as on GitHub's own merge box. */
+const PASSING = ["SUCCESS", "NEUTRAL", "SKIPPED"];
+
+function toCheck(c: RollupItem): PullRequestCheck {
+  const name = c.name ?? c.context ?? "unnamed check";
+  if (c.__typename === "StatusContext" || (c.state !== undefined && c.status === undefined)) {
+    const state = c.state === "SUCCESS" ? "passed" : c.state === "PENDING" || c.state === "EXPECTED" ? "pending" : "failed";
+    return { name, state };
+  }
+  if (c.status !== "COMPLETED") return { name, state: "pending" };
+  return { name, state: PASSING.includes(c.conclusion ?? "") ? "passed" : "failed" };
 }
 
 function toIssue(r: RestIssue): Issue {
@@ -309,6 +345,23 @@ export class GhGitHub implements GitHub {
   async createPullRequest(input: { head: string; base: string; title: string; body: string }) {
     const pr = await this.api<{ number: number }>("POST", `${REPO}/pulls`, input);
     return { number: pr.number, head: input.head, base: input.base, state: "open" as const, body: input.body };
+  }
+
+  async pullRequestReadiness(n: number): Promise<PullRequestReadiness> {
+    const pr = JSON.parse(await this.gh(["pr", "view", String(n), "--json", "mergeable,statusCheckRollup,headRefOid,baseRefName"])) as {
+      mergeable: string;
+      statusCheckRollup: RollupItem[] | null;
+      headRefOid: string;
+      baseRefName: string;
+    };
+    // mergeStateStatus says BEHIND only where branch protection asks for it; the comparison says it everywhere.
+    const compare = await this.api<{ behind_by: number }>("GET", `${REPO}/compare/${encodeURIComponent(pr.baseRefName)}...${pr.headRefOid}`);
+    const mergeable = pr.mergeable === "MERGEABLE" ? "mergeable" : pr.mergeable === "CONFLICTING" ? "conflicting" : "unknown";
+    return { headSha: pr.headRefOid, mergeable, behind: compare.behind_by > 0, checks: (pr.statusCheckRollup ?? []).map(toCheck) };
+  }
+  async mergeAtHead(n: number, headSha: string): Promise<MergeAttempt> {
+    const r = await this.exec(["pr", "merge", String(n), "--merge", "--match-head-commit", headSha]);
+    return r.code === 0 ? { merged: true } : { merged: false, detail: r.stderr.trim() || r.stdout.trim() };
   }
 
   /** A commit whose message and claim.json are the record; parentless for a new claim. */

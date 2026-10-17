@@ -137,6 +137,73 @@ describe("GhGitHub delivery locks", () => {
   });
 });
 
+describe("GhGitHub merging a PR", () => {
+  test("readiness reads mergeability, the checks on the head and whether the head is behind its base", async () => {
+    const { exec, calls } = scripted((c) => {
+      if (c.args[0] === "pr" && c.args[1] === "view") {
+        return {
+          stdout: {
+            mergeable: "MERGEABLE",
+            headRefOid: "abc123",
+            baseRefName: "1-todo",
+            statusCheckRollup: [
+              { __typename: "CheckRun", name: "test", status: "COMPLETED", conclusion: "FAILURE" },
+              { __typename: "CheckRun", name: "lint", status: "COMPLETED", conclusion: "SUCCESS" },
+              { __typename: "CheckRun", name: "docs", status: "COMPLETED", conclusion: "SKIPPED" },
+              { __typename: "CheckRun", name: "build", status: "IN_PROGRESS", conclusion: null },
+              { __typename: "StatusContext", context: "ci/legacy", state: "PENDING" },
+              { __typename: "StatusContext", context: "deploy", state: "ERROR" },
+            ],
+          },
+        };
+      }
+      if (path(c) === "repos/{owner}/{repo}/compare/1-todo...abc123") return { stdout: { behind_by: 2 } };
+    });
+
+    expect(await new GhGitHub(exec).pullRequestReadiness(13)).toEqual({
+      headSha: "abc123",
+      mergeable: "mergeable",
+      behind: true,
+      checks: [
+        { name: "test", state: "failed" },
+        { name: "lint", state: "passed" },
+        { name: "docs", state: "passed" },
+        { name: "build", state: "pending" },
+        { name: "ci/legacy", state: "pending" },
+        { name: "deploy", state: "failed" },
+      ],
+    });
+    expect(calls[0].args).toEqual(["pr", "view", "13", "--json", "mergeable,statusCheckRollup,headRefOid,baseRefName"]);
+  });
+
+  test("conflicts and a mergeability GitHub has not worked out yet, with no checks at all", async () => {
+    const view = (mergeable: string) =>
+      scripted((c) => {
+        if (c.args[0] === "pr") return { stdout: { mergeable, headRefOid: "h", baseRefName: "b", statusCheckRollup: null } };
+        return { stdout: { behind_by: 0 } };
+      }).exec;
+
+    expect(await new GhGitHub(view("CONFLICTING")).pullRequestReadiness(1)).toEqual({ headSha: "h", mergeable: "conflicting", behind: false, checks: [] });
+    expect((await new GhGitHub(view("UNKNOWN")).pullRequestReadiness(1)).mergeable).toBe("unknown");
+  });
+
+  test("merges with a merge commit, only at the head commit read", async () => {
+    const { exec, calls } = scripted(() => ({ stdout: "" }));
+
+    expect(await new GhGitHub(exec).mergeAtHead(13, "abc123")).toEqual({ merged: true });
+    expect(calls[0].args).toEqual(["pr", "merge", "13", "--merge", "--match-head-commit", "abc123"]);
+  });
+
+  test("a merge GitHub refuses is an attempt that failed, with GitHub's words", async () => {
+    const { exec } = scripted(() => ({ code: 1, stderr: "GraphQL: Base branch was modified; At least 1 approving review is required\n" }));
+
+    expect(await new GhGitHub(exec).mergeAtHead(13, "abc123")).toEqual({
+      merged: false,
+      detail: "GraphQL: Base branch was modified; At least 1 approving review is required",
+    });
+  });
+});
+
 describe("GhGitHub paged lists", () => {
   test("lists are read with --paginate --jq '.[]', one JSON value per line across pages, without --slurp", async () => {
     const { exec, calls } = scripted((c) => {
