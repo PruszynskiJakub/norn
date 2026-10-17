@@ -18,9 +18,10 @@ import {
 } from "@norn/core";
 import { dashboard, type StartDashboard } from "./dashboard.js";
 import { doctor, doctorFailed } from "./doctor.js";
+import { flows } from "./flows.js";
 import { init } from "./init.js";
 import { renderJson } from "./render-json.js";
-import { type Answer, type CliRefusal, NEEDS_NUMBER, renderAnswer, renderRefusal, renderWarning } from "./render-text.js";
+import { type Answer, type CliRefusal, NEEDS_NUMBER, renderAnswer, renderRefusal, renderWarning, USAGE } from "./render-text.js";
 
 export type Deps = Omit<Ctx, "config" | "slugs"> & {
   cwd: string;
@@ -52,8 +53,10 @@ interface Reply {
 export async function run(argv: string[], deps: Deps): Promise<Result> {
   const { bools } = parseArgs(argv);
   if (bools.has("version")) return { exitCode: 0, stdout: deps.version };
+  // Help is asked for, so it is an answer, not a usage error, and no command runs, e.g. the dashboard.
+  if (bools.has("help")) return { exitCode: 0, stdout: USAGE };
   const { answer, warnings } = await dispatch(argv, deps);
-  const usage = ["usage", "needs-number", "bad-dashboard-flag"];
+  const usage = ["usage", "needs-number", "bad-dashboard-flag", "flows-usage"];
   // doctor answers even when a check fails, but exits 1 so CI notices.
   const exitCode = answer.ok ? (answer.kind === "doctor" && doctorFailed(answer) ? 1 : 0) : usage.includes(answer.refusal.kind) ? 2 : 1;
   const head = warnings.length ? ["norn warning:", ...warnings.map((w) => `  ${renderWarning(w)}`), ""] : [];
@@ -66,7 +69,7 @@ export async function run(argv: string[], deps: Deps): Promise<Result> {
 const USES_WORKTREES = new Set(["take", "next", "done", "tidy"]);
 
 /** Commands that take no issue number. */
-const NO_NUMBER = new Set(["init", "tidy", "dashboard", "doctor"]);
+const NO_NUMBER = new Set(["init", "tidy", "dashboard", "doctor", "flows"]);
 
 const refused = (refusal: Refusal | CliRefusal): Refused => ({ ok: false, refusal });
 
@@ -78,6 +81,8 @@ async function dispatch(argv: string[], input: Deps): Promise<Reply> {
   if (cmd === "init") return { answer: await init(input), warnings: [] };
   // doctor reports a bad config, version or provider as checks, so none of them stops it.
   if (cmd === "doctor") return { answer: await doctor(input), warnings: [] };
+  // export only copies a built-in flow into the project, so it needs neither the config nor GitHub.
+  if (cmd === "flows") return { answer: flows(input.cwd, rest), warnings: [] };
   const loaded = await loadConfig(input.workspace);
   if (!loaded.ok) return { answer: loaded, warnings: [] };
   const version = versionCheck(loaded.config, input.version);

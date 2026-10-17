@@ -46,7 +46,7 @@ describe("merge-queue on a slice", () => {
     const res = await w.norn("done", "127");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("PR #50 from 123-rate-limiting-127 targets main, not the story branch 123-rate-limiting.");
+    expect(res.stdout).toContain("PR #50 from 123-rate-limiting-127 targets main, not the parent's branch 123-rate-limiting.");
     expect(res.stdout).toContain("gh pr edit 50 --base 123-rate-limiting");
   });
 
@@ -58,7 +58,7 @@ describe("merge-queue on a slice", () => {
     const res = await w.norn("done", "127");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("norn escalate 127 'slice PR #50 was merged into main, not 123-rate-limiting'");
+    expect(res.stdout).toContain("norn escalate 127 'PR #50 was merged into main, not 123-rate-limiting'");
     expect(w.github.issues.get(127)!.state).toBe("open");
   });
 

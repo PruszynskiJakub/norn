@@ -1,6 +1,7 @@
 import { join } from "node:path";
+import type { Flow } from "./flow.js";
 import type { GitHub, Issue } from "./github.js";
-import { kindOf } from "./machine.js";
+
 import { storySlug, type Slugs } from "./slug.js";
 import { sh, sliceBranch, storyBranch, worktreePath } from "./text.js";
 import type { Provider, Workspace } from "./workspace.js";
@@ -10,19 +11,27 @@ export interface Location {
   branch: string;
   base: string;
   worktree: string;
-  /** The story, for a slice; the issue itself, for a story. */
+  /** The parent, for an issue whose flow works in its parent's branch, e.g. a slice; else the issue itself. */
   story: Issue;
   /** The story's recorded slug. */
   slug: string;
 }
 
-export async function locate(issue: Issue, ctx: { github: GitHub; slugs: Slugs; config: { baseBranch: string } }): Promise<Location | null> {
-  if (kindOf(issue) === "story") {
+/** `flow` is the issue's flow, when it runs one: its workspace decides. An issue with no flow has no workspace. */
+export async function locate(
+  issue: Issue,
+  ctx: { github: GitHub; slugs: Slugs; config: { baseBranch: string } },
+  flow: Flow | null = null,
+): Promise<Location | null> {
+  if (flow?.workspace === "none") return null;
+  // An own workspace: a branch named after the issue, with a PR into the base branch.
+  if (flow?.workspace === "own") {
     const slug = await storySlug(ctx, issue);
     const branch = storyBranch(issue.number, slug);
     return { branch, base: ctx.config.baseBranch, worktree: worktreePath(branch), story: issue, slug };
   }
-  if (kindOf(issue) === "slice") {
+  // A parent workspace is named after the parent's branch, which its PR goes into.
+  if (flow?.workspace === "parent") {
     const parent = await ctx.github.parentOf(issue.number);
     if (!parent) return null;
     const story = await ctx.github.getIssue(parent);

@@ -2,12 +2,12 @@ import { describe, expect, test } from "vitest";
 import { setup } from "@norn/testing";
 
 describe("triage", () => {
-  test("accept makes the issue a story in needs-refinement owned by the user, and releases the claim", async () => {
+  test("story makes the issue a story in needs-refinement owned by the user, and releases the claim", async () => {
     const w = setup();
     w.github.seedIssue({ number: 7, title: "Rate limiting" });
     await w.norn("take", "7");
 
-    const res = await w.norn("done", "7", "accept");
+    const res = await w.norn("done", "7", "story");
 
     expect(res.exitCode).toBe(0);
     expect(w.github.labels(7).sort()).toEqual(["needs-refinement", "type:story"]);
@@ -67,7 +67,7 @@ describe("done refusals", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain('"approve" is not an outcome of triage');
-    expect(res.stdout).toContain("norn done 7 accept");
+    expect(res.stdout).toContain("norn done 7 story");
     expect(res.stdout).toContain("norn done 7 reject");
     expect(w.github.claim(7)).not.toBeNull();
   });

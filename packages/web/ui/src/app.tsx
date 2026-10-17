@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardState } from "../../src/contract.ts";
 import { Detail, Progress } from "./components/detail.tsx";
 import { Feed } from "./components/feed.tsx";
+import { FlowsPage } from "./components/flows.tsx";
 import { Hero } from "./components/overview.tsx";
 import { Sidebar } from "./components/sidebar.tsx";
 import { Button } from "./components/ui/button.tsx";
@@ -11,7 +12,7 @@ import { fetchState, refreshState } from "./lib/api.ts";
 import { type Theme, applyTheme, initialTheme, saveTheme } from "./lib/theme.ts";
 import { cn } from "./lib/utils.ts";
 import { allItems } from "./model.ts";
-import { type View, ViewContext } from "./view.ts";
+import { type Page, type View, ViewContext } from "./view.ts";
 import { FEED, SERVER_GONE, failureNotice, pollHint, stateSentence, updatedLabel } from "./wording.ts";
 
 /** The server's cache is cheap to read, so the page asks often and shows a poll as soon as it lands. */
@@ -19,12 +20,17 @@ const POLL_MS = 10_000;
 /** How often "updated N ago" and the holders' durations are reworded. */
 const TICK_MS = 15_000;
 
+const UNKNOWN_LABEL = { color: "cccccc", description: "" };
+
 const EMPTY: DashboardState = {
   status: "loading",
   me: null,
   repoUrl: null,
   board: [],
   waiting: [],
+  flows: [],
+  // Never shown: no item or flow has a state to colour before the server's first answer, which brings norn's own.
+  stateLabelDefaults: { gate: UNKNOWN_LABEL, attended: UNKNOWN_LABEL, agent: UNKNOWN_LABEL },
   feed: [],
   lastUpdated: null,
   lastError: null,
@@ -104,19 +110,53 @@ function useTheme() {
   return toggle;
 }
 
+const pageInAddress = (): Page => (window.location.hash === "#flows" ? "flows" : "board");
+
+/** The page shown, kept in the address as #flows so the Flows page can be linked to and survives a reload. */
+function usePage(): [Page, (p: Page) => void] {
+  const [page, setPage] = useState<Page>(pageInAddress);
+  useEffect(() => {
+    // Back and forward, and a #flows typed into the address.
+    const follow = () => setPage(pageInAddress());
+    window.addEventListener("popstate", follow);
+    window.addEventListener("hashchange", follow);
+    return () => {
+      window.removeEventListener("popstate", follow);
+      window.removeEventListener("hashchange", follow);
+    };
+  }, []);
+  const go = useCallback((p: Page) => {
+    setPage(p);
+    const hash = p === "flows" ? "#flows" : "";
+    if (window.location.hash !== hash) window.history.pushState(null, "", hash || window.location.pathname + window.location.search);
+  }, []);
+  return [page, go];
+}
+
 export function App() {
   const { state, offset, serverGone, refreshing, refresh } = useDashboardState();
   const now = useNow(offset);
   const toggleTheme = useTheme();
   const [selectedNumber, setSelected] = useState<number | null>(null);
+  const [page, setPage] = usePage();
 
-  const items = useMemo(() => allItems(state.board), [state.board]);
+  const items = useMemo(() => allItems(state.board, state.flows), [state.board, state.flows]);
   const byNumber = useMemo(() => new Map(items.map((x) => [x.number, x])), [items]);
   // An item that left the board (unassigned, or out of the 7-day window) is no longer selectable.
-  const selected = selectedNumber === null ? null : (byNumber.get(selectedNumber) ?? null);
-  const select = useCallback((n: number | null) => setSelected((cur) => (n === null || cur === n ? null : n)), []);
+  const selected = page === "flows" || selectedNumber === null ? null : (byNumber.get(selectedNumber) ?? null);
+  const select = useCallback(
+    (n: number | null) => {
+      setPage("board");
+      setSelected((cur) => (n === null || cur === n ? null : n));
+    },
+    [setPage],
+  );
+  const showFlows = useCallback(() => {
+    setSelected(null);
+    setPage("flows");
+  }, [setPage]);
 
-  const view: View = { state, items, item: (n) => byNumber.get(n), now, selected, select };
+  const view: View = { state, items, item: (n) => byNumber.get(n), now, selected, select, page, showFlows };
   const loading = state.status === "loading";
   const notice = serverGone ? SERVER_GONE : state.lastError ? failureNotice(state.lastError, state.lastUpdated) : null;
   const reading = refreshing || (state.status === "ready" && state.nextPoll === null);
@@ -176,18 +216,24 @@ export function App() {
               </>
             ) : (
               <div className={cn(notice && "opacity-55")}>
-                {selected ? (
-                  <>
-                    <h1 className="mt-0 mb-1 font-semibold text-[24px] leading-[1.3] tracking-[-0.02em]">{selected.title}</h1>
-                    <p className="mt-0 mb-7 text-muted-foreground">{stateSentence(selected)}</p>
-                  </>
+                {page === "flows" ? (
+                  <FlowsPage />
                 ) : (
                   <>
-                    <Hero />
-                    <div className="mt-10 mb-7 h-px bg-border" />
+                    {selected ? (
+                      <>
+                        <h1 className="mt-0 mb-1 font-semibold text-[24px] leading-[1.3] tracking-[-0.02em]">{selected.title}</h1>
+                        <p className="mt-0 mb-7 text-muted-foreground">{stateSentence(selected)}</p>
+                      </>
+                    ) : (
+                      <>
+                        <Hero />
+                        <div className="mt-10 mb-7 h-px bg-border" />
+                      </>
+                    )}
+                    <Feed />
                   </>
                 )}
-                <Feed />
               </div>
             )}
           </div>

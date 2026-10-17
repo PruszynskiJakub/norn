@@ -39,6 +39,8 @@ function data(a: Answer): Record<string, unknown> {
   switch (a.kind) {
     case "taken":
       return { issue: a.issue, state: a.state, step: a.step.name, skill: a.step.skill, attended: a.step.attended, outcomes: a.step.outcomes };
+    case "handed-over":
+      return { issue: a.issue, state: a.state, flow: a.flow };
     case "done":
       return { issue: a.issue, from: a.from, to: a.to, ...(a.evidence ? { evidence: a.evidence } : {}) };
     case "status":
@@ -64,6 +66,8 @@ function data(a: Answer): Record<string, unknown> {
       return {};
     case "doctor":
       return { checks: a.checks };
+    case "flow-exported":
+      return { flow: a.flow, file: a.file };
     default:
       return unreachable(a);
   }

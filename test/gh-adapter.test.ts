@@ -212,6 +212,53 @@ describe("GhGitHub issues", () => {
   });
 });
 
+describe("GhGitHub files at a ref", () => {
+  test("readFileAt reads a file's contents at a ref and decodes them", async () => {
+    const text = '{ "start": "triaging" }\n';
+    // GitHub breaks the base64 into lines.
+    const content = `${Buffer.from(text).toString("base64").slice(0, 8)}\n${Buffer.from(text).toString("base64").slice(8)}`;
+    const { exec, calls } = scripted(() => ({ stdout: { type: "file", encoding: "base64", content } }));
+
+    expect(await new GhGitHub(exec).readFileAt(".agents/flows/bug.json", "main")).toBe(text);
+    expect(method(calls[0])).toBe("GET");
+    expect(path(calls[0])).toBe("repos/{owner}/{repo}/contents/.agents/flows/bug.json?ref=main");
+  });
+
+  test("readFileAt encodes the ref, so a branch with a slash is one ref", async () => {
+    const { exec, calls } = scripted(() => ({ stdout: { type: "file", encoding: "base64", content: "" } }));
+    await new GhGitHub(exec).readFileAt(".agents/flows/bug.json", "release/1");
+    expect(path(calls[0])).toBe("repos/{owner}/{repo}/contents/.agents/flows/bug.json?ref=release%2F1");
+  });
+
+  test("readFileAt is null for a missing file or ref, and for a directory", async () => {
+    const missing = scripted(() => ({ code: 1, stderr: "gh: Not Found (HTTP 404)" }));
+    expect(await new GhGitHub(missing.exec).readFileAt(".agents/flows/bug.json", "main")).toBeNull();
+    const dir = scripted(() => ({ stdout: [{ type: "file", name: "bug.json" }] }));
+    expect(await new GhGitHub(dir.exec).readFileAt(".agents/flows", "main")).toBeNull();
+  });
+
+  test("listFilesAt names the files directly in a directory at a ref, not its subdirectories", async () => {
+    const { exec, calls } = scripted(() => ({
+      stdout: [
+        { type: "file", name: "bug.json" },
+        { type: "dir", name: "old" },
+        { type: "file", name: "chore.json" },
+      ],
+    }));
+
+    expect(await new GhGitHub(exec).listFilesAt(".agents/flows", "release/1")).toEqual(["bug.json", "chore.json"]);
+    expect(method(calls[0])).toBe("GET");
+    expect(path(calls[0])).toBe("repos/{owner}/{repo}/contents/.agents/flows?ref=release%2F1");
+  });
+
+  test("listFilesAt is empty for a missing directory or ref, and for a file", async () => {
+    const missing = scripted(() => ({ code: 1, stderr: "gh: Not Found (HTTP 404)" }));
+    expect(await new GhGitHub(missing.exec).listFilesAt(".agents/flows", "main")).toEqual([]);
+    const file = scripted(() => ({ stdout: { type: "file", name: "bug.json", content: "" } }));
+    expect(await new GhGitHub(file.exec).listFilesAt(".agents/flows/bug.json", "main")).toEqual([]);
+  });
+});
+
 describe("GhGitHub branches and evidence", () => {
   test("pushFiles commits exactly the files on top of the branch's head and moves it without force", async () => {
     let blobs = 0;
@@ -298,10 +345,28 @@ describe("GhGitHub reads for norn doctor", () => {
     expect(await gh.permission()).toBe("none");
   });
 
-  test("labelNames pages through the repository's labels", async () => {
-    const { exec, calls } = scripted(() => ({ stdout: [JSON.stringify({ name: "blocked" }), JSON.stringify({ name: "type:story" }), ""].join("\n") }));
+  test("openIssues pages through the open issues with a label, leaving out pull requests", async () => {
+    const issue = (number: number, extra: object = {}) =>
+      JSON.stringify({ id: number, number, title: `#${number}`, state: "open", labels: [{ name: "type:bug" }], assignees: [], ...extra });
+    const { exec, calls } = scripted(() => ({ stdout: [issue(12), issue(13, { pull_request: { url: "x" } }), ""].join("\n") }));
 
-    expect(await new GhGitHub(exec).labelNames()).toEqual(["blocked", "type:story"]);
+    expect(await new GhGitHub(exec).openIssues("type:bug")).toEqual([{ number: 12, title: "#12", state: "open", labels: ["type:bug"], assignees: [] }]);
+    expect(calls[0].args).toEqual(["api", "--paginate", "--jq", ".[]", "repos/{owner}/{repo}/issues?state=open&labels=type%3Abug&per_page=100"]);
+  });
+
+  test("repositoryLabels pages through the repository's labels, with their colour and description", async () => {
+    const { exec, calls } = scripted(() => ({
+      stdout: [
+        JSON.stringify({ name: "blocked", color: "b60205", description: "Blocked (norn)" }),
+        JSON.stringify({ name: "frontend", color: "ededed", description: null }),
+        "",
+      ].join("\n"),
+    }));
+
+    expect(await new GhGitHub(exec).repositoryLabels()).toEqual([
+      { name: "blocked", color: "b60205", description: "Blocked (norn)" },
+      { name: "frontend", color: "ededed", description: "" },
+    ]);
     expect(calls[0].args).toEqual(["api", "--paginate", "--jq", ".[]", "repos/{owner}/{repo}/labels"]);
   });
 });

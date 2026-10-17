@@ -5,14 +5,14 @@ norn runs a team's work through a spec-driven process on GitHub. A developer's a
 ## Work items
 
 **Issue**:
-A GitHub issue norn works on. A new issue becomes a story at triage or is closed as not planned.
+A GitHub issue norn works on. At triage a new issue is given its type, e.g. it becomes a story, or is closed as not planned.
 
 **Story**:
-An issue that is one feature, from triage until its story PR is merged into the base branch. It has one spec, one story branch and, once sliced, its slices.
+An issue that is one feature, from triage until its story PR is merged into the base branch. It has one spec, one story branch and, once sliced, its slices. It runs the built-in `story` flow. norn runs any issue whose flow creates slices as it runs a story, but calls it by its type, e.g. an epic.
 _Avoid_: epic, feature issue
 
 **Slice**:
-A sub-issue of a story that is one independently mergeable part of it. It is implemented, reviewed, QA'd and merged into the story branch on its own.
+A sub-issue of a story that is one independently mergeable part of it. It is implemented, reviewed, QA'd and merged into the story branch on its own. Its type is the one the story's flow names for its slices, `slice` for the built-in story.
 _Avoid_: task, sub-task, child issue
 
 **Spec**:
@@ -26,6 +26,22 @@ The short name derived from a story's title the first time norn writes on it, th
 The person a story is assigned to. They own its slices too, and only they merge the story PR.
 
 ## Process
+
+**Flow**:
+The process for one issue, as data: its states, the skill and outcomes of each, where it starts and its workspace. A repository defines a flow in `.agents/flows/<name>.json`, read from the base branch on GitHub. norn ships the built-in `story` and `slice` flows in the same format, and publishes the format as a JSON Schema. See [`docs/flows.md`](docs/flows.md).
+
+**Type**:
+The flow an issue runs, carried as its `type:<name>` label, e.g. `type:bug` runs the flow `bug`. Triage gives an issue its type; an issue with none is new.
+
+**Behaviour**:
+A built-in mechanic a state of a flow opts into by name, e.g. `slices`, `waitsForSlices`, `opensPR`, `humanGate` or `syncsBlocked`. It adds its lines to the briefing, its checks and changes to `norn done`, what an issue it holds waits for, and its follow-ups. The set is closed: a flow names behaviours, it cannot define them.
+
+**Workspace**:
+Where a flow's work happens: `none`, no branch; `own`, a branch of the issue's own with one PR into the base branch; `parent`, a branch off the parent issue's branch with one PR into it, as for a slice.
+
+**Orphaned issue**:
+An issue left in a state its flow no longer has. norn moves it to the new name when the flow's `renamed` map names the state, and otherwise hands it to a person through `needs-human`.
+_Avoid_: stale state, migrated issue
 
 **State**:
 Where an issue is in its process, carried as exactly one state label, e.g. `needs-review`. Two state labels mean a label change failed halfway, and norn acts on neither.
@@ -57,7 +73,7 @@ An automatic transition after an outcome, such as unblocking slices or opening t
 norn's answer when it will not do what was asked: why, and what to do instead.
 
 **Mode**:
-Whether a slice is checked by an agent only (`afk`) or by an agent then a person (`hil`).
+Whether a slice is checked by an agent only (`afk`) or by an agent then a person (`hil`), from its `mode:afk` or `mode:hil` label. A flow's state with `when` runs in that mode only; in the other mode norn passes through it by its `passThrough` outcome.
 
 **Agent QA**:
 QA by an agent that runs the app as a user would and collects evidence per criterion. Every slice and story gets it.

@@ -1,5 +1,19 @@
 import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
-import { compareVersions, type ConfigProblem, DEFAULT_TEAM_CONFIG, FLAGS, type GitHub, isVersion, LOCAL_CONFIG, STATES, TEAM_CONFIG } from "@norn/core";
+import {
+  compareVersions,
+  type ConfigProblem,
+  DEFAULT_TEAM_CONFIG,
+  ENGINE_FLAGS,
+  flowLabels,
+  nornLabel,
+  repositoryFlows,
+  type GitHub,
+  isVersion,
+  type LabelDefinition,
+  LOCAL_CONFIG,
+  type LoadedFlow,
+  TEAM_CONFIG,
+} from "@norn/core";
 import { join } from "node:path";
 
 /** Skills norn briefings name. */
@@ -22,30 +36,18 @@ export const SKILLS = [
   "norn-codebase-design",
 ] as const;
 
-const DESCRIPTIONS: Record<string, [string, string]> = {
-  "needs-refinement": ["c5def5", "Triaged; the spec is being refined"],
-  "needs-clarification": ["fbca04", "Refinement found questions or unknowns"],
-  "needs-plan": ["c5def5", "All questions answered; plan goes into the spec"],
-  "needs-slicing": ["c5def5", "Plan done; slices to be created"],
-  blocked: ["b60205", "Has an open native blocked-by relation"],
-  "ready-for-agent": ["0e8a16", "Unblocked, can be picked up"],
-  implementation: ["1d76db", "Story: slices in progress. Slice: implement"],
-  "needs-review": ["5319e7", "Code review of the slice PR or the story PR"],
-  "changes-requested": ["d93f0b", "Review asked for changes"],
-  "needs-qa": ["5319e7", "QA by an agent, with evidence"],
-  "needs-human-qa": ["e99695", "QA by a person, after the agent's"],
-  "qa-failed": ["d93f0b", "QA found problems"],
-  "merge-queue": ["0e8a16", "Implementation done, review has no requests, QA passed"],
-  "type:story": ["ededed", "norn story state machine"],
-  "type:slice": ["ededed", "norn slice state machine"],
-  "in-progress": ["fef2c0", "Someone holds the claim (mirror of the git-ref claim)"],
+/** The labels of the engine's own flags, which every flow shares. */
+const FLAG_LABELS: Record<(typeof ENGINE_FLAGS)[number], [string, string]> = {
+  "in-progress": ["fef2c0", "Someone holds the claim, mirrored from the git-ref claim"],
   "needs-human": ["e11d21", "A person is needed; cleared with the norn-resolve skill"],
   "mode:afk": ["bfdadc", "QA by an agent only"],
   "mode:hil": ["bfdadc", "QA by an agent, then by a person"],
 };
 
-export function labelDefinitions() {
-  return [...STATES, ...FLAGS].map((name) => ({ name, color: DESCRIPTIONS[name][0], description: DESCRIPTIONS[name][1] }));
+/** The labels norn needs: those of the valid flows in effect, then the engine's flags. */
+export function labelDefinitions(flows: LoadedFlow[]): LabelDefinition[] {
+  const valid = flows.flatMap((l) => (l.ok ? [{ name: l.name, flow: l.flow }] : []));
+  return [...flowLabels(valid), ...ENGINE_FLAGS.map((name) => nornLabel(name, ...FLAG_LABELS[name]))];
 }
 
 export interface InitDeps {
@@ -113,8 +115,9 @@ export async function init({ github, cwd, installSkills, version }: InitDeps): P
   mkdirSync(specs, { recursive: true });
   if (readdirSync(specs).length === 0) writeFileSync(join(specs, ".gitkeep"), "");
 
+  const baseBranch = typeof team.settings?.baseBranch === "string" ? team.settings.baseBranch : await github.defaultBranch();
   if (team.settings === null) {
-    const config = { nornVersion: version, ...DEFAULT_TEAM_CONFIG, baseBranch: await github.defaultBranch() };
+    const config = { nornVersion: version, ...DEFAULT_TEAM_CONFIG, baseBranch };
     writeFileSync(teamConfig, `${JSON.stringify(config, null, 2)}\n`);
   } else if (from !== version) {
     // Only the version changes; an existing key keeps its place, a new one goes first.
@@ -124,7 +127,9 @@ export async function init({ github, cwd, installSkills, version }: InitDeps): P
   ensureGitignored(cwd, [".agents/worktrees/", LOCAL_CONFIG]);
   const instructed = writeAgentInstructions(cwd);
 
-  await github.ensureLabels(labelDefinitions());
+  // The flows on the base branch decide the states; an invalid one is left for norn doctor to report.
+  const labels = labelDefinitions(await repositoryFlows({ github, config: { baseBranch } }));
+  await github.ensureLabels(labels);
 
   return {
     ok: true,
@@ -132,7 +137,7 @@ export async function init({ github, cwd, installSkills, version }: InitDeps): P
     skills: installed.length,
     updated,
     instructed,
-    labels: labelDefinitions().length,
+    labels: labels.length,
     version: from === version ? null : { from, to: version },
   };
 }

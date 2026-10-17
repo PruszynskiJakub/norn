@@ -95,6 +95,9 @@ export class FakeGitHub implements GitHub {
   async getIssue(n: number) {
     return structuredClone(this.mustGet(n));
   }
+  async openIssues(label: string) {
+    return [...this.issues.values()].filter((i) => i.state === "open" && i.labels.includes(label)).map((i) => structuredClone(i));
+  }
   async addLabels(n: number, labels: string[]) {
     const i = this.mustGet(n);
     for (const l of labels) {
@@ -159,8 +162,30 @@ export class FakeGitHub implements GitHub {
   async ensureLabels(labels: { name: string; color: string; description: string }[]) {
     for (const l of labels) this.labelDefs.set(l.name, { color: l.color, description: l.description });
   }
-  async labelNames() {
-    return [...this.labelDefs.keys()];
+  async repositoryLabels() {
+    return [...this.labelDefs].map(([name, l]) => ({ name, ...l }));
+  }
+  /** Files on GitHub by ref, then path: what readFileAt reads. Tests seed them with seedFile. */
+  files = new Map<string, Map<string, string>>();
+  /** Puts a file on a branch, as if it were committed and pushed there; the branch is created if missing. */
+  seedFile(path: string, content: string, ref = this.defaultBranchName) {
+    if (!this.files.has(ref)) this.files.set(ref, new Map());
+    this.files.get(ref)!.set(path, content);
+    this.branches.add(ref);
+  }
+  /** A flow at .agents/flows/<name>.json on a branch: an object is written as JSON, a string as it is. */
+  seedFlow(name: string, flow: unknown, ref = this.defaultBranchName) {
+    this.seedFile(`.agents/flows/${name}.json`, typeof flow === "string" ? flow : JSON.stringify(flow, null, 2), ref);
+  }
+  async readFileAt(path: string, ref: string) {
+    return this.files.get(ref)?.get(path) ?? null;
+  }
+  async listFilesAt(dir: string, ref: string) {
+    const prefix = `${dir.replace(/\/+$/, "")}/`;
+    return [...(this.files.get(ref)?.keys() ?? [])]
+      .filter((p) => p.startsWith(prefix) && !p.slice(prefix.length).includes("/"))
+      .map((p) => p.slice(prefix.length))
+      .sort();
   }
   /** gh's state; when logged in, only to the hosts in ghHosts. */
   ghAuthState: GhAuth = { kind: "logged-in" };
@@ -243,10 +268,12 @@ export class FakeGitHub implements GitHub {
     this.observed++;
     const repoUrl = await this.repoUrl();
     const claims = [...this.claims].map(([issue, record]) => ({ issue, sha: this.claimShas.get(issue) ?? "seeded", record: { ...record } }));
-    const storyOf = (n: number) => (this.mustGet(n).labels.includes("type:slice") ? (this.parents.get(n) ?? null) : n);
+    const typed = (n: number | undefined) => n !== undefined && (this.issues.get(n)?.labels.some((l) => l.startsWith("type:")) ?? false);
+    const topLevel = (n: number) => typed(n) && !typed(this.parents.get(n));
+    const storyOf = (n: number) => (topLevel(n) ? n : (this.parents.get(n) ?? null));
     const held = new Set(claims.filter((c) => c.record.holder === query.user).map((c) => storyOf(c.issue)));
     const stories = [...this.issues.values()].filter((i) => {
-      if (!i.labels.includes("type:story")) return false;
+      if (!topLevel(i.number)) return false;
       if (held.has(i.number)) return true;
       if (!i.assignees.includes(query.user)) return false;
       return i.state === "open" || (this.closedAt.get(i.number) ?? "") >= query.closedSince;

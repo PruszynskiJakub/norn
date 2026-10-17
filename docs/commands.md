@@ -14,11 +14,14 @@ norn answers in prose written as instructions to the agent, always in the same o
 | [`norn tidy`](#norn-tidy) | Remove what belongs to closed issues |
 | [`norn dashboard`](#norn-dashboard) | Watch your work in the browser |
 | [`norn doctor`](#norn-doctor) | Check the whole setup and say what to fix |
+| [`norn flows export <name>`](#norn-flows-export) | Copy a built-in flow into the repository to change it |
 | [`norn add-slice <story> "title"`](#norn-add-slice) | Create a slice (used by the `norn-slice` skill) |
 | [`norn escalate <issue> "reason"`](#norn-escalate) | Set `needs-human` and release the claim |
 | [`norn release <issue>`](#norn-release) | Give up the claim without a transition |
 
-`norn --version` prints the running norn's version.
+`norn --version` prints the running norn's version. `norn --help`, or `--help` (`-h`) after any command, prints the list of commands and runs nothing.
+
+norn calls an issue by its type, the flow it runs: a story is `Story #123`, an issue of a repository flow `bug` is `Bug #40`, its PR the bug PR.
 
 ## norn init
 
@@ -32,7 +35,7 @@ Sets norn up in the current repository. Running it again is safe and refreshes w
 - **Agent instructions.** Writes a short norn section between `<!-- norn:start -->` and `<!-- norn:end -->` into `AGENTS.md` and `CLAUDE.md`, whichever exist. With neither, it creates `AGENTS.md` and a `CLAUDE.md` that imports it.
 - **Files.** Creates `.agents/specs/` and the team config `.agents/norn.config.json`, taking `baseBranch` from the repository's default branch. Adds `.agents/worktrees/` and `.agents/norn.config.local.json` to `.gitignore`.
 - **Version.** Records the running norn's version as [`nornVersion`](configuration.md#the-norn-version) in the team config. On a repository set up before, it changes `nornVersion` and no other setting, and reports the change next to the skills it updated, so the two are committed together. It refuses when the repository's `nornVersion` is newer than your norn: upgrade norn instead of rolling the team's skills back.
-- **Labels.** Creates norn's labels on the GitHub repository.
+- **Labels.** Creates norn's labels on the GitHub repository: every state of the valid [flows](flows.md) on the base branch, built-in or the repository's, `type:<flow>` for each flow, and the flags `in-progress`, `needs-human`, `mode:afk` and `mode:hil`. A state's label takes its `color` and `description`, or a default for its kind. An invalid flow is skipped; `norn doctor` reports it. Labels are never deleted.
 
 It ends by suggesting `norn doctor`, which checks what `init` cannot set up.
 
@@ -42,7 +45,7 @@ It ends by suggesting `norn doctor`, which checks what `init` cannot set up.
 npx norn next <story>
 ```
 
-Lists what can be done on the story now, each item with the command that starts it, and what is waiting and why. It is the entry point for `norn-deliver`.
+Lists what can be done on the story now, each item with the command that starts it, and what is waiting and why. It is the entry point for `norn-deliver`. On an issue of a [repository flow](flows.md) it lists the issue itself: for a person at a human gate, else to start, attended as its state says.
 
 ```text
 Story #123 "Rate limiting" is in implementation. 2 of 7 slices are merged
@@ -52,13 +55,13 @@ You can start 3 items now. They are independent, so run them in parallel, at
 most 2 at a time, each in its own fresh subagent, told to work in the item's
 worktree:
 
-  - Slice #131 "Per-key limits" is ready-for-agent.
+  - Slice #131 "Per-key limits" is in ready-for-agent: Ready for an agent.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-131
     Start it with: norn take 131
-  - Slice #128 "Limit headers" needs review.
+  - Slice #128 "Limit headers" is in needs-review: Waiting for review.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-128
     Start it with: norn take 128
-  - Slice #127 "Redis store" is in merge-queue.
+  - Slice #127 "Redis store" is in merge-queue: Queued to merge.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-127
     Start it with: norn take 127
 
@@ -118,6 +121,8 @@ npx norn done <issue> [outcome] ["note"] [--evidence <dir>]
 
 Finishes the step: norn makes the transition, posts a comment and releases the claim. The outcome word is needed only when the step can end more than one way (see [steps, skills and outcomes](how-it-works.md#steps-skills-and-outcomes)). The note carries review requests, QA results or a rejection reason. `--evidence <dir>` pushes the QA files in `<dir>` to `norn/qa/<issue>` and embeds them in the comment.
 
+It refuses, changing nothing, while the step's work is not where the flow needs it: leaving a state with `opensPR` needs the issue's PR open, closing an issue of a flow with `opensPR` needs that PR merged, and leaving a state with `slices` needs a slice. When the outcome sets `needs-human`, from the flow's `needsHuman` or the fix-round limit, `done` says so and why.
+
 Follow-ups after the transition (story branch, unblocking slices, story PR, `needs-review`) are best effort; `norn next` catches up on any that failed.
 
 ## norn status
@@ -126,7 +131,7 @@ Follow-ups after the transition (story branch, unblocking slices, story PR, `nee
 npx norn status <story>
 ```
 
-A read-only overview of the story and its slices: the story's owner and branch, and for each item its state, mode, open blockers, `needs-human` and whether a claim holds it (and whether that claim is stale).
+A read-only overview of the issue and its slices: its owner and, when its flow gives it one, its branch, and for each item its state, mode, open blockers, `needs-human` and whether a claim holds it (and whether that claim is stale). An issue whose flow has no slices shows on its own.
 
 ## norn tidy
 
@@ -147,7 +152,8 @@ Serves a read-only page on `127.0.0.1` over your norn work in this repository an
 - what needs you (`needs-human` and `needs-human-qa`), each with its `norn-drive` command;
 - what is worth a look: stale claims and items one fix round from the limit;
 - your stories with their slices and progress;
-- a feed of what happened, with the agents' implement, review and QA remarks and links to their evidence.
+- a feed of what happened, with the agents' implement, review and QA remarks and links to their evidence;
+- a Flows page (`#flows`): every flow of the repository, marked built-in, overridden or the repository's own, and valid or invalid with its errors, each drawn as a graph of its states and the outcomes between them, with each state's behaviours and `when` mode. It only shows the flows; you change one by merging a change to its file.
 
 ![The norn dashboard](assets/dashboard.png)
 
@@ -172,16 +178,34 @@ Checks the whole setup at once and lists every check, each with the exact comman
 | `git` | You are in a git checkout whose `origin` is on GitHub |
 | `base-branch` | `baseBranch` exists on GitHub |
 | `permission` | You have write access or higher to the repository |
-| `labels` | All of norn's labels exist |
+| `labels` | The labels of every valid flow and norn's flags exist, as `init` creates them; a label of norn's that no flow uses, on the base branch or in your working copy's flow files, (one norn created, by the `(norn)` at the end of its description, a `type:`, or a state a flow renamed) warns, and is never deleted |
+| `flows` | The flows on the base branch, and every flow file in your working copy that differs from it, are valid; every `.json` file in `.agents/flows/` is named as a type can be, e.g. not `Bug.json`; the skills they name are installed. It names the type of the slices each flow makes, and lists, as warnings, the labels your local flow edits need that the repository lacks and the open issues they would orphan: those in a state the edit drops without naming it in `renamed` |
 | `config` | The team and local config are valid; their warnings show as a warning |
 | `version` | `nornVersion` is set and compatible with your norn; a compatible difference warns |
 | `skills` | Every skill the briefings name is in `skills/` and linked from `.claude/skills/`; a skill that differs from the bundled copy warns, except under `NORN_SKILLS_SOURCE` |
 | `agent-instructions` | The norn block is in `AGENTS.md` or `CLAUDE.md` |
 | `provider` | The worktree provider matches the environment, as `take` requires |
 
-Each check shows as `✓` ok, `!` warning, `✗` fail, or `-` skipped when a check it needs did not pass, e.g. `skipped, needs gh`. It exits 1 only when a check fails, so CI can run it without failing on a warning. `--json` gives `{ ok, checks: [{ id, level, message, fix }] }`.
+Each check shows as `✓` ok, `!` warning, `✗` fail, or `-` skipped when a check it needs did not pass, e.g. `skipped, needs gh`. A check with several problems lists each on a line of its own. It exits 1 only when a check fails, so CI can run it without failing on a warning. `--json` gives `{ ok, checks: [{ id, level, message, fix }] }`.
+
+The `flows` check validates your uncommitted `.agents/flows/*.json` before you open the PR, so a broken flow never reaches the base branch. A local file the same as the base branch's is reported once, as the base branch's.
 
 `doctor` changes nothing and never refuses: an invalid config, an incompatible version or a run outside a checkout are reported as checks.
+
+## norn flows export
+
+```sh
+npx norn flows export <name>
+```
+
+Writes norn's built-in flow `<name>`, `story` or `slice`, to `.agents/flows/<name>.json` as a starting copy for the team's own version. Once that file is merged into the base branch, it replaces the built-in flow of its name completely: norn takes nothing from the built-in one, for triage, `take`, `done`, `next` and `add-slice` alike. Unchanged, the copy runs exactly like the built-in flow. See [Repository flows](flows.md) for the format.
+
+```text
+Wrote .agents/flows/story.json, a copy of the built-in story flow.
+Change it there and merge it into the base branch; from then on it runs in place of the built-in story flow, with nothing taken from it.
+```
+
+It refuses when the file exists, leaving it as it is, and names the built-in flows when `<name>` is not one of them. It works in the current directory and needs neither GitHub nor the team config. `--json` gives `{ ok, flow, file, message }`.
 
 ## norn add-slice
 
@@ -189,7 +213,7 @@ Each check shows as `✓` ok, `!` warning, `✗` fail, or `-` skipped when a che
 npx norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...
 ```
 
-Creates a slice as a sub-issue of the story, with its labels, the story's assignee, its native "blocked by" relations and its mode. The `norn-slice` skill calls it; you rarely need it by hand.
+Creates a slice as a sub-issue of the story, with its labels, the story's assignee, its native "blocked by" relations and its mode. The slice gets the type the story's flow names and starts in that type's start state, or held while a blocker is open; the answer names that state. A missing label for either is created first, with its colour and description. The `norn-slice` skill calls it; you rarely need it by hand.
 
 ## norn escalate
 

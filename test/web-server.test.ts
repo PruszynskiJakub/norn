@@ -93,11 +93,86 @@ describe("the dashboard server", () => {
     expect(d.due.map((x) => x.ms)).toEqual([120_000]);
   });
 
+  test("answers the repository's flows, valid or with their errors, and each issue's flow", async () => {
+    const w = setup({ now: "2026-10-13T12:00:00Z" });
+    const bug = {
+      description: "A defect.",
+      start: "reproducing",
+      workspace: "none",
+      states: {
+        reproducing: { skill: "bug-repro", attended: true, description: "Waiting for a repro", outcomes: { fixed: { to: "closed", means: "fixed" } } },
+      },
+    };
+    w.github.seedFlow("bug", bug);
+    w.github.seedFlow("chore", { description: "Broken.", start: "nowhere", workspace: "none", states: {} });
+    w.github.seedIssue({ number: 10, title: "Rate limiting", labels: ["type:story", "implementation"], assignees: ["alice"] });
+    w.github.seedIssue({ number: 11, title: "Redis store", labels: ["type:slice", "mode:afk", "ready-for-agent"], assignees: ["alice"] });
+    w.github.parents.set(11, 10);
+    w.github.seedIssue({ number: 40, title: "Crash", labels: ["type:bug", "reproducing"], assignees: ["alice"] });
+    const s = await started(await dashboard({ w }));
+    await s.idle();
+
+    const now = await state(s.url);
+
+    expect(now.flows.map((f) => [f.name, f.ok])).toEqual([
+      ["story", true],
+      ["slice", true],
+      ["bug", true],
+      ["chore", false],
+    ]);
+    expect(now.flows.find((f) => f.name === "bug")).toEqual({ ok: true, name: "bug", flow: bug, source: "repository" });
+    expect(now.flows.find((f) => f.name === "chore")).toEqual({
+      ok: false,
+      name: "chore",
+      errors: [{ kind: "start-unknown", start: "nowhere" }],
+      source: "repository",
+    });
+    expect(now.board.map((x) => [x.number, x.flow, x.states, x.slices.map((i) => [i.number, i.flow])])).toEqual([
+      [10, "story", ["implementation"], [[11, "slice"]]],
+      [40, "bug", ["reproducing"], []],
+    ]);
+  });
+
+  test("answers the label colour and description of each kind of state, as norn creates labels without a colour of their own", async () => {
+    const s = await started(await dashboard());
+    await s.idle();
+
+    const now = await state(s.url);
+
+    expect(now.stateLabelDefaults).toEqual({
+      gate: { color: "e99695", description: "a person checks the work here" },
+      attended: { color: "c5def5", description: "a person takes part in this step" },
+      agent: { color: "bfd4f2", description: "an agent runs this step unattended" },
+    });
+  });
+
+  test("says where each flow comes from: built into norn, a built-in one the repository overrides, or the repository's own", async () => {
+    const w = setup({ now: "2026-10-13T12:00:00Z" });
+    w.github.seedFlow("slice", { description: "Broken.", start: "nowhere", workspace: "none", states: {} });
+    w.github.seedFlow("bug", {
+      description: "A defect.",
+      start: "reproducing",
+      workspace: "none",
+      states: { reproducing: { skill: "bug-repro", attended: true, outcomes: { fixed: { to: "closed", means: "fixed" } } } },
+    });
+    const s = await started(await dashboard({ w }));
+    await s.idle();
+
+    const now = await state(s.url);
+
+    expect(now.flows.map((f) => [f.name, f.source, f.ok])).toEqual([
+      ["story", "built-in", true],
+      ["slice", "overridden", false],
+      ["bug", "repository", true],
+    ]);
+  });
+
   test("polls on the interval, adding what happened since to the feed", async () => {
     const d = await dashboard();
     const s = await started(d);
     await s.idle();
     d.w.setNow("2026-10-13T12:02:00Z");
+    d.w.github.prs.push({ number: 70, head: "10-rate-limiting-11", base: "10-rate-limiting", state: "open" });
     await d.w.norn("take", "11");
     await d.w.norn("done", "11");
 

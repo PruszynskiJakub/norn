@@ -1,8 +1,8 @@
 // The dashboard's renderer: every sentence the page shows is worded here, from
 // the typed read model, so the rest of the UI only lays words out.
-import type { BoardItem, ClaimHolder, FeedEvent, State, WaitingItem } from "@norn/core";
+import type { ClaimHolder, Expected, FeedEvent, FieldAt, Flow, FlowError, FlowSource, LoadedFlow, WaitingItem } from "@norn/core";
 import type { DashboardState, PollFailure } from "../../src/contract.ts";
-import { stateOf } from "./model.ts";
+import { atGate, atGateStep, type Item, isSliced, stateOf, stepGroupOf } from "./model.ts";
 
 function unreachable(x: never): never {
   throw new Error(`no wording for ${JSON.stringify(x)}`);
@@ -46,53 +46,21 @@ export function actorOf(e: FeedEvent, me: string | null): string {
   return login(e.actor, me);
 }
 
-function capitalise(s: string): string {
+export function capitalise(s: string): string {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-function qaWho(step: string, actor: string | null, me: string | null): string {
-  if (step === "agent QA") return "Agent QA";
-  return actor !== null && actor === me ? "Your QA" : "Human QA";
-}
-
-/** An outcome as a sentence: "Review asked for changes", "Agent QA passed". */
-function outcomeSentence(e: Extract<FeedEvent, { kind: "outcome" }>, me: string | null): string {
-  switch (e.step) {
-    case "implementation":
-      return e.fixRound ? `Fix round ${e.fixRound} pushed` : "Implementation pushed";
-    case "fixing":
-      return e.fixRound ? `Story fixes pushed, round ${e.fixRound}` : "Story fixes pushed";
-    case "review":
-      if (e.outcome === "approve") return "Review approved";
-      if (e.outcome === "request-changes") return "Review asked for changes";
-      break;
-    case "agent QA":
-    case "human QA":
-      if (e.outcome === "pass") return `${qaWho(e.step, e.actor, me)} passed`;
-      if (e.outcome === "fail") return `${qaWho(e.step, e.actor, me)} failed`;
-      break;
-    case "merge":
-      return "Merged into the story branch";
-    case "resolving needs-human":
-      return "Escalation resolved";
-    case "triage":
-      if (e.outcome === "accept") return "Accepted at triage";
-      if (e.outcome === "reject") return "Rejected at triage";
-      break;
-    case "refinement":
-      if (e.outcome === "clear") return "Refined, no open questions";
-      if (e.outcome === "questions") return "Refinement raised questions";
-      break;
-    case "clarification":
-      if (e.outcome === "answered") return "Questions answered";
-      if (e.outcome === "questions") return "Questions remain after clarification";
-      break;
-    case "planning":
-      return "Plan written";
-    case "slicing":
-      return "Sliced";
-  }
-  return e.outcome === "done" ? `${capitalise(e.step)} done` : `${capitalise(e.step)}: ${e.outcome}`;
+/**
+ * An outcome as a sentence, from its step and word as its flow names them: "Review: request-changes", "Your QA: pass",
+ * "Implementation done, fix round 2". Triage and resolving needs-human are norn's own steps in every flow.
+ */
+function outcomeSentence(e: Extract<FeedEvent, { kind: "outcome" }>, me: string | null, flows: LoadedFlow[]): string {
+  if (e.flow === null) return e.to === "not-planned" ? "Rejected at triage" : `Accepted at triage as a ${e.outcome}`;
+  if (e.step === "resolving needs-human") return "Escalation resolved";
+  // At a human gate, the developer's own check is theirs.
+  const step = atGateStep(e, flows) && e.actor !== null && e.actor === me ? "Your QA" : capitalise(e.step);
+  const round = e.fixRound && stepGroupOf(e, flows) === "implement" ? `, fix round ${e.fixRound}` : "";
+  return e.outcome === "done" ? `${step} done${round}` : `${step}: ${e.outcome}${round}`;
 }
 
 function otherActivity(e: Extract<FeedEvent, { kind: "other-activity" }>): string {
@@ -129,14 +97,14 @@ export function routineText(e: FeedEvent): string {
 }
 
 /** A significant event as a plain sentence; anything else keeps norn's terms. */
-export function sentence(e: FeedEvent, me: string | null): string {
+export function sentence(e: FeedEvent, me: string | null, flows: LoadedFlow[]): string {
   switch (e.kind) {
     case "outcome":
-      return outcomeSentence(e, me);
+      return outcomeSentence(e, me, flows);
     case "needs-human":
       return e.action === "raised" ? "Escalated to you" : "Escalation resolved";
     case "pr":
-      return e.action === "merged" ? `${e.target === "story" ? "Story" : "Slice"} PR #${e.pr} merged` : routineText(e);
+      return e.action === "merged" ? `${capitalise(e.target)} PR #${e.pr} merged` : routineText(e);
     case "claim":
       return e.action === "stale" ? `Agent ${e.session} went quiet` : routineText(e);
     case "step":
@@ -150,8 +118,8 @@ export function sentence(e: FeedEvent, me: string | null): string {
 }
 
 /** "· round 2 of 3" after a review or QA outcome inside a fix round. */
-export function roundNote(e: FeedEvent): string | null {
-  if (e.kind !== "outcome" || !e.fixRound || e.step === "implementation" || e.step === "fixing") return null;
+export function roundNote(e: FeedEvent, flows: LoadedFlow[]): string | null {
+  if (e.kind !== "outcome" || !e.fixRound || stepGroupOf(e, flows) === "implement") return null;
   return `round ${e.fixRound} of ${e.maxFixRounds}`;
 }
 
@@ -172,46 +140,20 @@ export function routineRun(n: number): string {
   return `${n} routine updates`;
 }
 
-function stateWords(s: State): string {
-  switch (s) {
-    case "needs-refinement":
-      return "Waiting for refinement";
-    case "needs-clarification":
-      return "Waiting for answers to its open questions";
-    case "needs-plan":
-      return "Waiting for a plan";
-    case "needs-slicing":
-      return "Waiting to be sliced";
-    case "blocked":
-      return "Blocked";
-    case "ready-for-agent":
-      return "Ready for an agent";
-    case "implementation":
-      return "Being implemented";
-    case "needs-review":
-      return "Waiting for review";
-    case "changes-requested":
-      return "Back for fixes after review";
-    case "needs-qa":
-      return "Waiting for agent QA";
-    case "needs-human-qa":
-      return "Waiting for your QA";
-    case "qa-failed":
-      return "Back for fixes after QA";
-    case "merge-queue":
-      return "Queued to merge";
-    default:
-      return unreachable(s);
-  }
+/** Where an item stands, as a sentence without its full stop: its state's description in its flow, else the state's name. */
+export function stateSentence(x: Item): string {
+  const s = stateOf(x);
+  if (s === "merged") return x.flowDef?.workspace === "none" ? "Done" : "Merged";
+  if (s === "closed") return "Closed without merging";
+  if (x.flowInvalid) return `Stopped: its flow, ${x.flow}, is invalid`;
+  if (s === null) return x.states.length ? `Its state labels disagree: ${x.states.join(" and ")}` : "Has no norn state label";
+  return x.flowDef?.states[s]?.description ?? s;
 }
 
-/** Where an item stands, as a sentence without its full stop. */
-export function stateSentence(x: BoardItem): string {
-  const s = stateOf(x);
-  if (s === "merged") return "Merged";
-  if (s === "closed") return "Closed without merging";
-  if (s === null) return x.states.length ? `Its state labels disagree: ${x.states.join(" and ")}` : "Has no norn state label";
-  return stateWords(s);
+/** What the item is, above its title: its flow, e.g. Story, or Slice of its story. */
+export function kicker(x: Item): string {
+  const flow = x.flow === null ? "Issue" : capitalise(x.flow);
+  return x.isStory ? flow : `${flow} of`;
 }
 
 /** Who holds an item, as a sentence. */
@@ -238,9 +180,9 @@ export function progressCount(merged: number, total: number): string {
 }
 
 /** The short flag beside an item in the sidebar, only where it needs attention. */
-export function itemFlag(x: BoardItem): { text: string; tone: "bad" | "warn" } | null {
+export function itemFlag(x: Item): { text: string; tone: "bad" | "warn" } | null {
   if (x.needsHuman) return { text: "needs you", tone: "bad" };
-  if (x.states.includes("needs-human-qa")) return { text: "your QA", tone: "warn" };
+  if (atGate(x)) return { text: "your QA", tone: "warn" };
   if (x.holder?.stale) return { text: "quiet", tone: "warn" };
   return null;
 }
@@ -254,8 +196,6 @@ export const SIDEBAR = {
 };
 
 export const DETAIL = {
-  story: "Story",
-  sliceOf: "Slice of",
   waitsFor: "Waits for",
   and: "and",
   humanQa: "You QA this one before it merges",
@@ -264,8 +204,12 @@ export const DETAIL = {
   openOnGitHub: "Open on GitHub ↗",
   progress: "Progress",
   noStories: "Nothing in progress.",
-  pipeline: ["build", "review", "QA", "merge"],
 };
+
+/** A stop of the pipeline that runs in one mode only. */
+export function onlyIn(when: "afk" | "hil"): string {
+  return `only in mode:${when}`;
+}
 
 export const FEED = {
   everything: "Everything",
@@ -306,13 +250,14 @@ export function waitingHeading(w: WaitingItem): string {
   }
 }
 
-/** Why an item waits for the developer, in plain words. */
-export function waitingReason(w: WaitingItem): string {
+/** Why an item waits for the developer, in plain words; `x` is the item, when on the board. */
+export function waitingReason(w: WaitingItem, x: Item | undefined): string {
   switch (w.kind) {
     case "needs-human":
       return w.reason ?? "Someone flagged it needs-human by hand; its comments say why.";
     case "needs-human-qa":
-      return w.issue === w.story ? "Every slice merged and agent QA passed. Your QA closes the story." : "Agent QA passed. A few checks need a person.";
+      if (w.issue !== w.story) return "Agent QA passed. A few checks need a person.";
+      return x && isSliced(x) ? `Every slice merged and agent QA passed. Your QA closes the ${x.flow}.` : "A few checks need a person.";
     default:
       return unreachable(w.kind);
   }
@@ -369,4 +314,150 @@ export function feedTitle(selected: boolean): string {
 
 export function emptyFeed(remarksOnly: boolean): string {
   return remarksOnly ? "No remarks here." : "Nothing here yet.";
+}
+
+export const FLOWS = {
+  nav: "Flows",
+  title: "Flows",
+  sub: "The processes this repository's issues run, as norn reads them from .agents/flows on the base branch. Read-only: a flow changes when a change to its file merges.",
+  none: "No flows read yet.",
+  valid: "valid",
+  invalid: "invalid",
+  graph: "States and the outcomes between them",
+  states: "States",
+  attended: "attended",
+  agent: "agent",
+  start: "start",
+};
+
+export function invalidFlows(n: number): string {
+  return n === 1 ? "1 flow is invalid" : `${n} flows are invalid`;
+}
+
+/** Where a flow comes from, as its badge says it. */
+export function flowSourceLabel(source: FlowSource): string {
+  switch (source) {
+    case "built-in":
+      return "built-in";
+    case "overridden":
+      return "overridden";
+    case "repository":
+      return "repository";
+    default:
+      return unreachable(source);
+  }
+}
+
+/** Where a flow comes from, as a sentence for its badge's hint. */
+export function flowSourceHint(source: FlowSource, name: string): string {
+  switch (source) {
+    case "built-in":
+      return "Ships with norn.";
+    case "overridden":
+      return `Ships with norn; the repository's .agents/flows/${name}.json replaces it.`;
+    case "repository":
+      return `The repository's own, from .agents/flows/${name}.json.`;
+    default:
+      return unreachable(source);
+  }
+}
+
+/** A flow's facts under its description: where it starts, where its work happens, whether triage offers it. */
+export function flowFacts(flow: Flow): string {
+  const where =
+    flow.workspace === "none" ? "no branch" : flow.workspace === "own" ? "its own branch, PR into the base branch" : "a branch off its parent's, PR into it";
+  return `Starts in ${flow.start} · works on ${where}${flow.triage === false ? " · triage doesn't offer it" : ""}`;
+}
+
+/** A behaviour's parameters, e.g. "to ready-for-agent"; empty for none. */
+export function behaviourParams(params: Record<string, unknown> | undefined): string {
+  return Object.entries(params ?? {})
+    .map(([k, v]) => `${k} ${typeof v === "string" ? v : JSON.stringify(v)}`)
+    .join(", ");
+}
+
+/** What a field of a flow must be. */
+function expectedText(e: Expected): string {
+  switch (e.kind) {
+    case "string":
+      return "text";
+    case "boolean":
+      return "true or false";
+    case "object":
+      return "an object";
+    case "hex-colour":
+      return "a hex colour like 1d76db";
+    case "state":
+      return "a state of the flow";
+    case "outcome-word":
+      return "one of the state's outcomes";
+    case "flow-name":
+      return "a flow's name";
+    case "behaviours":
+      return "an object of behaviours";
+    case "params":
+      return "an object of parameters, {} for none";
+    case "one-of":
+      return e.values.map((v) => `"${v}"`).join(" or ");
+    default:
+      return unreachable(e);
+  }
+}
+
+/** Where a field is in a flow file, as the subject of a sentence. */
+function fieldText(at: FieldAt): string {
+  switch (at.in) {
+    case "flow":
+      return at.field === null ? "The flow" : `The field ${at.field}`;
+    case "state":
+      return at.field === null ? `The state ${at.state}` : `${at.field} of ${at.state}`;
+    case "outcome":
+      return at.field === null ? `The outcome ${at.word} of ${at.state}` : `${at.field} of the outcome ${at.word} of ${at.state}`;
+    case "behaviour":
+      return at.param === null ? `The parameters of ${at.behaviour} on ${at.state}` : `${at.param} of ${at.behaviour} on ${at.state}`;
+    case "renamed":
+      return `What renamed moves ${at.from} to`;
+    default:
+      return unreachable(at);
+  }
+}
+
+/** What is wrong with a flow, as a sentence. */
+export function flowErrorText(e: FlowError): string {
+  switch (e.kind) {
+    case "not-json":
+      return `The file isn't JSON: ${e.detail}`;
+    case "field-invalid":
+      return `${fieldText(e.at)} must be ${expectedText(e.expected)}.`;
+    case "field-unknown":
+      return `${fieldText(e.at)} is no field of the flow format.`;
+    case "start-unknown":
+      return `start names ${e.start}, which is no state of the flow.`;
+    case "target-unknown":
+      return `The outcome ${e.word} of ${e.state} leads to ${e.to}, which is no state of the flow and no end.`;
+    case "notify-agent-state":
+      return `The outcome ${e.word} of ${e.state} notifies a person, but ${e.to} is an agent's step.`;
+    case "renamed-unknown":
+      return `renamed moves ${e.from} to ${e.to}, which is no state of the flow.`;
+    case "state-reserved":
+      return `The state ${e.state} takes a name norn keeps for itself.`;
+    case "pass-through-invalid":
+      return e.word === null
+        ? `${e.state} runs in one mode only but has no passThrough.`
+        : `The passThrough of ${e.state}, ${e.word}, is not one of its outcomes.`;
+    case "end-unreachable":
+      return `No outcomes lead from ${e.state} to closed or not-planned${e.mode ? ` in mode:${e.mode}` : ""}, so an issue there could never end.`;
+    case "behaviour-unknown":
+      return `${e.state} uses ${e.behaviour}, a behaviour this norn doesn't have${e.like ? `; did you mean ${e.like}?` : "."}`;
+    case "behaviours-conflict":
+      return `${e.state} uses ${e.behaviours[0]} and ${e.behaviours[1]}, which can't go together.`;
+    case "flow-unknown":
+      return `${e.behaviour} of ${e.state} names the flow ${e.flow}, which the repository doesn't have.`;
+    case "behaviour-needs":
+      return `${e.behaviour} of ${e.state} needs workspace to be ${e.workspace.map((w) => `"${w}"`).join(" or ")}.`;
+    case "flow-reserved":
+      return `The name ${e.flow} is one norn keeps for itself.`;
+    default:
+      return unreachable(e);
+  }
 }

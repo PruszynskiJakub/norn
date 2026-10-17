@@ -75,6 +75,58 @@ describe("norn init", () => {
   });
 });
 
+/** A bug flow with a coloured state and one with no colour or description, which takes the default of its kind. */
+const BUG = {
+  description: "A defect: reproduce it, fix it, close it.",
+  start: "reproducing",
+  workspace: "none",
+  states: {
+    reproducing: { skill: "bug-repro", attended: true, outcomes: { reproduced: { to: "fixing", means: "reproduced" } } },
+    fixing: { skill: "bug-fix", attended: false, color: "123456", description: "Being fixed", outcomes: { fixed: { to: "closed", means: "fixed" } } },
+  },
+};
+
+describe("norn init: labels from the flows", () => {
+  test("creates every state and type:<flow> of the repository's flows on the base branch, with the defaults of a state's kind", async () => {
+    const { w, cwd, norn } = project();
+    mkdirSync(join(cwd, ".agents"), { recursive: true });
+    writeFileSync(join(cwd, ".agents", "norn.config.json"), JSON.stringify({ baseBranch: "develop" }));
+    w.github.seedFlow("bug", BUG, "develop");
+
+    const res = await norn("init");
+
+    expect(res.exitCode).toBe(0);
+    expect(w.github.labelDefs.get("reproducing")).toEqual({ color: "c5def5", description: "a person takes part in this step (norn)" });
+    expect(w.github.labelDefs.get("fixing")).toEqual({ color: "123456", description: "Being fixed (norn)" });
+    expect(w.github.labelDefs.get("type:bug")).toEqual({ color: "ededed", description: "Runs the bug flow (norn)" });
+    expect(w.github.labelDefs.get("needs-review")).toEqual({ color: "5319e7", description: "Waiting for review (norn)" });
+    expect(res.stdout).toContain(`  - ${w.github.labelDefs.size} labels on the repository`);
+  });
+
+  test("a repository flow that replaces a built-in one gives its states instead", async () => {
+    const { w, norn } = project();
+    w.github.seedFlow("slice", { ...BUG, workspace: "parent", triage: false });
+
+    await norn("init");
+
+    expect(w.github.labelDefs.has("reproducing")).toBe(true);
+    expect(w.github.labelDefs.has("blocked")).toBe(false);
+    expect(w.github.labelDefs.has("type:slice")).toBe(true);
+  });
+
+  test("skips an invalid flow and still creates the others' labels", async () => {
+    const { w, norn } = project();
+    w.github.seedFlow("bug", { ...BUG, start: "nowhere" });
+
+    const res = await norn("init");
+
+    expect(res.exitCode).toBe(0);
+    expect(w.github.labelDefs.has("reproducing")).toBe(false);
+    expect(w.github.labelDefs.has("type:bug")).toBe(false);
+    expect(w.github.labelDefs.has("needs-refinement")).toBe(true);
+  });
+});
+
 describe("norn init: configuration and worktrees", () => {
   test("creates the team config with defaults and gitignores worktrees and the local config", async () => {
     const { cwd, norn } = project();

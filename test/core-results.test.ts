@@ -27,7 +27,7 @@ describe("done", () => {
     const res = await done(ctx, 41, {});
 
     expect(res).toMatchObject({ ok: true, kind: "done", issue: 41, from: "merge-queue", to: "closed" });
-    expect(res.ok && res.followUps).toEqual([{ kind: "story-promoted", story: 40 }]);
+    expect(res.ok && res.followUps).toEqual([{ kind: "story-promoted", story: 40, flow: "story", to: "needs-review" }]);
   });
 
   test("a follow-up that fails is an event saying what failed and which norn next retries it", async () => {
@@ -84,7 +84,7 @@ describe("done", () => {
     await take(ctx, 7, { takeover: false });
     const res = await done(ctx, 7, { word: "maybe" });
     expect(res).toMatchObject({ ok: false, refusal: { kind: "outcome-unknown", issue: 7, word: "maybe", step: "triage" } });
-    expect(!res.ok && res.refusal.kind === "outcome-unknown" && res.refusal.finish.map((f) => f.word)).toEqual(["accept", "reject"]);
+    expect(!res.ok && res.refusal.kind === "outcome-unknown" && res.refusal.finish.map((f) => f.word)).toEqual(["story", "reject"]);
   });
 });
 
@@ -95,7 +95,7 @@ describe("take", () => {
 
     const res = await take(ctx, 41, { takeover: false });
 
-    if (!res.ok) throw new Error("refused");
+    if (!res.ok || res.kind !== "taken") throw new Error("not taken");
     expect(res.briefing).toMatchObject({
       issue: 41,
       noun: "slice",
@@ -146,7 +146,7 @@ describe("next", () => {
 
     const res = await next(await w.ctx(), 30);
 
-    expect(res.ok && res.report.notes).toEqual([{ kind: "story-closed", story: 30 }]);
+    expect(res.ok && res.report.notes).toEqual([{ kind: "story-closed", story: 30, flow: "story" }]);
   });
 
   test("closing a merged story that fails is a follow-up-failed event", async () => {
@@ -178,7 +178,7 @@ describe("next", () => {
 
   test("a slice is refused, naming its story", async () => {
     const w = lastSlice();
-    expect(await next(await w.ctx(), 41)).toEqual({ ok: false, refusal: { kind: "is-a-slice", issue: 41, story: 40 } });
+    expect(await next(await w.ctx(), 41)).toEqual({ ok: false, refusal: { kind: "is-a-slice", issue: 41, flow: "slice", story: 40 } });
   });
 });
 

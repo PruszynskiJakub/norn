@@ -96,6 +96,7 @@ Your agent runs most of these for you. Add `--json` for scripts. See [commands](
 ## Documentation
 
 - [How norn works](docs/how-it-works.md): principles, assumptions, labels, flows, claims and delivery
+- [Flows](docs/flows.md): the process as data, and how a repository defines its own
 - [Commands](docs/commands.md): every command, flag and output
 - [Configuration](docs/configuration.md): team and local settings, providers, notifications
 - [Tutorial](docs/tutorial.md): try norn in a sandbox repository

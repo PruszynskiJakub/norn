@@ -7,7 +7,7 @@ import { StateDot } from "./sidebar.tsx";
 
 /** The one thing the page wants read first: what needs the developer, then what looks stuck. */
 export function Hero() {
-  const { state, items, now, select } = useView();
+  const { state, items, item, now, select } = useView();
   const open = items.filter((x) => !isDone(x));
   const working = open.filter((x) => x.holder && !x.holder.stale).length;
   const quiet = quietItems(items);
@@ -34,7 +34,7 @@ export function Hero() {
             className="mb-2.5 grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 rounded-[14px] border border-border bg-card px-[18px] py-4 transition-[border-color,box-shadow] hover:border-faint hover:shadow-[0_2px_10px_rgba(0,0,0,.04)]"
           >
             <div className="font-medium text-[15.5px]">{w.title}</div>
-            <div className="col-start-1 text-[14px] text-muted-foreground">{waitingReason(w)}</div>
+            <div className="col-start-1 text-[14px] text-muted-foreground">{waitingReason(w, item(w.issue))}</div>
             <div className="col-start-2 row-span-2 row-start-1 flex flex-col items-end gap-1.5">
               <span className={cn("font-medium text-[12.5px]", escalated ? "text-bad" : "text-warn")}>
                 {waitingKind(w)}

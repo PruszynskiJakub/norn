@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/PruszynskiJakub/norn/main/schema/flow.schema.json",
+  "title": "norn flow",
+  "description": "A norn flow: the process for the issues of one type, in .agents/flows/<name>.json. The file name is the flow's name and its type: an issue labelled type:<name> runs it. The schema checks the shape; norn doctor also checks what it cannot, e.g. that every target is a state and every state can reach an end.",
+  "type": "object",
+  "required": ["description", "start", "workspace", "states"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "description": "Where an editor finds this schema." },
+    "description": { "type": "string", "description": "What the flow is for. Triage offers the flow with it." },
+    "start": { "type": "string", "description": "The state an issue enters the flow in." },
+    "workspace": {
+      "enum": ["none", "own", "parent"],
+      "description": "Where the work happens: none, no branch; own, a branch and a PR into the base branch; parent, a branch and a PR into the parent issue's branch."
+    },
+    "triage": { "type": "boolean", "description": "Whether triage offers the flow as an outcome. Default true." },
+    "states": {
+      "type": "object",
+      "description": "The states, by name. Each name is the label of the state on GitHub. closed, not-planned, in-progress and needs-human are norn's own.",
+      "additionalProperties": { "$ref": "#/$defs/state" }
+    },
+    "renamed": {
+      "type": "object",
+      "description": "Old state name to its new one: an issue still in the old state moves to the new one when norn next touches it.",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "state": {
+      "type": "object",
+      "required": ["skill", "attended", "outcomes"],
+      "additionalProperties": false,
+      "dependentRequired": { "when": ["passThrough"] },
+      "properties": {
+        "skill": { "type": "string", "description": "The skill the briefing names for the step." },
+        "attended": { "type": "boolean", "description": "Whether a person takes part in the step." },
+        "name": { "type": "string", "description": "The step's human name, e.g. agent QA. Default: the state's name." },
+        "enterAs": { "type": "string", "description": "The state the issue moves to when the step is taken." },
+        "description": { "type": "string", "description": "What the state means: its label's description and the dashboard's wording." },
+        "color": { "type": "string", "pattern": "^[0-9a-fA-F]{6}$", "description": "The label's colour, hex without the #, e.g. 1d76db." },
+        "evidence": { "type": "boolean", "description": "The step can attach evidence files with norn done --evidence <dir>." },
+        "when": {
+          "enum": ["afk", "hil"],
+          "description": "The only mode the state runs in. In the other mode norn follows passThrough instead of entering it."
+        },
+        "passThrough": { "type": "string", "description": "With when: the outcome word norn follows when the issue's mode skips the state." },
+        "behaviours": { "$ref": "#/$defs/behaviours" },
+        "outcomes": {
+          "type": "object",
+          "description": "How the step can end, by outcome word. The empty word is the single way to end.",
+          "additionalProperties": { "$ref": "#/$defs/outcome" }
+        }
+      }
+    },
+    "outcome": {
+      "type": "object",
+      "required": ["to", "means"],
+      "additionalProperties": false,
+      "properties": {
+        "to": { "type": "string", "description": "A state of the flow, closed or not-planned." },
+        "means": { "type": "string", "description": "How the briefing describes the outcome." },
+        "meansSkipped": { "type": "string", "description": "How it is described instead when the issue's mode skips the state it leads to." },
+        "note": { "type": "string", "description": "The outcome needs a note; this names it, e.g. reason." },
+        "needsHuman": { "type": "string", "description": "After the transition, set needs-human; this says who must do what." },
+        "notify": {
+          "type": "boolean",
+          "description": "After the transition, a person does QA and is notified; a human gate does this on its own. It leads only into an attended state or a human gate, never an agent's."
+        }
+      }
+    },
+    "behaviours": {
+      "type": "object",
+      "description": "Built-in mechanics the state opts into, by name, with their parameters ({} for none).",
+      "additionalProperties": false,
+      "properties": {
+        "writesSpec": {
+          "type": "object",
+          "description": "The step writes the spec, pushed to the issue's branch. Needs workspace own.",
+          "additionalProperties": false,
+          "properties": { "readsIssue": { "type": "boolean", "description": "The briefing has the agent read the issue first." } }
+        },
+        "countsFixRounds": {
+          "type": "object",
+          "description": "The state counts fix rounds; at the team's maxFixRounds the issue goes to needs-human.",
+          "additionalProperties": false
+        },
+        "opensPR": {
+          "type": "object",
+          "description": "The step opens the issue's PR; later states see it. Needs workspace own or parent.",
+          "additionalProperties": false
+        },
+        "waitsForSlices": {
+          "type": "object",
+          "description": "The issue waits until its slices are closed, then norn opens its PR and moves it on. Needs workspace own.",
+          "required": ["to"],
+          "additionalProperties": false,
+          "properties": { "to": { "type": "string", "description": "The state the issue moves to once its slices are done." } }
+        },
+        "humanGate": {
+          "type": "object",
+          "description": "A person checks the work here: norn notifies them, and the step can attach evidence.",
+          "additionalProperties": false
+        },
+        "mergesSlice": {
+          "type": "object",
+          "description": "Leaving needs the PR merged into the parent's branch; then norn tidies up and releases blocked siblings. Needs workspace parent.",
+          "additionalProperties": false
+        },
+        "syncsBlocked": {
+          "type": "object",
+          "description": "The issue waits while it has open blockers, then norn releases it.",
+          "required": ["to"],
+          "additionalProperties": false,
+          "properties": { "to": { "type": "string", "description": "The state the issue is released to." } }
+        },
+        "slices": {
+          "type": "object",
+          "description": "The step creates slices with norn add-slice; leaving needs at least one.",
+          "required": ["type"],
+          "additionalProperties": false,
+          "properties": { "type": { "type": "string", "description": "The flow the slices run, e.g. slice." } }
+        },
+        "waitsForMerge": {
+          "type": "object",
+          "description": "The issue's owner merges its PR; norn closes the issue once it is merged. Needs workspace own.",
+          "additionalProperties": false
+        }
+      }
+    }
+  }
+}

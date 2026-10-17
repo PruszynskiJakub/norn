@@ -62,6 +62,9 @@ export function ghFailure(e: unknown): GhFailure {
 
 const REPO = "repos/{owner}/{repo}";
 
+/** The contents API path of a file or directory at a ref; the ref is encoded, so a branch with a slash is one ref. */
+const contentsAt = (path: string, ref: string) => `${REPO}/contents/${path.split("/").map(encodeURIComponent).join("/")}?ref=${encodeURIComponent(ref)}`;
+
 interface RestIssue {
   id: number;
   number: number;
@@ -72,6 +75,8 @@ interface RestIssue {
   assignees: { login: string }[];
   /** API URL of the issue's repository, e.g. https://api.github.com/repos/acme/app. */
   repository_url?: string;
+  /** Set when the issue is a pull request. */
+  pull_request?: unknown;
 }
 
 function toIssue(r: RestIssue): Issue {
@@ -116,6 +121,21 @@ export class GhGitHub implements GitHub {
     }
   }
 
+  async readFileAt(path: string, ref: string): Promise<string | null> {
+    const r = await this.find<{ type?: string; content?: string } | unknown[]>(contentsAt(path, ref));
+    // A directory comes back as a list of its entries.
+    if (r === null || Array.isArray(r) || r.type !== "file" || r.content === undefined) return null;
+    // GitHub breaks the base64 into lines; Buffer skips the line breaks.
+    return Buffer.from(r.content, "base64").toString("utf8");
+  }
+
+  async listFilesAt(dir: string, ref: string): Promise<string[]> {
+    const r = await this.find<{ type?: string; name?: string }[] | { type?: string }>(contentsAt(dir, ref));
+    // A file comes back as one object, a directory as a list of its entries.
+    if (!Array.isArray(r)) return [];
+    return r.filter((e) => e.type === "file" && typeof e.name === "string").map((e) => e.name as string);
+  }
+
   private async rawIssue(n: number) {
     return this.api<RestIssue>("GET", `${REPO}/issues/${n}`);
   }
@@ -131,6 +151,10 @@ export class GhGitHub implements GitHub {
   }
   async getIssue(n: number) {
     return toIssue(await this.rawIssue(n));
+  }
+  async openIssues(label: string) {
+    const all = await this.paginate<RestIssue>(`${REPO}/issues?state=open&labels=${encodeURIComponent(label)}&per_page=100`);
+    return all.filter((r) => r.pull_request === undefined).map(toIssue);
   }
   async addLabels(n: number, labels: string[]) {
     await this.api("POST", `${REPO}/issues/${n}/labels`, { labels });
@@ -201,8 +225,9 @@ export class GhGitHub implements GitHub {
     }
   }
 
-  async labelNames() {
-    return (await this.paginate<{ name: string }>(`${REPO}/labels`)).map((l) => l.name);
+  async repositoryLabels() {
+    const labels = await this.paginate<{ name: string; color: string; description: string | null }>(`${REPO}/labels`);
+    return labels.map((l) => ({ name: l.name, color: l.color, description: l.description ?? "" }));
   }
 
   async ghAuth(host: string): Promise<GhAuth> {

@@ -1,4 +1,4 @@
-import type { BoardStory, FeedEvent, WaitingItem } from "@norn/core";
+import type { BoardStory, FeedEvent, SourcedFlow, StateKind, WaitingItem } from "@norn/core";
 
 /** Why the last read of GitHub failed, as far as norn can tell. */
 export type PollFailure = "auth" | "rate-limit" | "network" | "other";
@@ -15,6 +15,10 @@ export interface DashboardState {
   repoUrl: string | null;
   board: BoardStory[];
   waiting: WaitingItem[];
+  /** The repository's flows, valid or with their errors and with where each comes from; each board item names its own by `flow`. Empty before the first good read. */
+  flows: SourcedFlow[];
+  /** The colour and description norn gives a state's label by its kind when the flow names none, as norn creates labels. */
+  stateLabelDefaults: Record<StateKind, { color: string; description: string }>;
   /** Newest first. */
   feed: FeedEvent[];
   /** When the last good read finished, ISO; null before one. */

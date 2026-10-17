@@ -34,6 +34,20 @@ async function healthy() {
   return { w, cwd, bundled, norn };
 }
 
+/** A bug flow: reproduce, fix, close. Its skills are the team's own, not norn's. */
+function bugFlow(over: Record<string, unknown> = {}) {
+  return {
+    description: "A defect: reproduce it, fix it, close it.",
+    start: "reproducing",
+    workspace: "none",
+    states: {
+      reproducing: { skill: "bug-repro", attended: true, outcomes: { reproduced: { to: "fixing", means: "reproduced" } } },
+      fixing: { skill: "bug-fix", attended: false, outcomes: { fixed: { to: "closed", means: "fixed" } } },
+    },
+    ...over,
+  };
+}
+
 /** The check lines and their fix lines, without the summary. */
 function lines(stdout: string) {
   return stdout.split("\n\n")[0].split("\n");
@@ -64,6 +78,7 @@ describe("norn doctor on a healthy setup", () => {
         "✓ base-branch: main exists on GitHub",
         "✓ permission: you have write access to the repository",
         "✓ labels: all 19 of norn's labels exist",
+        "✓ flows: all 2 flows are valid: story, slice; story makes slices of type slice",
         "✓ config: the team and local config are valid",
         "✓ version: norn 1.4.2, repo 1.4.2",
         "✓ skills: all 16 skills are in skills/ and linked from .claude/skills/",
@@ -88,6 +103,7 @@ describe("norn doctor on a healthy setup", () => {
       "base-branch",
       "permission",
       "labels",
+      "flows",
       "config",
       "version",
       "skills",
@@ -202,6 +218,7 @@ describe("norn doctor: gh and git", () => {
       "- base-branch: skipped, needs git",
       "- permission: skipped, needs git",
       "- labels: skipped, needs git",
+      "- flows: skipped, needs git",
       "- config: skipped, needs git",
       "- version: skipped, needs git",
       "- skills: skipped, needs git",
@@ -252,6 +269,297 @@ describe("norn doctor: the repository on GitHub", () => {
       message: "2 of norn's labels are missing: blocked, mode:hil",
       fix: "norn init",
     });
+  });
+});
+
+describe("norn doctor: labels from the flows", () => {
+  test("the labels of a repository flow on the base branch are norn's labels too", async () => {
+    const { w, norn } = await healthy();
+    w.github.seedFlow("bug", bugFlow());
+
+    expect(await check(norn, "labels")).toEqual({
+      id: "labels",
+      level: "fail",
+      message: "3 of norn's labels are missing: reproducing, fixing, type:bug",
+      fix: "norn init",
+    });
+  });
+
+  test("labels no flow uses warn, and stay on the repository", async () => {
+    const { w, norn } = await healthy();
+    w.github.seedFlow("slice", { ...bugFlow(), workspace: "parent", triage: false });
+    await w.github.ensureLabels(["reproducing", "fixing", "type:chore", "bug"].map((name) => ({ name, color: "ededed", description: "" })));
+
+    expect(await check(norn, "labels")).toEqual({
+      id: "labels",
+      level: "warning",
+      message: "all 19 of norn's labels exist; no flow uses blocked, ready-for-agent, type:chore",
+      fix: "delete these labels on GitHub once no issue needs them; norn never deletes a label",
+    });
+    expect(w.github.labelDefs.has("blocked")).toBe(true);
+  });
+
+  test("a label norn made for a state a flow has since removed counts as one no flow uses; a team's own label does not", async () => {
+    const { w, norn } = await healthy();
+    const triaging = { skill: "bug-triage", attended: true, outcomes: { triaged: { to: "reproducing", means: "triaged" } } };
+    w.github.seedFlow("bug", bugFlow({ start: "triaging", states: { ...bugFlow().states, triaging } }));
+    // Triage puts a new issue into the flow's start, creating its label as norn does.
+    w.github.seedIssue({ number: 7, title: "Crash" });
+    await w.norn("take", "7");
+    await w.norn("done", "7", "bug");
+    w.github.seedFlow("bug", bugFlow());
+    await w.github.ensureLabels(["reproducing", "fixing"].map((name) => ({ name, color: "ededed", description: "" })));
+    await w.github.ensureLabels([{ name: "frontend", color: "ededed", description: "The web app" }]);
+
+    const labels = await check(norn, "labels");
+
+    expect(labels).toMatchObject({ level: "warning" });
+    expect(labels?.message).toContain("no flow uses triaging");
+    expect(labels?.message).not.toContain("frontend");
+  });
+
+  test("a label a local flow edit uses is not one no flow uses, as the flows check reads that edit too", async () => {
+    const { w, cwd, norn } = await healthy();
+    w.github.seedFlow("bug", bugFlow());
+    for (const name of ["bug-repro", "bug-fix"]) skillDir(join(cwd, "skills"), name);
+    await w.github.ensureLabels(
+      ["reproducing", "fixing", "type:bug", "triaging"].map((name) => ({ name, color: "ededed", description: "Made by norn (norn)" })),
+    );
+    const triaging = { skill: "bug-repro", attended: true, outcomes: { triaged: { to: "reproducing", means: "triaged" } } };
+    localFlow(cwd, "bug", bugFlow({ start: "triaging", states: { ...bugFlow().states, triaging } }));
+
+    const labels = await check(norn, "labels");
+
+    expect(labels?.message).not.toContain("triaging");
+  });
+
+  test("norn marks the description of every label it creates as norn's", async () => {
+    const { w } = await healthy();
+
+    expect([...w.github.labelDefs.values()].every((l) => l.description.endsWith(" (norn)"))).toBe(true);
+  });
+
+  test("a label a flow renamed counts as one no flow uses", async () => {
+    const { w, norn } = await healthy();
+    w.github.seedFlow("bug", bugFlow({ renamed: { triaging: "reproducing" } }));
+    await w.github.ensureLabels(["reproducing", "fixing", "type:bug", "triaging"].map((name) => ({ name, color: "ededed", description: "" })));
+
+    expect(await check(norn, "labels")).toMatchObject({ level: "warning", message: "all 22 of norn's labels exist; no flow uses triaging" });
+  });
+});
+
+/** Writes a flow into the checkout's working copy, as a team lead editing it before the PR. */
+function localFlow(cwd: string, name: string, flow: unknown) {
+  mkdirSync(join(cwd, ".agents", "flows"), { recursive: true });
+  writeFileSync(join(cwd, ".agents", "flows", `${name}.json`), typeof flow === "string" ? flow : JSON.stringify(flow, null, 2));
+}
+
+/** A healthy setup with the bug flow merged, its skills installed and its labels created. */
+async function withBugFlow(over: Record<string, unknown> = {}) {
+  const h = await healthy();
+  h.w.github.seedFlow("bug", bugFlow(over));
+  for (const name of ["bug-repro", "bug-fix"]) skillDir(join(h.cwd, "skills"), name);
+  await h.w.github.ensureLabels(["reproducing", "fixing", "type:bug"].map((name) => ({ name, color: "ededed", description: "" })));
+  return h;
+}
+
+describe("norn doctor: flows", () => {
+  test("the flows in effect are valid, and the skills they name installed", async () => {
+    const { norn } = await withBugFlow();
+
+    expect(await check(norn, "flows")).toEqual({
+      id: "flows",
+      level: "ok",
+      message: "all 3 flows are valid: story, slice, bug; story makes slices of type slice",
+      fix: null,
+    });
+  });
+
+  test("the labels a local flow edit needs that the repository lacks warn, with how they get made", async () => {
+    const { cwd, norn } = await withBugFlow();
+    const triaging = { skill: "bug-repro", attended: true, outcomes: { triaged: { to: "reproducing", means: "triaged" } } };
+    localFlow(cwd, "bug", bugFlow({ start: "triaging", states: { ...bugFlow().states, triaging } }));
+
+    expect(await check(norn, "flows")).toEqual({
+      id: "flows",
+      level: "warning",
+      message: "Labels the local flows need are not on GitHub yet: triaging (bug in this checkout).",
+      fix: "norn creates each one when an issue first gets it; to create them up front, run norn init once the change is merged",
+    });
+  });
+
+  test("an invalid flow on the base branch fails, with every problem and the file to fix", async () => {
+    const { w, norn } = await withBugFlow();
+    w.github.seedFlow("bug", bugFlow({ start: "nowhere", workspace: "elsewhere" }));
+
+    expect(await check(norn, "flows")).toEqual({
+      id: "flows",
+      level: "fail",
+      message: [
+        "2 problems:",
+        '    - .agents/flows/bug.json on main: The field workspace must be "none", "own" or "parent".',
+        "    - .agents/flows/bug.json on main: start names nowhere, which is not one of its states.",
+      ].join("\n"),
+      fix: "fix .agents/flows/bug.json and merge it into main",
+    });
+  });
+
+  test("a flow file whose name cannot name a type fails, on the base branch and in the checkout, instead of being skipped", async () => {
+    const { w, cwd, norn } = await withBugFlow();
+    w.github.seedFile(".agents/flows/Bug-Fix.json", JSON.stringify(bugFlow()));
+    localFlow(cwd, "Chore", bugFlow());
+
+    expect(await check(norn, "flows")).toEqual({
+      id: "flows",
+      level: "fail",
+      message: [
+        "2 problems:",
+        "    - .agents/flows/Bug-Fix.json on main: its name cannot name a type, so norn reads no flow from it. A flow's name is lowercase letters, digits, - and _.",
+        "    - .agents/flows/Chore.json in this checkout: its name cannot name a type, so norn reads no flow from it. A flow's name is lowercase letters, digits, - and _.",
+      ].join("\n"),
+      fix: "rename .agents/flows/Bug-Fix.json, e.g. to .agents/flows/bug-fix.json; rename .agents/flows/Chore.json, e.g. to .agents/flows/chore.json",
+    });
+  });
+
+  test("every problem of a flow is reported at once, the flows its behaviours name included, a misspelt behaviour with its likely name", async () => {
+    const { cwd, norn } = await withBugFlow();
+    localFlow(cwd, "epic", {
+      ...bugFlow({ workspace: "own" }),
+      states: {
+        reproducing: {
+          skill: "bug-repro",
+          attended: true,
+          behaviours: { slices: { type: "tsk" }, syncBlocked: { to: "fixing" }, waitsForSlices: { to: "nowhere" } },
+          outcomes: { done: { to: "closed", means: "done" } },
+        },
+      },
+    });
+
+    const message = (await check(norn, "flows"))?.message ?? "";
+
+    expect(message.split("\n")).toEqual([
+      "3 problems:",
+      "    - .agents/flows/epic.json in this checkout: The state reproducing uses the behaviour syncBlocked, which norn does not have; did you mean syncsBlocked?",
+      "    - .agents/flows/epic.json in this checkout: The parameter to of the behaviour waitsForSlices of the state reproducing must be a state of the flow.",
+      "    - .agents/flows/epic.json in this checkout: The behaviour slices of reproducing names the flow tsk, which the repository does not have.",
+    ]);
+  });
+
+  test("an invalid flow in the working copy fails before it is merged", async () => {
+    const { cwd, norn } = await withBugFlow();
+    localFlow(cwd, "chore", "{ not json");
+
+    const found = await check(norn, "flows");
+
+    expect(found?.level).toBe("fail");
+    expect(found?.message).toMatch(/^\.agents\/flows\/chore\.json in this checkout: It is not valid JSON: /);
+    expect(found?.fix).toBe("fix .agents/flows/chore.json, then run norn doctor again");
+  });
+
+  test("a working copy the same as the base branch is reported once", async () => {
+    const { w, cwd, norn } = await withBugFlow();
+    const broken = bugFlow({ start: "nowhere" });
+    w.github.seedFlow("bug", broken);
+    localFlow(cwd, "bug", broken);
+
+    expect((await check(norn, "flows"))?.message).toBe(".agents/flows/bug.json on main: start names nowhere, which is not one of its states.");
+  });
+
+  test("a local flow naming a slice type only the working copy has is valid", async () => {
+    const { w, cwd, norn } = await withBugFlow();
+    await w.github.ensureLabels(["type:task", "type:epic"].map((name) => ({ name, color: "ededed", description: "" })));
+    localFlow(cwd, "task", { ...bugFlow(), workspace: "parent", triage: false });
+    localFlow(cwd, "epic", {
+      ...bugFlow({ workspace: "own" }),
+      states: {
+        reproducing: { skill: "bug-repro", attended: true, behaviours: { slices: { type: "task" } }, outcomes: { done: { to: "closed", means: "done" } } },
+      },
+    });
+
+    const found = await check(norn, "flows");
+
+    expect(found?.level).toBe("ok");
+    expect(found?.message).toContain("; epic in this checkout makes slices of type task");
+  });
+
+  test("a skill a flow names that is not installed fails", async () => {
+    const { cwd, norn } = await withBugFlow();
+    rmSync(join(cwd, "skills", "bug-fix"), { recursive: true });
+    localFlow(cwd, "chore", {
+      ...bugFlow(),
+      states: { tidying: { skill: "chore-do", attended: false, outcomes: { done: { to: "closed", means: "done" } } } },
+      start: "tidying",
+    });
+
+    expect(await check(norn, "flows")).toEqual({
+      id: "flows",
+      level: "fail",
+      message: [
+        "2 problems:",
+        "    - Skills the flows name are not in skills/: bug-fix (bug, fixing), chore-do (chore in this checkout, tidying).",
+        "    - Labels the local flows need are not on GitHub yet: tidying (chore in this checkout), type:chore (chore in this checkout).",
+      ].join("\n"),
+      fix: "add the skills to skills/ and link them from .claude/skills/; norn creates each one when an issue first gets it; to create them up front, run norn init once the change is merged",
+    });
+  });
+
+  test("lists the open issues the working copy would orphan, as a warning", async () => {
+    const { w, cwd, norn } = await withBugFlow();
+    w.github.seedIssue({ number: 12, title: "Crash", labels: ["type:bug", "fixing"] });
+    w.github.seedIssue({ number: 13, title: "Hang", labels: ["type:bug", "reproducing"] });
+    w.github.seedIssue({ number: 14, title: "Old", labels: ["type:bug", "fixing"], state: "closed" });
+    localFlow(cwd, "bug", {
+      ...bugFlow(),
+      states: { reproducing: { skill: "bug-repro", attended: true, outcomes: { fixed: { to: "closed", means: "fixed" } } } },
+    });
+
+    expect(await check(norn, "flows")).toEqual({
+      id: "flows",
+      level: "warning",
+      message: "The local .agents/flows/bug.json would orphan #12 (fixing): its state is gone, so it would go to needs-human.",
+      fix: "name the new state of each removed one in renamed in .agents/flows/bug.json, or move these issues on first",
+    });
+  });
+
+  test("a removed state the working copy renames orphans nothing", async () => {
+    const { w, cwd, norn } = await withBugFlow();
+    w.github.seedIssue({ number: 12, title: "Crash", labels: ["type:bug", "fixing"] });
+    await w.github.ensureLabels([{ name: "repairing", color: "ededed", description: "" }]);
+    localFlow(cwd, "bug", {
+      ...bugFlow(),
+      renamed: { fixing: "repairing" },
+      states: {
+        reproducing: { skill: "bug-repro", attended: true, outcomes: { reproduced: { to: "repairing", means: "reproduced" } } },
+        repairing: { skill: "bug-fix", attended: false, outcomes: { fixed: { to: "closed", means: "fixed" } } },
+      },
+    });
+
+    expect(await check(norn, "flows")).toMatchObject({ level: "ok" });
+  });
+
+  test("a local flow replacing a built-in one is compared with the built-in", async () => {
+    const { w, cwd, norn } = await withBugFlow();
+    w.github.seedIssue({ number: 21, title: "A slice", labels: ["type:slice", "blocked"] });
+    localFlow(cwd, "slice", { ...bugFlow(), workspace: "parent", triage: false });
+
+    expect((await check(norn, "flows"))?.message).toBe(
+      "The local .agents/flows/slice.json would orphan #21 (blocked): its state is gone, so it would go to needs-human.",
+    );
+  });
+
+  test("changes nothing", async () => {
+    const { w, cwd, norn } = await withBugFlow();
+    w.github.seedIssue({ number: 12, title: "Crash", labels: ["type:bug", "fixing"] });
+    localFlow(cwd, "bug", {
+      ...bugFlow(),
+      states: { reproducing: { skill: "bug-repro", attended: true, outcomes: { fixed: { to: "closed", means: "fixed" } } } },
+    });
+    const before = structuredClone([...w.github.issues]);
+
+    await norn("doctor");
+
+    expect([...w.github.issues]).toEqual(before);
+    expect(w.github.claims.size).toBe(0);
   });
 });
 

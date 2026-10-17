@@ -1,5 +1,7 @@
+import { blockedStates, fixStatesOf, slicesAmong } from "./behaviours.js";
+import { type Flow, flowNameOf, flowStep } from "./flow.js";
 import type { Issue, ObservedStory } from "./github.js";
-import { FIX_STATES, FLAGS, kindOf, STATES, type State, type Step, stepFor, type Target } from "./machine.js";
+import { ENGINE_FLAGS, type Step } from "./machine.js";
 import { recordedSlug } from "./slug.js";
 import { sliceBranch, slugify, storyBranch } from "./text.js";
 import { type Evidence, fixRounds, needsHumanIn, parseTransitionComment } from "./transitions.js";
@@ -9,7 +11,7 @@ interface FeedBase {
   /** Stable across polls, so the same event read twice is one event. */
   id: string;
   issue: number;
-  /** The story the issue belongs to; the issue itself for a story. */
+  /** The top-level issue the issue belongs to, e.g. a slice's story; the issue itself for a top-level one. */
   story: number;
   /** ISO time. */
   at: string;
@@ -24,20 +26,23 @@ interface FeedBase {
  */
 export type FeedEvent =
   /** A state change norn made on its own, or a person made by hand. `to` is closed when the issue closed. */
-  | (FeedBase & { kind: "step"; from: State | null; to: State | "closed" })
+  | (FeedBase & { kind: "step"; from: string | null; to: string })
   /**
    * A step ended with an outcome. `step` is its name as the machine has it,
    * e.g. review, agent QA, implementation; `outcome` the word, "done" for a
    * step with a single way to end. `fixRound` is the round this outcome
    * starts or finishes, null when it is no fix round. `note` is the agent's
-   * remark as markdown.
+   * remark as markdown. `flow` is the flow the issue ran the step in, null
+   * for triage, before it had one: `from` and `outcome` are its state and word.
    */
   | (FeedBase & {
       kind: "outcome";
+      flow: string | null;
       step: string;
       outcome: string;
-      from: State | null;
-      to: Target;
+      from: string | null;
+      /** A state of the issue's flow, closed or not-planned. */
+      to: string;
       fixRound: number | null;
       maxFixRounds: number;
       note: string | null;
@@ -47,7 +52,8 @@ export type FeedEvent =
   | (FeedBase & { kind: "needs-human"; action: "raised" | "resolved"; reason: string | null })
   | (FeedBase & { kind: "qa-evidence"; evidence: Evidence })
   | (FeedBase & { kind: "slice"; action: "created" | "unblocked" })
-  | (FeedBase & { kind: "pr"; action: "opened" | "merged"; target: "story" | "slice"; pr: number })
+  /** `target` is the flow of the issue the PR is for, e.g. story or slice. */
+  | (FeedBase & { kind: "pr"; action: "opened" | "merged"; target: string; pr: number })
   /** Seen by comparing claim refs between two reads; `at` is the claim's time for taken and stale, the read's for released. */
   | (FeedBase & { kind: "claim"; action: "taken" | "released" | "stale"; session: string })
   /** Anything norn does not recognise. `detail` is opaque, e.g. IssueComment or LabeledEvent; `label` names a label that changed. */
@@ -55,8 +61,10 @@ export type FeedEvent =
 
 export type FeedEventKind = FeedEvent["kind"];
 
-/** What feedOf needs besides the story: facts of the read and the team's configuration. */
+/** What feedOf needs besides the story: facts of the read, the team's configuration and its flows. */
 export interface FeedContext {
+  /** The repository's valid flows by name, as norn reads them for the issues' types. */
+  flows: ReadonlyMap<string, Flow>;
   maxFixRounds: number;
   /** Only events after this ISO time; null for all. */
   since: string | null;
@@ -68,10 +76,19 @@ export interface FeedContext {
  * linked PRs. Pure: the same story always gives the same events.
  */
 export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
-  const slices = story.subIssues.filter((i) => kindOf(i) === "slice");
+  const flowFor = (issue: Issue) => fc.flows.get(flowNameOf(issue) ?? "") ?? null;
+  const storyFlow = flowFor(story);
+  const slices = storyFlow ? slicesAmong(story.subIssues, storyFlow) : [];
   const slug = recordedSlug(story.nornComments.map((c) => c.body)) ?? slugify(story.title);
   const events: FeedEvent[] = [];
   for (const issue of [story, ...slices]) {
+    // Each issue runs its flow, read beforehand so the feed stays pure.
+    const flow = flowFor(issue);
+    const states: readonly string[] = flow ? Object.keys(flow.states) : [];
+    const fixStates: readonly string[] = flow ? fixStatesOf(flow) : [];
+    const blocked = flow ? blockedStates(flow) : null;
+    /** Whether norn released the issue from being held by its blockers. */
+    const released = (from: string | null, to: string) => blocked !== null && from === blocked.held && to === blocked.release;
     const base = { issue: issue.number, story: story.number };
     const ofIssue = { ...base, url: issue.url };
     const bodies = issue.nornComments.map((c) => c.body);
@@ -84,10 +101,10 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
       list.find((x) => Math.abs(Date.parse(x.t.at) - Date.parse(at)) <= MATCH_MS && ok(x));
     const markers = issue.timeline.flatMap((t) => (t.kind === "comment" && t.body !== null ? [{ t, reason: needsHumanIn(t.body) }] : []));
 
-    // The PR from the issue's own branch: the story PR on the story, a slice PR on its slice. A PR comes
-    // before what norn does about it at the same time, e.g. closing the story it merged.
-    const branch = issue === story ? storyBranch(story.number, slug) : sliceBranch(story.number, slug, issue.number);
-    const target = issue === story ? "story" : "slice";
+    // The PR from the issue's branch, as its workspace names it: the story PR on the story, a slice PR on its slice.
+    // A PR comes before what norn does about it at the same time, e.g. closing the story it merged.
+    const branch = flow?.workspace === "parent" ? sliceBranch(story.number, slug, issue.number) : storyBranch(issue.number, slug);
+    const target = flowNameOf(issue) ?? "";
     for (const pr of issue.pullRequests.filter((p) => p.head === branch)) {
       const at = { ...base, url: pr.url, target, pr: pr.number } as const;
       events.push({ ...at, id: `pr-opened:${pr.number}`, kind: "pr", action: "opened", at: pr.createdAt, actor: pr.author });
@@ -101,28 +118,29 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
         }
         const c = parseTransitionComment(t.body);
         if (!c || c.why === "needs-human resolved") continue;
-        const from = (STATES as readonly string[]).includes(c.from) ? (c.from as State) : null;
+        const from = states.includes(c.from) ? c.from : null;
         const to = targetOf(c.to);
         const at = { ...base, at: t.at, actor: t.actor, url: t.url };
         if (c.why === "automatic") {
           events.push(
-            from === "blocked" && to === "ready-for-agent"
+            released(from, to)
               ? { ...at, id: `slice:${t.url}`, kind: "slice", action: "unblocked" }
-              : { ...at, id: `step:${t.url}`, kind: "step", from, to: to === "not-planned" ? "closed" : (to as State | "closed") },
+              : { ...at, id: `step:${t.url}`, kind: "step", from, to: to === "not-planned" ? "closed" : to },
           );
           continue;
         }
         // Rounds counted up to this comment, as done counted them when it wrote it.
         // By the comment's URL: norn writes the same words for, say, every implement done without a note.
         const upTo = bodies.slice(0, issue.nornComments.findIndex((pc) => pc.url === t.url) + 1);
-        const step = stepAt(issue, from);
+        const step = stepAt(issue, from, flow);
         // Review or QA sending the issue back starts a round; the implement after it finishes that round.
-        const entersFix = FIX_STATES.includes(to as State) && from !== to;
-        const fixRound = entersFix ? fixRounds(upTo.slice(0, -1)) + 1 : step?.skill === "norn-implement" ? fixRounds(upTo) || null : null;
+        const entersFix = fixStates.includes(to) && from !== to;
+        const fixRound = entersFix ? fixRounds(upTo.slice(0, -1), fixStates) + 1 : fixes(from, flow) ? fixRounds(upTo, fixStates) || null : null;
         events.push({
           ...at,
           id: `outcome:${t.url}`,
           kind: "outcome",
+          flow: flow && from !== null ? target : null,
           step: step?.name ?? from ?? "triage",
           outcome: c.why ?? "done",
           from,
@@ -153,24 +171,24 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
           });
           continue;
         }
-        if ((STATES as readonly string[]).includes(t.label)) {
+        if (states.includes(t.label)) {
           // A state change shows as the new label added, then the old one removed; norn's own come with a comment that says more.
           if (t.kind === "unlabeled") continue;
           const old = issue.timeline
             .slice(i + 1)
-            .find((u) => u.kind === "unlabeled" && (STATES as readonly string[]).includes(u.label) && Date.parse(u.at) - Date.parse(t.at) <= MATCH_MS);
+            .find((u) => u.kind === "unlabeled" && states.includes(u.label) && Date.parse(u.at) - Date.parse(t.at) <= MATCH_MS);
           if (old?.kind !== "unlabeled") continue;
           if (near(transitions, t.at, (x) => x.c.to === t.label)) continue;
-          const from = old.label as State;
-          const to = t.label as State;
+          const from = old.label;
+          const to = t.label;
           events.push(
-            from === "blocked" && to === "ready-for-agent"
+            released(from, to)
               ? { ...ofIssue, id, kind: "slice", action: "unblocked", at: t.at, actor: t.actor }
               : { ...ofIssue, id, kind: "step", from, to, at: t.at, actor: t.actor },
           );
           continue;
         }
-        if ((FLAGS as readonly string[]).includes(t.label)) continue;
+        if ((ENGINE_FLAGS as readonly string[]).includes(t.label) || t.label.startsWith("type:")) continue;
         events.push({
           ...ofIssue,
           id,
@@ -202,14 +220,20 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
 /** How far apart a label change and the norn comment that explains it can be. */
 const MATCH_MS = 60_000;
 
-function targetOf(to: string): Target {
-  return to === "closed as not planned" ? "not-planned" : (to as Target);
+function targetOf(to: string): string {
+  return to === "closed as not planned" ? "not-planned" : to;
 }
 
-/** The step an issue in `from` was in, as the machine has it; a new issue's is triage. */
-function stepAt(issue: Issue, from: State | null): Step | null {
-  const flags = issue.labels.filter((l) => !(STATES as readonly string[]).includes(l) && l !== "needs-human");
-  return stepFor({ ...issue, state: "open", labels: from ? [...flags, from] : flags.filter((l) => !l.startsWith("type:")) });
+/** The step an issue of the flow in `from` was in; null for none, e.g. triage, before it had the flow. */
+function stepAt(issue: Issue, from: string | null, flow: Flow | null): Step | null {
+  if (!flow || !from) return null;
+  const flags = issue.labels.filter((l) => !Object.hasOwn(flow.states, l) && l !== "needs-human");
+  return flowStep({ ...issue, state: "open" as const, labels: [...flags, from] }, flow);
+}
+
+/** Whether the step taken in `from` fixes what a fix round sent back: a step in a state that counts rounds, or in the one such a state enters as. */
+function fixes(from: string | null, flow: Flow | null): boolean {
+  return flow !== null && from !== null && fixStatesOf(flow).some((s) => s === from || flow.states[s].enterAs === from);
 }
 
 /** Newest-first lists merged into one, newest first; events at the same time keep their order. */
