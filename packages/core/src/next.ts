@@ -1,4 +1,4 @@
-import { isStale } from "./claims.js";
+import { isStale, paneOf } from "./claims.js";
 import { type Delivery, heldDelivery } from "./delivery.js";
 import type { Event } from "./events.js";
 import { send } from "./notify.js";
@@ -262,8 +262,9 @@ async function offer(
   }
   const { loc, worktree, createWorktree, checkedOutAt, here } = await place(ctx, issue, flow);
   const herdr = ctx.config.provider === "herdr";
-  // Nobody holds the item, so an agent still in its pane is one an earlier phase left behind.
-  const earlier = herdr && worktree ? ((await ctx.workspace.agentsIn(worktree))[0] ?? null) : null;
+  // Nobody holds the item, so an agent still in its pane is one an earlier phase left behind; never this session's own.
+  const own = paneOf(ctx)?.id;
+  const earlier = herdr && worktree ? ((await ctx.workspace.agentsIn(worktree)).find((a) => a.pane !== own) ?? null) : null;
   report.start.push({
     issue: n,
     branch: loc?.branch ?? null,

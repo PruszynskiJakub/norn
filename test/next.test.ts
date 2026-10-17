@@ -223,6 +223,20 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     });
   });
 
+  test("herdr: this session's own pane is never one to stop, e.g. the orchestrator's in the story's worktree", async () => {
+    const w = setup();
+    w.workspace.env = { HERDR_ENV: "1", HERDR_PANE_ID: "w3T:p1" };
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-review"] });
+    w.github.branches.add("123-rate-limiting");
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting");
+    w.workspace.agents = [{ pane: "w3T:p1", name: "norn-123", activity: "working", cwd: "/repo/.agents/worktrees/123-rate-limiting" }];
+
+    const res = await w.norn("next", "123");
+
+    expect(res.stdout).not.toContain("Stop it first");
+    expect(res.stdout).not.toContain("--pane w3T:p1");
+  });
+
   test("herdr: an agent in another worktree's pane is not this item's", async () => {
     const w = setup();
     w.workspace.env = { HERDR_ENV: "1" };
