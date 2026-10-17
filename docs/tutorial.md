@@ -18,7 +18,7 @@ npm init -y && echo node_modules >> .gitignore
 ## 2. Install and set up norn
 
 ```sh
-npm install -D github:PruszynskiJakub/norn#v0.10.0
+npm install -D github:PruszynskiJakub/norn#v0.10.1
 npx norn init
 git add -A && git commit -m "Set up norn" && git push
 ```

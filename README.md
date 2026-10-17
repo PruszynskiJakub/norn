@@ -10,7 +10,7 @@
 
 <p align="center">
   <a href="https://github.com/PruszynskiJakub/norn/actions/workflows/ci.yml"><img src="https://github.com/PruszynskiJakub/norn/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
-  <a href="https://github.com/PruszynskiJakub/norn/releases"><img src="https://img.shields.io/badge/release-v0.10.0-blue" alt="Release v0.10.0"></a>
+  <a href="https://github.com/PruszynskiJakub/norn/releases"><img src="https://img.shields.io/badge/release-v0.10.1-blue" alt="Release v0.10.1"></a>
   <img src="https://img.shields.io/badge/node-%3E%3D20-brightgreen" alt="Node 20 or later">
 </p>
 
@@ -52,7 +52,7 @@ You ask your agent `norn-drive <issue>` to shape a story with you. Once it is sl
 norn is not on npm yet. While this repository is private, you need read access to it. Install a release tag, which carries the built CLI:
 
 ```sh
-npm install -D github:PruszynskiJakub/norn#v0.10.0
+npm install -D github:PruszynskiJakub/norn#v0.10.1
 ```
 
 Only release tags can be installed: a branch or commit has no built CLI.
@@ -60,8 +60,8 @@ Only release tags can be installed: a branch or commit has no built CLI.
 To install norn globally, install the package attached to the release. `npm install -g` with a `github:` URL leaves a broken `norn` behind, so use the attached package:
 
 ```sh
-gh release download v0.10.0 -R PruszynskiJakub/norn -p 'norn-*.tgz' -D /tmp
-npm install -g /tmp/norn-0.10.0.tgz
+gh release download v0.10.1 -R PruszynskiJakub/norn -p 'norn-*.tgz' -D /tmp
+npm install -g /tmp/norn-0.10.1.tgz
 ```
 
 ## Quick start
