@@ -4,6 +4,21 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- `norn wait <story>` blocks until `norn next` has something new for the orchestrator to do, then prints one line and exits 0 (start), 3 (nothing left that you can do, or the story is closed) or 4 (`--timeout`, default `30m`); a refusal exits 2. It wakes on what `norn next` would answer now, not on a change it observed, reads one cheap stamp per check and works out `norn next` only when it changed, and backs off from every 30s to every 2m. `--json` gives the wake, the new items and the `next` report.
+- `norn deliver <story>` takes the story's delivery lock, so only one orchestrator delivers a story; a second one is refused and told which session holds it and since when. The lock goes stale like a claim, `--takeover` takes your own at any age and `--stop` releases it. `norn wait` keeps it fresh and releases it when delivery stops. `norn next` and `norn status` say who delivers a story, and `norn done` no longer offers `norn-deliver` for a story already being delivered.
+- Under herdr, `norn wait` escalates an item whose agent stopped while holding it: idle, done, gone or waiting at a prompt for longer than the new `deliver.stuckAfter` (default `10m`). It sets `needs-human` with the agent's state and pane, deletes the claim and notifies you. Claims record the herdr pane and machine they were taken in; a teammate's claim, or one of a session norn cannot observe, is never touched.
+- `norn init` allows `Bash(norn:*)` and `Bash(npx norn:*)` in `.claude/settings.json`, adding to what is there, so agents run norn's commands without a permission prompt. `norn doctor`'s new `agent-permissions` check warns when a repository with `.claude/` lacks them.
+
+### Changed
+
+- At a slice's merge step, `norn done` merges the slice PR into the story branch itself, with a merge commit at the head commit whose checks it read, so auto mode and permission prompts no longer stop slice merges. It refuses, changing nothing, while the PR has conflicts, is behind the story branch, or has a failed or running check, and says what to do; a merge GitHub refuses comes with its reason and the `norn escalate` to run. A PR merged by hand is still accepted, and norn never merges into the base branch. The briefing and the `norn-merge` skill no longer tell the agent to run `gh pr merge`.
+- Every briefing ends with `Never end your turn while you hold #n: finish with a command above, norn release n, or norn escalate n "reason"`, and tells an agent blocked by a permission, a tool error or a decision only a person can make, or by a skill's "stop and hand it to a person", to escalate with what blocked it.
+- Under herdr, `norn next` names each phase's agent for its step, e.g. `norn-3-review` then `norn-3-merge`, and when the item's pane still runs an earlier agent prints the command that stops it, so each phase reuses its pane. `norn next` points at `norn wait` instead of telling the orchestrator to run it again.
+- The `norn-deliver` skill is a short loop: `norn deliver`, then `norn tidy`, `norn next`, start agents, `norn wait` in the background, by its exit code. It forbids scripts around norn, matching its text and typing into panes other than with `herdr agent prompt`, and its report lists the items norn escalated for stuck agents.
+- `norn next` no longer sends the hand-over notification for an issue in a state its flow dropped from inside its report: `norn next` and `norn take` send it, so `norn wait` notifies nobody on its checks.
+
 ## [0.10.1] - 2026-10-17
 
 ### Fixed

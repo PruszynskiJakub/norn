@@ -133,6 +133,13 @@ A skill that runs norn itself: norn-drive, which takes one issue through its ste
 Running a sliced story unattended with the norn-deliver skill, a fresh agent per step, until only a person can move it on.
 _Avoid_: autopilot
 
+**Delivery lock**:
+The lock on a story that lets one orchestrator deliver it, taken by `norn deliver`, kept fresh by `norn wait` and released when delivery stops. It works like a claim, under its own ref namespace.
+_Avoid_: delivery claim
+
+**Stuck agent**:
+An agent in a herdr pane that has stopped while holding a claim: idle, done, gone or at a prompt for longer than `deliver.stuckAfter`. `norn wait` escalates its item for it.
+
 **Parallel slot**:
 Room for one more of the user's agents on a story under the parallel limit. Agents already holding items use slots.
 

@@ -41,6 +41,7 @@ An unknown key or an invalid value makes norn refuse every command and name the 
 | `claims.staleAfter` | `2h` | team only | Age after which a claim counts as abandoned. A duration such as `30m` or `2h`; below `10m` it is raised to `10m` with a warning |
 | `deliver.maxParallel` | `2` | team or local | How many of your agents `deliver` runs at once on a story |
 | `deliver.maxFixRounds` | `3` | team only | Rounds of `changes-requested` or `qa-failed` before an issue gets `needs-human` |
+| `deliver.stuckAfter` | `10m` | team or local | How long `norn wait` lets the herdr agent holding an item sit idle, done, gone or at a prompt before it escalates the item for it; also how long an item offered but not taken waits before `norn wait` wakes to start it again |
 | `notifications` | `auto` | local only | Where notifications go; see [notifications](#notifications) |
 | `dashboard.port` | `4477` | local only | The dashboard's port |
 | `dashboard.interval` | `2m` | local only | How often the dashboard reads GitHub; at least `30s` |

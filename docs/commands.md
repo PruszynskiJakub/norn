@@ -2,12 +2,16 @@
 
 norn is run through `npx norn` in a project that has it installed. Run `norn` with no arguments to list the commands. Every command that works on an issue takes its number explicitly, and every command takes `--json` for machine-readable output; prose is the default.
 
+Commands exit 0 with an answer, 1 on a refusal and 2 on a usage error. `norn doctor` exits 1 when a check fails, and `norn wait` says by its exit code what to do next (see [norn wait](#norn-wait)).
+
 norn answers in prose written as instructions to the agent, always in the same order: where you are, what to do now (including the skill to invoke), how to finish (the exact commands), and what not to do. A refusal says why and what to do instead.
 
 | Command | What it does |
 | --- | --- |
 | [`norn init`](#norn-init) | Set up the project: skills, agent instructions, `.agents/`, labels |
 | [`norn next <story>`](#norn-next) | What can be done on the story now |
+| [`norn deliver <story>`](#norn-deliver) | Take the story's delivery lock and get the deliver loop |
+| [`norn wait <story>`](#norn-wait) | Block until there is something new to do on the story |
 | [`norn take <issue>`](#norn-take) | Claim the issue and get the briefing for its step |
 | [`norn done <issue> [outcome] ["note"]`](#norn-done) | Finish the step; norn makes the transition |
 | [`norn status <story>`](#norn-status) | Read-only overview of the story and its slices |
@@ -35,6 +39,7 @@ Sets norn up in the current repository. Running it again is safe and refreshes w
 - **Agent instructions.** Writes a short norn section between `<!-- norn:start -->` and `<!-- norn:end -->` into `AGENTS.md` and `CLAUDE.md`, whichever exist. With neither, it creates `AGENTS.md` and a `CLAUDE.md` that imports it.
 - **Files.** Creates `.agents/specs/` and the team config `.agents/norn.config.json`, taking `baseBranch` from the repository's default branch. Adds `.agents/worktrees/` and `.agents/norn.config.local.json` to `.gitignore`.
 - **Version.** Records the running norn's version as [`nornVersion`](configuration.md#the-norn-version) in the team config. On a repository set up before, it changes `nornVersion` and no other setting, and reports the change next to the skills it updated, so the two are committed together. It refuses when the repository's `nornVersion` is newer than your norn: upgrade norn instead of rolling the team's skills back.
+- **Claude Code permissions.** Adds `Bash(norn:*)` and `Bash(npx norn:*)` to `permissions.allow` in `.claude/settings.json`, creating the file when it is missing, so agents run norn's commands without a permission prompt. It adds to what is there and never removes anything, and allows nothing but norn: what else agents may run stays the team's decision. A settings file that is not valid JSON is left as it is, and `init` says what to add.
 - **Labels.** Creates norn's labels on the GitHub repository: every state of the valid [flows](flows.md) on the base branch, built-in or the repository's, `type:<flow>` for each flow, and the flags `in-progress`, `needs-human`, `mode:afk` and `mode:hil`. A state's label takes its `color` and `description`, or a default for its kind. An invalid flow is skipped; `norn doctor` reports it. Labels are never deleted.
 
 It ends by suggesting `norn doctor`, which checks what `init` cannot set up.
@@ -69,13 +74,59 @@ Waiting, nothing to do for you:
   - #132 is blocked by #131.
   - #129 needs human QA (mode:hil). Do not take it.
 
-Each phase gets a new agent. When an item is done, run norn next 123 again.
+Each phase gets a new agent. Then run norn wait 123: it ends when something new can start.
 ```
 
 - It offers only the free slots under `deliver.maxParallel`, counting your agents already running on the story.
 - An item for a person that a session already holds is listed as held by it, with no hand-off.
 - It catches up on follow-ups a `norn done` could not finish (story branch, unblocking slices, story PR, `needs-review`), closes a story whose PR is merged if GitHub did not, and removes state labels left on closed issues.
 - Under the git provider it gives each agent it lists its own `NORN_SESSION`.
+- Under herdr each phase's agent is named for its issue and step, e.g. `norn-3-review`, then `norn-3-merge`, so a new phase never collides with the last one's name. When the item's worktree pane still runs an earlier phase's agent, it prints the command that stops it, and the new agent starts in that pane instead of a new one.
+- When a session delivers the story it says which one and since when, e.g. `Story #1 is being delivered by another session of yours, herdr:w3T:p1, since 16:15. Do not start another delivery.` The delivering session's own `next` records on its delivery lock what it offered, so `norn wait` wakes only for what is new.
+
+## norn deliver
+
+```sh
+npx norn deliver <story> [--stop] [--takeover]
+```
+
+Takes the story's delivery lock for this session and prints the loop the `norn-deliver` skill follows. Only one orchestrator delivers a story: a second one is refused and told who holds the lock and since when.
+
+```text
+Story #1 is being delivered by session herdr:w3T:p1 since 16:15. Do not start another delivery.
+If that session has stopped, take its delivery over with: norn deliver 1 --takeover
+```
+
+- The lock is a claim on the story under `refs/norn/deliveries/<story>`, with the same rules: running `deliver` again refreshes it, it goes stale after `claims.staleAfter`, and `--takeover` takes your own at any age, never a teammate's.
+- `norn wait` keeps it fresh while it waits and releases it when delivery stops; `--stop` releases it at any time.
+- `norn next` and `norn status` show it.
+- `--json` gives `{ ok, story, reacquired, tookOver, message }`.
+
+## norn wait
+
+```sh
+npx norn wait <story> [--timeout 30m]
+```
+
+Blocks until `norn next` has something new for the orchestrator to do, then prints one line and exits with a code that says what to do. The orchestrator runs it in the background instead of a monitor of its own.
+
+```text
+#4 is ready for an agent (1 slot free). Run: norn next 1
+```
+
+| Exit code | Meaning |
+| --- | --- |
+| 0 | Something new can start: run `norn next <story>`. |
+| 3 | Nothing is left that you can do, or the story is closed: `Nothing left you can do: #8 needs human QA (mode:hil). Run norn next 1 for the report.` The delivery lock is released. |
+| 4 | `--timeout` (default `30m`) passed first. Run it again. |
+| 1 | An error, e.g. GitHub failed. |
+| 2 | A refusal or a usage error, e.g. another session delivers the story. |
+
+- **It wakes on a condition, not a change.** It holds on what `norn next` would answer now: an unattended item can start with a slot free, and the delivering session's last `norn next` did not offer it in that state. So a change made before the wait started wakes it at once, an agent finishing a step while no slot is free does not, and an item offered but never taken wakes it again after `deliver.stuckAfter`.
+- **It reads GitHub sparingly.** Each check reads one cheap stamp (the update times of the story and its sub-issues in one GraphQL query, and the claims with `git ls-remote`), and works out `norn next` only when it changed, or every 10 minutes for claims gone stale. Checks start every 30s and slow to every 2m while nothing changes.
+- **It escalates a stuck agent.** Under herdr, an item held by one of your sessions in a herdr pane of this machine whose agent has been idle, done, gone or waiting at a prompt for longer than `deliver.stuckAfter` (default `10m`) is escalated for it: `needs-human` with what the agent is doing and its pane, e.g. `agent in pane w3Y:p2 stopped while holding the claim`, the claim deleted and you notified. The pane is left as it is, for you to read. A teammate's claim, or one of a Claude Code subagent or a git session, is never touched: norn cannot observe them.
+- It sends no notification of its own except for such an escalation, and writes nothing beyond the follow-ups `norn next` makes and its delivery lock.
+- `--json` gives `{ ok, story, wake, items, escalated, next, message }`, `next` being the `norn next --json` report.
 
 ## norn take
 
@@ -105,9 +156,14 @@ When the user agrees refinement is finished, run one of:
 On a long step, run norn take 123 again now and then: it keeps your claim fresh.
 If you have to stop, run: norn release 123
 If something is wrong and a person is needed, run: norn escalate 123 "reason"
+That covers a permission or a tool error that blocks you, a decision only a person can make, and a skill telling
+you to stop and hand it to a person. Say what blocked you, e.g. norn escalate 123 "auto mode refused: gh pr merge 13"
 
 Do not change labels yourself. Only norn changes them.
+Never end your turn while you hold #123: finish with a command above, norn release 123, or norn escalate 123 "reason".
 ```
+
+Every briefing ends with that rule, so an agent that stops always leaves a state norn can see: the step finished, the claim released, or the issue escalated.
 
 - Running `take` again on an issue you hold re-briefs you and refreshes the claim.
 - A stale claim (older than `claims.staleAfter`) is taken over by one session only.
@@ -123,6 +179,15 @@ Finishes the step: norn makes the transition, posts a comment and releases the c
 
 It refuses, changing nothing, while the step's work is not where the flow needs it: leaving a state with `opensPR` needs the issue's PR open, closing an issue of a flow with `opensPR` needs that PR merged, and leaving a state with `slices` needs a slice. When the outcome sets `needs-human`, from the flow's `needsHuman` or the fix-round limit, `done` says so and why.
 
+At a slice's merge step (`mergesSlice`), `done` merges the slice PR into the story branch itself, with a merge commit, so an agent needs no permission to merge. The agent brings the branch up to date, resolves conflicts, runs the checks and pushes first. norn refuses, changing nothing and keeping the claim, while the PR targets another branch than the story branch, has conflicts, is behind the story branch, or has a check that failed or is still running, and says what to do:
+
+```text
+#3: check "test" failed on PR #13. Fix it and push, then run norn done 3 again.
+#3: 2 checks on PR #13 are still running. Run norn done 3 again when they finish.
+```
+
+It merges only the commit whose checks it read: a push landing in between is refused, and the agent syncs and checks again. A merge GitHub refuses, e.g. for branch protection on the story branch, is refused with GitHub's reason and the `norn escalate` to run. A slice PR a person already merged is accepted. norn never merges into the base branch: the story PR stays its owner's to merge.
+
 Follow-ups after the transition (story branch, unblocking slices, story PR, `needs-review`) are best effort; `norn next` catches up on any that failed.
 
 ## norn status
@@ -131,7 +196,7 @@ Follow-ups after the transition (story branch, unblocking slices, story PR, `nee
 npx norn status <story>
 ```
 
-A read-only overview of the issue and its slices: its owner and, when its flow gives it one, its branch, and for each item its state, mode, open blockers, `needs-human` and whether a claim holds it (and whether that claim is stale). An issue whose flow has no slices shows on its own.
+A read-only overview of the issue and its slices: its owner and, when its flow gives it one, its branch, and for each item its state, mode, open blockers, `needs-human` and whether a claim holds it (and whether that claim is stale). An issue whose flow has no slices shows on its own. When a session delivers the story, it says which one and since when.
 
 ## norn tidy
 
@@ -184,6 +249,7 @@ Checks the whole setup at once and lists every check, each with the exact comman
 | `version` | `nornVersion` is set and compatible with your norn; a compatible difference warns |
 | `skills` | Every skill the briefings name is in `.agents/skills/` and linked from `.claude/skills/`; a skill that differs from the bundled copy warns, except under `NORN_SKILLS_SOURCE` |
 | `agent-instructions` | The norn block is in `AGENTS.md` or `CLAUDE.md` |
+| `agent-permissions` | Claude Code's settings (`.claude/settings.json` or `.claude/settings.local.json`) allow `Bash(norn:*)` and `Bash(npx norn:*)`; a missing rule warns, fixed by `norn init`. Checked only when the repository has `.claude/` |
 | `provider` | The worktree provider matches the environment, as `take` requires |
 
 Each check shows as `✓` ok, `!` warning, `✗` fail, or `-` skipped when a check it needs did not pass, e.g. `skipped, needs gh`. A check with several problems lists each on a line of its own. It exits 1 only when a check fails, so CI can run it without failing on a warning. `--json` gives `{ ok, checks: [{ id, level, message, fix }] }`.

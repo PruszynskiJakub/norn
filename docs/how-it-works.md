@@ -207,6 +207,9 @@ A claim is a git ref, `refs/norn/claims/<issue>`, created on GitHub in one step 
 - **Refreshing.** `norn take` on an issue the same session already holds re-briefs it and moves the claim's time forward. Long steps re-run it so a slow session is not mistaken for a crashed one.
 - **Stale claims.** A claim older than `claims.staleAfter` (default 2h) is treated as abandoned, and one session can take it over. Its worktree is kept: the next holder is told to check `git status` there before starting.
 - **Your own stopped session.** `norn take <issue> --takeover` takes over a claim of the same GitHub user at any age. It never takes a teammate's claim.
+- **The herdr pane.** A session in a herdr pane records the pane and the machine on its claim, so `norn wait` can watch the agent there.
+
+A story's **delivery lock** is a claim of the same kind on the story, under `refs/norn/deliveries/<story>`, held by the session running `norn-deliver`.
 
 **Which session holds a claim.** norn keeps no state, so it tells sessions apart by their environment: `NORN_SESSION`, else `CLAUDE_CODE_SESSION_ID`, else the herdr pane (`HERDR_PANE_ID`), else host and repository root. Under the git provider, `norn next` gives each agent its own `NORN_SESSION`.
 
@@ -216,13 +219,15 @@ A claim is a git ref, `refs/norn/claims/<issue>`, created on GitHub in one step 
 
 `norn-deliver <story>` runs a story's unattended steps, its slices first, until it needs a person. You start it once slicing is done (`norn-drive` offers it).
 
-1. Run `norn tidy` once, then ask `norn next <story>` for work.
-2. Start a fresh subagent per actionable item, in its worktree, up to the free slots `norn next` gives.
-3. Wait for the subagents to finish, then go back to step 1.
-4. Once every slice is merged into the story branch, run story review and story QA the same way, plus fixes if either asks for changes.
-5. Stop when the story reaches a human gate (for the built-in story, `needs-human-qa`, always a person) or only items waiting for a person remain. Run `norn tidy` and report what is done, what is waiting and who needs to act.
+1. `norn deliver <story>` takes the story's delivery lock, so only one orchestrator delivers it.
+2. `norn tidy` removes what merged slices left behind, on every turn.
+3. `norn next <story>` lists the items to start; the orchestrator starts a fresh agent per item, in its worktree, up to the free slots.
+4. `norn wait <story>`, in the background, ends when something new can start (exit 0: back to 2), when nothing is left that the orchestrator can do (exit 3), or on its timeout (exit 4: wait again). Once every slice is merged into the story branch, story review and story QA come the same way, plus fixes if either asks for changes.
+5. On exit 3, the story has reached a human gate (for the built-in story, `needs-human-qa`, always a person) or only items waiting for a person remain. The orchestrator runs `norn tidy` and reports what is done, what is waiting, who needs to act, and the items norn escalated because their agent stopped.
 
-The orchestrator never does a step's work itself, never touches labels, branches or PRs, and never takes an item flagged `needs-human` or at a human gate.
+The orchestrator never does a step's work itself, never touches labels, branches or PRs, never writes a monitor of its own around norn, and never takes an item flagged `needs-human` or at a human gate. norn merges each slice PR into the story branch in the merge step's `norn done`; the story PR stays its owner's.
+
+**No agent stops holding a claim.** Every briefing ends with the rule to finish, release or escalate, and a blocked agent escalates with what blocked it. Under herdr, `norn wait` also catches an agent that stopped anyway: an item whose agent has sat idle, done, gone or at a prompt for longer than `deliver.stuckAfter` is escalated for it, with its pane, and you are notified.
 
 ## Limits
 
@@ -257,4 +262,4 @@ The title says who must act on what (`norn: #131 needs you`); the body gives the
 
 ## Housekeeping
 
-All cleanup is `norn tidy`. It removes what belongs to closed issues: QA evidence branches, worktrees, merged slice and story branches, and claim refs. Anything with uncommitted or unpushed work is named, not removed. It is idempotent, and `--dry-run` only lists. `norn-deliver` runs it when it starts and stops, `norn-drive` when a story finishes. Nothing is cleaned up at merge: the owner merges the story on GitHub, where norn does not run.
+All cleanup is `norn tidy`. It removes what belongs to closed issues: QA evidence branches, worktrees, merged slice and story branches, and claim refs. Anything with uncommitted or unpushed work is named, not removed. It is idempotent, and `--dry-run` only lists. `norn-deliver` runs it on every turn of its loop and when it stops, `norn-drive` when a story finishes. Nothing is cleaned up at merge: the owner merges the story on GitHub, where norn does not run.
