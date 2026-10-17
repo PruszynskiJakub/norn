@@ -12,6 +12,7 @@ Unattended delivery of epic #1 in `norn-todo-sandbox` merged 4 of 9 slices in ab
 4. **Auto mode blocked every slice merge.** The permission guard refused `gh pr merge` as "Merge Without Review" on PR #12 and PR #13. Merging a slice into the story branch is an agent's job by design, but the guard sees an unapproved PR, and the same `gh` identity cannot approve its own PR. Every slice will hit this.
 5. **Two orchestrators ran on the same epic.** A second `/norn-deliver 1` in another pane started its own merge agent while the first was still driving slices. Claims kept them off the same item, but nothing told the second one that the story was already being delivered.
 6. **Agents and panes piled up.** A new phase in a pane whose previous agent was still there needed a split pane and a new name. Idle agents from earlier phases stayed, and the session ended with 16 herdr workspaces.
+7. **The user had to leave the story pane.** QA of #3 ran with an agent in #3's own pane, which `norn-drive` focused. The blocked merge was fixed by running `! gh pr merge 13` in the merge agent's pane. #7 had to be released from its own pane. The user learnt that two items needed them only by asking the story pane "how is it going?". The goal is to watch and act in the story pane alone.
 
 ## Solution
 
@@ -23,6 +24,11 @@ norn takes over the parts the orchestrator and the agents got wrong. It does the
 - **One orchestrator per story.** `norn deliver <story>` takes a delivery lock on the story. A second orchestrator is refused and told who holds it and since when. `norn wait` keeps the lock fresh and releases it when delivery stops.
 - **Phases reuse their pane.** Under herdr, `norn next` names each phase's agent `norn-<issue>-<step>` and, when the pane still runs an earlier phase's agent, prints the command that stops it first.
 - **The `norn-deliver` skill becomes a short loop**: `norn deliver`, `norn next`, start agents, `norn wait` in the background, `norn tidy`, repeat. It is told not to script around norn and to read data with `--json` only.
+- **The story pane is the only pane a person needs.** Everything that needs a person comes to the delivering session, as soon as it happens:
+  - `norn wait` also wakes when an item newly waits for a person, while other agents keep working.
+  - Attended steps such as a slice's human QA or resolving an escalation run in the story pane's own conversation, working in the item's worktree. Delivery of the other slices goes on in the background.
+  - When an agent's pane stops at a permission prompt, the prompt is shown in the story pane, and the user's answer is passed back to it.
+  - Slice panes start unfocused and norn never focuses them. They are there to look at, never to act in.
 
 ## Behaviour
 
@@ -99,6 +105,23 @@ norn takes over the parts the orchestrator and the agents got wrong. It does the
 37. As a user, I want `norn-deliver` to follow this loop: `norn deliver <story>`; `norn tidy`; `norn next <story>`; start an agent per start item; run `norn wait <story>` in the background; on exit 0 loop, on 3 run `norn tidy` and report, on 4 wait again, so that every orchestrator runs the same short loop.
 38. As a user, I want the report at the end to include items norn escalated for stuck agents, with their panes, so that I know what to look at.
 
+### One pane for the person
+
+39. As an orchestrator, I want `norn wait` to exit 5 as soon as an item waits for a person that I have not reported yet, even while agents are still working, so that the user hears about it at once instead of at the end.
+    Example: #3 reaches human QA while #7 is being reviewed → `#3 needs human QA. Waiting for a person: 3. Pass --reported 3 next time.`, exit 5. `norn wait 1 --reported 3` then stays asleep until something else happens.
+40. As a user, I want the story pane to tell me in one short message what needs me and what I can do about it, while delivery of the rest goes on, so that I never have to ask how it is going.
+    Example: `#3 is ready for your QA. Say "QA 3" to do it here. 2 other slices are still running.`
+41. As a user, I want to do a slice's human QA in the story pane, with the agent working in the slice's worktree and running the app from there, so that I never switch to the slice's pane.
+42. As a user, I want to resolve an escalated item in the story pane the same way, so that a stuck merge or a failed check is handled where I already am.
+43. As an orchestrator, I want new agents to keep starting and `norn wait` to keep running in the background while the user and I are in an attended step, so that one person's QA never stops the other slices.
+44. As a user, I want the slot an attended step uses in the story pane to count like any running agent under `deliver.maxParallel`, so that the limit still holds.
+45. As a user running delivery under herdr, I want a permission prompt in an agent's pane to reach the story pane with the exact command it asks about, so that I can answer it without going there.
+    Example: `norn-5-implement in w43:p1 asks to run: npx playwright install chromium. Allow once, or deny?` → the answer goes back to that pane, and the agent carries on.
+46. As a user, I want the orchestrator never to answer a prompt without my answer for that prompt, and to show the command as the pane shows it, so that relaying never becomes approving on my behalf.
+47. As a user, I want a prompt I have not answered within `deliver.stuckAfter` to be escalated as in story 13, so that an unanswered prompt still ends in a state norn can see.
+48. As a user, I want `norn-drive` never to focus or hand off to an item's pane while a delivery runs in my session, and to do attended steps in this conversation instead, so that drive and deliver keep me in one place.
+49. As a user, I want norn's notifications for a story being delivered to point to the delivering session's pane, so that a notification takes me to the story pane, not to a slice.
+
 ## Out of scope
 
 - Running delivery off the laptop: GitHub Actions runners (#47), the webhook dispatcher (#68) and the identity question (#64). `norn wait`'s wake condition is written so the dispatcher can reuse it.
@@ -108,12 +131,15 @@ norn takes over the parts the orchestrator and the agents got wrong. It does the
 - Approving PRs, and branch protection setup (#43).
 - Cutting down fresh sessions per phase. One fresh agent per step stays by design.
 - Delivery metrics such as fix rounds per slice (#48).
+- Answering permission prompts without the user, by rule or allowlist inferred by norn.
+- A story pane outside herdr. Under Claude Code and git, attended steps still come to the delivering session, but permission prompts are not relayed.
 
 ## Open questions
 
 1. Does auto mode let `norn done` through once the merge happens inside norn, or does its classifier infer the merge and block that too? Check it in the sandbox in the first slice of the merge work. If it is blocked, the permission rule in story 24 is needed before the merge slice is useful. (Jakub)
 2. Is `Bash(norn:*)` the right Claude Code rule for both a global `norn` and `npx norn`, or are two rules needed? Check against Claude Code's permission docs. (Jakub)
 3. Is 10m the right default for `deliver.stuckAfter`? An agent can sit idle at the end of a long tool call without being stuck. (Jakub)
+4. Is relaying permission prompts acceptable to a security reviewer? The prompt text is read from a pane an agent controls, so the relay must show herdr's own reading of the prompt and nothing the agent wrote. Check how reliably herdr exposes the blocked command. (Jakub)
 
 ## Plan
 
@@ -134,7 +160,10 @@ norn takes over the parts the orchestrator and the agents got wrong. It does the
 ### Decisions
 
 - `norn wait` is level-triggered. It computes the full `next` report only when the cheap fingerprint changes, and it never writes beyond the follow-ups `next` already makes.
-- Exit codes: 0 work to start, 3 stop, 4 timeout, 1 error, 2 refusal. They are documented in `docs/commands.md`.
+- Exit codes: 0 work to start, 5 a person is needed, 3 stop, 4 timeout, 1 error, 2 refusal. They are documented in `docs/commands.md`. When several hold at once, 0 wins over 5, so agents start before the user is asked.
+- The "already reported" set lives with the orchestrator and is passed as `--reported`, so `norn wait` stays stateless. Each exit prints the current set.
+- An attended step in the story pane holds the item's claim under the delivering session. The step's skill works in the item's worktree by its absolute path, and nothing changes directory for the session.
+- A relayed prompt is answered with `herdr agent send-keys` to the agent's pane, only after the user's answer in the story pane.
 - An item escalated for a stuck agent loses its claim, like `norn escalate`, so a person can take it with `norn-drive`. The pane is left as it is, for the person to read.
 - norn merges a slice with a merge commit, as the briefing does today. It refuses when GitHub reports conflicts or a failing or pending check. A repository with no checks merges once the PR is mergeable.
 - The merge happens inside the merge step's `done`, before the transition to `closed`. A failed merge changes no state and keeps the claim.
@@ -156,5 +185,8 @@ norn takes over the parts the orchestrator and the agents got wrong. It does the
 | 8 | herdr agent activity in the workspace, stuck escalation in `norn wait` | 13–15 | 7 |
 | 9 | herdr phase names and the stop-the-previous-agent line in `next` | 33–34 | — |
 | 10 | `norn-deliver` skill rewritten around `deliver`, `wait` and `tidy`; report lists stuck escalations | 35–38 | 1, 6, 7, 9 |
+| 11 | `norn wait` exits 5 for new items waiting for a person, with `--reported` | 39 | 7 |
+| 12 | Attended steps in the delivering session: deliver and drive skills, the slot counted, notifications point to the story pane | 40–44, 48–49 | 10, 11 |
+| 13 | Permission prompt relay under herdr, with escalation when unanswered | 45–47 | 8, 12 |
 
-Slices 1, 2, 3, 5 and 9 can start at once. Slice 4's QA answers open question 1. The whole story is QA'd in `norn-todo-sandbox` with a fresh epic, delivered end to end under herdr with auto mode on. It passes when it stops only for human QA.
+Slices 1, 2, 3, 5 and 9 can start at once. Slice 4's QA answers open question 1, and slice 13's QA answers open question 4. The whole story is QA'd in `norn-todo-sandbox` with a fresh epic, delivered end to end under herdr with auto mode on. It passes when the user works only in the story pane and the run stops only for human QA.
