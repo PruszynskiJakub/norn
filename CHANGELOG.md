@@ -4,6 +4,8 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-10-17
+
 ### Added
 
 - Repository flows: a repository can define a process of its own in `.agents/flows/<name>.json`, and an issue labelled `type:<name>` runs it through `norn take` and `norn done`. norn reads flows from the base branch on GitHub, briefs each state's skill and outcomes, gives the issue a branch and a PR into the base branch with `"workspace": "own"`, creates a missing state label on the first transition into it, and refuses a broken flow, with what is wrong, for the issues of its type only. Stories and slices keep the built-in process. See [Repository flows](docs/flows.md).
@@ -218,7 +220,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/norn/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/norn/compare/v0.9.0...HEAD
+[0.9.0]: https://github.com/PruszynskiJakub/norn/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/PruszynskiJakub/norn/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/PruszynskiJakub/norn/compare/v0.6.1...v0.7.0
 [0.6.1]: https://github.com/PruszynskiJakub/norn/compare/v0.6.0...v0.6.1
