@@ -19,6 +19,30 @@ describe("norn take", () => {
   });
 });
 
+describe("every briefing leaves a stopped agent a state norn can see", () => {
+  test.each([
+    ["triage", { number: 7, title: "Rate limiting" }],
+    ["a slice's merge", { number: 7, title: "Docs", labels: ["type:slice", "mode:afk", "merge-queue"] }],
+  ])("%s ends with the rule never to end a turn holding the claim", async (_, issue) => {
+    const w = setup();
+    w.github.seedIssue(issue);
+
+    const out = (await w.norn("take", "7")).stdout;
+
+    expect(out.split("\n").at(-1)).toBe('Never end your turn while you hold #7: finish with a command above, norn release 7, or norn escalate 7 "reason".');
+  });
+
+  test("a blocked agent is told to escalate with what blocked it, a skill's hand-off to a person included", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 7, title: "Rate limiting" });
+
+    const out = (await w.norn("take", "7")).stdout;
+
+    expect(out).toContain("That covers a permission or a tool error that blocks you, a decision only a person can make, and a skill telling");
+    expect(out).toContain('you to stop and hand it to a person. Say what blocked you, e.g. norn escalate 7 "auto mode refused: gh pr merge 13"');
+  });
+});
+
 describe("norn take refusals", () => {
   test("an issue held by another session is refused, with what to do instead", async () => {
     const w = setup();

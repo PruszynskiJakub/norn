@@ -10,4 +10,6 @@ description: Build an issue's change test-first at the seams its spec agreed, th
 3. Run the typecheck and the test file you are in often, and the whole suite before each commit.
 4. **Review pass.** Read your whole diff the way review will: every acceptance criterion (or review/QA point) met and nothing beyond it, the repo's documented standards, and the smells in [the `norn-review` skill's SMELLS.md](../norn-review/SMELLS.md). Refactor here, with the suite green after each change.
 
+When a criterion cannot be met without a decision only a person can make, or something outside the change blocks you (a permission, a broken tool, a missing access), stop and hand it to a person with what blocked you. Never stop without saying so.
+
 Done when every acceptance criterion (or every review/QA point) has a passing test at an agreed seam, the typecheck and the full suite are green, and the work is pushed with CI green.

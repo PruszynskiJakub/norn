@@ -30,8 +30,11 @@ describe("take names the worktree", () => {
         "On a long step, run norn take 123 again now and then: it keeps your claim fresh.",
         "If you have to stop, run: norn release 123",
         'If something is wrong and a person is needed, run: norn escalate 123 "reason"',
+        "That covers a permission or a tool error that blocks you, a decision only a person can make, and a skill telling",
+        'you to stop and hand it to a person. Say what blocked you, e.g. norn escalate 123 "auto mode refused: gh pr merge 13"',
         "",
         "Do not change labels yourself. Only norn changes them.",
+        'Never end your turn while you hold #123: finish with a command above, norn release 123, or norn escalate 123 "reason".',
       ].join("\n"),
     );
   });

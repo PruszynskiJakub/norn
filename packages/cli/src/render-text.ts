@@ -762,7 +762,23 @@ function checkedOutElsewhere(branch: string, path: string) {
   return `Branch ${branch} is checked out at ${path}; work there or switch that checkout to another branch.`;
 }
 
-/** Briefing in fixed order: where you are, what to do, how to finish, what not to do. */
+/**
+ * What a blocked agent does: escalate, saying what blocked it, so the user is notified and the item shows as needing a
+ * human. A step skill says "stop and hand it to a person" for the same thing, since it knows nothing of norn.
+ */
+function blockedLines(n: number): string[] {
+  return [
+    "That covers a permission or a tool error that blocks you, a decision only a person can make, and a skill telling",
+    `you to stop and hand it to a person. Say what blocked you, e.g. norn escalate ${n} "auto mode refused: gh pr merge 13"`,
+  ];
+}
+
+/** The last line of every briefing: a stopped agent must leave a state norn can see, never a claim it no longer works on. */
+export function claimRule(n: number): string {
+  return `Never end your turn while you hold #${n}: finish with a command above, norn release ${n}, or norn escalate ${n} "reason".`;
+}
+
+/** Briefing in fixed order: where you are, what to do, how to finish, what not to do; the claim rule last. */
 export function renderBriefing(b: Briefing): string[] {
   const n = b.issue;
   const { step } = b;
@@ -794,8 +810,10 @@ export function renderBriefing(b: Briefing): string[] {
     `On a long step, run norn take ${n} again now and then: it keeps your claim fresh.`,
     `If you have to stop, run: norn release ${n}`,
     `If something is wrong and a person is needed, run: norn escalate ${n} "reason"`,
+    ...blockedLines(n),
     "",
     "Do not change labels yourself. Only norn changes them.",
+    claimRule(n),
   ];
 }
 
