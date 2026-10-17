@@ -5,3 +5,5 @@ dist
 .claude/worktrees/
 *.tsbuildinfo
 packages/web/ui-dist
+.agents/worktrees/
+.agents/norn.config.local.json
