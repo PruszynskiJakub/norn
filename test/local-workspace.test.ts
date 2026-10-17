@@ -172,3 +172,48 @@ describe("comparing paths", () => {
     expect(isWithin("/r/.agents/worktrees/7-x-12", "/r/.agents/worktrees/7-x", "linux")).toBe(false);
   });
 });
+
+describe("LocalWorkspace under herdr", () => {
+  const list = (agents: unknown[]) => JSON.stringify({ id: "cli:agent:list", result: { agents, type: "agent_list" } });
+  const agent = (pane: string, status: string, seq: number) => ({
+    agent: "claude",
+    agent_status: status,
+    pane_id: pane,
+    name: "norn-3-merge",
+    state_change_seq: seq,
+  });
+
+  test("an agent's activity is what herdr reports for its pane, timed from when this process first saw it so", async () => {
+    let answer = list([agent("w3Y:p2", "idle", 7)]);
+    const { run, calls } = scripted(() => ({ stdout: answer }));
+    let now = 1_000;
+    const ws = new LocalWorkspace("/repo", { HERDR_ENV: "1" }, run, "/repo", () => now);
+
+    expect(await ws.agentActivity("w3Y:p2")).toEqual({ activity: "idle", forMs: 0 });
+    now += 600_000;
+    expect(await ws.agentActivity("w3Y:p2")).toEqual({ activity: "idle", forMs: 600_000 });
+    // A new count is a new state, even one that reads the same: the agent worked a turn in between.
+    answer = list([agent("w3Y:p2", "idle", 9)]);
+    now += 60_000;
+    expect(await ws.agentActivity("w3Y:p2")).toEqual({ activity: "idle", forMs: 0 });
+    expect(calls[0]).toBe("herdr agent list");
+  });
+
+  test("a pane with no agent is gone; herdr's other states read as they are", async () => {
+    const { run } = scripted(() => ({ stdout: list([agent("w1:p1", "blocked", 1), agent("w1:p2", "working", 2), agent("w1:p3", "done", 3)]) }));
+    const ws = new LocalWorkspace("/repo", { HERDR_ENV: "1" }, run);
+
+    expect((await ws.agentActivity("w1:p1")).activity).toBe("blocked");
+    expect((await ws.agentActivity("w1:p2")).activity).toBe("working");
+    expect((await ws.agentActivity("w1:p3")).activity).toBe("done");
+    expect((await ws.agentActivity("w9:p9")).activity).toBe("gone");
+  });
+
+  test("outside herdr, or when herdr does not answer, norn cannot tell", async () => {
+    const outside = scripted(() => undefined);
+    expect(await new LocalWorkspace("/repo", {}, outside.run).agentActivity("w1:p1")).toEqual({ activity: "unknown", forMs: 0 });
+    expect(outside.calls).toEqual([]);
+    const failing = scripted(() => ({ code: 1 }));
+    expect((await new LocalWorkspace("/repo", { HERDR_ENV: "1" }, failing.run).agentActivity("w1:p1")).activity).toBe("unknown");
+  });
+});
