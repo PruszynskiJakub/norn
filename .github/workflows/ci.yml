@@ -26,6 +26,12 @@ jobs:
           out=$(npx norn --help)
           echo "$out"
           echo "$out" | grep -q "norn runs work through the SDD process"
+      - name: Run --help from the installed package outside a git repository
+        run: |
+          mkdir "$RUNNER_TEMP/outside" && cd "$RUNNER_TEMP/outside"
+          out=$("$RUNNER_TEMP/app/node_modules/.bin/norn" --help)
+          echo "$out"
+          echo "$out" | grep -q "norn runs work through the SDD process"
       - name: Serve the dashboard from the installed package
         working-directory: ${{ runner.temp }}/app
         run: |

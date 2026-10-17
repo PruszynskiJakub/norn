@@ -4,6 +4,10 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Fixed
+
+- `norn --help` and `-h` print the usage outside a git repository too, instead of refusing with `Not inside a git repository's checkout`.
+
 ## [0.10.0] - 2026-10-17
 
 ### Changed

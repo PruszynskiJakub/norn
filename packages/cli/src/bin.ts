@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { randomBytes } from "node:crypto";
 import { hostname } from "node:os";
-import { parseArgs } from "./args.js";
+import { runsOutsideCheckout } from "./args.js";
 import { run } from "./cli.js";
 import { ghFailureMessage, renderNotification } from "./render-text.js";
 import { sessionId } from "./env.js";
@@ -14,15 +14,14 @@ import { launchDashboard } from "@norn/web";
 const argv = process.argv.slice(2);
 
 /**
- * The main checkout's root. Outside one, only doctor and --version run: doctor
+ * The main checkout's root. Outside one, only doctor, --version and --help run: doctor
  * reports why as its git check, from where norn was started.
  */
 async function findRoot(): Promise<{ root: string; checkoutProblem: string | null }> {
   try {
     return { root: await LocalWorkspace.findRoot(process.cwd()), checkoutProblem: null };
   } catch (e) {
-    const { positionals, bools } = parseArgs(argv);
-    if (e instanceof RootError && (positionals[0] === "doctor" || bools.has("version"))) return { root: process.cwd(), checkoutProblem: e.message };
+    if (e instanceof RootError && runsOutsideCheckout(argv)) return { root: process.cwd(), checkoutProblem: e.message };
     throw e;
   }
 }
