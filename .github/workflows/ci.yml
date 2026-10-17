@@ -23,12 +23,8 @@ jobs:
           mkdir "$RUNNER_TEMP/app" && cd "$RUNNER_TEMP/app"
           git init -q && npm init -y > /dev/null
           npm install "$RUNNER_TEMP"/norn-*.tgz
-          set +e
           out=$(npx norn --help)
-          code=$?
-          set -e
           echo "$out"
-          test "$code" -eq 2
           echo "$out" | grep -q "norn runs work through the SDD process"
       - name: Serve the dashboard from the installed package
         working-directory: ${{ runner.temp }}/app
