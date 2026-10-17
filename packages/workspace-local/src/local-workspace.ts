@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { type Provider, samePath, type Workspace } from "@norn/core";
+import { type AgentActivity, type PaneActivity, type Provider, samePath, type Workspace } from "@norn/core";
 
 /** Runs a command; `env` is added to this process's environment. */
 export type Run = (cmd: string, args: string[], env?: Record<string, string>) => Promise<{ code: number; stdout: string; stderr: string }>;
@@ -17,6 +17,18 @@ export const runCommand: Run = (cmd, args, env) =>
     child.on("close", (code) => resolve({ code: code ?? 1, stdout, stderr }));
   });
 
+/** An agent as herdr agent list prints it. */
+interface HerdrAgent {
+  pane_id: string;
+  name?: string;
+  agent_status?: string;
+  cwd?: string;
+  foreground_cwd?: string;
+  state_change_seq?: number;
+}
+
+const HERDR_STATUS: Record<string, AgentActivity> = { working: "working", idle: "idle", done: "done", blocked: "blocked" };
+
 /** norn cannot tell which checkout to work in. A refusal for the user, not a crash. */
 export class RootError extends Error {}
 
@@ -27,7 +39,44 @@ export class LocalWorkspace implements Workspace {
     public env: Record<string, string | undefined>,
     private run: Run = runCommand,
     public cwd: string = root,
+    private clock: () => number = Date.now,
   ) {}
+
+  /**
+   * When this process first saw each pane's agent in the state it is in now. herdr says what an agent does but not
+   * since when, so a long-running norn wait measures it itself.
+   */
+  private seen = new Map<string, { key: string; at: number }>();
+
+  /** The agents herdr runs on this machine; null when norn does not run under herdr or herdr does not answer. */
+  private async herdrAgents(): Promise<HerdrAgent[] | null> {
+    if (this.env.HERDR_ENV !== "1") return null;
+    let r: Awaited<ReturnType<Run>>;
+    try {
+      r = await this.run("herdr", ["agent", "list"]);
+    } catch {
+      return null;
+    }
+    if (r.code !== 0) return null;
+    try {
+      return (JSON.parse(r.stdout) as { result: { agents: HerdrAgent[] } }).result.agents;
+    } catch {
+      return null;
+    }
+  }
+
+  async agentActivity(pane: string): Promise<PaneActivity> {
+    const agents = await this.herdrAgents();
+    if (!agents) return { activity: "unknown", forMs: 0 };
+    const agent = agents.find((a) => a.pane_id === pane);
+    const activity = agent ? (HERDR_STATUS[agent.agent_status ?? ""] ?? "unknown") : "gone";
+    // herdr counts every change of an agent's state, so a new count is a new state even when it reads the same.
+    const key = `${activity}:${agent?.state_change_seq ?? ""}`;
+    const now = this.clock();
+    const was = this.seen.get(pane);
+    if (was?.key !== key) this.seen.set(pane, { key, at: now });
+    return { activity, forMs: was?.key === key ? now - was.at : 0 };
+  }
 
   /**
    * The main checkout's root, also from inside a linked worktree. The parent of

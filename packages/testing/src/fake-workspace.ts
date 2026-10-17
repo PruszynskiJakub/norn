@@ -1,4 +1,4 @@
-import type { Provider, Workspace } from "@norn/core";
+import type { PaneActivity, Provider, Workspace } from "@norn/core";
 
 export class FakeWorkspace implements Workspace {
   root = "/repo";
@@ -62,6 +62,11 @@ export class FakeWorkspace implements Workspace {
   fetched = 0;
   async fetchRemote() {
     this.fetched++;
+  }
+  /** What the agent in each herdr pane does, and for how long; a pane not here is unknown. */
+  activities = new Map<string, PaneActivity>();
+  async agentActivity(pane: string): Promise<PaneActivity> {
+    return structuredClone(this.activities.get(pane) ?? { activity: "unknown", forMs: 0 });
   }
   /** Evidence directories by the path norn is given. */
   evidence = new Map<string, { path: string; content: Buffer }[]>();

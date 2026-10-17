@@ -318,6 +318,17 @@ export class FakeGitHub implements GitHub {
     shas.delete(n);
   }
 
+  /** How often activityStamp was called. */
+  stamped = 0;
+  async activityStamp(story: number) {
+    this.stamped++;
+    const issue = (n: number) => {
+      const i = this.mustGet(n);
+      return { n, state: i.state, labels: [...i.labels].sort(), comments: this.comments(n).length, blockers: this.blockerNumbers(n) };
+    };
+    return JSON.stringify({ story: issue(story), subs: this.subIssueNumbers(story).map(issue), claims: [...this.claimShas] });
+  }
+
   /** How often observeWork was called. */
   observed = 0;
   async observeWork(query: WorkQuery): Promise<Work> {

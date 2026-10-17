@@ -23,7 +23,7 @@ import { locate } from "./location.js";
 import { type Step, TRIAGE } from "./machine.js";
 import { heldDelivery, recordOffered } from "./delivery.js";
 import { computeNext, type NextReport, nextRefusal, notifyWaiting } from "./next.js";
-import { notifyNeedsHuman, notifySettled } from "./notify.js";
+import { notifySettled } from "./notify.js";
 import { type Refusal, type Refused, refuse } from "./refusals.js";
 import { storySlug } from "./slug.js";
 import { qaBranch } from "./tidy.js";
@@ -35,8 +35,8 @@ import {
   ensureStateLabel,
   ensureTypeLabel,
   type Evidence,
+  flagNeedsHuman,
   leftState,
-  needsHumanLine,
   oneLine,
   type Settled,
   settleLeftState,
@@ -321,14 +321,8 @@ export async function escalate(ctx: Ctx, n: number, reason: string | undefined):
   if (!reason) return refuse({ kind: "reason-missing", issue: n });
   const notHeld = await checkHeld(ctx, n);
   if (notHeld) return notHeld;
-  const { github } = ctx;
-  await github.addLabels(n, ["needs-human"]);
-  await github.removeLabels(n, ["in-progress"]);
-  const why = `escalated: "${oneLine(reason)}"`;
   // The full reason keeps its line breaks in its own paragraph; the marker line stays single-line.
-  await github.comment(n, [needsHumanLine(why), ...(reason.includes("\n") ? ["", reason] : [])].join("\n"));
-  await notifyNeedsHuman(ctx, n, why);
-  await github.deleteClaim(n);
+  await flagNeedsHuman(ctx, n, `escalated: "${oneLine(reason)}"`, reason);
   return { ok: true, kind: "escalated", issue: n };
 }
 

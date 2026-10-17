@@ -240,6 +240,19 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, { w
   }
 }
 
+/**
+ * Sets needs-human on an issue whose claim this session holds, with the reason as the marker norn reads back, notifies
+ * the user and releases the claim. `full` is the reason with its line breaks, kept in a paragraph of its own.
+ */
+export async function flagNeedsHuman(ctx: Ctx, n: number, why: string, full?: string): Promise<void> {
+  const { github } = ctx;
+  await github.addLabels(n, ["needs-human"]);
+  await github.removeLabels(n, ["in-progress"]);
+  await github.comment(n, [needsHumanLine(why), ...(full?.includes("\n") ? ["", full] : [])].join("\n"));
+  await notifyNeedsHuman(ctx, n, why);
+  await github.deleteClaim(n);
+}
+
 /** Runs fn; a failure becomes an event instead of an error. `retry` is the story whose norn next retries it. */
 export async function bestEffort(what: FollowUpTask, issue: number, retry: number, fn: () => Promise<Event[]>): Promise<Event[]> {
   try {

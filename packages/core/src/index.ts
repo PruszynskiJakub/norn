@@ -18,6 +18,7 @@ export * from "./slug.js";
 export * from "./status.js";
 export * from "./text.js";
 export * from "./tidy.js";
+export * from "./wait.js";
 export * from "./transitions.js";
 export * from "./workspace.js";
 export * from "./feed.js";

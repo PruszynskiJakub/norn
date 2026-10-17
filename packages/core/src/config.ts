@@ -19,6 +19,8 @@ export interface Config {
   staleAfterMs: number;
   maxParallel: number;
   maxFixRounds: number;
+  /** How long the agent of a claim norn wait watches may sit idle, done, gone or blocked before norn escalates the item for it. */
+  stuckAfterMs: number;
   /** Where notifications go; null when turned off. */
   notifications: Channel | null;
   /** The developer's own dashboard settings; null where they set none. */
@@ -34,6 +36,8 @@ const NOTIFICATIONS = ["auto", "herdr", "os", "none"];
 const ENV_FOR: Record<Provider, string | null> = { herdr: "HERDR_ENV", "claude-code": "CLAUDECODE", git: null };
 const UNITS: Record<string, number> = { s: 1000, m: 60_000, h: 3_600_000, d: 86_400_000 };
 const MIN_STALE_AFTER_MS = 10 * UNITS.m;
+/** An agent can sit idle a while at the end of a long tool call without being stuck; ten minutes leaves it room. */
+const DEFAULT_STUCK_AFTER = "10m";
 
 function toMs(duration: string) {
   return Number(duration.slice(0, -1)) * UNITS[duration.slice(-1)];
@@ -49,7 +53,7 @@ interface Raw {
   baseBranch?: string;
   worktrees?: { provider?: string };
   claims?: { staleAfter?: string };
-  deliver?: { maxParallel?: number; maxFixRounds?: number };
+  deliver?: { maxParallel?: number; maxFixRounds?: number; stuckAfter?: string };
   notifications?: string;
   dashboard?: { port?: number; interval?: string };
 }
@@ -65,6 +69,7 @@ export type ConfigProblem =
   | { kind: "notifications-in-team-file"; file: string; local: string }
   | { kind: "bad-notifications"; file: string; allowed: readonly string[] }
   | { kind: "bad-deliver-number"; file: string; key: string }
+  | { kind: "bad-stuck-after"; file: string }
   | { kind: "dashboard-in-team-file"; file: string; local: string }
   | { kind: "bad-dashboard-setting"; file: string; key: "port" | "interval" }
   | { kind: "norn-version-in-local-file"; file: string; team: string }
@@ -140,6 +145,9 @@ function check(file: string, raw: unknown): { problems: ConfigProblem[]; warning
     const v = deliver[key];
     if (v !== undefined && !(Number.isInteger(v) && (v as number) > 0)) problems.push({ kind: "bad-deliver-number", file, key });
   }
+  if (deliver.stuckAfter !== undefined && (typeof deliver.stuckAfter !== "string" || durationMs(deliver.stuckAfter) === null)) {
+    problems.push({ kind: "bad-stuck-after", file });
+  }
   return { problems, warnings };
 }
 
@@ -183,6 +191,7 @@ export async function loadConfig(workspace: Workspace): Promise<Loaded> {
       maxParallel: local.raw.deliver?.maxParallel ?? team.raw.deliver?.maxParallel ?? DEFAULT_TEAM_CONFIG.deliver.maxParallel,
       notifications: channel,
       maxFixRounds: team.raw.deliver?.maxFixRounds ?? DEFAULT_TEAM_CONFIG.deliver.maxFixRounds,
+      stuckAfterMs: toMs(local.raw.deliver?.stuckAfter ?? team.raw.deliver?.stuckAfter ?? DEFAULT_STUCK_AFTER),
       dashboard: {
         port: local.raw.dashboard?.port ?? null,
         intervalMs: local.raw.dashboard?.interval === undefined ? null : durationMs(local.raw.dashboard.interval),

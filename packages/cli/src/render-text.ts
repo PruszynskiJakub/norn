@@ -37,6 +37,7 @@ import {
   TEAM_CONFIG,
   type TidyResult,
   type WaitItem,
+  type WaitResult,
 } from "@norn/core";
 import type { DashboardRefusal, DashboardResult } from "./dashboard.js";
 import { type CheckFact, type DoctorCheck, type DoctorResult, doctorFailed, type FlowsFact } from "./doctor.js";
@@ -56,6 +57,7 @@ export type Answer =
   | EscalateResult
   | ReleaseResult
   | AddSliceResult
+  | WaitResult
   | DeliverResult
   | DeliveryStoppedResult
   | NextResult
@@ -67,7 +69,15 @@ export type Answer =
   | FlowExported;
 
 /** Refusals only the CLI makes: how it was called, init's skill install, the dashboard and flows export. */
-export type CliRefusal = { kind: "usage" } | { kind: "needs-number"; command: string } | MissingSkills | InitWouldDowngrade | DashboardRefusal | FlowsRefusal;
+export type CliRefusal =
+  | { kind: "usage" }
+  | { kind: "needs-number"; command: string }
+  /** norn wait --timeout takes a duration such as 30m. */
+  | { kind: "bad-wait-timeout"; value: string }
+  | MissingSkills
+  | InitWouldDowngrade
+  | DashboardRefusal
+  | FlowsRefusal;
 
 export function unreachable(x: never): never {
   throw new Error(`no wording for ${JSON.stringify(x)}`);
@@ -110,6 +120,8 @@ export const USAGE = [
   "  norn deliver <story> [--stop] [--takeover]",
   "                                     Take the story's delivery lock and get the deliver loop;",
   "                                     --stop releases it, --takeover takes it from a stopped session of yours",
+  "  norn wait <story> [--timeout 30m]  Block until there is something new to do on the story;",
+  "                                     exits 0 to start, 3 to stop, 4 on timeout",
   "  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;",
   "                                     --takeover takes it from a stopped session of yours",
   '  norn done <issue> [outcome] ["note"] [--evidence <dir>]',
@@ -134,6 +146,7 @@ export const USAGE = [
 export const NEEDS_NUMBER: Record<string, string> = {
   next: "norn next <story>",
   deliver: "norn deliver <story> [--stop] [--takeover]",
+  wait: "norn wait <story> [--timeout <duration>]",
   take: "norn take <issue>",
   done: 'norn done <issue> [outcome] ["note"] [--evidence <dir>]',
   "add-slice": 'norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
@@ -187,6 +200,8 @@ function problem(p: ConfigProblem): string {
       return `${p.file}: notifications must be one of ${p.allowed.join(", ")}`;
     case "bad-deliver-number":
       return `${p.file}: deliver.${p.key} must be a whole number above 0`;
+    case "bad-stuck-after":
+      return `${p.file}: deliver.stuckAfter must be a duration like 10m or 1h`;
     case "dashboard-in-team-file":
       return `${p.file}: dashboard is each developer's own; set it in ${p.local}`;
     case "bad-dashboard-setting":
@@ -233,6 +248,8 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
   switch (r.kind) {
     case "usage":
       return [USAGE];
+    case "bad-wait-timeout":
+      return [`--timeout ${r.value} is not a duration. Give one like 30m or 1h: norn wait <story> --timeout 30m`];
     case "needs-number":
       return ["Give the issue number explicitly:", `  ${NEEDS_NUMBER[r.command]}`];
     case "port-taken":
@@ -644,6 +661,8 @@ export function renderAnswer(a: Answer): string[] {
       const status = a.blockedBy.length ? `blocked by ${issues(a.blockedBy)}` : a.state;
       return [`Created slice #${a.slice} "${a.title}" (mode:${a.mode}, ${status}).`];
     }
+    case "waited":
+      return renderWaited(a);
     case "delivering":
       return renderDelivering(a);
     case "delivery-stopped":
@@ -694,6 +713,25 @@ function allowedLine(p: Allowed): string {
     return `  - ${p.file} is not a JSON object with a permissions.allow list, so norn left it: add ${NORN_PERMISSIONS.join(" and ")} to permissions.allow`;
   if (!p.added.length) return `  - norn's commands already allowed for Claude Code in ${CLAUDE_SETTINGS}`;
   return `  - ${p.added.join(" and ")} allowed for Claude Code in ${CLAUDE_SETTINGS}, so agents run norn without a prompt`;
+}
+
+/** norn wait's answer: one line saying what to do, after the items it escalated for stuck agents. */
+function renderWaited(w: WaitResult): string[] {
+  const n = w.story;
+  const stuck = w.escalated.map((e) => `norn escalated #${e.issue}: ${e.reason}. A person picks it up; the user is notified.`);
+  if (w.wake === "start") {
+    const ids = issues(w.items.map((s) => s.issue));
+    const ready = w.items.length === 1 ? `${ids} is ready for an agent` : `${ids} are ready for agents`;
+    const slots = `${w.report.slots} ${w.report.slots === 1 ? "slot" : "slots"} free`;
+    return [...stuck, `${ready} (${slots}). Run: norn next ${n}`];
+  }
+  if (w.wake === "timeout") return [...stuck, `Nothing new to start on ${w.flow} #${n} yet. Run norn wait ${n} again.`];
+  if (w.report.closed) return [...stuck, `${capitalise(w.flow)} #${n} is closed. Run norn next ${n} for the report.`];
+  const left = [
+    ...w.report.waiting.filter((x) => FOR_HUMAN.includes(x.reason)).map(waitText),
+    ...w.report.start.filter((s) => s.attended).map((s) => `#${s.issue} is in ${s.state}, a step the user takes part in`),
+  ];
+  return [...stuck, `Nothing left you can do${left.length ? `: ${left.join("; ")}` : ""}. Run norn next ${n} for the report.`];
 }
 
 /** The deliver loop, as the orchestrator runs it from here on. */

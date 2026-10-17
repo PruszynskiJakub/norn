@@ -135,6 +135,64 @@ Story #1 "A story": needs-plan · owner none · branch 1-a-story
 No slices yet."
 `;
 
+exports[`output of every command, text and --json > deliver > json 1`] = `
+"exit 0
+{
+  "ok": true,
+  "story": 123,
+  "reacquired": false,
+  "tookOver": null,
+  "message": "You now deliver story #123 \\"Rate limiting\\". No other session can deliver it while you do.\\n\\nRun this loop, and nothing else, until it says to stop:\\n  1. norn tidy\\n  2. norn next 123: start one fresh agent per item it lists, as it says. Start none of your own.\\n  3. norn wait 123, in the background, and act on its exit code when it ends:\\n       0: something new can start. Go back to 1.\\n       3: nothing is left that you can do. Run norn tidy, then norn next 123, and report to the user. Stop.\\n       4: it timed out. Run norn wait 123 again.\\n       anything else: it says why. Do what it says, or report to the user and stop.\\n\\nnorn wait does the waiting: never write a monitor, script or sleep loop around norn, and never match its text.\\nTo read norn's data, add --json. Type into an agent's pane only with herdr agent prompt.\\nIf you stop delivering before norn wait exits 3, run: norn deliver 123 --stop"
+}"
+`;
+
+exports[`output of every command, text and --json > deliver > text 1`] = `
+"exit 0
+You now deliver story #123 "Rate limiting". No other session can deliver it while you do.
+
+Run this loop, and nothing else, until it says to stop:
+  1. norn tidy
+  2. norn next 123: start one fresh agent per item it lists, as it says. Start none of your own.
+  3. norn wait 123, in the background, and act on its exit code when it ends:
+       0: something new can start. Go back to 1.
+       3: nothing is left that you can do. Run norn tidy, then norn next 123, and report to the user. Stop.
+       4: it timed out. Run norn wait 123 again.
+       anything else: it says why. Do what it says, or report to the user and stop.
+
+norn wait does the waiting: never write a monitor, script or sleep loop around norn, and never match its text.
+To read norn's data, add --json. Type into an agent's pane only with herdr agent prompt.
+If you stop delivering before norn wait exits 3, run: norn deliver 123 --stop"
+`;
+
+exports[`output of every command, text and --json > deliver --stop > json 1`] = `
+"exit 0
+{
+  "ok": true,
+  "story": 123,
+  "held": true,
+  "message": "Stopped delivering story #123: its delivery lock is released, and another session may deliver it."
+}"
+`;
+
+exports[`output of every command, text and --json > deliver --stop > text 1`] = `
+"exit 0
+Stopped delivering story #123: its delivery lock is released, and another session may deliver it."
+`;
+
+exports[`output of every command, text and --json > deliver held by another session > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "Story #123 is being delivered by session orchestrator since 12:00. Do not start another delivery.\\nIf that session has stopped, take its delivery over with: norn deliver 123 --takeover"
+}"
+`;
+
+exports[`output of every command, text and --json > deliver held by another session > text 1`] = `
+"exit 1
+Story #123 is being delivered by session orchestrator since 12:00. Do not start another delivery.
+If that session has stopped, take its delivery over with: norn deliver 123 --takeover"
+`;
+
 exports[`output of every command, text and --json > doctor with problems > json 1`] = `
 "exit 1
 {
@@ -1163,6 +1221,133 @@ exports[`output of every command, text and --json > next on a slice > json 1`] =
 exports[`output of every command, text and --json > next on a slice > text 1`] = `
 "exit 1
 #127 is a slice of #123. Run norn next 123 instead."
+`;
+
+exports[`output of every command, text and --json > next on a story being delivered by another session > json 1`] = `
+"exit 0
+{
+  "ok": true,
+  "issue": 123,
+  "flow": "story",
+  "provider": "claude-code",
+  "maxParallel": 2,
+  "title": "Rate limiting",
+  "state": "implementation",
+  "branch": "123-rate-limiting",
+  "slices": {
+    "total": 6,
+    "merged": 1
+  },
+  "start": [
+    {
+      "issue": 127,
+      "branch": "123-rate-limiting-127",
+      "worktree": "/repo/.agents/worktrees/123-rate-limiting-127",
+      "createWorktree": null,
+      "checkedOutAt": null,
+      "here": false,
+      "session": null,
+      "kind": "slice",
+      "flow": "slice",
+      "title": "Redis store",
+      "state": "merge-queue",
+      "description": "Queued to merge",
+      "step": "merge",
+      "skill": "norn-merge",
+      "attended": false,
+      "command": "norn take 127"
+    },
+    {
+      "issue": 128,
+      "branch": "123-rate-limiting-128",
+      "worktree": "/repo/.agents/worktrees/123-rate-limiting-128",
+      "createWorktree": null,
+      "checkedOutAt": null,
+      "here": false,
+      "session": null,
+      "kind": "slice",
+      "flow": "slice",
+      "title": "Limit headers",
+      "state": "needs-review",
+      "description": "Waiting for review",
+      "step": "review",
+      "skill": "norn-review",
+      "attended": false,
+      "command": "norn take 128"
+    },
+    {
+      "issue": 132,
+      "branch": "123-rate-limiting-132",
+      "worktree": "/repo/.agents/worktrees/123-rate-limiting-132",
+      "createWorktree": null,
+      "checkedOutAt": null,
+      "here": false,
+      "session": null,
+      "kind": "slice",
+      "flow": "slice",
+      "title": "Docs",
+      "state": "ready-for-agent",
+      "description": "Ready for an agent",
+      "step": "implementation",
+      "skill": "norn-implement",
+      "attended": false,
+      "command": "norn take 132"
+    }
+  ],
+  "waiting": [
+    {
+      "issue": 131,
+      "reason": "blocked",
+      "detail": "is blocked by #127"
+    },
+    {
+      "issue": 133,
+      "reason": "human-qa",
+      "detail": "needs human QA (mode:hil)"
+    }
+  ],
+  "notes": [],
+  "nothingLeft": false,
+  "closed": false,
+  "notPlanned": false,
+  "notified": true,
+  "running": 0,
+  "slots": 2,
+  "delivery": {
+    "session": "yours",
+    "mine": true,
+    "who": "orchestrator",
+    "since": "2026-10-13T12:00:00.000Z"
+  },
+  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\nStory #123 is being delivered by another session of yours, orchestrator, since 12:00. Do not start another delivery.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each in its own fresh subagent, told to work in the item's\\nworktree:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue: Queued to merge.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Start it with: norn take 127\\n  - Slice #128 \\"Limit headers\\" is in needs-review: Waiting for review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Start it with: norn take 128\\n  - Slice #132 \\"Docs\\" is in ready-for-agent: Ready for an agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start it with: norn take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
+}"
+`;
+
+exports[`output of every command, text and --json > next on a story being delivered by another session > text 1`] = `
+"exit 0
+Story #123 "Rate limiting" is in implementation. 1 of 6 slices are merged
+into 123-rate-limiting.
+Story #123 is being delivered by another session of yours, orchestrator, since 12:00. Do not start another delivery.
+
+You can start 3 items now. They are independent, so run them in parallel, at
+most 2 at a time, each in its own fresh subagent, told to work in the item's
+worktree:
+
+  - Slice #127 "Redis store" is in merge-queue: Queued to merge.
+    Worktree: /repo/.agents/worktrees/123-rate-limiting-127
+    Start it with: norn take 127
+  - Slice #128 "Limit headers" is in needs-review: Waiting for review.
+    Worktree: /repo/.agents/worktrees/123-rate-limiting-128
+    Start it with: norn take 128
+  - Slice #132 "Docs" is in ready-for-agent: Ready for an agent.
+    Worktree: /repo/.agents/worktrees/123-rate-limiting-132
+    Start it with: norn take 132
+
+Waiting, nothing to do for you:
+  - #131 is blocked by #127.
+  - #133 needs human QA (mode:hil). Do not take it.
+
+Each phase gets a new agent. When an item is done, run norn next 123 again."
 `;
 
 exports[`output of every command, text and --json > next on a story closed as not planned > json 1`] = `
@@ -3021,7 +3206,7 @@ exports[`output of every command, text and --json > unknown command > json 1`] =
 "exit 2
 {
   "ok": false,
-  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn deliver <story> [--stop] [--takeover]\\n                                     Take the story's delivery lock and get the deliver loop;\\n                                     --stop releases it, --takeover takes it from a stopped session of yours\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
+  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn deliver <story> [--stop] [--takeover]\\n                                     Take the story's delivery lock and get the deliver loop;\\n                                     --stop releases it, --takeover takes it from a stopped session of yours\\n  norn wait <story> [--timeout 30m]  Block until there is something new to do on the story;\\n                                     exits 0 to start, 3 to stop, 4 on timeout\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -3034,6 +3219,8 @@ norn runs work through the SDD process. Commands on an issue take its number exp
   norn deliver <story> [--stop] [--takeover]
                                      Take the story's delivery lock and get the deliver loop;
                                      --stop releases it, --takeover takes it from a stopped session of yours
+  norn wait <story> [--timeout 30m]  Block until there is something new to do on the story;
+                                     exits 0 to start, 3 to stop, 4 on timeout
   norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;
                                      --takeover takes it from a stopped session of yours
   norn done <issue> [outcome] ["note"] [--evidence <dir>]
@@ -3058,7 +3245,7 @@ exports[`output of every command, text and --json > usage > json 1`] = `
 "exit 2
 {
   "ok": false,
-  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn deliver <story> [--stop] [--takeover]\\n                                     Take the story's delivery lock and get the deliver loop;\\n                                     --stop releases it, --takeover takes it from a stopped session of yours\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
+  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn deliver <story> [--stop] [--takeover]\\n                                     Take the story's delivery lock and get the deliver loop;\\n                                     --stop releases it, --takeover takes it from a stopped session of yours\\n  norn wait <story> [--timeout 30m]  Block until there is something new to do on the story;\\n                                     exits 0 to start, 3 to stop, 4 on timeout\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -3071,6 +3258,8 @@ norn runs work through the SDD process. Commands on an issue take its number exp
   norn deliver <story> [--stop] [--takeover]
                                      Take the story's delivery lock and get the deliver loop;
                                      --stop releases it, --takeover takes it from a stopped session of yours
+  norn wait <story> [--timeout 30m]  Block until there is something new to do on the story;
+                                     exits 0 to start, 3 to stop, 4 on timeout
   norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;
                                      --takeover takes it from a stopped session of yours
   norn done <issue> [outcome] ["note"] [--evidence <dir>]
@@ -3099,4 +3288,348 @@ exports[`output of every command, text and --json > version > json 1`] = `
 exports[`output of every command, text and --json > version > text 1`] = `
 "exit 0
 1.4.2"
+`;
+
+exports[`output of every command, text and --json > wait refused while another session delivers > json 1`] = `
+"exit 2
+{
+  "ok": false,
+  "refusal": "Story #123 is being delivered by session orchestrator since 12:00. Do not start another delivery.\\nIf that session has stopped, take its delivery over with: norn deliver 123 --takeover"
+}"
+`;
+
+exports[`output of every command, text and --json > wait refused while another session delivers > text 1`] = `
+"exit 2
+Story #123 is being delivered by session orchestrator since 12:00. Do not start another delivery.
+If that session has stopped, take its delivery over with: norn deliver 123 --takeover"
+`;
+
+exports[`output of every command, text and --json > wait times out > json 1`] = `
+"exit 4
+{
+  "ok": true,
+  "story": 123,
+  "wake": "timeout",
+  "items": [],
+  "escalated": [],
+  "next": {
+    "issue": 123,
+    "flow": "story",
+    "provider": "claude-code",
+    "maxParallel": 2,
+    "title": "Rate limiting",
+    "state": "implementation",
+    "branch": "123-rate-limiting",
+    "slices": {
+      "total": 6,
+      "merged": 1
+    },
+    "start": [
+      {
+        "issue": 127,
+        "branch": "123-rate-limiting-127",
+        "worktree": "/repo/.agents/worktrees/123-rate-limiting-127",
+        "createWorktree": null,
+        "checkedOutAt": null,
+        "here": false,
+        "session": null,
+        "kind": "slice",
+        "flow": "slice",
+        "title": "Redis store",
+        "state": "merge-queue",
+        "description": "Queued to merge",
+        "step": "merge",
+        "skill": "norn-merge",
+        "attended": false,
+        "command": "norn take 127"
+      },
+      {
+        "issue": 128,
+        "branch": "123-rate-limiting-128",
+        "worktree": "/repo/.agents/worktrees/123-rate-limiting-128",
+        "createWorktree": null,
+        "checkedOutAt": null,
+        "here": false,
+        "session": null,
+        "kind": "slice",
+        "flow": "slice",
+        "title": "Limit headers",
+        "state": "needs-review",
+        "description": "Waiting for review",
+        "step": "review",
+        "skill": "norn-review",
+        "attended": false,
+        "command": "norn take 128"
+      },
+      {
+        "issue": 132,
+        "branch": "123-rate-limiting-132",
+        "worktree": "/repo/.agents/worktrees/123-rate-limiting-132",
+        "createWorktree": null,
+        "checkedOutAt": null,
+        "here": false,
+        "session": null,
+        "kind": "slice",
+        "flow": "slice",
+        "title": "Docs",
+        "state": "ready-for-agent",
+        "description": "Ready for an agent",
+        "step": "implementation",
+        "skill": "norn-implement",
+        "attended": false,
+        "command": "norn take 132"
+      }
+    ],
+    "waiting": [
+      {
+        "issue": 131,
+        "reason": "blocked",
+        "detail": "is blocked by #127"
+      },
+      {
+        "issue": 133,
+        "reason": "human-qa",
+        "detail": "needs human QA (mode:hil)"
+      }
+    ],
+    "notes": [],
+    "nothingLeft": false,
+    "closed": false,
+    "notPlanned": false,
+    "notified": true,
+    "running": 0,
+    "slots": 2,
+    "delivery": {
+      "session": "this",
+      "mine": true,
+      "who": "session-1",
+      "since": "2026-10-13T12:00:00.000Z"
+    }
+  },
+  "message": "Nothing new to start on story #123 yet. Run norn wait 123 again."
+}"
+`;
+
+exports[`output of every command, text and --json > wait times out > text 1`] = `
+"exit 4
+Nothing new to start on story #123 yet. Run norn wait 123 again."
+`;
+
+exports[`output of every command, text and --json > wait with nothing left > json 1`] = `
+"exit 3
+{
+  "ok": true,
+  "story": 20,
+  "wake": "stop",
+  "items": [],
+  "escalated": [],
+  "next": {
+    "issue": 20,
+    "flow": "story",
+    "provider": "claude-code",
+    "maxParallel": 2,
+    "title": "Waits",
+    "state": "implementation",
+    "branch": "20-waits",
+    "slices": {
+      "total": 1,
+      "merged": 0
+    },
+    "start": [],
+    "waiting": [
+      {
+        "issue": 21,
+        "reason": "needs-human",
+        "detail": "escalated: \\"auto mode refused: gh pr merge 13\\""
+      }
+    ],
+    "notes": [
+      "Created the story branch 20-waits."
+    ],
+    "nothingLeft": true,
+    "closed": false,
+    "notPlanned": false,
+    "notified": true,
+    "running": 0,
+    "slots": 2,
+    "delivery": {
+      "session": "this",
+      "mine": true,
+      "who": "session-1",
+      "since": "2026-10-13T12:00:00.000Z"
+    }
+  },
+  "message": "Nothing left you can do: #21 needs a human: escalated: \\"auto mode refused: gh pr merge 13\\". Run norn next 20 for the report."
+}"
+`;
+
+exports[`output of every command, text and --json > wait with nothing left > text 1`] = `
+"exit 3
+Nothing left you can do: #21 needs a human: escalated: "auto mode refused: gh pr merge 13". Run norn next 20 for the report."
+`;
+
+exports[`output of every command, text and --json > wait with something to start > json 1`] = `
+"exit 0
+{
+  "ok": true,
+  "story": 123,
+  "wake": "start",
+  "items": [
+    {
+      "issue": 127,
+      "branch": "123-rate-limiting-127",
+      "worktree": "/repo/.agents/worktrees/123-rate-limiting-127",
+      "createWorktree": null,
+      "checkedOutAt": null,
+      "here": false,
+      "session": null,
+      "kind": "slice",
+      "flow": "slice",
+      "title": "Redis store",
+      "state": "merge-queue",
+      "description": "Queued to merge",
+      "step": "merge",
+      "skill": "norn-merge",
+      "attended": false,
+      "command": "norn take 127"
+    },
+    {
+      "issue": 128,
+      "branch": "123-rate-limiting-128",
+      "worktree": "/repo/.agents/worktrees/123-rate-limiting-128",
+      "createWorktree": null,
+      "checkedOutAt": null,
+      "here": false,
+      "session": null,
+      "kind": "slice",
+      "flow": "slice",
+      "title": "Limit headers",
+      "state": "needs-review",
+      "description": "Waiting for review",
+      "step": "review",
+      "skill": "norn-review",
+      "attended": false,
+      "command": "norn take 128"
+    },
+    {
+      "issue": 132,
+      "branch": "123-rate-limiting-132",
+      "worktree": "/repo/.agents/worktrees/123-rate-limiting-132",
+      "createWorktree": null,
+      "checkedOutAt": null,
+      "here": false,
+      "session": null,
+      "kind": "slice",
+      "flow": "slice",
+      "title": "Docs",
+      "state": "ready-for-agent",
+      "description": "Ready for an agent",
+      "step": "implementation",
+      "skill": "norn-implement",
+      "attended": false,
+      "command": "norn take 132"
+    }
+  ],
+  "escalated": [],
+  "next": {
+    "issue": 123,
+    "flow": "story",
+    "provider": "claude-code",
+    "maxParallel": 2,
+    "title": "Rate limiting",
+    "state": "implementation",
+    "branch": "123-rate-limiting",
+    "slices": {
+      "total": 6,
+      "merged": 1
+    },
+    "start": [
+      {
+        "issue": 127,
+        "branch": "123-rate-limiting-127",
+        "worktree": "/repo/.agents/worktrees/123-rate-limiting-127",
+        "createWorktree": null,
+        "checkedOutAt": null,
+        "here": false,
+        "session": null,
+        "kind": "slice",
+        "flow": "slice",
+        "title": "Redis store",
+        "state": "merge-queue",
+        "description": "Queued to merge",
+        "step": "merge",
+        "skill": "norn-merge",
+        "attended": false,
+        "command": "norn take 127"
+      },
+      {
+        "issue": 128,
+        "branch": "123-rate-limiting-128",
+        "worktree": "/repo/.agents/worktrees/123-rate-limiting-128",
+        "createWorktree": null,
+        "checkedOutAt": null,
+        "here": false,
+        "session": null,
+        "kind": "slice",
+        "flow": "slice",
+        "title": "Limit headers",
+        "state": "needs-review",
+        "description": "Waiting for review",
+        "step": "review",
+        "skill": "norn-review",
+        "attended": false,
+        "command": "norn take 128"
+      },
+      {
+        "issue": 132,
+        "branch": "123-rate-limiting-132",
+        "worktree": "/repo/.agents/worktrees/123-rate-limiting-132",
+        "createWorktree": null,
+        "checkedOutAt": null,
+        "here": false,
+        "session": null,
+        "kind": "slice",
+        "flow": "slice",
+        "title": "Docs",
+        "state": "ready-for-agent",
+        "description": "Ready for an agent",
+        "step": "implementation",
+        "skill": "norn-implement",
+        "attended": false,
+        "command": "norn take 132"
+      }
+    ],
+    "waiting": [
+      {
+        "issue": 131,
+        "reason": "blocked",
+        "detail": "is blocked by #127"
+      },
+      {
+        "issue": 133,
+        "reason": "human-qa",
+        "detail": "needs human QA (mode:hil)"
+      }
+    ],
+    "notes": [],
+    "nothingLeft": false,
+    "closed": false,
+    "notPlanned": false,
+    "notified": true,
+    "running": 0,
+    "slots": 2,
+    "delivery": {
+      "session": "this",
+      "mine": true,
+      "who": "session-1",
+      "since": "2026-10-13T12:00:00.000Z"
+    }
+  },
+  "message": "#127, #128, #132 are ready for agents (2 slots free). Run: norn next 123"
+}"
+`;
+
+exports[`output of every command, text and --json > wait with something to start > text 1`] = `
+"exit 0
+#127, #128, #132 are ready for agents (2 slots free). Run: norn next 123"
 `;

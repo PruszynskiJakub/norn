@@ -420,20 +420,35 @@ export class GhGitHub implements GitHub {
     }
   }
 
+  private async graphql(text: string, vars: Record<string, string | number | null>) {
+    // gh fills {owner} and {repo} from the current repository.
+    const args = ["api", "graphql", "-F", "owner={owner}", "-F", "name={repo}", "-f", `query=${text}`];
+    for (const [k, v] of Object.entries(vars)) if (v !== null) args.push(typeof v === "number" ? "-F" : "-f", `${k}=${v}`);
+    return JSON.parse(await this.gh(args));
+  }
+
+  /** The claim refs and the commits they point at, as git prints them. */
+  private async lsRemoteClaims() {
+    // Free against the API limit, unlike listing the refs through it.
+    const args = ["ls-remote", "origin", "refs/norn/claims/*"];
+    const r = await this.git(args);
+    if (r.code !== 0) throw new GhError(["(git)", ...args], r.stderr);
+    return r.stdout;
+  }
+
+  async activityStamp(story: number) {
+    const query = `query($owner: String!, $name: String!, $n: Int!) {
+  repository(owner: $owner, name: $name) { issue(number: $n) { updatedAt subIssues(first: 100) { nodes { number updatedAt } } } }
+}`;
+    const data = await this.graphql(query, { n: story });
+    return JSON.stringify({ issue: data?.data?.repository?.issue ?? null, claims: (await this.lsRemoteClaims()).trim() });
+  }
+
   async observeWork(query: WorkQuery) {
-    const graphql = async (text: string, vars: Record<string, string | number | null>) => {
-      // gh fills {owner} and {repo} from the current repository.
-      const args = ["api", "graphql", "-F", "owner={owner}", "-F", "name={repo}", "-f", `query=${text}`];
-      for (const [k, v] of Object.entries(vars)) if (v !== null) args.push(typeof v === "number" ? "-F" : "-f", `${k}=${v}`);
-      return JSON.parse(await this.gh(args));
-    };
-    const lsRemote = async () => {
-      // Free against the API limit, unlike listing the refs through it.
-      const args = ["ls-remote", "origin", "refs/norn/claims/*"];
-      const r = await this.git(args);
-      if (r.code !== 0) throw new GhError(["(git)", ...args], r.stderr);
-      return r.stdout;
-    };
-    return observeWork(graphql, lsRemote, query);
+    return observeWork(
+      (text, vars) => this.graphql(text, vars),
+      () => this.lsRemoteClaims(),
+      query,
+    );
   }
 }

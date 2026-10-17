@@ -59,6 +59,14 @@ function data(a: Answer): Record<string, unknown> {
       return a.launch.kind === "started"
         ? { url: a.launch.url, port: a.launch.port, intervalMs: a.intervalMs, opened: a.launch.opened }
         : { url: a.launch.url, alreadyRunning: true };
+    case "waited":
+      return {
+        story: a.story,
+        wake: a.wake,
+        items: a.items,
+        escalated: a.escalated,
+        next: { ...a.report, waiting: a.report.waiting.map(wait), notes: a.report.notes.flatMap(renderEvent) },
+      };
     case "delivering":
       return { story: a.story, reacquired: a.reacquired, tookOver: a.tookOver };
     case "delivery-stopped":

@@ -23,6 +23,15 @@ export function isWithin(path: string, dir: string, platform = process.platform)
   return p === d || p.startsWith(`${d}/`);
 }
 
+/** What the agent in a herdr pane is doing, as herdr reports it; `gone` when the pane runs no agent, `unknown` when norn cannot tell. */
+export type AgentActivity = "working" | "idle" | "done" | "blocked" | "gone" | "unknown";
+
+/** The agent in a pane, and how long it has been doing what it does now, as far as this process has watched it. */
+export interface PaneActivity {
+  activity: AgentActivity;
+  forMs: number;
+}
+
 /** The local machine: the repository checkout, its worktrees and the environment. */
 export interface Workspace {
   /** Absolute path of the main repository checkout. */
@@ -57,4 +66,9 @@ export interface Workspace {
    * to it; null when it is not a directory.
    */
   readEvidence(dir: string): Promise<{ path: string; content: Buffer }[] | null>;
+  /**
+   * What the agent in a herdr pane of this machine does, and for how long. `unknown` outside herdr, or when herdr does
+   * not answer: norn never acts on what it cannot observe.
+   */
+  agentActivity(pane: string): Promise<PaneActivity>;
 }

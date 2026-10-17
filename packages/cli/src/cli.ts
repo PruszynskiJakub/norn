@@ -12,10 +12,13 @@ import {
   type Refusal,
   release,
   type Slugs,
+  type WaitResult,
   status,
   take,
   tidy,
   versionCheck,
+  wait,
+  durationMs,
 } from "@norn/core";
 import { dashboard, type StartDashboard } from "./dashboard.js";
 import { doctor, doctorFailed } from "./doctor.js";
@@ -57,17 +60,34 @@ export async function run(argv: string[], deps: Deps): Promise<Result> {
   // Help is asked for, so it is an answer, not a usage error, and no command runs, e.g. the dashboard.
   if (bools.has("help")) return { exitCode: 0, stdout: USAGE };
   const { answer, warnings } = await dispatch(argv, deps);
-  const usage = ["usage", "needs-number", "bad-dashboard-flag", "flows-usage"];
-  // doctor answers even when a check fails, but exits 1 so CI notices.
-  const exitCode = answer.ok ? (answer.kind === "doctor" && doctorFailed(answer) ? 1 : 0) : usage.includes(answer.refusal.kind) ? 2 : 1;
+  const usage = ["usage", "needs-number", "bad-dashboard-flag", "flows-usage", "bad-wait-timeout"];
+  const exitCode = answer.ok ? answerCode(answer) : usage.includes(answer.refusal.kind) || waits(argv) ? 2 : 1;
   const head = warnings.length ? ["norn warning:", ...warnings.map((w) => `  ${renderWarning(w)}`), ""] : [];
   const body = answer.ok ? renderAnswer(answer) : renderRefusal(answer.refusal);
   if (bools.has("json")) return { exitCode, stdout: renderJson(answer, warnings) };
   return { exitCode, stdout: [...head, ...body].join("\n") };
 }
 
+/**
+ * An answer's exit code: 0, but doctor exits 1 when a check fails, so CI notices, and norn wait says by its code what
+ * the orchestrator does next.
+ */
+function answerCode(answer: Answer): number {
+  if (answer.kind === "doctor") return doctorFailed(answer) ? 1 : 0;
+  if (answer.kind === "waited") return WAIT_CODES[answer.wake];
+  return 0;
+}
+
+/** norn wait's exit codes: 0 something new can start, 3 stop, 4 timed out; a refusal is 2, so 1 is left to errors. */
+const WAIT_CODES: Record<WaitResult["wake"], number> = { start: 0, stop: 3, timeout: 4 };
+
+const waits = (argv: string[]) => parseArgs(argv).positionals[0] === "wait";
+
 /** Commands that name or touch worktrees, and so need the provider to match the environment. */
-const USES_WORKTREES = new Set(["take", "next", "done", "tidy", "deliver"]);
+const USES_WORKTREES = new Set(["take", "next", "done", "tidy", "deliver", "wait"]);
+
+/** How long norn wait waits for something new before it gives up, so an orchestrator is never stuck for good. */
+const DEFAULT_WAIT_TIMEOUT = "30m";
 
 /** Commands that take no issue number. */
 const NO_NUMBER = new Set(["init", "tidy", "dashboard", "doctor", "flows"]);
@@ -118,6 +138,12 @@ async function command(cmd: string, rest: string[], flags: Record<string, string
       return next(ctx, n);
     case "deliver":
       return deliver(ctx, n, { takeover: bools.has("takeover"), stop: bools.has("stop") });
+    case "wait": {
+      const timeout = flags.timeout?.[0] ?? DEFAULT_WAIT_TIMEOUT;
+      const timeoutMs = durationMs(timeout);
+      if (timeoutMs === null || timeoutMs === 0) return refused({ kind: "bad-wait-timeout", value: timeout });
+      return wait(ctx, n, { timeoutMs });
+    }
     case "add-slice":
       return addSlice(ctx, n, { title: rest[1], mode: flags.mode?.[0], blockedBy: (flags["blocked-by"] ?? []).map(Number) });
   }

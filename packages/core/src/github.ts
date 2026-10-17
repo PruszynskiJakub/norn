@@ -174,6 +174,13 @@ export interface GitHub {
   deleteClaim(number: number, space?: ClaimSpace): Promise<void>;
 
   /**
+   * A cheap stamp of what changes norn next's answer on a story: the update times of the issue and its sub-issues, and
+   * the claim refs. Equal stamps mean nothing of that changed; the stamp is compared, never read. One API call at most,
+   * for norn wait, which reads it far more often than it computes norn next.
+   */
+  activityStamp(story: number): Promise<string>;
+
+  /**
    * The developer's norn work in one read, for the dashboard: their issues of
    * every flow type with their sub-issues, labels, blockers, linked PRs, norn's comments and the timeline since
    * `since`, and the claims. Read-only and cheap: one query, plus the claim refs.

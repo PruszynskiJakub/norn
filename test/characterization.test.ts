@@ -160,6 +160,60 @@ const scenarios: Scenario[] = [
     },
     argv: ["next", "123"],
   },
+  // deliver and wait
+  { name: "deliver", arrange: story, argv: ["deliver", "123"] },
+  {
+    name: "deliver held by another session",
+    arrange: async (w) => {
+      story(w);
+      await w.as("orchestrator")("deliver", "123");
+    },
+    argv: ["deliver", "123"],
+  },
+  {
+    name: "deliver --stop",
+    arrange: async (w) => {
+      story(w);
+      await w.norn("deliver", "123");
+    },
+    argv: ["deliver", "123", "--stop"],
+  },
+  {
+    name: "next on a story being delivered by another session",
+    arrange: async (w) => {
+      story(w);
+      await w.as("orchestrator")("deliver", "123");
+    },
+    argv: ["next", "123"],
+  },
+  { name: "wait with something to start", arrange: story, argv: ["wait", "123"] },
+  {
+    name: "wait times out",
+    arrange: async (w) => {
+      story(w);
+      await w.norn("deliver", "123");
+      await w.norn("next", "123");
+    },
+    argv: ["wait", "123", "--timeout", "1m"],
+  },
+  {
+    name: "wait with nothing left",
+    arrange: (w) => {
+      w.github.seedIssue({ number: 20, title: "Waits", labels: ["type:story", "implementation"] });
+      w.github.seedIssue({ number: 21, title: "Needs a person", labels: ["type:slice", "mode:afk", "needs-review", "needs-human"] });
+      w.github.parents.set(21, 20);
+      w.github.commentsByIssue.set(21, ['norn: needs-human — escalated: "auto mode refused: gh pr merge 13"']);
+    },
+    argv: ["wait", "20"],
+  },
+  {
+    name: "wait refused while another session delivers",
+    arrange: async (w) => {
+      story(w);
+      await w.as("orchestrator")("deliver", "123");
+    },
+    argv: ["wait", "123"],
+  },
   {
     name: "next with every slot taken",
     arrange: (w) => {
