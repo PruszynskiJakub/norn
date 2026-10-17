@@ -1,5 +1,6 @@
 import {
   type ClaimRecord,
+  type ClaimSpace,
   type FileToPush,
   type GhAuth,
   type GitHub,
@@ -232,34 +233,47 @@ export class FakeGitHub implements GitHub {
   }
   /** The commit each claim ref points at. */
   claimShas = new Map<number, string>();
+  /** Delivery locks, refs/norn/deliveries/<story>, and the commit each points at. */
+  deliveries = new Map<number, ClaimRecord>();
+  deliveryShas = new Map<number, string>();
   private commits = 0;
-  private point(n: number, record: ClaimRecord) {
-    this.claims.set(n, { holder: record.holder, session: record.session, since: record.since });
-    this.claimShas.set(n, `claim${++this.commits}`);
+  private space(space: ClaimSpace) {
+    return space === "claims" ? { records: this.claims, shas: this.claimShas } : { records: this.deliveries, shas: this.deliveryShas };
   }
-  async createClaim(n: number, record: ClaimRecord) {
-    if (this.claims.has(n)) return false;
-    this.point(n, record);
+  private point(n: number, record: ClaimRecord, space: ClaimSpace) {
+    const { records, shas } = this.space(space);
+    records.set(n, structuredClone(record));
+    shas.set(n, `${space === "claims" ? "claim" : "delivery"}${++this.commits}`);
+  }
+  delivery(n: number) {
+    return this.deliveries.get(n) ?? null;
+  }
+  async createClaim(n: number, record: ClaimRecord, space: ClaimSpace = "claims") {
+    if (this.space(space).records.has(n)) return false;
+    this.point(n, record, space);
     return true;
   }
   /** Runs before replaceClaim checks the ref, to stage a race: another session moving or deleting it. */
   beforeReplace: ((n: number) => void) | null = null;
-  async replaceClaim(n: number, fromSha: string, record: ClaimRecord) {
+  async replaceClaim(n: number, fromSha: string, record: ClaimRecord, space: ClaimSpace = "claims") {
     this.beforeReplace?.(n);
-    if (!this.claims.has(n) || (this.claimShas.get(n) ?? "seeded") !== fromSha) return false;
-    this.point(n, record);
+    const { records, shas } = this.space(space);
+    if (!records.has(n) || (shas.get(n) ?? "seeded") !== fromSha) return false;
+    this.point(n, record, space);
     return true;
   }
-  async readClaim(n: number) {
-    const claim = this.claims.get(n);
-    return claim ? { ...claim, sha: this.claimShas.get(n) ?? "seeded" } : null;
+  async readClaim(n: number, space: ClaimSpace = "claims") {
+    const { records, shas } = this.space(space);
+    const claim = records.get(n);
+    return claim ? { ...structuredClone(claim), sha: shas.get(n) ?? "seeded" } : null;
   }
-  async listClaims() {
-    return [...this.claims.keys()];
+  async listClaims(space: ClaimSpace = "claims") {
+    return [...this.space(space).records.keys()];
   }
-  async deleteClaim(n: number) {
-    this.claims.delete(n);
-    this.claimShas.delete(n);
+  async deleteClaim(n: number, space: ClaimSpace = "claims") {
+    const { records, shas } = this.space(space);
+    records.delete(n);
+    shas.delete(n);
   }
 
   /** How often observeWork was called. */

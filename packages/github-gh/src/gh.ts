@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import type { ClaimRecord, FileToPush, GhAuth, GitHub, Issue, Permission, PullRequest, WorkQuery } from "@norn/core";
+import type { ClaimRecord, ClaimSpace, FileToPush, GhAuth, GitHub, Issue, Permission, PullRequest, WorkQuery } from "@norn/core";
 import { observeWork } from "./observe-work.js";
 
 export type Exec = (args: string[], input?: string) => Promise<{ code: number; stdout: string; stderr: string }>;
@@ -324,43 +324,44 @@ export class GhGitHub implements GitHub {
     });
     return commit.sha;
   }
-  async replaceClaim(n: number, fromSha: string, record: ClaimRecord) {
+  async replaceClaim(n: number, fromSha: string, record: ClaimRecord, space: ClaimSpace = "claims") {
     const sha = await this.claimCommit(record, [fromSha]);
     try {
       // Not forced: GitHub only moves the ref if the new commit descends from where it points now.
-      await this.api("PATCH", `${REPO}/git/refs/norn/claims/${n}`, { sha, force: false });
+      await this.api("PATCH", `${REPO}/git/refs/norn/${space}/${n}`, { sha, force: false });
       return true;
     } catch (e) {
       if (e instanceof GhError && e.status === 422) return false;
       throw e;
     }
   }
-  async createClaim(n: number, record: ClaimRecord) {
+  async createClaim(n: number, record: ClaimRecord, space: ClaimSpace = "claims") {
     const sha = await this.claimCommit(record);
     try {
-      await this.api("POST", `${REPO}/git/refs`, { ref: `refs/norn/claims/${n}`, sha });
+      await this.api("POST", `${REPO}/git/refs`, { ref: `refs/norn/${space}/${n}`, sha });
       return true;
     } catch (e) {
       if (e instanceof GhError && e.status === 422) return false;
       throw e;
     }
   }
-  async readClaim(n: number) {
-    const ref = await this.find<{ object: { sha: string } }>(`${REPO}/git/ref/norn/claims/${n}`);
+  async readClaim(n: number, space: ClaimSpace = "claims") {
+    const ref = await this.find<{ object: { sha: string } }>(`${REPO}/git/ref/norn/${space}/${n}`);
     if (!ref) return null;
     const commit = await this.api<{ message: string }>("GET", `${REPO}/git/commits/${ref.object.sha}`);
     return { ...(JSON.parse(commit.message) as ClaimRecord), sha: ref.object.sha };
   }
-  async listClaims() {
-    const refs = await this.paginate<{ ref: string }>(`${REPO}/git/matching-refs/norn/claims`);
+  async listClaims(space: ClaimSpace = "claims") {
+    const refs = await this.paginate<{ ref: string }>(`${REPO}/git/matching-refs/norn/${space}`);
+    const own = new RegExp(`^refs/norn/${space}/(\\d+)$`);
     return refs
-      .map((r) => /^refs\/norn\/claims\/(\d+)$/.exec(r.ref))
+      .map((r) => own.exec(r.ref))
       .filter((m) => m !== null)
       .map((m) => Number(m[1]));
   }
-  async deleteClaim(n: number) {
+  async deleteClaim(n: number, space: ClaimSpace = "claims") {
     try {
-      await this.api("DELETE", `${REPO}/git/refs/norn/claims/${n}`);
+      await this.api("DELETE", `${REPO}/git/refs/norn/${space}/${n}`);
     } catch (e) {
       if (!(e instanceof GhError && (e.status === 404 || e.status === 422))) throw e;
     }

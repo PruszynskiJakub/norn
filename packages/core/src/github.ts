@@ -23,12 +23,35 @@ export interface FileToPush {
   content: Buffer;
 }
 
+/**
+ * The ref namespaces under refs/norn/ that hold locks: `claims` on issues, one session per item, and `deliveries` on
+ * stories, one orchestrator per story.
+ */
+export type ClaimSpace = "claims" | "deliveries";
+
+/** A herdr pane, on the machine its herdr runs on, e.g. w3Y:p2 on a laptop's host name. */
+export interface Pane {
+  id: string;
+  machine: string;
+}
+
 /** What a claim ref's commit records. */
 export interface ClaimRecord {
   holder: string;
   session: string;
   /** ISO timestamp */
   since: string;
+  /** The herdr pane the session runs in, when it runs in one; norn wait watches the agent there. */
+  pane?: Pane;
+  /** On a delivery lock: what the orchestrator's latest norn next offered to start, so norn wait wakes only for something new. */
+  offered?: Offered;
+}
+
+/** The items a norn next offered to start, each in the state it was offered in, and when. */
+export interface Offered {
+  /** ISO timestamp */
+  at: string;
+  items: { issue: number; state: string }[];
 }
 
 /** A claim as read back: its record and the commit its ref points at. */
@@ -106,8 +129,11 @@ export interface GitHub {
   findPullRequest(head: string): Promise<PullRequest | null>;
   createPullRequest(input: { head: string; base: string; title: string; body: string }): Promise<PullRequest>;
 
-  /** Atomically create refs/norn/claims/<issue>. False when it already exists. */
-  createClaim(number: number, record: ClaimRecord): Promise<boolean>;
+  /**
+   * Atomically create refs/norn/<space>/<issue>, by default a claim. False when it already exists. The other spaces
+   * hold locks of the same kind, e.g. a story's delivery lock, read and moved by the same rules.
+   */
+  createClaim(number: number, record: ClaimRecord, space?: ClaimSpace): Promise<boolean>;
   /**
    * Points the claim ref at a new record, but only while it still points at
    * `fromSha`: the new claim commit is a child of that one and the ref moves
@@ -115,11 +141,11 @@ export interface GitHub {
    * stale one, so neither can overwrite a claim that changed in between.
    * False when the ref has moved or is gone.
    */
-  replaceClaim(number: number, fromSha: string, record: ClaimRecord): Promise<boolean>;
-  readClaim(number: number): Promise<HeldClaim | null>;
+  replaceClaim(number: number, fromSha: string, record: ClaimRecord, space?: ClaimSpace): Promise<boolean>;
+  readClaim(number: number, space?: ClaimSpace): Promise<HeldClaim | null>;
   /** Issue numbers that have a claim ref. */
-  listClaims(): Promise<number[]>;
-  deleteClaim(number: number): Promise<void>;
+  listClaims(space?: ClaimSpace): Promise<number[]>;
+  deleteClaim(number: number, space?: ClaimSpace): Promise<void>;
 
   /**
    * The developer's norn work in one read, for the dashboard: their issues of

@@ -21,7 +21,7 @@ import type { Issue } from "./github.js";
 import { locate } from "./location.js";
 import { type Step, TRIAGE } from "./machine.js";
 import { computeNext, type NextReport, nextRefusal, notifyWaiting } from "./next.js";
-import { notifyNeedsHuman } from "./notify.js";
+import { notifyNeedsHuman, notifySettled } from "./notify.js";
 import { type Refusal, type Refused, refuse } from "./refusals.js";
 import { storySlug } from "./slug.js";
 import { qaBranch } from "./tidy.js";
@@ -189,6 +189,7 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
     }
     if (settled?.kind === "state-renamed") resolved = await stepOf(ctx, issue);
     else if (settled?.kind === "handed-over") {
+      await notifySettled(ctx, [settled]);
       await github.deleteClaim(n);
       return { ok: true, kind: "handed-over", issue: n, state: settled.state, flow: settled.flow };
     }
@@ -380,6 +381,7 @@ export async function next(ctx: Ctx, n: number): Promise<NextResult | Refused> {
   const r = await nextRefusal(ctx.github, issue, loaded);
   if (r || !loaded) return refuse(r ?? { kind: "not-a-story", issue: n });
   const report = await computeNext(ctx, n, loaded);
+  await notifySettled(ctx, report.notes);
   if (report.nothingLeft && !report.closed) await notifyWaiting(ctx, report);
   return { ok: true, kind: "next", report };
 }

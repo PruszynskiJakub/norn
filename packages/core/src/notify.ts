@@ -1,5 +1,6 @@
 import type { Mode } from "./flow.js";
 import type { WaitItem } from "./waiting.js";
+import type { Event } from "./events.js";
 import type { Ctx } from "./transitions.js";
 
 export type Channel = "herdr" | "os";
@@ -42,6 +43,11 @@ export async function notifyNeedsHuman(ctx: Ctx, n: number, reason: string) {
 /** An issue in a state its flow no longer has was handed to a person. */
 export async function notifyStateLeft(ctx: Ctx, n: number, state: string, flow: string) {
   await send(ctx, { kind: "state-left", issue: n, state, flow, url: `${await ctx.github.repoUrl()}/issues/${n}` });
+}
+
+/** Tells the user of each issue norn handed to a person among what it did, e.g. next's housekeeping. */
+export async function notifySettled(ctx: Ctx, events: Event[]) {
+  for (const e of events) if (e.kind === "handed-over") await notifyStateLeft(ctx, e.issue, e.state, e.flow);
 }
 
 /** An issue reached QA by a person. */

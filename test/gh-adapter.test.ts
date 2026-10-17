@@ -111,6 +111,32 @@ describe("GhGitHub claims", () => {
   });
 });
 
+describe("GhGitHub delivery locks", () => {
+  test("a delivery lock is a claim behind refs/norn/deliveries/<story>, read, moved, listed and deleted the same way", async () => {
+    const { exec, calls } = scripted((c) => {
+      if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t" } };
+      if (path(c).endsWith("/git/commits")) return { stdout: { sha: "c1" } };
+      if (path(c).endsWith("/git/refs")) return { stdout: { ref: "refs/norn/deliveries/1" } };
+      if (path(c) === "repos/{owner}/{repo}/git/ref/norn/deliveries/1") return { stdout: { object: { sha: "c1" } } };
+      if (path(c) === "repos/{owner}/{repo}/git/commits/c1") return { stdout: { message: JSON.stringify({ holder: "a", session: "s", since: "t" }) } };
+      if (path(c).endsWith("/git/refs/norn/deliveries/1")) return { stdout: "" };
+      if (path(c) === "repos/{owner}/{repo}/git/matching-refs/norn/deliveries") {
+        return { stdout: `${JSON.stringify({ ref: "refs/norn/deliveries/1" })}\n${JSON.stringify({ ref: "refs/norn/claims/2" })}` };
+      }
+    });
+    const gh = new GhGitHub(exec);
+
+    expect(await gh.createClaim(1, { holder: "a", session: "s", since: "t" }, "deliveries")).toBe(true);
+    expect(await gh.readClaim(1, "deliveries")).toEqual({ holder: "a", session: "s", since: "t", sha: "c1" });
+    expect(await gh.replaceClaim(1, "c1", { holder: "a", session: "s", since: "u" }, "deliveries")).toBe(true);
+    expect(await gh.listClaims("deliveries")).toEqual([1]);
+    await gh.deleteClaim(1, "deliveries");
+
+    expect(calls.find((c) => path(c).endsWith("/git/refs"))!.input).toEqual({ ref: "refs/norn/deliveries/1", sha: "c1" });
+    expect(calls.filter((c) => path(c).endsWith("/git/refs/norn/deliveries/1")).map(method)).toEqual(["PATCH", "DELETE"]);
+  });
+});
+
 describe("GhGitHub paged lists", () => {
   test("lists are read with --paginate --jq '.[]', one JSON value per line across pages, without --slurp", async () => {
     const { exec, calls } = scripted((c) => {

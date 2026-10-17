@@ -9,7 +9,7 @@ import type { Config } from "./config.js";
 import type { BaseBranchMissing, Event, FollowUpTask } from "./events.js";
 import { type Flow, flowStatesOf, hasSpec, type LabelDefinition, type Mode, type NamedFlow, renamedTo, stateLabel, typeLabel } from "./flow.js";
 import { type FlowCache, loadFlow, validFlow } from "./flow-loading.js";
-import { notifyHumanQa, notifyNeedsHuman, notifyStateLeft, type Notify } from "./notify.js";
+import { notifyHumanQa, notifyNeedsHuman, type Notify } from "./notify.js";
 
 /** The marker norn writes when it sets needs-human; norn next reads the reason back from it. */
 export const NEEDS_HUMAN_MARK = "norn: needs-human — ";
@@ -320,7 +320,8 @@ export type Settled = Extract<Event, { kind: "state-renamed" | "handed-over" }>;
 /**
  * For an issue in a state its flow no longer has: follows the flow's `renamed` to the state's new name, or hands the
  * issue to a person through needs-human. Null, changing nothing, for an issue in a state of its flow. Runs under a
- * claim this session holds; `issue` is changed to what it left.
+ * claim this session holds; `issue` is changed to what it left. It sends no notification: the caller says whether a
+ * hand-over is told to the user, so norn wait can compute what next would without notifying on every check.
  */
 export async function settleLeftState(ctx: Ctx, issue: Issue, { name, flow }: NamedFlow): Promise<Settled | null> {
   const from = await leftState(ctx, issue, flow);
@@ -344,7 +345,7 @@ async function followRename(ctx: Ctx, issue: Issue, flow: Flow, name: string, fr
   issue.labels = [...issue.labels.filter((l) => l !== from), to];
 }
 
-/** Hands an issue in a state its flow no longer has to a person, under the claim this session holds. */
+/** Hands an issue in a state its flow no longer has to a person, under the claim this session holds; see notifySettled. */
 async function handOverLeft(ctx: Ctx, issue: Issue, name: string, state: string): Promise<void> {
   const n = issue.number;
   await ctx.github.addLabels(n, ["needs-human"]);
@@ -352,7 +353,6 @@ async function handOverLeft(ctx: Ctx, issue: Issue, name: string, state: string)
   // The old label goes, so the resolve step moves the issue into a state of the flow.
   await ctx.github.removeLabels(n, [state, "in-progress"]);
   issue.labels = [...issue.labels.filter((l) => l !== state && l !== "in-progress"), "needs-human"];
-  await notifyStateLeft(ctx, n, state, name);
 }
 
 /**

@@ -1,4 +1,5 @@
 import { describe, expect, test } from "vitest";
+import { computeNext, flowOf } from "@norn/core";
 import { setup } from "@norn/testing";
 
 /**
@@ -482,6 +483,24 @@ describe("norn next on an issue of a flow", () => {
     expect(w.github.labels(40).sort()).toEqual(["needs-human", "type:bug"]);
     expect(w.github.comments(40).at(-1)).toBe("norn: needs-human — the state testing is no longer in the flow bug");
     expect(w.github.claim(40)).toBeNull();
+  });
+
+  test("next tells the user of the hand-over; computing what next would, as norn wait does, sends nothing", async () => {
+    const w = bugAt("testing");
+    w.github.commentsByIssue.set(40, ["norn: fixing → testing (fixed)"]);
+    const ctx = await w.ctx();
+
+    const report = await computeNext(ctx, 40, (await flowOf(ctx, await w.github.getIssue(40)))!);
+
+    expect(report.notes).toEqual([{ kind: "handed-over", issue: 40, state: "testing", flow: "bug" }]);
+    expect(w.notifications).toEqual([]);
+
+    const again = bugAt("testing");
+    again.github.commentsByIssue.set(40, ["norn: fixing → testing (fixed)"]);
+    await again.norn("next", "40");
+    expect(again.notifications.map((n) => n.body.split("\n")[0])).toContain(
+      "#40 was in testing, which the flow bug no longer has; move it to a state of the flow",
+    );
   });
 
   test("an issue in a state its flow no longer has that a session holds waits for a person", async () => {
