@@ -62,4 +62,6 @@ norn is installed from release tags, which carry the built CLI; `dist/` is not c
    git push origin v<version>
    ```
 
-3. Check that `npm install -D github:PruszynskiJakub/norn#v<version>` works in a throwaway project.
+   Then pack that commit with `npm pack` and attach `norn-<version>.tgz` to the GitHub release: it is what a global install uses, since `npm install -g` with a `github:` URL leaves a broken `norn`.
+
+3. Check that `npm install -D github:PruszynskiJakub/norn#v<version>` works in a throwaway project, and that `npm install -g norn-<version>.tgz` gives a working `norn --version`.

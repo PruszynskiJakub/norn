@@ -57,6 +57,13 @@ npm install -D github:PruszynskiJakub/norn#v0.10.0
 
 Only release tags can be installed: a branch or commit has no built CLI.
 
+To install norn globally, install the package attached to the release. `npm install -g` with a `github:` URL leaves a broken `norn` behind, so use the attached package:
+
+```sh
+gh release download v0.10.0 -R PruszynskiJakub/norn -p 'norn-*.tgz' -D /tmp
+npm install -g /tmp/norn-0.10.0.tgz
+```
+
 ## Quick start
 
 ```sh
