@@ -71,7 +71,23 @@ export interface InitResult {
   labels: number;
   /** How this run changed the team's nornVersion; null when it was already the running version. */
   version: { from: string | null; to: string } | null;
+  /** The rules allowing norn this run added to Claude Code's project settings, or why it could not. */
+  permissions: Allowed;
 }
+
+/** What init did to Claude Code's project settings: the rules it added, none when all were there, or a file it cannot read. */
+export type Allowed = { kind: "allowed"; added: string[] } | { kind: "settings-unreadable"; file: string };
+
+/** Claude Code's project settings, committed with the repository, so every developer's agents get the rules. */
+export const CLAUDE_SETTINGS = ".claude/settings.json";
+/** The developer's own Claude Code settings beside them, which count too. */
+export const CLAUDE_LOCAL_SETTINGS = ".claude/settings.local.json";
+
+/**
+ * The rules that let an agent run norn without a permission prompt: norn on the PATH, and through npx. Nothing else:
+ * what else agents may run stays the team's decision.
+ */
+export const NORN_PERMISSIONS = ["Bash(norn:*)", "Bash(npx norn:*)"] as const;
 
 /** The skill install left out skills norn briefings name. */
 export interface MissingSkills {
@@ -129,6 +145,7 @@ export async function init({ github, cwd, installSkills, version }: InitDeps): P
   }
   ensureGitignored(cwd, [".agents/worktrees/", LOCAL_CONFIG]);
   const instructed = writeAgentInstructions(cwd);
+  const permissions = allowNorn(cwd);
 
   // The flows on the base branch decide the states; an invalid one is left for norn doctor to report.
   const labels = labelDefinitions(await repositoryFlows({ github, config: { baseBranch } }));
@@ -142,7 +159,57 @@ export async function init({ github, cwd, installSkills, version }: InitDeps): P
     instructed,
     labels: labels.length,
     version: from === version ? null : { from, to: version },
+    permissions,
   };
+}
+
+/** The settings in a Claude Code settings file: {} when there is none, null when it is not a JSON object. */
+function readSettings(file: string): Record<string, unknown> | null {
+  if (!existsSync(file)) return {};
+  try {
+    const raw: unknown = JSON.parse(readFileSync(file, "utf8"));
+    return typeof raw === "object" && raw !== null && !Array.isArray(raw) ? (raw as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
+/** The permissions.allow list of settings; null when it is there but not a list. */
+function allowList(settings: Record<string, unknown>): unknown[] | null {
+  const permissions = settings.permissions ?? {};
+  if (typeof permissions !== "object" || permissions === null || Array.isArray(permissions)) return null;
+  const allow = (permissions as Record<string, unknown>).allow ?? [];
+  return Array.isArray(allow) ? allow : null;
+}
+
+/**
+ * Adds the rules allowing norn to permissions.allow in Claude Code's project settings, creating the file when it is
+ * missing. Everything else in it stays as it is, and nothing is ever removed.
+ */
+function allowNorn(cwd: string): Allowed {
+  const file = join(cwd, CLAUDE_SETTINGS);
+  const settings = readSettings(file);
+  const allow = settings && allowList(settings);
+  if (!settings || !allow) return { kind: "settings-unreadable", file: CLAUDE_SETTINGS };
+  const added = NORN_PERMISSIONS.filter((rule) => !allow.includes(rule));
+  if (!added.length) return { kind: "allowed", added: [] };
+  const permissions = { ...((settings.permissions as Record<string, unknown> | undefined) ?? {}), allow: [...allow, ...added] };
+  mkdirSync(join(cwd, ".claude"), { recursive: true });
+  writeFileSync(file, `${JSON.stringify({ ...settings, permissions }, null, 2)}\n`);
+  return { kind: "allowed", added };
+}
+
+/**
+ * The rules allowing norn that neither of Claude Code's settings files in the repository has; null when the repository
+ * does not use Claude Code, i.e. has no .claude/.
+ */
+export function missingNornPermissions(cwd: string): string[] | null {
+  if (!existsSync(join(cwd, ".claude"))) return null;
+  const allowed = [CLAUDE_SETTINGS, CLAUDE_LOCAL_SETTINGS].flatMap((name) => {
+    const settings = readSettings(join(cwd, name));
+    return (settings && allowList(settings)) ?? [];
+  });
+  return NORN_PERMISSIONS.filter((rule) => !allowed.includes(rule));
 }
 
 /** The team file's settings, null when there is none; refused when init could not rewrite it safely. */

@@ -26,11 +26,23 @@ import {
   versionMatch,
   type Workspace,
 } from "@norn/core";
-import { filesWithAgentInstructions, labelDefinitions, SKILLS } from "./init.js";
+import { filesWithAgentInstructions, labelDefinitions, missingNornPermissions, SKILLS } from "./init.js";
 import { SKILLS_DIR, sameTree } from "./install-skills.js";
 
 /** The checks norn doctor makes, in the order it reports them. */
-export type CheckId = "gh" | "git" | "base-branch" | "permission" | "labels" | "flows" | "config" | "version" | "skills" | "agent-instructions" | "provider";
+export type CheckId =
+  | "gh"
+  | "git"
+  | "base-branch"
+  | "permission"
+  | "labels"
+  | "flows"
+  | "config"
+  | "version"
+  | "skills"
+  | "agent-instructions"
+  | "agent-permissions"
+  | "provider";
 
 /** Only `fail` makes doctor exit 1; `skipped` means a check it depends on did not pass. */
 export type CheckLevel = "ok" | "warning" | "fail" | "skipped";
@@ -55,6 +67,8 @@ export type CheckFact =
   /** `drifted` is null when the skills come from NORN_SKILLS_SOURCE and are not compared. */
   | { kind: "skills"; total: number; missing: string[]; unlinked: string[]; drifted: string[] | null }
   | { kind: "agent-instructions"; files: string[] }
+  /** The rules allowing norn missing from Claude Code's settings; null when the repository has no .claude/. */
+  | { kind: "agent-permissions"; missing: string[] | null }
   | { kind: "provider"; provider: Provider; unsetVariable: string | null };
 
 /**
@@ -257,6 +271,13 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
   else {
     const files = filesWithAgentInstructions(d.cwd);
     add("agent-instructions", files.length ? "ok" : "fail", { kind: "agent-instructions", files });
+  }
+
+  if (!inCheckout) skip("agent-permissions", "git");
+  else {
+    // Without them every norn step of an unattended agent stops at a permission prompt.
+    const missing = missingNornPermissions(d.cwd);
+    add("agent-permissions", missing?.length ? "warning" : "ok", { kind: "agent-permissions", missing });
   }
 
   if (!withConfig.ok) skip("provider", withConfig.needs);

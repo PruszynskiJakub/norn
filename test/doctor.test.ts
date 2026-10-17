@@ -83,6 +83,7 @@ describe("norn doctor on a healthy setup", () => {
         "✓ version: norn 1.4.2, repo 1.4.2",
         "✓ skills: all 16 skills are in .agents/skills/ and linked from .claude/skills/",
         "✓ agent-instructions: the norn block is in AGENTS.md",
+        "✓ agent-permissions: Claude Code's settings allow norn's commands",
         "✓ provider: claude-code matches the environment",
         "",
         "Everything norn needs is set up.",
@@ -108,6 +109,7 @@ describe("norn doctor on a healthy setup", () => {
       "version",
       "skills",
       "agent-instructions",
+      "agent-permissions",
       "provider",
     ]);
     expect(body.checks[0]).toEqual({ id: "gh", level: "ok", message: "logged in to github.com", fix: null });
@@ -223,6 +225,7 @@ describe("norn doctor: gh and git", () => {
       "- version: skipped, needs git",
       "- skills: skipped, needs git",
       "- agent-instructions: skipped, needs git",
+      "- agent-permissions: skipped, needs git",
       "- provider: skipped, needs git",
     ]);
   });
@@ -681,6 +684,38 @@ describe("norn doctor: skills, instructions and provider", () => {
       level: "fail",
       message: "neither AGENTS.md nor CLAUDE.md has the norn block",
       fix: "norn init",
+    });
+  });
+
+  test("Claude Code settings without the rules allowing norn warn, with the fix", async () => {
+    const { cwd, norn } = await healthy();
+    writeFileSync(join(cwd, ".claude", "settings.json"), JSON.stringify({ permissions: { allow: ["Bash(npm test:*)"] } }));
+
+    expect(await check(norn, "agent-permissions")).toEqual({
+      id: "agent-permissions",
+      level: "warning",
+      message: "Claude Code's settings do not allow Bash(norn:*), Bash(npx norn:*), so agents stop at a permission prompt on every norn step",
+      fix: "norn init",
+    });
+  });
+
+  test("the rules in the developer's local Claude Code settings count too", async () => {
+    const { cwd, norn } = await healthy();
+    rmSync(join(cwd, ".claude", "settings.json"));
+    writeFileSync(join(cwd, ".claude", "settings.local.json"), JSON.stringify({ permissions: { allow: ["Bash(norn:*)", "Bash(npx norn:*)"] } }));
+
+    expect((await check(norn, "agent-permissions"))?.level).toBe("ok");
+  });
+
+  test("a repository without .claude/ does not use Claude Code, so nothing is asked of its settings", async () => {
+    const { cwd, norn } = await healthy();
+    rmSync(join(cwd, ".claude"), { recursive: true });
+
+    expect(await check(norn, "agent-permissions")).toEqual({
+      id: "agent-permissions",
+      level: "ok",
+      message: "no .claude/ here, so no Claude Code settings to check",
+      fix: null,
     });
   });
 

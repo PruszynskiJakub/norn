@@ -38,7 +38,7 @@ import {
 import type { DashboardRefusal, DashboardResult } from "./dashboard.js";
 import { type CheckFact, type DoctorCheck, type DoctorResult, doctorFailed, type FlowsFact } from "./doctor.js";
 import type { FlowExported, FlowsRefusal } from "./flows.js";
-import type { InitResult, InitWouldDowngrade, MissingSkills } from "./init.js";
+import { type Allowed, CLAUDE_SETTINGS, type InitResult, type InitWouldDowngrade, type MissingSkills, NORN_PERMISSIONS } from "./init.js";
 
 /**
  * Every sentence norn prints. Each union is switched on exhaustively, so a
@@ -619,14 +619,23 @@ export function renderAnswer(a: Answer): string[] {
         `  - ${TEAM_CONFIG} with the team settings (each developer can override in ${LOCAL_CONFIG})`,
         "  - .agents/worktrees/ and the local config in .gitignore",
         `  - how to work with norn in ${a.instructed.join(" and ")}`,
+        allowedLine(a.permissions),
         `  - ${a.labels} labels on the repository`,
         "",
-        `Commit .claude/skills/, .agents/, .gitignore and ${a.instructed.join(", ")}. Then ask your agent: norn-drive <issue>`,
+        `Commit .claude/, .agents/, .gitignore and ${a.instructed.join(", ")}. Then ask your agent: norn-drive <issue>`,
         "Run norn doctor to check what init cannot set up: gh, your access to the repository, the worktree provider.",
       ];
     default:
       return unreachable(a);
   }
+}
+
+/** What init did to Claude Code's settings, as a line of its list. */
+function allowedLine(p: Allowed): string {
+  if (p.kind === "settings-unreadable")
+    return `  - ${p.file} is not a JSON object with a permissions.allow list, so norn left it: add ${NORN_PERMISSIONS.join(" and ")} to permissions.allow`;
+  if (!p.added.length) return `  - norn's commands already allowed for Claude Code in ${CLAUDE_SETTINGS}`;
+  return `  - ${p.added.join(" and ")} allowed for Claude Code in ${CLAUDE_SETTINGS}, so agents run norn without a prompt`;
 }
 
 // Doctor
@@ -720,6 +729,14 @@ export function renderCheck(c: DoctorCheck): { message: string; fix: string | nu
       const source = f.drifted === null ? " (from NORN_SKILLS_SOURCE, so not compared with the bundled ones)" : "";
       return { message: `all ${f.total} skills are in .agents/skills/ and linked from .claude/skills/${source}`, fix: null };
     }
+    case "agent-permissions":
+      if (f.missing === null) return { message: "no .claude/ here, so no Claude Code settings to check", fix: null };
+      if (f.missing.length)
+        return {
+          message: `Claude Code's settings do not allow ${f.missing.join(", ")}, so agents stop at a permission prompt on every norn step`,
+          fix: "norn init",
+        };
+      return { message: `Claude Code's settings allow norn's commands`, fix: null };
     case "agent-instructions":
       return f.files.length
         ? { message: `the norn block is in ${f.files.join(" and ")}`, fix: null }

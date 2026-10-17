@@ -42,6 +42,48 @@ describe("norn init", () => {
     expect(res.stdout).toContain("norn is set up");
   });
 
+  test("allows norn's commands in Claude Code's project settings, creating them when missing", async () => {
+    const { cwd, norn } = project();
+
+    const res = await norn("init");
+
+    expect(JSON.parse(readFileSync(join(cwd, ".claude", "settings.json"), "utf8"))).toEqual({
+      permissions: { allow: ["Bash(norn:*)", "Bash(npx norn:*)"] },
+    });
+    expect(res.stdout).toContain("  - Bash(norn:*) and Bash(npx norn:*) allowed for Claude Code in .claude/settings.json, so agents run norn without a prompt");
+    expect(res.stdout).toContain("Commit .claude/, .agents/, .gitignore");
+  });
+
+  test("adds the rules to existing settings, keeping everything else and removing nothing", async () => {
+    const { cwd, norn } = project();
+    mkdirSync(join(cwd, ".claude"), { recursive: true });
+    const settings = { model: "opus", permissions: { allow: ["Bash(npm test:*)", "Bash(norn:*)"], deny: ["Bash(rm:*)"] } };
+    writeFileSync(join(cwd, ".claude", "settings.json"), JSON.stringify(settings));
+
+    await norn("init");
+
+    expect(JSON.parse(readFileSync(join(cwd, ".claude", "settings.json"), "utf8"))).toEqual({
+      model: "opus",
+      permissions: { allow: ["Bash(npm test:*)", "Bash(norn:*)", "Bash(npx norn:*)"], deny: ["Bash(rm:*)"] },
+    });
+    const again = await norn("init");
+    expect(again.stdout).toContain("  - norn's commands already allowed for Claude Code in .claude/settings.json");
+  });
+
+  test("leaves Claude Code settings it cannot read as they are, and says what to add", async () => {
+    const { cwd, norn } = project();
+    mkdirSync(join(cwd, ".claude"), { recursive: true });
+    writeFileSync(join(cwd, ".claude", "settings.json"), "{ not json");
+
+    const res = await norn("init");
+
+    expect(res.exitCode).toBe(0);
+    expect(readFileSync(join(cwd, ".claude", "settings.json"), "utf8")).toBe("{ not json");
+    expect(res.stdout).toContain(
+      "  - .claude/settings.json is not a JSON object with a permissions.allow list, so norn left it: add Bash(norn:*) and Bash(npx norn:*) to permissions.allow",
+    );
+  });
+
   test("leaves the project's own skills/ alone, norn-named ones included", async () => {
     const { cwd, norn } = project();
     mkdirSync(join(cwd, "skills", "norn-drive"), { recursive: true });

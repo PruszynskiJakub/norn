@@ -200,6 +200,12 @@ exports[`output of every command, text and --json > doctor with problems > json 
       "fix": "norn init"
     },
     {
+      "id": "agent-permissions",
+      "level": "ok",
+      "message": "no .claude/ here, so no Claude Code settings to check",
+      "fix": null
+    },
+    {
       "id": "provider",
       "level": "ok",
       "message": "claude-code matches the environment",
@@ -225,6 +231,7 @@ exports[`output of every command, text and --json > doctor with problems > text 
   fix: norn init
 ✗ agent-instructions: neither AGENTS.md nor CLAUDE.md has the norn block
   fix: norn init
+✓ agent-permissions: no .claude/ here, so no Claude Code settings to check
 ✓ provider: claude-code matches the environment
 
 3 checks failed and 1 warned. Run the fixes above, then norn doctor again."
@@ -296,6 +303,12 @@ exports[`output of every command, text and --json > doctor without gh > json 1`]
       "fix": "norn init"
     },
     {
+      "id": "agent-permissions",
+      "level": "ok",
+      "message": "no .claude/ here, so no Claude Code settings to check",
+      "fix": null
+    },
+    {
       "id": "provider",
       "level": "ok",
       "message": "claude-code matches the environment",
@@ -321,6 +334,7 @@ exports[`output of every command, text and --json > doctor without gh > text 1`]
   fix: norn init
 ✗ agent-instructions: neither AGENTS.md nor CLAUDE.md has the norn block
   fix: norn init
+✓ agent-permissions: no .claude/ here, so no Claude Code settings to check
 ✓ provider: claude-code matches the environment
 
 3 checks failed and 1 warned. Run the fixes above, then norn doctor again."
@@ -858,7 +872,7 @@ exports[`output of every command, text and --json > init > json 1`] = `
 "exit 0
 {
   "ok": true,
-  "message": "norn is set up in this project:\\n  - 16 skills in .agents/skills/, linked into .claude/skills/\\n  - updated to this norn version: norn-drive (git diff .agents/skills/ shows the changes)\\n  - nornVersion set to 1.4.2 in .agents/norn.config.json\\n  - .agents/specs/ for story specs\\n  - .agents/norn.config.json with the team settings (each developer can override in .agents/norn.config.local.json)\\n  - .agents/worktrees/ and the local config in .gitignore\\n  - how to work with norn in AGENTS.md and CLAUDE.md\\n  - 19 labels on the repository\\n\\nCommit .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>\\nRun norn doctor to check what init cannot set up: gh, your access to the repository, the worktree provider."
+  "message": "norn is set up in this project:\\n  - 16 skills in .agents/skills/, linked into .claude/skills/\\n  - updated to this norn version: norn-drive (git diff .agents/skills/ shows the changes)\\n  - nornVersion set to 1.4.2 in .agents/norn.config.json\\n  - .agents/specs/ for story specs\\n  - .agents/norn.config.json with the team settings (each developer can override in .agents/norn.config.local.json)\\n  - .agents/worktrees/ and the local config in .gitignore\\n  - how to work with norn in AGENTS.md and CLAUDE.md\\n  - Bash(norn:*) and Bash(npx norn:*) allowed for Claude Code in .claude/settings.json, so agents run norn without a prompt\\n  - 19 labels on the repository\\n\\nCommit .claude/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>\\nRun norn doctor to check what init cannot set up: gh, your access to the repository, the worktree provider."
 }"
 `;
 
@@ -872,9 +886,10 @@ norn is set up in this project:
   - .agents/norn.config.json with the team settings (each developer can override in .agents/norn.config.local.json)
   - .agents/worktrees/ and the local config in .gitignore
   - how to work with norn in AGENTS.md and CLAUDE.md
+  - Bash(norn:*) and Bash(npx norn:*) allowed for Claude Code in .claude/settings.json, so agents run norn without a prompt
   - 19 labels on the repository
 
-Commit .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>
+Commit .claude/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>
 Run norn doctor to check what init cannot set up: gh, your access to the repository, the worktree provider."
 `;
 
