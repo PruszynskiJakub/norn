@@ -1,4 +1,4 @@
-import { mkdtempSync, mkdirSync, readlinkSync, writeFileSync, existsSync, readFileSync, lstatSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readlinkSync, writeFileSync, existsSync, readFileSync, lstatSync, symlinkSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
@@ -12,8 +12,8 @@ function project() {
   const norn = w.withProject(cwd, async (dir) => {
     installs.push(dir);
     for (const name of SKILLS) {
-      mkdirSync(join(dir, "skills", name), { recursive: true });
-      writeFileSync(join(dir, "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
+      mkdirSync(join(dir, ".agents", "skills", name), { recursive: true });
+      writeFileSync(join(dir, ".agents", "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
     }
     return [];
   });
@@ -21,7 +21,7 @@ function project() {
 }
 
 describe("norn init", () => {
-  test("installs skills into skills/, symlinks them into .claude/skills/, creates .agents/specs/ and the labels", async () => {
+  test("installs skills into .agents/skills/, symlinks them into .claude/skills/, creates .agents/specs/ and the labels", async () => {
     const { w, cwd, installs, norn } = project();
 
     const res = await norn("init");
@@ -31,7 +31,7 @@ describe("norn init", () => {
     for (const name of SKILLS) {
       const link = join(cwd, ".claude", "skills", name);
       expect(lstatSync(link).isSymbolicLink()).toBe(true);
-      expect(readlinkSync(link)).toBe(join("..", "..", "skills", name));
+      expect(readlinkSync(link)).toBe(join("..", "..", ".agents", "skills", name));
       expect(readFileSync(join(link, "SKILL.md"), "utf8")).toContain(`name: ${name}`);
     }
     expect(existsSync(join(cwd, ".agents", "specs"))).toBe(true);
@@ -40,6 +40,30 @@ describe("norn init", () => {
       expect(labels).toContain(l);
     }
     expect(res.stdout).toContain("norn is set up");
+  });
+
+  test("leaves the project's own skills/ alone, norn-named ones included", async () => {
+    const { cwd, norn } = project();
+    mkdirSync(join(cwd, "skills", "norn-drive"), { recursive: true });
+    writeFileSync(join(cwd, "skills", "norn-drive", "SKILL.md"), "the project's own\n");
+
+    const res = await norn("init");
+
+    expect(res.exitCode).toBe(0);
+    expect(readFileSync(join(cwd, "skills", "norn-drive", "SKILL.md"), "utf8")).toBe("the project's own\n");
+    expect(readlinkSync(join(cwd, ".claude", "skills", "norn-drive"))).toBe(join("..", "..", ".agents", "skills", "norn-drive"));
+  });
+
+  test("moves a link an older norn made into skills/ to .agents/skills/, and keeps the project's own", async () => {
+    const { cwd, norn } = project();
+    mkdirSync(join(cwd, ".claude", "skills", "norn-qa"), { recursive: true });
+    writeFileSync(join(cwd, ".claude", "skills", "norn-qa", "SKILL.md"), "ours\n");
+    symlinkSync(join("..", "..", "skills", "norn-drive"), join(cwd, ".claude", "skills", "norn-drive"), "dir");
+
+    await norn("init");
+
+    expect(readlinkSync(join(cwd, ".claude", "skills", "norn-drive"))).toBe(join("..", "..", ".agents", "skills", "norn-drive"));
+    expect(readFileSync(join(cwd, ".claude", "skills", "norn-qa", "SKILL.md"), "utf8")).toBe("ours\n");
   });
 
   test("running it twice is safe", async () => {
@@ -54,15 +78,15 @@ describe("norn init", () => {
     const cwd = mkdtempSync(join(tmpdir(), "norn-init-"));
     const norn = w.withProject(cwd, async (dir) => {
       for (const name of SKILLS) {
-        mkdirSync(join(dir, "skills", name), { recursive: true });
-        writeFileSync(join(dir, "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
+        mkdirSync(join(dir, ".agents", "skills", name), { recursive: true });
+        writeFileSync(join(dir, ".agents", "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
       }
       return ["norn-deliver", "norn-drive"];
     });
 
     const res = await norn("init");
 
-    expect(res.stdout).toContain("  - updated to this norn version: norn-deliver, norn-drive (git diff skills/ shows the changes)");
+    expect(res.stdout).toContain("  - updated to this norn version: norn-deliver, norn-drive (git diff .agents/skills/ shows the changes)");
   });
 
   test("reports skills the installer did not provide", async () => {

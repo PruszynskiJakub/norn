@@ -231,7 +231,10 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
     case "bad-dashboard-flag":
       return [r.flag === "port" ? "--port takes a port number, e.g. 4477." : "--interval takes a duration such as 30s, 2m or 1h."];
     case "missing-skills":
-      return [`Missing skills: ${r.missing.join(", ")}. The skill install did not provide them into skills/.`, "Fix the install and run norn init again."];
+      return [
+        `Missing skills: ${r.missing.join(", ")}. The skill install did not provide them into .agents/skills/.`,
+        "Fix the install and run norn init again.",
+      ];
     case "flows-usage":
       return ["Usage: norn flows export <name>", "  Writes the built-in flow <name> to .agents/flows/<name>.json, e.g. norn flows export story."];
     case "flow-not-built-in":
@@ -399,8 +402,8 @@ function flowsCheck(f: FlowsFact): { message: string; fix: string | null } {
   }
   if (f.missingSkills.length) {
     const named = f.missingSkills.map((m) => `${m.skill} (${m.flow}${m.local ? " in this checkout" : ""}, ${m.state})`);
-    problems.push(`Skills the flows name are not in skills/: ${named.join(", ")}.`);
-    fixes.push("add the skills to skills/ and link them from .claude/skills/");
+    problems.push(`Skills the flows name are not installed: ${named.join(", ")}.`);
+    fixes.push("add the skills to .claude/skills/, or to skills/ or .agents/skills/ linked from .claude/skills/");
   }
   if (f.missingLabels.length) {
     problems.push(`Labels the local flows need are not on GitHub yet: ${f.missingLabels.map((m) => `${m.label} (${m.flow} in this checkout)`).join(", ")}.`);
@@ -609,8 +612,8 @@ export function renderAnswer(a: Answer): string[] {
     case "initialized":
       return [
         "norn is set up in this project:",
-        `  - ${a.skills} skills in skills/, linked into .claude/skills/`,
-        ...(a.updated.length ? [`  - updated to this norn version: ${a.updated.join(", ")} (git diff skills/ shows the changes)`] : []),
+        `  - ${a.skills} skills in .agents/skills/, linked into .claude/skills/`,
+        ...(a.updated.length ? [`  - updated to this norn version: ${a.updated.join(", ")} (git diff .agents/skills/ shows the changes)`] : []),
         ...(a.version ? [`  - nornVersion ${a.version.from ? `${a.version.from} → ${a.version.to}` : `set to ${a.version.to}`} in ${TEAM_CONFIG}`] : []),
         "  - .agents/specs/ for story specs",
         `  - ${TEAM_CONFIG} with the team settings (each developer can override in ${LOCAL_CONFIG})`,
@@ -618,7 +621,7 @@ export function renderAnswer(a: Answer): string[] {
         `  - how to work with norn in ${a.instructed.join(" and ")}`,
         `  - ${a.labels} labels on the repository`,
         "",
-        `Commit skills/, .claude/skills/, .agents/, .gitignore and ${a.instructed.join(", ")}. Then ask your agent: norn-drive <issue>`,
+        `Commit .claude/skills/, .agents/, .gitignore and ${a.instructed.join(", ")}. Then ask your agent: norn-drive <issue>`,
         "Run norn doctor to check what init cannot set up: gh, your access to the repository, the worktree provider.",
       ];
     default:
@@ -708,14 +711,14 @@ export function renderCheck(c: DoctorCheck): { message: string; fix: string | nu
     case "skills": {
       if (f.missing.length || f.unlinked.length) {
         const parts = [
-          ...(f.missing.length ? [`missing from skills/: ${f.missing.join(", ")}`] : []),
+          ...(f.missing.length ? [`missing from .agents/skills/: ${f.missing.join(", ")}`] : []),
           ...(f.unlinked.length ? [`not linked from .claude/skills/: ${f.unlinked.join(", ")}`] : []),
         ];
         return { message: parts.join("; "), fix: "norn init" };
       }
       if (f.drifted?.length) return { message: `differ from the skills bundled with this norn: ${f.drifted.join(", ")}`, fix: "norn init" };
       const source = f.drifted === null ? " (from NORN_SKILLS_SOURCE, so not compared with the bundled ones)" : "";
-      return { message: `all ${f.total} skills are in skills/ and linked from .claude/skills/${source}`, fix: null };
+      return { message: `all ${f.total} skills are in .agents/skills/ and linked from .claude/skills/${source}`, fix: null };
     }
     case "agent-instructions":
       return f.files.length

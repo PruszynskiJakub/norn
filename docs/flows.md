@@ -153,7 +153,7 @@ A broken flow stops only the issues of its own type. `norn take` and `norn done`
 
 **JSON Schema.** norn publishes the format as a JSON Schema, [`schema/flow.schema.json`](../schema/flow.schema.json), in the npm package (`node_modules/norn/schema/flow.schema.json`) and on GitHub. Point `$schema` at it, as in the example above, and an editor completes the fields and flags a mistake of the shape as you type. The schema checks the shape, the same as norn's first rule; the rules that span the flow, such as reachability, only norn checks.
 
-**`norn doctor`.** Its `flows` check validates the flows on the base branch and every flow file in your working copy that differs from it, so a change is checked before its PR. It fails on an invalid flow, naming every problem at once, each on a line with its file, on a flow file whose name cannot name a type, and on a skill a flow names that is not installed in `skills/`. Its `labels` check counts a label your working copy's flows use as in use. See [commands](commands.md#norn-doctor).
+**`norn doctor`.** Its `flows` check validates the flows on the base branch and every flow file in your working copy that differs from it, so a change is checked before its PR. It fails on an invalid flow, naming every problem at once, each on a line with its file, on a flow file whose name cannot name a type, and on a skill a flow names that is not installed in `.claude/skills/`, `.agents/skills/` or `skills/`. Its `labels` check counts a label your working copy's flows use as in use. See [commands](commands.md#norn-doctor).
 
 ## Changing a flow under issues in progress
 

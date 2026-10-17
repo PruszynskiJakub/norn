@@ -3,13 +3,16 @@ import { cpSync, existsSync, readdirSync, readFileSync, rmSync, statSync } from 
 import { join, relative } from "node:path";
 import { BUNDLED_SKILLS } from "./package.js";
 
+/** Where init installs norn's skills in a project, apart from the project's own skills/. */
+export const SKILLS_DIR = join(".agents", "skills");
+
 /**
- * Installs norn's skills into <cwd>/skills/ and returns the names of those it
+ * Installs norn's skills into <cwd>/.agents/skills/ and returns the names of those it
  * updated. With NORN_SKILLS_SOURCE set (a repo the `skills` CLI understands),
  * runs `npx skills add <source>` first, and that source owns the skills: only
  * missing ones are copied from the package. Otherwise a skill that differs
  * from the package is replaced, so upgrading norn and running init again
- * brings its skills along; skills/ is committed, so git shows what changed.
+ * brings its skills along; .agents/skills/ is committed, so git shows what changed.
  */
 export async function installSkills(cwd: string, env = process.env): Promise<string[]> {
   const source = env.NORN_SKILLS_SOURCE;
@@ -20,7 +23,7 @@ export async function installSkills(cwd: string, env = process.env): Promise<str
   const updated: string[] = [];
   for (const name of readdirSync(BUNDLED_SKILLS)) {
     const bundled = join(BUNDLED_SKILLS, name);
-    const target = join(cwd, "skills", name);
+    const target = join(cwd, SKILLS_DIR, name);
     if (existsSync(join(target, "SKILL.md"))) {
       if (source || sameTree(bundled, target)) continue;
       rmSync(target, { recursive: true, force: true });

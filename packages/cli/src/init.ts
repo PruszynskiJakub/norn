@@ -1,4 +1,4 @@
-import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import {
   compareVersions,
   type ConfigProblem,
@@ -15,6 +15,7 @@ import {
   TEAM_CONFIG,
 } from "@norn/core";
 import { join } from "node:path";
+import { SKILLS_DIR } from "./install-skills.js";
 
 /** Skills norn briefings name. */
 export const SKILLS = [
@@ -98,7 +99,7 @@ export async function init({ github, cwd, installSkills, version }: InitDeps): P
   }
 
   const updated = await installSkills(cwd);
-  const skillsDir = join(cwd, "skills");
+  const skillsDir = join(cwd, SKILLS_DIR);
   const installed = existsSync(skillsDir) ? readdirSync(skillsDir).filter((d) => existsSync(join(skillsDir, d, "SKILL.md"))) : [];
   const missing = SKILLS.filter((s) => !installed.includes(s));
   if (missing.length) return { ok: false, refusal: { kind: "missing-skills", missing } };
@@ -107,8 +108,10 @@ export async function init({ github, cwd, installSkills, version }: InitDeps): P
   mkdirSync(linkDir, { recursive: true });
   for (const name of installed) {
     const link = join(linkDir, name);
-    if (exists(link)) continue;
-    symlinkSync(join("..", "..", "skills", name), link, "dir");
+    // A link from an older norn points into skills/; it moves to .agents/skills/, anything else is the project's.
+    if (exists(link) && !(lstatSync(link).isSymbolicLink() && readlinkSync(link) === join("..", "..", "skills", name))) continue;
+    rmSync(link, { force: true });
+    symlinkSync(join("..", "..", SKILLS_DIR, name), link, "dir");
   }
 
   const specs = join(cwd, ".agents", "specs");

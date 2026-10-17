@@ -27,7 +27,7 @@ import {
   type Workspace,
 } from "@norn/core";
 import { filesWithAgentInstructions, labelDefinitions, SKILLS } from "./init.js";
-import { sameTree } from "./install-skills.js";
+import { SKILLS_DIR, sameTree } from "./install-skills.js";
 
 /** The checks norn doctor makes, in the order it reports them. */
 export type CheckId = "gh" | "git" | "base-branch" | "permission" | "labels" | "flows" | "config" | "version" | "skills" | "agent-instructions" | "provider";
@@ -92,7 +92,7 @@ export interface DoctorResult {
 export interface DoctorDeps {
   github: GitHub;
   workspace: Workspace;
-  /** The repository's root, where skills/ and the agent instructions live. */
+  /** The repository's root, where .agents/skills/ and the agent instructions live. */
   cwd: string;
   version: string;
   /** The skills bundled with the running norn, to compare the installed ones with. */
@@ -301,6 +301,7 @@ async function flows(d: DoctorDeps, config: Config, inEffect: LoadedFlow[], loca
   // norn's own skills are the skills check's.
   const installed = (skill: string) =>
     (SKILLS as readonly string[]).includes(skill) ||
+    existsSync(join(d.cwd, SKILLS_DIR, skill, "SKILL.md")) ||
     existsSync(join(d.cwd, "skills", skill, "SKILL.md")) ||
     existsSync(join(d.cwd, ".claude", "skills", skill, "SKILL.md"));
   const missingSkills: FlowsFact["missingSkills"] = [];
@@ -360,9 +361,9 @@ function isNorns(label: { name: string; description: string }, flows: LoadedFlow
   return flows.some((l) => l.ok && renamedTo(l.flow, label.name) !== null);
 }
 
-/** The skills norn briefings name: in skills/, linked from .claude/skills/, and the same as the bundled ones. */
+/** The skills norn briefings name: in .agents/skills/, linked from .claude/skills/, and the same as the bundled ones. */
 function skills(d: DoctorDeps): Extract<CheckFact, { kind: "skills" }> {
-  const dir = join(d.cwd, "skills");
+  const dir = join(d.cwd, SKILLS_DIR);
   const missing = SKILLS.filter((s) => !existsSync(join(dir, s, "SKILL.md")));
   // Following the link, so one that points nowhere counts as unlinked; a missing skill is named once, as missing.
   const unlinked = SKILLS.filter((s) => !missing.includes(s) && !existsSync(join(d.cwd, ".claude", "skills", s, "SKILL.md")));

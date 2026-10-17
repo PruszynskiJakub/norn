@@ -4,6 +4,10 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Changed
+
+- `norn init` installs norn's skills into `.agents/skills/` instead of `skills/`, and links them from `.claude/skills/` there, so a project's own `skills/` is never touched. `norn doctor`'s `skills` check looks for them there. To upgrade, run `norn init`: it installs the skills into `.agents/skills/` and moves the `.claude/skills/` links it made to them. Then delete the `norn-*` skills from `skills/` and commit.
+
 ## [0.9.0] - 2026-10-17
 
 ### Added

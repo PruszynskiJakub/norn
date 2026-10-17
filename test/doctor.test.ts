@@ -24,7 +24,7 @@ async function healthy() {
   const bundled = mkdtempSync(join(tmpdir(), "norn-bundled-"));
   for (const name of SKILLS) skillDir(bundled, name);
   const install = async (dir: string) => {
-    for (const name of SKILLS) skillDir(join(dir, "skills"), name);
+    for (const name of SKILLS) skillDir(join(dir, ".agents", "skills"), name);
     return [];
   };
   const init = await w.withProject(cwd, install)("init");
@@ -81,7 +81,7 @@ describe("norn doctor on a healthy setup", () => {
         "✓ flows: all 2 flows are valid: story, slice; story makes slices of type slice",
         "✓ config: the team and local config are valid",
         "✓ version: norn 1.4.2, repo 1.4.2",
-        "✓ skills: all 16 skills are in skills/ and linked from .claude/skills/",
+        "✓ skills: all 16 skills are in .agents/skills/ and linked from .claude/skills/",
         "✓ agent-instructions: the norn block is in AGENTS.md",
         "✓ provider: claude-code matches the environment",
         "",
@@ -496,10 +496,10 @@ describe("norn doctor: flows", () => {
       level: "fail",
       message: [
         "2 problems:",
-        "    - Skills the flows name are not in skills/: bug-fix (bug, fixing), chore-do (chore in this checkout, tidying).",
+        "    - Skills the flows name are not installed: bug-fix (bug, fixing), chore-do (chore in this checkout, tidying).",
         "    - Labels the local flows need are not on GitHub yet: tidying (chore in this checkout), type:chore (chore in this checkout).",
       ].join("\n"),
-      fix: "add the skills to skills/ and link them from .claude/skills/; norn creates each one when an issue first gets it; to create them up front, run norn init once the change is merged",
+      fix: "add the skills to .claude/skills/, or to skills/ or .agents/skills/ linked from .claude/skills/; norn creates each one when an issue first gets it; to create them up front, run norn init once the change is merged",
     });
   });
 
@@ -637,22 +637,22 @@ describe("norn doctor: config and version", () => {
 });
 
 describe("norn doctor: skills, instructions and provider", () => {
-  test("a skill missing from skills/ or not linked from .claude/skills/ fails", async () => {
+  test("a skill missing from .agents/skills/ or not linked from .claude/skills/ fails", async () => {
     const { cwd, norn } = await healthy();
-    rmSync(join(cwd, "skills", "norn-qa"), { recursive: true });
+    rmSync(join(cwd, ".agents", "skills", "norn-qa"), { recursive: true });
     rmSync(join(cwd, ".claude", "skills", "norn-tdd"));
 
     expect(await check(norn, "skills")).toEqual({
       id: "skills",
       level: "fail",
-      message: "missing from skills/: norn-qa; not linked from .claude/skills/: norn-tdd",
+      message: "missing from .agents/skills/: norn-qa; not linked from .claude/skills/: norn-tdd",
       fix: "norn init",
     });
   });
 
   test("a skill that differs from the bundled copy warns", async () => {
     const { cwd, norn } = await healthy();
-    writeFileSync(join(cwd, "skills", "norn-drive", "SKILL.md"), "edited\n");
+    writeFileSync(join(cwd, ".agents", "skills", "norn-drive", "SKILL.md"), "edited\n");
 
     const res = await norn("doctor");
 
@@ -664,11 +664,11 @@ describe("norn doctor: skills, instructions and provider", () => {
   test("under NORN_SKILLS_SOURCE drift from the bundled skills is not checked", async () => {
     const { w, cwd, norn } = await healthy();
     w.workspace.env = { ...w.workspace.env, NORN_SKILLS_SOURCE: "acme/skills" };
-    writeFileSync(join(cwd, "skills", "norn-drive", "SKILL.md"), "ours\n");
+    writeFileSync(join(cwd, ".agents", "skills", "norn-drive", "SKILL.md"), "ours\n");
 
     expect(await check(norn, "skills")).toMatchObject({
       level: "ok",
-      message: "all 16 skills are in skills/ and linked from .claude/skills/ (from NORN_SKILLS_SOURCE, so not compared with the bundled ones)",
+      message: "all 16 skills are in .agents/skills/ and linked from .claude/skills/ (from NORN_SKILLS_SOURCE, so not compared with the bundled ones)",
     });
   });
 

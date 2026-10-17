@@ -190,7 +190,7 @@ exports[`output of every command, text and --json > doctor with problems > json 
     {
       "id": "skills",
       "level": "fail",
-      "message": "missing from skills/: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design",
+      "message": "missing from .agents/skills/: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design",
       "fix": "norn init"
     },
     {
@@ -221,7 +221,7 @@ exports[`output of every command, text and --json > doctor with problems > text 
 ✓ config: the team and local config are valid
 ! version: norn 1.4.2, repo has no nornVersion
   fix: norn init
-✗ skills: missing from skills/: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design
+✗ skills: missing from .agents/skills/: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design
   fix: norn init
 ✗ agent-instructions: neither AGENTS.md nor CLAUDE.md has the norn block
   fix: norn init
@@ -286,7 +286,7 @@ exports[`output of every command, text and --json > doctor without gh > json 1`]
     {
       "id": "skills",
       "level": "fail",
-      "message": "missing from skills/: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design",
+      "message": "missing from .agents/skills/: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design",
       "fix": "norn init"
     },
     {
@@ -317,7 +317,7 @@ exports[`output of every command, text and --json > doctor without gh > text 1`]
 ✓ config: the team and local config are valid
 ! version: norn 1.4.2, repo has no nornVersion
   fix: norn init
-✗ skills: missing from skills/: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design
+✗ skills: missing from .agents/skills/: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design
   fix: norn init
 ✗ agent-instructions: neither AGENTS.md nor CLAUDE.md has the norn block
   fix: norn init
@@ -858,15 +858,15 @@ exports[`output of every command, text and --json > init > json 1`] = `
 "exit 0
 {
   "ok": true,
-  "message": "norn is set up in this project:\\n  - 16 skills in skills/, linked into .claude/skills/\\n  - updated to this norn version: norn-drive (git diff skills/ shows the changes)\\n  - nornVersion set to 1.4.2 in .agents/norn.config.json\\n  - .agents/specs/ for story specs\\n  - .agents/norn.config.json with the team settings (each developer can override in .agents/norn.config.local.json)\\n  - .agents/worktrees/ and the local config in .gitignore\\n  - how to work with norn in AGENTS.md and CLAUDE.md\\n  - 19 labels on the repository\\n\\nCommit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>\\nRun norn doctor to check what init cannot set up: gh, your access to the repository, the worktree provider."
+  "message": "norn is set up in this project:\\n  - 16 skills in .agents/skills/, linked into .claude/skills/\\n  - updated to this norn version: norn-drive (git diff .agents/skills/ shows the changes)\\n  - nornVersion set to 1.4.2 in .agents/norn.config.json\\n  - .agents/specs/ for story specs\\n  - .agents/norn.config.json with the team settings (each developer can override in .agents/norn.config.local.json)\\n  - .agents/worktrees/ and the local config in .gitignore\\n  - how to work with norn in AGENTS.md and CLAUDE.md\\n  - 19 labels on the repository\\n\\nCommit .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>\\nRun norn doctor to check what init cannot set up: gh, your access to the repository, the worktree provider."
 }"
 `;
 
 exports[`output of every command, text and --json > init > text 1`] = `
 "exit 0
 norn is set up in this project:
-  - 16 skills in skills/, linked into .claude/skills/
-  - updated to this norn version: norn-drive (git diff skills/ shows the changes)
+  - 16 skills in .agents/skills/, linked into .claude/skills/
+  - updated to this norn version: norn-drive (git diff .agents/skills/ shows the changes)
   - nornVersion set to 1.4.2 in .agents/norn.config.json
   - .agents/specs/ for story specs
   - .agents/norn.config.json with the team settings (each developer can override in .agents/norn.config.local.json)
@@ -874,7 +874,7 @@ norn is set up in this project:
   - how to work with norn in AGENTS.md and CLAUDE.md
   - 19 labels on the repository
 
-Commit skills/, .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>
+Commit .claude/skills/, .agents/, .gitignore and AGENTS.md, CLAUDE.md. Then ask your agent: norn-drive <issue>
 Run norn doctor to check what init cannot set up: gh, your access to the repository, the worktree provider."
 `;
 
@@ -882,13 +882,13 @@ exports[`output of every command, text and --json > init with missing skills > j
 "exit 1
 {
   "ok": false,
-  "refusal": "Missing skills: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design. The skill install did not provide them into skills/.\\nFix the install and run norn init again."
+  "refusal": "Missing skills: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design. The skill install did not provide them into .agents/skills/.\\nFix the install and run norn init again."
 }"
 `;
 
 exports[`output of every command, text and --json > init with missing skills > text 1`] = `
 "exit 1
-Missing skills: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design. The skill install did not provide them into skills/.
+Missing skills: norn-triage, norn-refine, norn-clarify, norn-plan, norn-slice, norn-implement, norn-review, norn-auto-qa, norn-qa, norn-merge, norn-resolve, norn-drive, norn-deliver, norn-tdd, norn-interview, norn-codebase-design. The skill install did not provide them into .agents/skills/.
 Fix the install and run norn init again."
 `;
 
