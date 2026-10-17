@@ -188,12 +188,54 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     expect(res.stdout).toContain(
       "    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-131 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-131 --path /repo/.agents/worktrees/123-rate-limiting-131 --no-focus",
     );
-    expect(res.stdout).toContain("    Start an agent: herdr agent start norn-131 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-131>");
     expect(res.stdout).toContain(
-      '    Then prompt it: herdr agent prompt norn-131 "Work in /repo/.agents/worktrees/123-rate-limiting-131. Run norn take 131, follow its briefing to the end, and finish with the norn command it gives."',
+      "    Start an agent: herdr agent start norn-131-implementation --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-131>",
+    );
+    expect(res.stdout).toContain(
+      '    Then prompt it: herdr agent prompt norn-131-implementation "Work in /repo/.agents/worktrees/123-rate-limiting-131. Run norn take 131, follow its briefing to the end, and finish with the norn command it gives."',
     );
     const s128 = res.stdout.slice(res.stdout.indexOf("#128"), res.stdout.indexOf("#127"));
     expect(s128).not.toContain("Create the worktree");
+  });
+
+  test("herdr: each phase's agent is named for its step, and an earlier phase's agent in the pane is stopped first", async () => {
+    const w = setup();
+    w.workspace.env = { HERDR_ENV: "1" };
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 3, title: "List tasks", labels: ["type:slice", "mode:afk", "merge-queue"] });
+    w.github.parents.set(3, 123);
+    w.github.branches.add("123-rate-limiting");
+    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting-3");
+    w.workspace.agents = [{ pane: "w3Y:p2", name: "norn-3-review", activity: "idle", cwd: "/repo/.agents/worktrees/123-rate-limiting-3" }];
+
+    const res = await w.norn("next", "123");
+
+    expect(res.stdout).toContain(
+      [
+        "    Its pane still runs an earlier agent. Stop it first: herdr agent prompt norn-3-review /exit",
+        "    Start an agent: herdr agent start norn-3-merge --kind claude --pane w3Y:p2",
+        '    Then prompt it: herdr agent prompt norn-3-merge "Work in /repo/.agents/worktrees/123-rate-limiting-3. Run norn take 3, follow its briefing to the end, and finish with the norn command it gives."',
+      ].join("\n"),
+    );
+    expect(JSON.parse((await w.norn("next", "123", "--json")).stdout).start[0]).toMatchObject({
+      agent: "norn-3-merge",
+      earlier: { pane: "w3Y:p2", name: "norn-3-review", activity: "idle" },
+    });
+  });
+
+  test("herdr: an agent in another worktree's pane is not this item's", async () => {
+    const w = setup();
+    w.workspace.env = { HERDR_ENV: "1" };
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 3, title: "List tasks", labels: ["type:slice", "mode:afk", "merge-queue"] });
+    w.github.parents.set(3, 123);
+    w.github.branches.add("123-rate-limiting");
+    w.workspace.agents = [{ pane: "w4:p1", name: "norn-30-review", activity: "idle", cwd: "/repo/.agents/worktrees/123-rate-limiting-30" }];
+
+    const res = await w.norn("next", "123");
+
+    expect(res.stdout).not.toContain("Stop it first");
+    expect(res.stdout).toContain("herdr agent start norn-3-merge --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-3>");
   });
 
   test("herdr: an attended step is handed to an agent in the worktree, which drives the story", async () => {
@@ -207,9 +249,9 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     expect(res.stdout).toContain(
       [
         "    Hand the story to an agent in its worktree, which drives it on with the user:",
-        "      herdr agent start norn-123 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting>",
-        '      herdr agent prompt norn-123 "norn-drive 123"',
-        "      herdr agent focus norn-123",
+        "      herdr agent start norn-123-refinement --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting>",
+        '      herdr agent prompt norn-123-refinement "norn-drive 123"',
+        "      herdr agent focus norn-123-refinement",
       ].join("\n"),
     );
     expect(res.stdout).not.toContain("Start an agent:");
@@ -240,9 +282,9 @@ describe("next names how to start fresh agents for the worktree tool", () => {
         "  - #129 needs human QA (mode:hil). Do not take it.",
         "    If the user does it now, hand it to an agent in its worktree:",
         "      Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-129 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-129 --path /repo/.agents/worktrees/123-rate-limiting-129 --no-focus",
-        "      herdr agent start norn-129 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-129>",
-        '      herdr agent prompt norn-129 "norn-drive 129"',
-        "      herdr agent focus norn-129",
+        "      herdr agent start norn-129-human-qa --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-129>",
+        '      herdr agent prompt norn-129-human-qa "norn-drive 129"',
+        "      herdr agent focus norn-129-human-qa",
       ].join("\n"),
     );
     expect(JSON.parse((await w.norn("next", "123", "--json")).stdout).waiting[1]).toMatchObject({
@@ -284,9 +326,9 @@ describe("next names how to start fresh agents for the worktree tool", () => {
         "Waiting for a human:",
         '  - #131 needs a human: escalated: "Redis client times out in tests" (3 fix rounds reached).',
         "    If the user does it now, hand it to an agent in its worktree:",
-        "      herdr agent start norn-131 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-131>",
-        '      herdr agent prompt norn-131 "norn-drive 131"',
-        "      herdr agent focus norn-131",
+        "      herdr agent start norn-131-resolve --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-131>",
+        '      herdr agent prompt norn-131-resolve "norn-drive 131"',
+        "      herdr agent focus norn-131-resolve",
         "Stop here and report to the user.",
       ].join("\n"),
     );

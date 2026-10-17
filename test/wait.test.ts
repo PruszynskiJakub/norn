@@ -273,6 +273,8 @@ const item = (issue: number, state: string, attended = false) =>
     checkedOutAt: null,
     here: false,
     session: null,
+    agent: null,
+    earlier: null,
   }) as const;
 const running = { issue: 9, reason: "held", holder: { session: "yours", mine: true, since: "2026-10-17T16:00:00Z" } } as const;
 const now = new Date("2026-10-17T16:20:00Z");

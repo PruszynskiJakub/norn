@@ -32,6 +32,13 @@ export interface PaneActivity {
   forMs: number;
 }
 
+/** An agent herdr runs in a pane: the pane, the agent's name if it has one, and what it does. */
+export interface PaneAgent {
+  pane: string;
+  name: string | null;
+  activity: AgentActivity;
+}
+
 /** The local machine: the repository checkout, its worktrees and the environment. */
 export interface Workspace {
   /** Absolute path of the main repository checkout. */
@@ -71,4 +78,6 @@ export interface Workspace {
    * not answer: norn never acts on what it cannot observe.
    */
   agentActivity(pane: string): Promise<PaneActivity>;
+  /** The agents herdr runs on this machine in `dir` (absolute) or below it, e.g. a worktree's; [] outside herdr. */
+  agentsIn(dir: string): Promise<PaneAgent[]>;
 }

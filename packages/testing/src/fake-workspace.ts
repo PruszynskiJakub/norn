@@ -1,4 +1,4 @@
-import type { PaneActivity, Provider, Workspace } from "@norn/core";
+import { isWithin, type PaneActivity, type PaneAgent, type Provider, type Workspace } from "@norn/core";
 
 export class FakeWorkspace implements Workspace {
   root = "/repo";
@@ -67,6 +67,11 @@ export class FakeWorkspace implements Workspace {
   activities = new Map<string, PaneActivity>();
   async agentActivity(pane: string): Promise<PaneActivity> {
     return structuredClone(this.activities.get(pane) ?? { activity: "unknown", forMs: 0 });
+  }
+  /** The agents herdr runs, each in the directory it works in. */
+  agents: (PaneAgent & { cwd: string })[] = [];
+  async agentsIn(dir: string): Promise<PaneAgent[]> {
+    return this.agents.filter((a) => isWithin(a.cwd, dir)).map(({ cwd: _cwd, ...a }) => a);
   }
   /** Evidence directories by the path norn is given. */
   evidence = new Map<string, { path: string; content: Buffer }[]>();

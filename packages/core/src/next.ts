@@ -4,7 +4,8 @@ import type { Event } from "./events.js";
 import { send } from "./notify.js";
 import { join } from "node:path";
 import { branchAt, createWorktreeCommand, locate } from "./location.js";
-import { isWithin, type Provider } from "./workspace.js";
+import { isWithin, type PaneAgent, type Provider } from "./workspace.js";
+import { slugify } from "./text.js";
 import type { GitHub, Issue } from "./github.js";
 import type { NextRefusal } from "./refusals.js";
 import { gateOf, heldInput, heldWaiting, holds, inFlowOf, needsBranch, reconcileState, releaseBlocked, slicesOf } from "./behaviours.js";
@@ -49,6 +50,15 @@ export interface StartItem {
   here: boolean;
   /** Under plain git, the NORN_SESSION to start the item's agent with, unique per listing, so each agent is its own session. */
   session: string | null;
+  /** Under herdr, the name of the step's agent, e.g. norn-3-merge: one per phase, so it never collides with the last. */
+  agent: string | null;
+  /** Under herdr, an earlier phase's agent still running in the worktree's pane, to stop before the pane is reused. */
+  earlier: PaneAgent | null;
+}
+
+/** The name of the herdr agent for an issue's step, e.g. norn-3-agent-qa. */
+export function agentName(issue: number, step: string): string {
+  return `norn-${issue}-${slugify(step)}`;
 }
 
 export interface NextReport {
@@ -251,6 +261,9 @@ async function offer(
     return;
   }
   const { loc, worktree, createWorktree, checkedOutAt, here } = await place(ctx, issue, flow);
+  const herdr = ctx.config.provider === "herdr";
+  // Nobody holds the item, so an agent still in its pane is one an earlier phase left behind.
+  const earlier = herdr && worktree ? ((await ctx.workspace.agentsIn(worktree))[0] ?? null) : null;
   report.start.push({
     issue: n,
     branch: loc?.branch ?? null,
@@ -260,6 +273,8 @@ async function offer(
     here,
     // Fresh for every agent: a new agent on an item whose claim went stale must not pass for the old holder.
     session: ctx.config.provider === "git" ? `norn-${n}-${ctx.nonce()}` : null,
+    agent: herdr ? agentName(n, step.name) : null,
+    earlier,
     kind,
     flow: named.name,
     title: issue.title,

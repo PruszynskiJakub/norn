@@ -1,5 +1,6 @@
 import { parseArgs } from "./args.js";
 import {
+  agentName,
   type AddSliceResult,
   type Briefing,
   type ConfigProblem,
@@ -1140,12 +1141,13 @@ function humanHandOff(w: WaitItem): string[] {
   if (!w.worktree || w.heldBy) return [];
   if (w.here) return ["    You are in its worktree: if the user does it now, take it in this session."];
   if (w.checkedOutAt && w.branch) return [`    ${checkedOutElsewhere(w.branch, w.checkedOutAt)}`];
+  const agent = agentName(w.issue, w.reason === "human-qa" ? "human QA" : "resolve");
   return [
     "    If the user does it now, hand it to an agent in its worktree:",
     ...(w.createWorktree ? [`      Create the worktree: ${w.createWorktree}`] : []),
-    `      herdr agent start norn-${w.issue} --kind claude --pane <pane of ${w.worktree}>`,
-    `      herdr agent prompt norn-${w.issue} "norn-drive ${w.issue}"`,
-    `      herdr agent focus norn-${w.issue}`,
+    `      herdr agent start ${agent} --kind claude --pane <pane of ${w.worktree}>`,
+    `      herdr agent prompt ${agent} "norn-drive ${w.issue}"`,
+    `      herdr agent focus ${agent}`,
   ];
 }
 
@@ -1239,18 +1241,24 @@ export function renderNext(r: NextReport): string {
       if (s.createWorktree) out.push(`    Create the worktree: ${s.createWorktree}`);
       if (s.checkedOutAt && s.branch) out.push(`    ${checkedOutElsewhere(s.branch, s.checkedOutAt)}`);
       if (r.provider === "herdr" && s.worktree) {
-        const start = `herdr agent start norn-${s.issue} --kind claude --pane <pane of ${s.worktree}>`;
+        const agent = s.agent ?? agentName(s.issue, s.step);
+        // The earlier phase's agent is stopped and its pane reused, so no pane is split for each phase.
+        const pane = s.earlier?.pane ?? `<pane of ${s.worktree}>`;
+        const start = `herdr agent start ${agent} --kind claude --pane ${pane}`;
+        const stop =
+          s.earlier && !s.here ? [`    Its pane still runs an earlier agent. Stop it first: herdr agent prompt ${s.earlier.name ?? s.earlier.pane} /exit`] : [];
         if (!s.attended) {
           const prompt = `Work in ${s.worktree}. Run norn take ${s.issue}, follow its briefing to the end, and finish with the norn command it gives.`;
-          out.push(`    Start an agent: ${start}`, `    Then prompt it: herdr agent prompt norn-${s.issue} "${prompt}"`);
+          out.push(...stop, `    Start an agent: ${start}`, `    Then prompt it: herdr agent prompt ${agent} "${prompt}"`);
         } else if (s.here) out.push("    You are in its worktree: take it in this session.");
         else {
           // An attended step needs the user, so the new agent drives the issue from its worktree and this session stops.
           out.push(
+            ...stop,
             `    Hand the ${r.flow} to an agent in its worktree, which drives it on with the user:`,
             `      ${start}`,
-            `      herdr agent prompt norn-${s.issue} "norn-drive ${r.issue}"`,
-            `      herdr agent focus norn-${s.issue}`,
+            `      herdr agent prompt ${agent} "norn-drive ${r.issue}"`,
+            `      herdr agent focus ${agent}`,
           );
         }
       }

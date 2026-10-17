@@ -1153,6 +1153,8 @@ exports[`output of every command, text and --json > next creates the story branc
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "story",
       "flow": "story",
       "title": "All done",
@@ -1247,6 +1249,8 @@ exports[`output of every command, text and --json > next on a story being delive
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Redis store",
@@ -1265,6 +1269,8 @@ exports[`output of every command, text and --json > next on a story being delive
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Limit headers",
@@ -1283,6 +1289,8 @@ exports[`output of every command, text and --json > next on a story being delive
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Docs",
@@ -1408,6 +1416,8 @@ exports[`output of every command, text and --json > next on a story in implement
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Redis store",
@@ -1426,6 +1436,8 @@ exports[`output of every command, text and --json > next on a story in implement
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Limit headers",
@@ -1444,6 +1456,8 @@ exports[`output of every command, text and --json > next on a story in implement
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Docs",
@@ -1529,6 +1543,8 @@ exports[`output of every command, text and --json > next on a story in implement
       "checkedOutAt": null,
       "here": false,
       "session": "norn-127-n1",
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Redis store",
@@ -1547,6 +1563,8 @@ exports[`output of every command, text and --json > next on a story in implement
       "checkedOutAt": null,
       "here": false,
       "session": "norn-132-n2",
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Docs",
@@ -1640,6 +1658,8 @@ exports[`output of every command, text and --json > next on a story in implement
       "checkedOutAt": "/elsewhere",
       "here": false,
       "session": null,
+      "agent": "norn-127-merge",
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Redis store",
@@ -1658,6 +1678,8 @@ exports[`output of every command, text and --json > next on a story in implement
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": "norn-128-review",
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Limit headers",
@@ -1676,6 +1698,8 @@ exports[`output of every command, text and --json > next on a story in implement
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": "norn-132-implementation",
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Docs",
@@ -1712,7 +1736,7 @@ exports[`output of every command, text and --json > next on a story in implement
   "running": 0,
   "slots": 2,
   "delivery": null,
-  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each as a new herdr agent in the item's worktree pane:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue: Queued to merge.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n    Start an agent: herdr agent start norn-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>\\n    Then prompt it: herdr agent prompt norn-127 \\"Work in /repo/.agents/worktrees/123-rate-limiting-127. Run norn take 127, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 127\\n  - Slice #128 \\"Limit headers\\" is in needs-review: Waiting for review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus\\n    Start an agent: herdr agent start norn-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>\\n    Then prompt it: herdr agent prompt norn-128 \\"Work in /repo/.agents/worktrees/123-rate-limiting-128. Run norn take 128, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 128\\n  - Slice #132 \\"Docs\\" is in ready-for-agent: Ready for an agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start an agent: herdr agent start norn-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>\\n    Then prompt it: herdr agent prompt norn-132 \\"Work in /repo/.agents/worktrees/123-rate-limiting-132. Run norn take 132, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus\\n      herdr agent start norn-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>\\n      herdr agent prompt norn-133 \\"norn-drive 133\\"\\n      herdr agent focus norn-133\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
+  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each as a new herdr agent in the item's worktree pane:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue: Queued to merge.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n    Start an agent: herdr agent start norn-127-merge --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>\\n    Then prompt it: herdr agent prompt norn-127-merge \\"Work in /repo/.agents/worktrees/123-rate-limiting-127. Run norn take 127, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 127\\n  - Slice #128 \\"Limit headers\\" is in needs-review: Waiting for review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus\\n    Start an agent: herdr agent start norn-128-review --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>\\n    Then prompt it: herdr agent prompt norn-128-review \\"Work in /repo/.agents/worktrees/123-rate-limiting-128. Run norn take 128, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 128\\n  - Slice #132 \\"Docs\\" is in ready-for-agent: Ready for an agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start an agent: herdr agent start norn-132-implementation --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>\\n    Then prompt it: herdr agent prompt norn-132-implementation \\"Work in /repo/.agents/worktrees/123-rate-limiting-132. Run norn take 132, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus\\n      herdr agent start norn-133-human-qa --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>\\n      herdr agent prompt norn-133-human-qa \\"norn-drive 133\\"\\n      herdr agent focus norn-133-human-qa\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
 }"
 `;
 
@@ -1727,19 +1751,19 @@ most 2 at a time, each as a new herdr agent in the item's worktree pane:
   - Slice #127 "Redis store" is in merge-queue: Queued to merge.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-127
     Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.
-    Start an agent: herdr agent start norn-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>
-    Then prompt it: herdr agent prompt norn-127 "Work in /repo/.agents/worktrees/123-rate-limiting-127. Run norn take 127, follow its briefing to the end, and finish with the norn command it gives."
+    Start an agent: herdr agent start norn-127-merge --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>
+    Then prompt it: herdr agent prompt norn-127-merge "Work in /repo/.agents/worktrees/123-rate-limiting-127. Run norn take 127, follow its briefing to the end, and finish with the norn command it gives."
     Start it with: norn take 127
   - Slice #128 "Limit headers" is in needs-review: Waiting for review.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-128
     Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus
-    Start an agent: herdr agent start norn-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>
-    Then prompt it: herdr agent prompt norn-128 "Work in /repo/.agents/worktrees/123-rate-limiting-128. Run norn take 128, follow its briefing to the end, and finish with the norn command it gives."
+    Start an agent: herdr agent start norn-128-review --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>
+    Then prompt it: herdr agent prompt norn-128-review "Work in /repo/.agents/worktrees/123-rate-limiting-128. Run norn take 128, follow its briefing to the end, and finish with the norn command it gives."
     Start it with: norn take 128
   - Slice #132 "Docs" is in ready-for-agent: Ready for an agent.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-132
-    Start an agent: herdr agent start norn-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>
-    Then prompt it: herdr agent prompt norn-132 "Work in /repo/.agents/worktrees/123-rate-limiting-132. Run norn take 132, follow its briefing to the end, and finish with the norn command it gives."
+    Start an agent: herdr agent start norn-132-implementation --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>
+    Then prompt it: herdr agent prompt norn-132-implementation "Work in /repo/.agents/worktrees/123-rate-limiting-132. Run norn take 132, follow its briefing to the end, and finish with the norn command it gives."
     Start it with: norn take 132
 
 Waiting, nothing to do for you:
@@ -1747,9 +1771,9 @@ Waiting, nothing to do for you:
   - #133 needs human QA (mode:hil). Do not take it.
     If the user does it now, hand it to an agent in its worktree:
       Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus
-      herdr agent start norn-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>
-      herdr agent prompt norn-133 "norn-drive 133"
-      herdr agent focus norn-133
+      herdr agent start norn-133-human-qa --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>
+      herdr agent prompt norn-133-human-qa "norn-drive 133"
+      herdr agent focus norn-133-human-qa
 
 Each phase gets a new agent. When an item is done, run norn next 123 again."
 `;
@@ -1821,6 +1845,8 @@ exports[`output of every command, text and --json > next on a story in refinemen
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "story",
       "flow": "story",
       "title": "Refine me",
@@ -1880,6 +1906,8 @@ exports[`output of every command, text and --json > next on a story in refinemen
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": "norn-32-refinement",
+      "earlier": null,
       "kind": "story",
       "flow": "story",
       "title": "Refine me",
@@ -1900,7 +1928,7 @@ exports[`output of every command, text and --json > next on a story in refinemen
   "running": 0,
   "slots": 2,
   "delivery": null,
-  "message": "Story #32 \\"Refine me\\" is in needs-refinement.\\n\\nYou can start 1 item now, with the user:\\n\\n  - Story #32 \\"Refine me\\" is in needs-refinement: Waiting for refinement (attended: the user takes part).\\n    Worktree: /repo/.agents/worktrees/32-refine-me\\n    Create the worktree: git -C /repo fetch origin main && git -C /repo branch --no-track 32-refine-me origin/main && herdr worktree create --cwd /repo --branch 32-refine-me --path /repo/.agents/worktrees/32-refine-me --no-focus\\n    Hand the story to an agent in its worktree, which drives it on with the user:\\n      herdr agent start norn-32 --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>\\n      herdr agent prompt norn-32 \\"norn-drive 32\\"\\n      herdr agent focus norn-32\\n    Start it with: norn take 32"
+  "message": "Story #32 \\"Refine me\\" is in needs-refinement.\\n\\nYou can start 1 item now, with the user:\\n\\n  - Story #32 \\"Refine me\\" is in needs-refinement: Waiting for refinement (attended: the user takes part).\\n    Worktree: /repo/.agents/worktrees/32-refine-me\\n    Create the worktree: git -C /repo fetch origin main && git -C /repo branch --no-track 32-refine-me origin/main && herdr worktree create --cwd /repo --branch 32-refine-me --path /repo/.agents/worktrees/32-refine-me --no-focus\\n    Hand the story to an agent in its worktree, which drives it on with the user:\\n      herdr agent start norn-32-refinement --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>\\n      herdr agent prompt norn-32-refinement \\"norn-drive 32\\"\\n      herdr agent focus norn-32-refinement\\n    Start it with: norn take 32"
 }"
 `;
 
@@ -1914,9 +1942,9 @@ You can start 1 item now, with the user:
     Worktree: /repo/.agents/worktrees/32-refine-me
     Create the worktree: git -C /repo fetch origin main && git -C /repo branch --no-track 32-refine-me origin/main && herdr worktree create --cwd /repo --branch 32-refine-me --path /repo/.agents/worktrees/32-refine-me --no-focus
     Hand the story to an agent in its worktree, which drives it on with the user:
-      herdr agent start norn-32 --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>
-      herdr agent prompt norn-32 "norn-drive 32"
-      herdr agent focus norn-32
+      herdr agent start norn-32-refinement --kind claude --pane <pane of /repo/.agents/worktrees/32-refine-me>
+      herdr agent prompt norn-32-refinement "norn-drive 32"
+      herdr agent focus norn-32-refinement
     Start it with: norn take 32"
 `;
 
@@ -1984,6 +2012,8 @@ exports[`output of every command, text and --json > next with every slot taken >
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Redis store",
@@ -2002,6 +2032,8 @@ exports[`output of every command, text and --json > next with every slot taken >
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Docs",
@@ -2160,7 +2192,7 @@ exports[`output of every command, text and --json > next with nothing left under
   "running": 0,
   "slots": 2,
   "delivery": null,
-  "message": "Story #20 \\"Waits\\": nothing left that you can do.\\nWaiting for a human:\\n  - #23 needs human QA (mode:hil).\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 20-waits && git -C /repo branch --no-track 20-waits-23 origin/20-waits && herdr worktree create --cwd /repo --branch 20-waits-23 --path /repo/.agents/worktrees/20-waits-23 --no-focus\\n      herdr agent start norn-23 --kind claude --pane <pane of /repo/.agents/worktrees/20-waits-23>\\n      herdr agent prompt norn-23 \\"norn-drive 23\\"\\n      herdr agent focus norn-23\\n  - #24 needs human QA (mode:hil), held by another session (since 11:00).\\nStop here and report to the user. norn has already notified them."
+  "message": "Story #20 \\"Waits\\": nothing left that you can do.\\nWaiting for a human:\\n  - #23 needs human QA (mode:hil).\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 20-waits && git -C /repo branch --no-track 20-waits-23 origin/20-waits && herdr worktree create --cwd /repo --branch 20-waits-23 --path /repo/.agents/worktrees/20-waits-23 --no-focus\\n      herdr agent start norn-23-human-qa --kind claude --pane <pane of /repo/.agents/worktrees/20-waits-23>\\n      herdr agent prompt norn-23-human-qa \\"norn-drive 23\\"\\n      herdr agent focus norn-23-human-qa\\n  - #24 needs human QA (mode:hil), held by another session (since 11:00).\\nStop here and report to the user. norn has already notified them."
 }"
 `;
 
@@ -2171,9 +2203,9 @@ Waiting for a human:
   - #23 needs human QA (mode:hil).
     If the user does it now, hand it to an agent in its worktree:
       Create the worktree: git -C /repo fetch origin 20-waits && git -C /repo branch --no-track 20-waits-23 origin/20-waits && herdr worktree create --cwd /repo --branch 20-waits-23 --path /repo/.agents/worktrees/20-waits-23 --no-focus
-      herdr agent start norn-23 --kind claude --pane <pane of /repo/.agents/worktrees/20-waits-23>
-      herdr agent prompt norn-23 "norn-drive 23"
-      herdr agent focus norn-23
+      herdr agent start norn-23-human-qa --kind claude --pane <pane of /repo/.agents/worktrees/20-waits-23>
+      herdr agent prompt norn-23-human-qa "norn-drive 23"
+      herdr agent focus norn-23-human-qa
   - #24 needs human QA (mode:hil), held by another session (since 11:00).
 Stop here and report to the user. norn has already notified them."
 `;
@@ -3333,6 +3365,8 @@ exports[`output of every command, text and --json > wait times out > json 1`] = 
         "checkedOutAt": null,
         "here": false,
         "session": null,
+        "agent": null,
+        "earlier": null,
         "kind": "slice",
         "flow": "slice",
         "title": "Redis store",
@@ -3351,6 +3385,8 @@ exports[`output of every command, text and --json > wait times out > json 1`] = 
         "checkedOutAt": null,
         "here": false,
         "session": null,
+        "agent": null,
+        "earlier": null,
         "kind": "slice",
         "flow": "slice",
         "title": "Limit headers",
@@ -3369,6 +3405,8 @@ exports[`output of every command, text and --json > wait times out > json 1`] = 
         "checkedOutAt": null,
         "here": false,
         "session": null,
+        "agent": null,
+        "earlier": null,
         "kind": "slice",
         "flow": "slice",
         "title": "Docs",
@@ -3483,6 +3521,8 @@ exports[`output of every command, text and --json > wait with something to start
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Redis store",
@@ -3501,6 +3541,8 @@ exports[`output of every command, text and --json > wait with something to start
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Limit headers",
@@ -3519,6 +3561,8 @@ exports[`output of every command, text and --json > wait with something to start
       "checkedOutAt": null,
       "here": false,
       "session": null,
+      "agent": null,
+      "earlier": null,
       "kind": "slice",
       "flow": "slice",
       "title": "Docs",
@@ -3552,6 +3596,8 @@ exports[`output of every command, text and --json > wait with something to start
         "checkedOutAt": null,
         "here": false,
         "session": null,
+        "agent": null,
+        "earlier": null,
         "kind": "slice",
         "flow": "slice",
         "title": "Redis store",
@@ -3570,6 +3616,8 @@ exports[`output of every command, text and --json > wait with something to start
         "checkedOutAt": null,
         "here": false,
         "session": null,
+        "agent": null,
+        "earlier": null,
         "kind": "slice",
         "flow": "slice",
         "title": "Limit headers",
@@ -3588,6 +3636,8 @@ exports[`output of every command, text and --json > wait with something to start
         "checkedOutAt": null,
         "here": false,
         "session": null,
+        "agent": null,
+        "earlier": null,
         "kind": "slice",
         "flow": "slice",
         "title": "Docs",

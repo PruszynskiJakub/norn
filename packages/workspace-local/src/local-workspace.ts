@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { readFile, readdir, stat } from "node:fs/promises";
 import { basename, dirname, join, relative, resolve, sep } from "node:path";
-import { type AgentActivity, type PaneActivity, type Provider, samePath, type Workspace } from "@norn/core";
+import { type AgentActivity, isWithin, type PaneActivity, type PaneAgent, type Provider, samePath, type Workspace } from "@norn/core";
 
 /** Runs a command; `env` is added to this process's environment. */
 export type Run = (cmd: string, args: string[], env?: Record<string, string>) => Promise<{ code: number; stdout: string; stderr: string }>;
@@ -63,6 +63,14 @@ export class LocalWorkspace implements Workspace {
     } catch {
       return null;
     }
+  }
+
+  async agentsIn(dir: string): Promise<PaneAgent[]> {
+    const agents = (await this.herdrAgents()) ?? [];
+    // The foreground directory is where the agent works now; cwd is where its pane started.
+    return agents
+      .filter((a) => [a.foreground_cwd, a.cwd].some((d) => d !== undefined && isWithin(d, dir)))
+      .map((a) => ({ pane: a.pane_id, name: a.name ?? null, activity: HERDR_STATUS[a.agent_status ?? ""] ?? "unknown" }));
   }
 
   async agentActivity(pane: string): Promise<PaneActivity> {
