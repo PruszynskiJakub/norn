@@ -23,7 +23,7 @@ npx norn init
 git add -A && git commit -m "Set up norn" && git push
 ```
 
-`init` installs the skills into `skills/` (linked into `.claude/skills/`), writes the norn section into `AGENTS.md` and `CLAUDE.md`, creates `.agents/specs/` and `.agents/norn.config.json`, gitignores `.agents/worktrees/` and the local config, and creates the labels on the repository.
+`init` installs the skills into `.agents/skills/` (linked into `.claude/skills/`), writes the norn section into `AGENTS.md` and `CLAUDE.md`, creates `.agents/specs/` and `.agents/norn.config.json`, gitignores `.agents/worktrees/` and the local config, and creates the labels on the repository.
 
 ## 3. Open an issue
 

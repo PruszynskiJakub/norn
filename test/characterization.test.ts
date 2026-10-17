@@ -82,8 +82,8 @@ const scenarios: Scenario[] = [
       const cwd = mkdtempSync(join(tmpdir(), "norn-char-"));
       return w.withProject(cwd, async (dir) => {
         for (const name of SKILLS) {
-          mkdirSync(join(dir, "skills", name), { recursive: true });
-          writeFileSync(join(dir, "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
+          mkdirSync(join(dir, ".agents", "skills", name), { recursive: true });
+          writeFileSync(join(dir, ".agents", "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
         }
         return ["norn-drive"];
       });

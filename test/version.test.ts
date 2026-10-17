@@ -158,8 +158,8 @@ function project(version = "1.4.2") {
   const norn = w.withProject(cwd, async (dir) => {
     installs.push(dir);
     for (const name of SKILLS) {
-      mkdirSync(join(dir, "skills", name), { recursive: true });
-      writeFileSync(join(dir, "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
+      mkdirSync(join(dir, ".agents", "skills", name), { recursive: true });
+      writeFileSync(join(dir, ".agents", "skills", name, "SKILL.md"), `---\nname: ${name}\n---\n`);
     }
     return ["norn-drive"];
   });
@@ -190,7 +190,7 @@ describe("norn init and nornVersion", () => {
 
     expect(JSON.parse(readTeam())).toEqual({ baseBranch: "develop", nornVersion: "1.4.2", worktrees: { provider: "herdr" }, deliver: { maxParallel: 5 } });
     expect(res.stdout).toContain(
-      ["  - updated to this norn version: norn-drive (git diff skills/ shows the changes)", `  - nornVersion 1.2.0 → 1.4.2 in ${TEAM}`].join("\n"),
+      ["  - updated to this norn version: norn-drive (git diff .agents/skills/ shows the changes)", `  - nornVersion 1.2.0 → 1.4.2 in ${TEAM}`].join("\n"),
     );
   });
 
