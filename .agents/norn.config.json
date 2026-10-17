@@ -1,0 +1,14 @@
+{
+  "nornVersion": "0.10.1",
+  "baseBranch": "main",
+  "worktrees": {
+    "provider": "auto"
+  },
+  "claims": {
+    "staleAfter": "2h"
+  },
+  "deliver": {
+    "maxParallel": 2,
+    "maxFixRounds": 3
+  }
+}
