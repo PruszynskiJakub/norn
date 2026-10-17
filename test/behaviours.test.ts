@@ -419,7 +419,7 @@ describe("norn next on an issue of a flow", () => {
         "    Worktree: /repo/.agents/worktrees/40-crash-on-empty-input",
         "    Start it with: norn take 40",
         "",
-        "Each phase gets a new agent. When an item is done, run norn next 40 again.",
+        "Each phase gets a new agent. Then run norn wait 40: it ends when something new can start.",
       ].join("\n"),
     );
   });

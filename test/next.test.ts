@@ -50,7 +50,7 @@ describe("norn next", () => {
         "  - #132 is blocked by #131.",
         "  - #129 needs human QA (mode:hil). Do not take it.",
         "",
-        "Each phase gets a new agent. When an item is done, run norn next 123 again.",
+        "Each phase gets a new agent. Then run norn wait 123: it ends when something new can start.",
       ].join("\n"),
     );
   });
@@ -470,7 +470,8 @@ describe("running agents count against the parallel limit", () => {
     expect(res.stdout).toContain(
       [
         "2 items are ready, but 2 of your agents are running, the limit of",
-        "deliver.maxParallel. Wait for one to finish, then run norn next 123 again.",
+        "deliver.maxParallel. Run norn wait 123: it ends when one has finished and",
+        "something new can start.",
         "",
         '  - Slice #133 "Slice 133" is in ready-for-agent: Ready for an agent.',
         '  - Slice #134 "Slice 134" is in ready-for-agent: Ready for an agent.',

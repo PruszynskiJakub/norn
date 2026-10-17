@@ -54,7 +54,7 @@ describe("norn next when nothing is left", () => {
     const res = await w.norn("next", "123");
 
     expect(res.stdout).not.toContain("nothing left");
-    expect(res.stdout).toContain("Nothing can be started now. Wait for the running items to finish, then run norn next 123 again.");
+    expect(res.stdout).toContain("Nothing can be started now. Run norn wait 123: it ends when something new can start.");
     expect(res.stdout).toContain("  - #131 needs a human: escalated");
   });
 

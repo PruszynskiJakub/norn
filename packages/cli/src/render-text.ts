@@ -1207,12 +1207,12 @@ export function renderNext(r: NextReport): string {
   out.push(wrap(head), ...deliveryLine(r.flow, r.issue, r.delivery), "");
 
   if (r.start.length === 0) {
-    out.push(`Nothing can be started now. Wait for the running items to finish, then run norn next ${r.issue} again.`);
+    out.push(`Nothing can be started now. Run norn wait ${r.issue}: it ends when something new can start.`);
   } else if (r.slots === 0 && r.start.every((s) => !s.attended)) {
     const ready = `${r.start.length} item${r.start.length === 1 ? " is" : "s are"} ready`;
     out.push(
       wrap(
-        `${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run norn next ${r.issue} again.`,
+        `${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Run norn wait ${r.issue}: it ends when one has finished and something new can start.`,
       ),
       "",
       ...r.start.map((s) => `  - ${itemWhat(s)} ${startState(s)}.`),
@@ -1270,7 +1270,7 @@ export function renderNext(r: NextReport): string {
     out.push("", "Waiting, nothing to do for you:");
     for (const w of r.waiting) out.push(waitLine(w), ...humanHandOff(w));
   }
-  if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. When an item is done, run norn next ${r.issue} again.`);
+  if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. Then run norn wait ${r.issue}: it ends when something new can start.`);
   return out.join("\n");
 }
 

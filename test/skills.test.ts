@@ -39,6 +39,30 @@ describe("the norn-deliver skill matches what norn next says", () => {
   });
 });
 
+describe("the norn-deliver skill is the short loop around norn deliver, norn wait and norn tidy", () => {
+  const md = () => readFileSync(join(BUNDLED_SKILLS, "norn-deliver", "SKILL.md"), "utf8");
+
+  test("it takes the delivery lock first, tidies on every turn and waits with norn wait, by its exit codes", () => {
+    const loop = md().slice(md().indexOf("## Loop"), md().indexOf("## Rules"));
+    expect(loop.indexOf("norn deliver <story>")).toBeLessThan(loop.indexOf("norn tidy"));
+    expect(loop.indexOf("norn tidy")).toBeLessThan(loop.indexOf("norn next <story>"));
+    expect(loop).toContain("Run `norn wait <story>` in the background");
+    expect(loop).toContain("**0**: something new can start. Go back to step 2.");
+    expect(loop).toContain("**3**: nothing is left that you can do. Run `norn tidy`");
+    expect(loop).toContain("**4**: it timed out. Run `norn wait <story>` again.");
+    expect(loop).not.toContain("herdr agent wait");
+  });
+
+  test("it forbids scripts around norn, matching its text, and typing into panes other than with herdr agent prompt", () => {
+    expect(md()).toContain("Never write a monitor, a script or a sleep loop around norn, and never decide what to do by matching norn's text");
+    expect(md()).toContain("Type into an agent's pane only with `herdr agent prompt`.");
+  });
+
+  test("its report lists the items norn escalated for stuck agents, with their panes", () => {
+    expect(md()).toContain("each item norn escalated because its agent stopped, with the agent's pane");
+  });
+});
+
 describe("the process skills hint at what they take", () => {
   test.each([
     ["norn-drive", "<issue | story | slice>"],
