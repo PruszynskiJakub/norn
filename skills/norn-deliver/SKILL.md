@@ -1,12 +1,14 @@
 ---
 name: norn-deliver
-description: Runs a norn story's unattended steps, its slices first, until it needs a human. Invoke as `norn-deliver <story id>` once slicing is done.
+description: Runs the unattended steps of a norn story, or any issue whose flow has slices such as an epic, its slices first, until it needs a human. Invoke as `norn-deliver <issue id>` once slicing is done.
 argument-hint: "<story>"
 ---
 
 # Deliver
 
 You are the orchestrator. Every phase of the story's work happens in a fresh subagent; you only call norn and start, wait for, and report on subagents.
+
+"Story" below means the issue you were given: a story, or any issue whose flow has slices, which norn names by its type, e.g. an epic.
 
 ## Loop
 

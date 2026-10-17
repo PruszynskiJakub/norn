@@ -2,7 +2,6 @@ import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import {
   type Config,
-  checkFlowsNamed,
   FLOWS_DIR,
   type FlowError,
   flowFileNames,
@@ -11,7 +10,8 @@ import {
   flowStatesOf,
   renamedTo,
   repositoryFlows,
-  parseFlow,
+  misnamedFlowFiles,
+  readFlow,
   type LoadedFlow,
   isNornLabel,
   type ConfigProblem,
@@ -62,11 +62,14 @@ export type CheckFact =
  * working copy where it differs; the type of the slices each valid flow makes; skills a valid flow names that are not
  * installed; the labels the working copy's valid flows need that the repository lacks (the labels check covers the
  * flows in effect); and the open issues the working copy's flows would orphan, in a state they drop without renaming it.
+ * `misnamed` are the JSON files in the flows directory, on the base branch or only in the checkout, whose names cannot
+ * name a type, so norn reads no flow from them.
  */
 export interface FlowsFact {
   kind: "flows";
   baseBranch: string;
   names: string[];
+  misnamed: { file: string; local: boolean }[];
   invalid: { flow: string; local: boolean; errors: FlowError[] }[];
   slices: { flow: string; local: boolean; type: string }[];
   missingSkills: { skill: string; flow: string; local: boolean; state: string }[];
@@ -193,10 +196,14 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
     else add("permission", WRITE.includes(permission.value) ? "ok" : "fail", { kind: "permission", permission: permission.value });
   }
 
-  // The flows in effect, read from the base branch on GitHub, as norn commands read them.
-  const inEffect: Ready<{ config: Config; flows: LoadedFlow[] }> = !withRepo.ok
+  // The flows in effect, read from the base branch on GitHub, as norn commands read them, and the checkout's flow files that differ.
+  const inEffect: Ready<{ config: Config; flows: LoadedFlow[]; local: LoadedFlow[] }> = !withRepo.ok
     ? withRepo
-    : await attempt(async () => ({ config: withRepo.value, flows: await repositoryFlows({ github: d.github, config: withRepo.value }) }));
+    : await attempt(async () => ({
+        config: withRepo.value,
+        flows: await repositoryFlows({ github: d.github, config: withRepo.value }),
+        local: await localFlows(d, withRepo.value),
+      }));
 
   if (!inEffect.ok && "needs" in inEffect) skip("labels", inEffect.needs);
   else {
@@ -204,9 +211,13 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
     if (!onRepo.ok) add("labels", "fail", onRepo.fact);
     else if (!inEffect.ok) add("labels", "fail", inEffect.fact);
     else {
-      const wanted = labelDefinitions(inEffect.value.flows).map((l) => l.name);
+      const { flows, local } = inEffect.value;
+      const wanted = labelDefinitions(flows).map((l) => l.name);
       const missing = wanted.filter((name) => !onRepo.value.some((l) => l.name === name));
-      const unused = onRepo.value.filter((l) => !wanted.includes(l.name) && isNorns(l, inEffect.value.flows)).map((l) => l.name);
+      // A label a flow in the checkout uses is in use once that change is merged, so it is not reported as unused.
+      const wantedLocally = flowLabels(local.flatMap((l) => (l.ok ? [l] : []))).map((l) => l.name);
+      const used = (name: string) => wanted.includes(name) || wantedLocally.includes(name);
+      const unused = onRepo.value.filter((l) => !used(l.name) && isNorns(l, [...flows, ...local])).map((l) => l.name);
       add("labels", missing.length ? "fail" : unused.length ? "warning" : "ok", { kind: "labels", total: wanted.length, missing, unused });
     }
   }
@@ -214,12 +225,13 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
   if (!inEffect.ok && "needs" in inEffect) skip("flows", inEffect.needs);
   else if (!inEffect.ok) add("flows", "fail", inEffect.fact);
   else {
-    const { config, flows: loaded } = inEffect.value;
-    const fact = await attempt(() => flows(d, config, loaded));
+    const { config, flows: loaded, local } = inEffect.value;
+    const fact = await attempt(() => flows(d, config, loaded, local));
     if (!fact.ok) add("flows", "fail", fact.fact);
     else {
       const f = fact.value;
-      add("flows", f.invalid.length || f.missingSkills.length ? "fail" : f.orphans.length || f.missingLabels.length ? "warning" : "ok", f);
+      const failed = f.misnamed.length || f.invalid.length || f.missingSkills.length;
+      add("flows", failed ? "fail" : f.orphans.length || f.missingLabels.length ? "warning" : "ok", f);
     }
   }
 
@@ -257,11 +269,8 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
   return { ok: true, kind: "doctor", checks };
 }
 
-/**
- * Checks the flows in effect and the checkout's flow files that differ from the base branch, as the team would have
- * them once merged. Reads only: the files, and the open issues of a flow whose working copy drops states.
- */
-async function flows(d: DoctorDeps, config: Config, inEffect: LoadedFlow[]): Promise<FlowsFact> {
+/** The flow files of the checkout's working copy that differ from the base branch, checked as the team would have them once merged. */
+async function localFlows(d: DoctorDeps, config: Config): Promise<LoadedFlow[]> {
   const remoteText = (name: string) => d.github.readFileAt(`${FLOWS_DIR}/${name}.json`, config.baseBranch);
   const dir = join(d.cwd, FLOWS_DIR);
   const localNames = existsSync(dir) ? flowFileNames(readdirSync(dir)) : [];
@@ -271,8 +280,20 @@ async function flows(d: DoctorDeps, config: Config, inEffect: LoadedFlow[]): Pro
     if (text === (await remoteText(name))) continue;
     // Once merged, a flow the working copy names may come from the working copy or the base branch.
     const exists = async (other: string) => localNames.includes(other) || (await remoteText(other)) !== null;
-    local.push(await checkFlowsNamed(parseFlow(name, text), exists));
+    local.push(await readFlow(name, text, exists));
   }
+  return local;
+}
+
+/**
+ * Checks the flows in effect and the checkout's flow files that differ from the base branch, as the team would have
+ * them once merged. Reads only: the files, and the open issues of a flow whose working copy drops states.
+ */
+async function flows(d: DoctorDeps, config: Config, inEffect: LoadedFlow[], local: LoadedFlow[]): Promise<FlowsFact> {
+  const dir = join(d.cwd, FLOWS_DIR);
+  const remoteMisnamed = misnamedFlowFiles(await d.github.listFilesAt(FLOWS_DIR, config.baseBranch));
+  const localMisnamed = existsSync(dir) ? misnamedFlowFiles(readdirSync(dir)).filter((file) => !remoteMisnamed.includes(file)) : [];
+  const misnamed = [...remoteMisnamed.map((file) => ({ file, local: false })), ...localMisnamed.map((file) => ({ file, local: true }))];
   const all = [...inEffect.map((l) => ({ l, local: false })), ...local.map((l) => ({ l, local: true }))];
 
   const invalid = all.flatMap(({ l, local }) => (l.ok ? [] : [{ flow: l.name, local, errors: l.errors }]));
@@ -317,7 +338,17 @@ async function flows(d: DoctorDeps, config: Config, inEffect: LoadedFlow[]): Pro
     }
   }
 
-  return { kind: "flows", baseBranch: config.baseBranch, names: inEffect.map((l) => l.name), invalid, slices, missingSkills, missingLabels, orphans };
+  return {
+    kind: "flows",
+    baseBranch: config.baseBranch,
+    names: inEffect.map((l) => l.name),
+    misnamed,
+    invalid,
+    slices,
+    missingSkills,
+    missingLabels,
+    orphans,
+  };
 }
 
 /**

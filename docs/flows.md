@@ -15,7 +15,7 @@ A flow is the process for one type of issue, as data: its states, the skill and 
 
 ## Where flows live
 
-A flow is a JSON file, `.agents/flows/<name>.json`; the file name is the flow's name and its type. norn reads flows from the base branch on GitHub, never from the working tree, so a change to a flow takes effect once it is merged, and everyone runs the same process. `norn doctor` also checks the flow files in your working copy, so you can try a change before you open its PR (see [validation](#validation)).
+A flow is a JSON file, `.agents/flows/<name>.json`; the file name is the flow's name and its type, so it is lowercase letters, digits, `-` and `_`, starting with a letter or digit. norn reads no flow from a file named otherwise, e.g. `Bug.json`, and `norn doctor` fails on it. norn's output calls an issue by its type, e.g. `Bug #40` and its bug PR, `Epic #13` and its tasks. norn reads flows from the base branch on GitHub, never from the working tree, so a change to a flow takes effect once it is merged, and everyone runs the same process. `norn doctor` also checks the flow files in your working copy, so you can try a change before you open its PR (see [validation](#validation)).
 
 ## The format
 
@@ -40,16 +40,23 @@ A flow is a JSON file, `.agents/flows/<name>.json`; the file name is the flow's 
       "color": "d93f0b",
       "description": "an agent fixes the bug",
       "behaviours": { "opensPR": {} },
-      "outcomes": { "fixed": { "to": "verifying", "means": "the fix is pushed, a person checks it" } }
+      "outcomes": { "fixed": { "to": "verifying", "means": "the fix is in its PR, a person checks it" } }
     },
     "verifying": {
       "skill": "bug-verify",
       "attended": true,
       "behaviours": { "humanGate": {} },
       "outcomes": {
-        "pass": { "to": "closed", "means": "the bug is gone" },
+        "pass": { "to": "merging", "means": "the bug is gone, its owner merges the PR" },
         "fail": { "to": "changes-requested", "means": "the bug is still there", "note": "repro" }
       }
+    },
+    "merging": {
+      "skill": "norn-merge",
+      "attended": true,
+      "description": "the owner merges the fix",
+      "behaviours": { "waitsForMerge": {} },
+      "outcomes": {}
     },
     "changes-requested": {
       "skill": "bug-fix",
@@ -61,6 +68,8 @@ A flow is a JSON file, `.agents/flows/<name>.json`; the file name is the flow's 
   }
 }
 ```
+
+The fix ends in its PR: `fixing` opens it, `norn done` refuses `fixed` until it is open, and the bug closes only once its owner merges it, which `merging` waits for. A flow whose work is a PR needs such a merge step, or `mergesSlice` for a PR into the parent's branch: `norn done` refuses to close an issue of a flow with `opensPR` while its PR is not merged.
 
 The top level:
 
@@ -79,7 +88,7 @@ Each state names the `skill` that runs it, whether it is `attended` (a person ta
 - `when` and `passThrough`: the only mode the state runs in (see [`when`](#mode-conditional-states-when)).
 - `color` (hex without the `#`) and `description`: the state's label. The dashboard words the state with its `description` (its name without one) and colours it with its `color` (a default by kind without one: attended, agent or human gate).
 
-Each outcome, keyed by its word, has a target `to` and what it `means`, the line the briefing gives it. `to` is a state of the flow, `closed` or `not-planned`; those two close the issue. The empty word `""` is the single way a step ends when it has only one. Optional fields: `note`, which makes `norn done` require a note and names it, e.g. `reason`; `needsHuman`, which sets `needs-human` after the transition, saying who must do what; `notify` (`true` or `false`), which tells a person their step is waiting, as entering a `humanGate` state does on its own (the notice names the flow, or the mode for a state with `when`); and `meansSkipped`, what the outcome means instead when the issue's mode skips the state it leads to.
+Each outcome, keyed by its word, has a target `to` and what it `means`, the line the briefing gives it. `to` is a state of the flow, `closed` or `not-planned`; those two close the issue. The empty word `""` is the single way a step ends when it has only one. Optional fields: `note`, which makes `norn done` require a note and names it, e.g. `reason`; `needsHuman`, which sets `needs-human` after the transition, saying who must do what, and `norn done` says so; `notify` (`true` or `false`), which tells a person their step is waiting, as entering a `humanGate` state does on its own (the notice names the flow, or the mode for a state with `when`), so it leads only into an attended state or a human gate, never an agent's; and `meansSkipped`, what the outcome means instead when the issue's mode skips the state it leads to.
 
 `needs-human`, claims and `in-progress` are norn's own and work in every flow as they do for stories and slices.
 
@@ -99,14 +108,14 @@ A state opts into norn's built-in mechanics by naming its behaviours, each with 
 
 | Behaviour | What it does |
 | --- | --- |
-| `opensPR` | The state's briefing says to commit, push and open the issue's PR into the base branch, or the parent's branch, if there is none yet. Once the PR exists, the briefing of every other state names it with its diff; a PR into the parent's branch is named in every other state, as its branch and base are known. It needs `"workspace": "own"` or `"parent"`. |
+| `opensPR` | The state's briefing says to commit, push and open the issue's PR into the base branch, or the parent's branch; once it is open, e.g. on rework, it names that PR and its diff instead. `norn done` refuses to leave the state before the PR exists (closing as `not-planned` needs none), and to close the issue, from any state, before the PR is merged. Once the PR exists, the briefing of every other state names it with its diff; a PR into the parent's branch is named in every other state, as its branch and base are known. It needs `"workspace": "own"` or `"parent"`. |
 | `countsFixRounds` | Entering the state from another one counts a fix round, and taking the issue from it (or in the state it enters as, once a round is counted) briefs the step as rework. When an outcome would start a round past `deliver.maxFixRounds`, the issue gets `needs-human` instead. Every state with it counts toward the same limit. |
 | `humanGate` | A person does this state's step. An outcome into it notifies the user and tells the agent to stop; `norn next` lists the issue as waiting for a person, for its type, or for its mode when the gate has `when`. The briefing carries the QA wording: run the app, tie remarks to criteria, a repro for every failure, and evidence with `--evidence <dir>`. |
 | `mergesSlice` | The state's briefing says to merge the parent's branch into the issue's and merge its PR. `norn done` refuses until that PR is merged into the parent's branch. Once the issue closes, its worktree waits for `norn tidy`, the issues it blocked are released (see `syncsBlocked`), and a story whose slices are all merged moves on. It needs `"workspace": "parent"`. |
 | `syncsBlocked` | `{ "to": "<state>" }`. An issue in the state has no step: it waits for its blockers, GitHub's native "blocked by" relations. Once every blocker is closed, norn moves it to the state `to` names, and back when a blocker reopens before it is taken; `norn next` on its parent and merging a sibling do this. `to` must be a state of the flow. |
 | `writesSpec` | `{ "readsIssue": true }` or `{}`. The issue has a spec of its own, `.agents/specs/<n>-<slug>/spec.md` on its branch: every step's briefing names it instead of the issue, transition comments link it, and resolving `needs-human` says spec changes go there. The state's own briefing says to commit and push the spec, and with `readsIssue` to read the issue first. It needs `"workspace": "own"`. |
 | `slices` | `{ "type": "<flow>" }`. The state's briefing says how to create the slices with `norn add-slice`, which works only in this state: each slice is a sub-issue labelled `type:<flow>`, in that flow's start state (or the state its `syncsBlocked` holds blocked issues in). `norn done` refuses to leave the state before there is a slice. The issue's slices are its sub-issues of that type; `norn next` on the issue runs them too. `type` must be a flow. |
-| `waitsForSlices` | `{ "to": "<state>" }`. An issue in the state has no step: it waits for its slices. Entering it creates the issue's own branch on GitHub, for the slices to branch off. Once every slice is merged, norn opens the issue's PR into the base branch and moves it to the state `to` names; merging the last slice and `norn next` do this. The states after that briefing the PR and its diff, and a state with `countsFixRounds` there commits fixes straight onto the branch. It needs `"workspace": "own"`. |
+| `waitsForSlices` | `{ "to": "<state>" }`. An issue in the state has no step: it waits for its slices. Entering it creates the issue's own branch on GitHub, for the slices to branch off. Once every slice is merged, norn opens the issue's PR into the base branch and moves it to the state `to` names; merging the last slice and `norn next` do this. The states after that brief the PR, by number, and its diff, and a state with `countsFixRounds` there also commits fixes straight onto the branch. It needs `"workspace": "own"`. |
 | `waitsForMerge` | An issue in the state has no step: its owner merges its PR into the base branch, and `norn take` says so. `norn next` lists it as waiting for the owner, and closes it once the PR is merged, as GitHub does not for a base branch other than the default one. It needs `"workspace": "own"`. |
 
 `norn next <issue>` works on an issue of any flow: a human gate or `needs-human` waits for a person, a state a behaviour holds waits for what it names, and any other state is offered to start, with the user when it is attended.
@@ -135,15 +144,16 @@ norn checks a flow strictly before it runs it:
 
 - the fields have the right types, no field is unknown (a misspelt field would otherwise be ignored), the start state exists, every target is a state, `closed` or `not-planned`, and every `renamed` target is a state;
 - every state with `when` names one of its outcomes as `passThrough`;
+- an outcome with `"notify": true` leads into an attended state or a human gate: into an agent's state, the person and an agent would both be sent to the step;
 - every state can reach `closed` or `not-planned` through its outcomes, or where its behaviour moves it (`syncsBlocked`, `waitsForSlices`, `waitsForMerge`), so no issue can be stuck in a loop, in either mode: in `mode:afk` the states for `hil` are passed through, and the other way round;
-- each state's `behaviours` are ones this norn knows, each with an object of the parameters it takes (`{}` for none), allowed together and with what they need, e.g. `opensPR` needs `"workspace": "own"` or `"parent"`, any flow they name exists, and any state they name is a state of the flow. A flow written for a newer norn fails here, which is what the [`nornVersion` pin](configuration.md#the-norn-version) protects against;
+- each state's `behaviours` are ones this norn knows, each with an object of the parameters it takes (`{}` for none), allowed together and with what they need, e.g. `opensPR` needs `"workspace": "own"` or `"parent"`, any flow they name exists, and any state they name is a state of the flow. A misspelt behaviour is named with the one it is closest to, e.g. `syncBlocked` with `syncsBlocked`. A flow written for a newer norn fails here too, which is what the [`nornVersion` pin](configuration.md#the-norn-version) protects against;
 - no state takes a name norn keeps for itself (`closed`, `not-planned`, `in-progress`, `needs-human`), and no flow is named `reject`, triage's outcome.
 
 A broken flow stops only the issues of its own type. `norn take` and `norn done` refuse them with every problem found, triage stops offering the flow, and `norn next` and the dashboard show them waiting for a person, blocked by the broken flow. Issues of other types keep working.
 
 **JSON Schema.** norn publishes the format as a JSON Schema, [`schema/flow.schema.json`](../schema/flow.schema.json), in the npm package (`node_modules/norn/schema/flow.schema.json`) and on GitHub. Point `$schema` at it, as in the example above, and an editor completes the fields and flags a mistake of the shape as you type. The schema checks the shape, the same as norn's first rule; the rules that span the flow, such as reachability, only norn checks.
 
-**`norn doctor`.** Its `flows` check validates the flows on the base branch and every flow file in your working copy that differs from it, so a change is checked before its PR. It fails on an invalid flow, naming each problem and the file, and on a skill a flow names that is not installed in `skills/`. See [commands](commands.md#norn-doctor).
+**`norn doctor`.** Its `flows` check validates the flows on the base branch and every flow file in your working copy that differs from it, so a change is checked before its PR. It fails on an invalid flow, naming every problem at once, each on a line with its file, on a flow file whose name cannot name a type, and on a skill a flow names that is not installed in `skills/`. Its `labels` check counts a label your working copy's flows use as in use. See [commands](commands.md#norn-doctor).
 
 ## Changing a flow under issues in progress
 

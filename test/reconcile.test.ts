@@ -30,7 +30,7 @@ describe("done makes the transition; what follows is best effort", () => {
     expect(w.github.issues.get(127)!.state).toBe("closed");
     expect(w.github.claim(127)).toBeNull();
     expect(w.github.labels(123)).toContain("implementation");
-    expect(res.stdout).toContain("Could not move the story on: HTTP 502. norn next 123 will retry this.");
+    expect(res.stdout).toContain("Could not move #123 on now that its slices are merged: HTTP 502. norn next 123 will retry this.");
 
     w.github.createPullRequest = create;
     const next = await w.norn("next", "123");

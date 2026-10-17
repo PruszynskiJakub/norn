@@ -1,7 +1,7 @@
 import { describe, expect, test } from "vitest";
 import { setup } from "@norn/testing";
 
-/** Story #123 in implementation with slice #127 in implementation, held by this session. */
+/** Story #123 in implementation with slice #127 in implementation, its PR open, held by this session. */
 async function sliceInImplementation() {
   const w = setup();
   const gh = w.github;
@@ -9,6 +9,7 @@ async function sliceInImplementation() {
   gh.seedIssue({ number: 127, title: "Redis store", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
   gh.parents.set(127, 123);
   gh.branches.add("123-rate-limiting");
+  gh.prs.push({ number: 70, head: "123-rate-limiting-127", base: "123-rate-limiting", state: "open" });
   await w.norn("take", "127");
   return w;
 }

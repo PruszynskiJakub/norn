@@ -28,6 +28,8 @@ export interface StartItem {
   issue: number;
   /** An issue of a repository flow is an `issue`. */
   kind: "story" | "slice" | "issue";
+  /** The flow the item runs, its type, e.g. story or bug. */
+  flow: string;
   title: string;
   state: string;
   /** What the state means, as its flow describes it, e.g. "Waiting for review"; null when the flow gives no description. */
@@ -51,8 +53,8 @@ export interface StartItem {
 export interface NextReport {
   /** The issue next is about: a story with its slices, or an issue of any other flow. */
   issue: number;
-  /** The repository flow the issue runs; absent for a story, which has slices. */
-  flow?: string;
+  /** The flow the issue runs, its type, e.g. story or bug. */
+  flow: string;
   provider: Provider;
   maxParallel: number;
   title: string;
@@ -93,9 +95,9 @@ async function reconcile(ctx: Ctx, n: number, named: NamedFlow): Promise<Event[]
     try {
       const branch = await ensureOwnBranch(ctx, issue);
       if (!branch.ok) notes.push(branch.refusal);
-      else if (branch.created) notes.push({ kind: "story-branch-created", branch: branch.branch });
+      else if (branch.created) notes.push({ kind: "story-branch-created", flow: named.name, branch: branch.branch });
     } catch (e) {
-      notes.push({ kind: "story-branch-failed", detail: (e as Error).message });
+      notes.push({ kind: "story-branch-failed", flow: named.name, detail: (e as Error).message });
     }
   }
   if (held) notes.push(...(await reconcileState(held)));
@@ -129,7 +131,7 @@ export async function computeNext(ctx: Ctx, n: number, loaded: LoadedFlow): Prom
   const loc = flow ? await locate(issue, ctx, flow) : null;
   const report: NextReport = {
     issue: n,
-    ...(story ? {} : { flow: loaded.name }),
+    flow: loaded.name,
     provider: ctx.config.provider,
     maxParallel: ctx.config.maxParallel,
     title: issue.title,
@@ -227,7 +229,7 @@ async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, named:
   }
   const step = flowStep(issue, flow);
   if (!step) return;
-  await offer(ctx, issue, report, { kind, state, step, flow });
+  await offer(ctx, issue, report, { kind, state, step, named });
 }
 
 /** Lists an item to start, or as held when a live claim is on it. */
@@ -235,8 +237,9 @@ async function offer(
   ctx: Ctx,
   issue: Issue,
   report: NextReport,
-  { kind, state, step, flow }: { kind: StartItem["kind"]; state: string; step: Step; flow: Flow | null },
+  { kind, state, step, named }: { kind: StartItem["kind"]; state: string; step: Step; named: NamedFlow },
 ) {
+  const { flow } = named;
   const n = issue.number;
   const held = await heldBy(ctx, n);
   if (held) {
@@ -254,6 +257,7 @@ async function offer(
     // Fresh for every agent: a new agent on an item whose claim went stale must not pass for the old holder.
     session: ctx.config.provider === "git" ? `norn-${n}-${ctx.nonce()}` : null,
     kind,
+    flow: named.name,
     title: issue.title,
     state,
     description: flow?.states[state]?.description ?? null,
@@ -307,7 +311,7 @@ export const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owne
 /** Why next refuses the issue, of `loaded` flow: one with no flow yet, or one that works in its parent's branch, which moves on with it. */
 export async function nextRefusal(github: GitHub, issue: Issue, loaded: LoadedFlow | null): Promise<NextRefusal | null> {
   const n = issue.number;
-  if (loaded?.ok && loaded.flow.workspace === "parent") return { kind: "is-a-slice", issue: n, story: await github.parentOf(n) };
+  if (loaded?.ok && loaded.flow.workspace === "parent") return { kind: "is-a-slice", issue: n, flow: loaded.name, story: await github.parentOf(n) };
   return loaded ? null : { kind: "not-a-story", issue: n };
 }
 
@@ -319,5 +323,5 @@ function toNotify(r: NextReport) {
 /** Delivery stops: tell the user what waits for them. */
 export async function notifyWaiting(ctx: Ctx, r: NextReport) {
   if (!r.notified) return;
-  await send(ctx, { kind: "story-waiting", story: r.issue, waiting: toNotify(r) });
+  await send(ctx, { kind: "story-waiting", story: r.issue, flow: r.flow, waiting: toNotify(r) });
 }

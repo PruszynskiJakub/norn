@@ -122,7 +122,7 @@ describe("norn next", () => {
     const w = prdExample();
     const res = await w.norn("next", "131");
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("#131 is a slice of story #123. Run norn next 123");
+    expect(res.stdout).toContain("#131 is a slice of #123. Run norn next 123");
   });
 });
 
@@ -282,7 +282,7 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     expect(res.stdout).toContain(
       [
         "Waiting for a human:",
-        '  - #131 escalated: "Redis client times out in tests" (3 fix rounds reached).',
+        '  - #131 needs a human: escalated: "Redis client times out in tests" (3 fix rounds reached).',
         "    If the user does it now, hand it to an agent in its worktree:",
         "      herdr agent start norn-131 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-131>",
         '      herdr agent prompt norn-131 "norn-drive 131"',

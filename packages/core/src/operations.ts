@@ -1,5 +1,6 @@
 import {
   behaviourFollowUps,
+  closeRefusal,
   entering,
   heldRefusal,
   holds,
@@ -67,10 +68,14 @@ export interface DoneResult {
   from: string | null;
   /** A state of the issue's flow, closed or not-planned. */
   to: string;
+  /** The issue's flow, its type; null for a new issue, which triage gives one. */
+  flow: string | null;
   /** QA evidence pushed and embedded in the transition comment. */
   evidence?: Evidence;
   /** The fix-round limit the outcome reached, so the issue needs a human instead of another round; null when not reached. */
   fixLimit: number | null;
+  /** The outcome set needs-human, saying who must do what, e.g. the flow's needsHuman or the fix-round limit; null when it did not. */
+  needsHuman: string | null;
   /** The issue's own branch, created on GitHub before it entered a state that needs it, e.g. one waiting for its slices. */
   storyBranchCreated: string | null;
   followUps: Event[];
@@ -256,7 +261,7 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   const landed = through?.outcome ?? outcome;
   const inFlow: OutcomeInput | null = named ? { ...inFlowOf(ctx, issue, named), from: stateIn(issue, named), outcome: landed, note } : null;
   if (inFlow) {
-    const r = await leaveRefusal(inFlow);
+    const r = (await leaveRefusal(inFlow)) ?? (await closeRefusal(inFlow));
     if (r) return refuse(r);
   }
   const files = evidenceDir === undefined ? undefined : await ctx.workspace.readEvidence(evidenceDir);
@@ -296,8 +301,10 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
     issue: n,
     from: stateIn(issue, named),
     to: landed.to,
+    flow: named?.name ?? null,
     ...(evidence ? { evidence } : {}),
     fixLimit,
+    needsHuman: applied.needsHuman ?? null,
     storyBranchCreated,
     followUps: inFlow ? await behaviourFollowUps(inFlow, { outcome: applied, fixLimit }) : [],
     deliverable: flow !== null && uses(flow, landed.to, "waitsForSlices"),
@@ -339,7 +346,8 @@ export async function addSlice(ctx: Ctx, story: number, input: { title?: string;
   if (of && !of.ok) return refuse({ kind: "flow-invalid", issue: story, flow: of.name, errors: of.errors });
   const state = of ? (flowStatesOf(parent, of.flow)[0] ?? null) : null;
   // Slices are added only in the state of the parent's flow with the slices behaviour, which names their type.
-  if (!of || !uses(of.flow, state, "slices")) return refuse({ kind: "story-not-slicing", story, state, slicing: of ? slicingState(of.flow) : null });
+  if (!of || !uses(of.flow, state, "slices"))
+    return refuse({ kind: "story-not-slicing", story, flow: of?.name ?? null, state, slicing: of ? slicingState(of.flow) : null });
   const type = sliceType(of.flow)!;
   const blockers = await Promise.all(input.blockedBy.map((b) => github.getIssue(b)));
   const open = blockers.filter((b) => b.state === "open");

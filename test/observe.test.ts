@@ -2,7 +2,7 @@ import { describe, expect, test } from "vitest";
 import { done, observe, take } from "@norn/core";
 import { setup } from "@norn/testing";
 
-/** alice's story #10 in implementation: #11 ready, #12 blocked by #11 in mode:hil. */
+/** alice's story #10 in implementation: #11 ready, its PR open, #12 blocked by #11 in mode:hil. */
 function story() {
   const w = setup({ now: "2026-10-13T12:00:00Z" });
   const gh = w.github;
@@ -12,6 +12,7 @@ function story() {
   gh.parents.set(11, 10);
   gh.parents.set(12, 10);
   gh.blockers.set(12, [11]);
+  gh.prs.push({ number: 70, head: "10-rate-limiting-11", base: "10-rate-limiting", state: "open" });
   return w;
 }
 
@@ -202,9 +203,9 @@ describe("observe: the feed", () => {
     await step("add-slice", "10", "Limits", "--mode", "hil", "--blocked-by", "1000");
     await step("done", "10");
     await step("take", "1000");
-    await step("done", "1000");
     tick();
     await w.github.createPullRequest({ head: "10-rate-limiting-1000", base: "10-rate-limiting", title: "Redis store", body: "Part of #10. Slice #1000." });
+    await step("done", "1000");
     await step("take", "1000");
     await step("escalate", "1000", "Which store?");
     tick();
@@ -251,8 +252,8 @@ describe("observe: the feed", () => {
       "03 #1001 slice created @alice",
       "04 #10 outcome slicing: done @alice",
       "05 #1000 step ready-for-agent → implementation @alice",
-      "06 #1000 outcome implementation: done @alice",
-      "07 #1000 pr slice PR #1002 opened @alice",
+      "06 #1000 pr slice PR #1002 opened @alice",
+      "07 #1000 outcome implementation: done @alice",
       '09 #1000 needs-human raised escalated: "Which store?" @alice',
       "10 #1000 other-activity IssueComment @bob",
       "12 #1000 needs-human resolved @alice",

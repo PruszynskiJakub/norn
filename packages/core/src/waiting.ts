@@ -32,7 +32,8 @@ export type WaitItem = { issue: number } & (
   | ({ reason: "human-qa"; gate: Gate } & HumanPlace)
   /** Held by one of the user's own sessions (`holder.mine`): an agent of theirs at work, using a parallel slot. */
   | { reason: "held"; holder: Holder }
-  | { reason: "owner-merge"; owner: string | null; into: string }
+  /** Its owner merges its PR into `into`; `flow` is its type, e.g. story. */
+  | { reason: "owner-merge"; owner: string | null; into: string; flow: string }
   | { reason: "no-state" }
   | { reason: "ambiguous-state"; states: string[] }
   /** The issue is in a state its flow no longer has; taking it hands it to a person. */

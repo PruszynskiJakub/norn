@@ -29,6 +29,14 @@ describe("the flow JSON Schema", () => {
     expect(validate(JSON.parse(JSON.stringify(f)))).toBe(true);
   });
 
+  test("the example flow in docs/flows.md matches it and is valid", () => {
+    const doc = readFileSync(join(import.meta.dirname, "..", "docs", "flows.md"), "utf8");
+    const example = JSON.parse(/```json\n([\s\S]*?)\n```/.exec(doc)![1]);
+
+    expect(validate(example)).toBe(true);
+    expect(validateFlow(example)).toEqual([]);
+  });
+
   test("ships in the npm package, at the path its $id names", () => {
     const pkg = JSON.parse(readFileSync(join(import.meta.dirname, "..", "package.json"), "utf8"));
     expect(pkg.files).toContain("schema");

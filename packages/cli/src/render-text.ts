@@ -11,6 +11,7 @@ import {
   type Expected,
   type FinishCommand,
   FLOWS_DIR,
+  type FieldAt,
   type FlowError,
   type Gate,
   type HandedOverResult,
@@ -91,6 +92,9 @@ export function hhmm(iso: string) {
   return iso.slice(11, 16);
 }
 
+/** A word as it starts a sentence, e.g. a flow's name: Story. */
+const capitalise = (word: string) => word.charAt(0).toUpperCase() + word.slice(1);
+
 const issues = (ns: number[]) => ns.map((b) => `#${b}`).join(", ");
 
 export const USAGE = [
@@ -113,6 +117,7 @@ export const USAGE = [
   "  norn doctor                        Check the whole setup and say what to fix",
   "  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it",
   "  norn --version                     Print the running norn's version",
+  "  norn --help                        Print this help; so does --help after any command",
   "",
   "Add --json for machine-readable output.",
 ].join("\n");
@@ -258,13 +263,13 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       return [`#${r.issue} has more than one state label (${r.states.join(", ")}); a person must remove the stale one.`, pick(r.story)];
     case "story-in-implementation":
       return [
-        `Story #${r.issue} is in ${r.state}. Its label follows its slices; there is no step to take on the story itself.`,
+        `${capitalise(r.flow)} #${r.issue} is in ${r.state}. Its label follows its slices; there is no step to take on the ${r.flow} itself.`,
         `Run norn next ${r.issue} to see its slices.`,
       ];
     case "story-in-merge-queue":
       return [
-        `Story #${r.issue} is in ${r.state}. Only the story owner (${r.owner ? `@${r.owner}` : "unassigned"}) merges the story PR;`,
-        `once it is merged, norn next ${r.issue} closes the story if GitHub has not. Do not merge it yourself.`,
+        `${capitalise(r.flow)} #${r.issue} is in ${r.state}. Only the ${r.flow} owner (${r.owner ? `@${r.owner}` : "unassigned"}) merges the ${r.flow} PR;`,
+        `once it is merged, norn next ${r.issue} closes the ${r.flow} if GitHub has not. Do not merge it yourself.`,
       ];
     case "blocked":
       return [`#${r.issue} is blocked by ${issues(r.blockers) || "other issues"}. Do not work on it yet.`, pick(r.story)];
@@ -301,7 +306,10 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
     case "outcome-unknown":
       return [`"${r.word}" is not an outcome of ${r.step}.`, "Finish with one of:", ...finishLines(r.finish)];
     case "note-missing":
-      return [`This outcome needs a ${r.note}. Run:`, `  norn done ${r.issue} ${r.word} "${r.note}"${r.evidence ? " [--evidence <dir>]" : ""}`];
+      return [
+        `${r.word ? `The outcome ${r.word}` : "This outcome"} needs a note: the ${r.note}. Run:`,
+        `  norn done ${r.issue}${r.word ? ` ${r.word}` : ""} "${r.note}"${r.evidence ? " [--evidence <dir>]" : ""}`,
+      ];
     case "evidence-not-allowed":
       return [`--evidence is for QA steps; ${r.step} takes none. Finish without it:`, ...finishLines(r.finish)];
     case "evidence-not-a-directory":
@@ -315,25 +323,35 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       ];
     case "no-slices":
       return [
-        `Story #${r.issue} has no slices yet. Create them first, one per slice, with:`,
+        `${capitalise(r.flow)} #${r.issue} has no slices yet. Create them first, one per slice, with:`,
         `  norn add-slice ${r.issue} "title" --mode afk|hil [--blocked-by <issue>]`,
       ];
+    case "no-pr":
+      return [
+        `No PR from ${r.head} into ${r.base} was found, and this step's work is that PR.`,
+        `Push ${r.head}, open the PR as the briefing says, then run norn done ${r.issue} again.`,
+      ];
+    case "pr-not-merged":
+      return [
+        `PR #${r.pr} from ${r.head} is not merged, so #${r.issue} cannot close yet: closing it would leave the work unmerged.`,
+        `Merge it into ${r.base} first, then run norn done ${r.issue} again.`,
+      ];
     case "not-in-story":
-      return [`#${r.issue} is not a sub-issue of a story.`];
+      return [`#${r.issue} is not a sub-issue of another issue.`];
     case "no-slice-pr":
       return [`No PR from ${r.head} was found. Open and merge it before running norn done ${r.issue}.`];
     case "slice-pr-wrong-base":
       return [
-        `PR #${r.pr} from ${r.head} targets ${r.base}, not the story branch ${r.storyBranch}.`,
+        `PR #${r.pr} from ${r.head} targets ${r.base}, not the parent's branch ${r.storyBranch}.`,
         r.merged
-          ? `Its changes are not on ${r.storyBranch}, and a person must sort that out. Run: norn escalate ${r.issue} ${sh(`slice PR #${r.pr} was merged into ${r.base}, not ${r.storyBranch}`)}`
+          ? `Its changes are not on ${r.storyBranch}, and a person must sort that out. Run: norn escalate ${r.issue} ${sh(`PR #${r.pr} was merged into ${r.base}, not ${r.storyBranch}`)}`
           : `Retarget it with: gh pr edit ${r.pr} --base ${sh(r.storyBranch)}, then merge it and run norn done ${r.issue}.`,
       ];
     case "slice-pr-not-merged":
       return [`PR #${r.pr} from ${r.head} is not merged yet.`, `Merge it into ${r.base} (resolve conflicts if needed), then run norn done ${r.issue}.`];
     case "base-branch-missing":
       return [
-        `The story branch ${r.branch} would start from ${r.base}, but ${r.base} does not exist on GitHub.`,
+        `The branch ${r.branch} would start from ${r.base}, but ${r.base} does not exist on GitHub.`,
         `Set baseBranch in ${TEAM_CONFIG} to the repository's default branch and run the command again.`,
       ];
     case "reason-missing":
@@ -343,46 +361,62 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
     case "story-not-slicing":
       return [
         r.slicing
-          ? `Story #${r.story} is in ${r.state ?? "no state"}, not ${r.slicing}. Slices are only added while slicing.`
+          ? `${capitalise(r.flow ?? "issue")} #${r.story} is in ${r.state ?? "no state"}, not ${r.slicing}. Slices are only added there.`
           : `#${r.story} cannot have slices: its flow has no state that adds them.`,
       ];
     case "is-a-slice":
-      return [`#${r.issue} is a slice${r.story ? ` of story #${r.story}. Run norn next ${r.story}` : ""} instead.`];
+      return [`#${r.issue} is a ${r.flow}${r.story ? ` of #${r.story}. Run norn next ${r.story}` : ""} instead.`];
     case "not-a-story":
-      return [`#${r.issue} is not a story yet. Triage it first with: norn take ${r.issue}`];
+      return [`#${r.issue} has no type yet. Triage it first with: norn take ${r.issue}`];
     default:
       return unreachable(r);
   }
 }
 
-/** The flows check: every problem, then the orphans, each with its fix. */
+/**
+ * The flows check: every problem as a sentence of its own, one per line when there are several, then the orphans,
+ * with the fixes after.
+ */
 function flowsCheck(f: FlowsFact): { message: string; fix: string | null } {
   const file = (flow: string) => `${FLOWS_DIR}/${flow}.json`;
-  const messages: string[] = [];
+  const where = (local: boolean) => (local ? "in this checkout" : `on ${f.baseBranch}`);
+  const problems: string[] = [];
   const fixes: string[] = [];
+  for (const m of f.misnamed) {
+    problems.push(
+      `${FLOWS_DIR}/${m.file} ${where(m.local)}: its name cannot name a type, so norn reads no flow from it. A flow's name is lowercase letters, digits, - and _.`,
+    );
+    fixes.push(
+      `rename ${FLOWS_DIR}/${m.file}, e.g. to ${FLOWS_DIR}/${m.file
+        .toLowerCase()
+        .replace(/[^a-z0-9_.-]/g, "-")
+        .replace(/^[-_]+/, "")}`,
+    );
+  }
   for (const i of f.invalid) {
-    messages.push(`${file(i.flow)} ${i.local ? "in this checkout" : `on ${f.baseBranch}`}: ${i.errors.map(flowError).join(" ")}`);
+    for (const e of i.errors) problems.push(`${file(i.flow)} ${where(i.local)}: ${flowError(e)}`);
     fixes.push(i.local ? `fix ${file(i.flow)}, then run norn doctor again` : `fix ${file(i.flow)} and merge it into ${f.baseBranch}`);
   }
   if (f.missingSkills.length) {
     const named = f.missingSkills.map((m) => `${m.skill} (${m.flow}${m.local ? " in this checkout" : ""}, ${m.state})`);
-    messages.push(`skills the flows name are not in skills/: ${named.join(", ")}`);
+    problems.push(`Skills the flows name are not in skills/: ${named.join(", ")}.`);
     fixes.push("add the skills to skills/ and link them from .claude/skills/");
   }
   if (f.missingLabels.length) {
-    messages.push(`labels the local flows need are not on GitHub yet: ${f.missingLabels.map((m) => `${m.label} (${m.flow} in this checkout)`).join(", ")}`);
+    problems.push(`Labels the local flows need are not on GitHub yet: ${f.missingLabels.map((m) => `${m.label} (${m.flow} in this checkout)`).join(", ")}.`);
     fixes.push("norn creates each one when an issue first gets it; to create them up front, run norn init once the change is merged");
   }
   for (const flow of [...new Set(f.orphans.map((o) => o.flow))]) {
     const of = f.orphans.filter((o) => o.flow === flow);
     const gone = of.length === 1 ? "its state is gone, so it would go to needs-human" : "their states are gone, so they would go to needs-human";
-    messages.push(`the local ${file(flow)} would orphan ${of.map((o) => `#${o.issue} (${o.state})`).join(", ")}: ${gone}`);
+    problems.push(`The local ${file(flow)} would orphan ${of.map((o) => `#${o.issue} (${o.state})`).join(", ")}: ${gone}.`);
     fixes.push(`name the new state of each removed one in renamed in ${file(flow)}, or move these issues on first`);
   }
   // With nothing to fix, what the flows make of each other: the type of the slices each one makes.
   const slices = f.slices.map((s) => `${s.flow}${s.local ? " in this checkout" : ""} makes slices of type ${s.type}`);
-  if (!messages.length) return { message: [`all ${plural(f.names.length, "flow")} are valid: ${f.names.join(", ")}`, ...slices].join("; "), fix: null };
-  return { message: messages.join("; "), fix: fixes.join("; ") };
+  if (!problems.length) return { message: [`all ${plural(f.names.length, "flow")} are valid: ${f.names.join(", ")}`, ...slices].join("; "), fix: null };
+  const message = problems.length === 1 ? problems[0] : [`${problems.length} problems:`, ...problems.map((p) => `    - ${p}`)].join("\n");
+  return { message, fix: fixes.join("; ") };
 }
 
 /** Values as a choice, e.g. "own" or "parent". */
@@ -428,19 +462,44 @@ const WORKSPACE_FOR: Partial<Record<BehaviourName, string>> = {
   waitsForMerge: "for the PR its owner merges",
 };
 
+/** Where a field is in a flow file, as the subject of a sentence. */
+function fieldText(at: FieldAt): string {
+  const outcome = (state: string, word: string) => `the outcome ${word || '""'} of the state ${state}`;
+  switch (at.in) {
+    case "flow":
+      return at.field === null ? "The file" : `The field ${at.field}`;
+    case "state":
+      return at.field === null ? `The state ${at.state}` : `The field ${at.field} of the state ${at.state}`;
+    case "outcome":
+      return at.field === null ? capitalise(outcome(at.state, at.word)) : `The field ${at.field} of ${outcome(at.state, at.word)}`;
+    case "behaviour":
+      return at.param === null
+        ? `The parameters of the behaviour ${at.behaviour} of the state ${at.state}`
+        : `The parameter ${at.param} of the behaviour ${at.behaviour} of the state ${at.state}`;
+    case "renamed":
+      return `What renamed moves ${at.from} to`;
+    default:
+      return unreachable(at);
+  }
+}
+
 /** One thing wrong with a flow file. */
 function flowError(e: FlowError): string {
   switch (e.kind) {
     case "not-json":
       return `It is not valid JSON: ${e.detail}`;
     case "field-invalid":
-      return `${e.path || "The file"} must be ${expectedText(e.expected)}.`;
+      return `${fieldText(e.at)} must be ${expectedText(e.expected)}.`;
     case "field-unknown":
-      return `${e.path} is not a field of a flow; check its spelling.`;
+      return e.at.in === "behaviour"
+        ? `${fieldText(e.at)} is not one the behaviour takes; check its spelling.`
+        : `${fieldText(e.at)} is not a field of a flow; check its spelling.`;
     case "start-unknown":
       return `start names ${e.start}, which is not one of its states.`;
     case "target-unknown":
       return `The outcome ${e.word} of ${e.state} leads to ${e.to}, which is not one of its states, closed or not-planned.`;
+    case "notify-agent-state":
+      return `The outcome ${e.word} of ${e.state} notifies a person, but ${e.to} is an agent's step, so an agent would take it too. Make ${e.to} attended or a humanGate, or drop notify.`;
     case "state-reserved":
       return `The state ${e.state} takes a name norn keeps for itself.`;
     case "pass-through-invalid":
@@ -454,7 +513,9 @@ function flowError(e: FlowError): string {
         ? `In mode:${e.mode}, where the states for the other mode are passed through, no outcome from ${e.state} ever leads to closed or not-planned.`
         : `From ${e.state}, no outcome ever leads to closed or not-planned.`;
     case "behaviour-unknown":
-      return `The state ${e.state} uses the behaviour ${e.behaviour}, which this norn does not know; a flow written for a newer norn needs the nornVersion pin raised.`;
+      return e.like
+        ? `The state ${e.state} uses the behaviour ${e.behaviour}, which norn does not have; did you mean ${e.like}?`
+        : `The state ${e.state} uses the behaviour ${e.behaviour}, which this norn does not know. Check its spelling; if the flow is written for a newer norn, raise the nornVersion pin.`;
     case "behaviours-conflict":
       return `The state ${e.state} has the behaviours ${e.behaviours[0]} and ${e.behaviours[1]}, which cannot go together.`;
     case "flow-reserved":
@@ -473,18 +534,20 @@ const heldSince = (since: string | null) => (since ? hhmm(since) : "unknown");
 
 // Events
 
-const TASKS: Record<Exclude<FollowUpTask, "clear-labels">, string> = {
-  "unblock-slices": "unblock the slices waiting on it",
-  "move-story-on": "move the story on",
-  "close-merged-story": "close the merged story",
+/** What a follow-up was to do for issue n. */
+const TASKS: Record<FollowUpTask, (n: number) => string> = {
+  "unblock-slices": () => "unblock the slices waiting on it",
+  "move-story-on": (n) => `move #${n} on now that its slices are merged`,
+  "close-merged-story": (n) => `close #${n}, whose PR is merged`,
+  "clear-labels": (n) => `clear the labels of #${n}`,
 };
 
 export function renderEvent(e: Event): string[] {
   switch (e.kind) {
     case "story-branch-created":
-      return [`Created the story branch ${e.branch}.`];
+      return [`Created the ${e.flow} branch ${e.branch}.`];
     case "story-branch-failed":
-      return [`Could not create the story branch: ${e.detail}`];
+      return [`Could not create the ${e.flow} branch: ${e.detail}`];
     case "base-branch-missing":
       return renderRefusal(e);
     case "worktree-left-for-tidy":
@@ -496,12 +559,11 @@ export function renderEvent(e: Event): string[] {
     case "handed-over":
       return [`#${e.issue} was in ${e.state}, which the flow ${e.flow} no longer has, so it now needs a human.`];
     case "story-promoted":
-      return [`Every slice is merged. Story #${e.story} is now in ${e.to}.`];
+      return [`Every slice is merged. ${capitalise(e.flow)} #${e.story} is now in ${e.to}.`];
     case "story-closed":
-      return [`The story PR is merged. Closed story #${e.story}.`];
+      return [`The ${e.flow} PR is merged. Closed ${e.flow} #${e.story}.`];
     case "follow-up-failed": {
-      const what = e.what === "clear-labels" ? `clear the labels of #${e.issue}` : TASKS[e.what];
-      return [`Could not ${what}: ${e.detail}. norn next ${e.retry} will retry this.`];
+      return [`Could not ${TASKS[e.what](e.issue)}: ${e.detail}. norn next ${e.retry} will retry this.`];
     }
     default:
       return unreachable(e);
@@ -757,10 +819,13 @@ function renderDone(d: DoneResult): string[] {
     const count = d.evidence.files.length;
     lines.push(`Pushed ${count} evidence file${count === 1 ? "" : "s"} to ${d.evidence.branch} and embedded them in the comment.`);
   }
-  if (d.fixLimit !== null) lines.push(`#${n} has reached ${d.fixLimit} fix rounds, so it now needs a human instead of another round of implement.`);
-  if (d.storyBranchCreated) lines.push(...renderEvent({ kind: "story-branch-created", branch: d.storyBranchCreated }));
+  if (d.fixLimit !== null) lines.push(`#${n} has reached ${d.fixLimit} fix rounds, so it now needs a human instead of another round in ${d.to}.`);
+  else if (d.needsHuman !== null)
+    lines.push(`#${n} now needs a human: ${d.needsHuman}. Do not take it again; a person picks it up with the norn-resolve skill.`);
+  if (d.storyBranchCreated) lines.push(...renderEvent({ kind: "story-branch-created", flow: d.flow ?? "issue", branch: d.storyBranchCreated }));
   lines.push(...d.followUps.flatMap(renderEvent));
-  if (d.deliverable) lines.push(`To run the story unattended until it needs a human, the user can start the norn-deliver skill: norn-deliver ${n}`);
+  if (d.deliverable)
+    lines.push(`To run the ${d.flow ?? "issue"} unattended until it needs a human, the user can start the norn-deliver skill: norn-deliver ${n}`);
   if (d.personNext) lines.push(`A person does the next step, so do not take #${n} again. norn has notified the user.`);
   return lines;
 }
@@ -784,13 +849,17 @@ function renderStatus(s: StatusResult): string[] {
     return parts.join(" · ");
   };
   const { story, slices } = s;
-  const lines = [`Story #${story.number} "${story.title}": ${describe(story)} · owner ${story.owner ? `@${story.owner}` : "none"} · branch ${story.branch}`];
+  const head = [
+    `${capitalise(story.flow ?? "issue")} #${story.number} "${story.title}": ${describe(story)}`,
+    `owner ${story.owner ? `@${story.owner}` : "none"}`,
+  ];
+  const lines = [[...head, ...(story.branch ? [`branch ${story.branch}`] : [])].join(" · ")];
   if (slices.length) {
     lines.push(`Slices (${slices.filter((r) => r.status === "merged").length} of ${slices.length} merged):`);
     const names = slices.map((r) => `#${r.number} "${r.title}"`);
     const width = Math.max(...names.map((x) => x.length)) + 3;
     for (const [i, r] of slices.entries()) lines.push(`  ${names[i].padEnd(width)}${describe(r)}`);
-  } else lines.push("No slices yet.");
+  } else if (story.makesSlices) lines.push("No slices yet.");
   return lines;
 }
 
@@ -876,7 +945,7 @@ export function waitDetail(w: WaitItem): string {
     case "held":
       return `is held by ${holderText(w.holder)}`;
     case "owner-merge":
-      return `waits for its owner (${w.owner ? `@${w.owner}` : "the story owner"}) to merge the story PR into ${w.into}`;
+      return `waits for its owner (${w.owner ? `@${w.owner}` : `the ${w.flow} owner`}) to merge the ${w.flow} PR into ${w.into}`;
     case "no-state":
       return "has no state label; a person must set one";
     case "ambiguous-state":
@@ -907,25 +976,29 @@ function humanHandOff(w: WaitItem): string[] {
   ];
 }
 
+/** An item and what it waits on, e.g. `#131 needs a human: escalated: "…"`. */
+function waitText(w: WaitItem) {
+  return `#${w.issue} ${w.reason === "needs-human" ? "needs a human: " : ""}${waitDetail(w)}`;
+}
+
 /** What waits for a person, and who holds it if a session does. */
 function humanDetail(w: WaitItem) {
   const held = heldByOf(w);
-  return `${waitDetail(w)}${held ? `, held by ${holderText(held)}` : ""}`;
+  return `${waitText(w)}${held ? `, held by ${holderText(held)}` : ""}`;
 }
 
 function waitLine(w: WaitItem) {
   // Inside its worktree this session is where the user does it, so it is not told off.
   const dont = "here" in w && w.here ? "" : " Do not take it.";
-  if (w.reason === "needs-human") return `  - #${w.issue} needs a human: ${humanDetail(w)}.${dont}`;
-  if (w.reason === "human-qa") return `  - #${w.issue} ${humanDetail(w)}.${dont}`;
-  return `  - #${w.issue} ${waitDetail(w)}.`;
+  if (w.reason === "needs-human" || w.reason === "human-qa") return `  - ${humanDetail(w)}.${dont}`;
+  return `  - ${waitText(w)}.`;
 }
 
 function renderNothingLeft(r: NextReport): string {
   const human = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));
   const blocked = r.waiting.filter((w) => w.reason === "blocked");
   const out = [...r.notes.flatMap(renderEvent), `${subject(r)}: nothing left that you can do.`];
-  if (human.length) out.push("Waiting for a human:", ...human.flatMap((w) => [`  - #${w.issue} ${humanDetail(w)}.`, ...humanHandOff(w)]));
+  if (human.length) out.push("Waiting for a human:", ...human.flatMap((w) => [`  - ${humanDetail(w)}.`, ...humanHandOff(w)]));
   if (blocked.length) out.push("Blocked until then:", ...blocked.map(waitLine));
   out.push(`Stop here and report to the user.${r.notified ? " norn has already notified them." : ""}`);
   return out.join("\n");
@@ -936,14 +1009,14 @@ function runningNote(r: NextReport) {
   return ` (${r.running} of your agents ${r.running === 1 ? "is" : "are"} running, the limit is ${r.maxParallel})`;
 }
 
-/** What next is about, e.g. `Story #123 "Rate limiting"`. */
+/** What next is about, called by its type, e.g. `Story #123 "Rate limiting"`. */
 function subject(r: NextReport) {
-  return `${r.flow ? "Issue" : "Story"} #${r.issue} "${r.title}"`;
+  return `${capitalise(r.flow)} #${r.issue} "${r.title}"`;
 }
 
 /** An item to start, e.g. `Slice #131 "Per-key limits"`. */
 function itemWhat(s: StartItem) {
-  return `${{ story: "Story", slice: "Slice", issue: "Issue" }[s.kind]} #${s.issue} "${s.title}"`;
+  return `${capitalise(s.flow)} #${s.issue} "${s.title}"`;
 }
 
 export function renderNext(r: NextReport): string {
@@ -999,9 +1072,9 @@ export function renderNext(r: NextReport): string {
           out.push(`    Start an agent: ${start}`, `    Then prompt it: herdr agent prompt norn-${s.issue} "${prompt}"`);
         } else if (s.here) out.push("    You are in its worktree: take it in this session.");
         else {
-          // An attended step needs the user, so the new agent drives the story from its worktree and this session stops.
+          // An attended step needs the user, so the new agent drives the issue from its worktree and this session stops.
           out.push(
-            "    Hand the story to an agent in its worktree, which drives it on with the user:",
+            `    Hand the ${r.flow} to an agent in its worktree, which drives it on with the user:`,
             `      ${start}`,
             `      herdr agent prompt norn-${s.issue} "norn-drive ${r.issue}"`,
             `      herdr agent focus norn-${s.issue}`,
@@ -1036,8 +1109,8 @@ export function renderNotification(n: Notification): { title: string; body: stri
       };
     case "story-waiting":
       return {
-        title: `norn: story #${n.story} is waiting for you`,
-        body: n.waiting.map((w) => `#${w.issue} ${waitDetail(w)}`).join("\n") || "Nothing left to do on the story.",
+        title: `norn: ${n.flow} #${n.story} is waiting for you`,
+        body: n.waiting.map(waitText).join("\n") || `Nothing left to do on the ${n.flow}.`,
       };
     default:
       return unreachable(n);

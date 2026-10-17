@@ -21,7 +21,7 @@ import { doctor, doctorFailed } from "./doctor.js";
 import { flows } from "./flows.js";
 import { init } from "./init.js";
 import { renderJson } from "./render-json.js";
-import { type Answer, type CliRefusal, NEEDS_NUMBER, renderAnswer, renderRefusal, renderWarning } from "./render-text.js";
+import { type Answer, type CliRefusal, NEEDS_NUMBER, renderAnswer, renderRefusal, renderWarning, USAGE } from "./render-text.js";
 
 export type Deps = Omit<Ctx, "config" | "slugs"> & {
   cwd: string;
@@ -53,6 +53,8 @@ interface Reply {
 export async function run(argv: string[], deps: Deps): Promise<Result> {
   const { bools } = parseArgs(argv);
   if (bools.has("version")) return { exitCode: 0, stdout: deps.version };
+  // Help is asked for, so it is an answer, not a usage error, and no command runs, e.g. the dashboard.
+  if (bools.has("help")) return { exitCode: 0, stdout: USAGE };
   const { answer, warnings } = await dispatch(argv, deps);
   const usage = ["usage", "needs-number", "bad-dashboard-flag", "flows-usage"];
   // doctor answers even when a check fails, but exits 1 so CI notices.

@@ -318,6 +318,21 @@ describe("norn doctor: labels from the flows", () => {
     expect(labels?.message).not.toContain("frontend");
   });
 
+  test("a label a local flow edit uses is not one no flow uses, as the flows check reads that edit too", async () => {
+    const { w, cwd, norn } = await healthy();
+    w.github.seedFlow("bug", bugFlow());
+    for (const name of ["bug-repro", "bug-fix"]) skillDir(join(cwd, "skills"), name);
+    await w.github.ensureLabels(
+      ["reproducing", "fixing", "type:bug", "triaging"].map((name) => ({ name, color: "ededed", description: "Made by norn (norn)" })),
+    );
+    const triaging = { skill: "bug-repro", attended: true, outcomes: { triaged: { to: "reproducing", means: "triaged" } } };
+    localFlow(cwd, "bug", bugFlow({ start: "triaging", states: { ...bugFlow().states, triaging } }));
+
+    const labels = await check(norn, "labels");
+
+    expect(labels?.message).not.toContain("triaging");
+  });
+
   test("norn marks the description of every label it creates as norn's", async () => {
     const { w } = await healthy();
 
@@ -368,7 +383,7 @@ describe("norn doctor: flows", () => {
     expect(await check(norn, "flows")).toEqual({
       id: "flows",
       level: "warning",
-      message: "labels the local flows need are not on GitHub yet: triaging (bug in this checkout)",
+      message: "Labels the local flows need are not on GitHub yet: triaging (bug in this checkout).",
       fix: "norn creates each one when an issue first gets it; to create them up front, run norn init once the change is merged",
     });
   });
@@ -380,9 +395,54 @@ describe("norn doctor: flows", () => {
     expect(await check(norn, "flows")).toEqual({
       id: "flows",
       level: "fail",
-      message: '.agents/flows/bug.json on main: workspace must be "none", "own" or "parent". start names nowhere, which is not one of its states.',
+      message: [
+        "2 problems:",
+        '    - .agents/flows/bug.json on main: The field workspace must be "none", "own" or "parent".',
+        "    - .agents/flows/bug.json on main: start names nowhere, which is not one of its states.",
+      ].join("\n"),
       fix: "fix .agents/flows/bug.json and merge it into main",
     });
+  });
+
+  test("a flow file whose name cannot name a type fails, on the base branch and in the checkout, instead of being skipped", async () => {
+    const { w, cwd, norn } = await withBugFlow();
+    w.github.seedFile(".agents/flows/Bug-Fix.json", JSON.stringify(bugFlow()));
+    localFlow(cwd, "Chore", bugFlow());
+
+    expect(await check(norn, "flows")).toEqual({
+      id: "flows",
+      level: "fail",
+      message: [
+        "2 problems:",
+        "    - .agents/flows/Bug-Fix.json on main: its name cannot name a type, so norn reads no flow from it. A flow's name is lowercase letters, digits, - and _.",
+        "    - .agents/flows/Chore.json in this checkout: its name cannot name a type, so norn reads no flow from it. A flow's name is lowercase letters, digits, - and _.",
+      ].join("\n"),
+      fix: "rename .agents/flows/Bug-Fix.json, e.g. to .agents/flows/bug-fix.json; rename .agents/flows/Chore.json, e.g. to .agents/flows/chore.json",
+    });
+  });
+
+  test("every problem of a flow is reported at once, the flows its behaviours name included, a misspelt behaviour with its likely name", async () => {
+    const { cwd, norn } = await withBugFlow();
+    localFlow(cwd, "epic", {
+      ...bugFlow({ workspace: "own" }),
+      states: {
+        reproducing: {
+          skill: "bug-repro",
+          attended: true,
+          behaviours: { slices: { type: "tsk" }, syncBlocked: { to: "fixing" }, waitsForSlices: { to: "nowhere" } },
+          outcomes: { done: { to: "closed", means: "done" } },
+        },
+      },
+    });
+
+    const message = (await check(norn, "flows"))?.message ?? "";
+
+    expect(message.split("\n")).toEqual([
+      "3 problems:",
+      "    - .agents/flows/epic.json in this checkout: The state reproducing uses the behaviour syncBlocked, which norn does not have; did you mean syncsBlocked?",
+      "    - .agents/flows/epic.json in this checkout: The parameter to of the behaviour waitsForSlices of the state reproducing must be a state of the flow.",
+      "    - .agents/flows/epic.json in this checkout: The behaviour slices of reproducing names the flow tsk, which the repository does not have.",
+    ]);
   });
 
   test("an invalid flow in the working copy fails before it is merged", async () => {
@@ -434,8 +494,11 @@ describe("norn doctor: flows", () => {
     expect(await check(norn, "flows")).toEqual({
       id: "flows",
       level: "fail",
-      message:
-        "skills the flows name are not in skills/: bug-fix (bug, fixing), chore-do (chore in this checkout, tidying); labels the local flows need are not on GitHub yet: tidying (chore in this checkout), type:chore (chore in this checkout)",
+      message: [
+        "2 problems:",
+        "    - Skills the flows name are not in skills/: bug-fix (bug, fixing), chore-do (chore in this checkout, tidying).",
+        "    - Labels the local flows need are not on GitHub yet: tidying (chore in this checkout), type:chore (chore in this checkout).",
+      ].join("\n"),
       fix: "add the skills to skills/ and link them from .claude/skills/; norn creates each one when an issue first gets it; to create them up front, run norn init once the change is merged",
     });
   });
@@ -453,7 +516,7 @@ describe("norn doctor: flows", () => {
     expect(await check(norn, "flows")).toEqual({
       id: "flows",
       level: "warning",
-      message: "the local .agents/flows/bug.json would orphan #12 (fixing): its state is gone, so it would go to needs-human",
+      message: "The local .agents/flows/bug.json would orphan #12 (fixing): its state is gone, so it would go to needs-human.",
       fix: "name the new state of each removed one in renamed in .agents/flows/bug.json, or move these issues on first",
     });
   });
@@ -480,7 +543,7 @@ describe("norn doctor: flows", () => {
     localFlow(cwd, "slice", { ...bugFlow(), workspace: "parent", triage: false });
 
     expect((await check(norn, "flows"))?.message).toBe(
-      "the local .agents/flows/slice.json would orphan #21 (blocked): its state is gone, so it would go to needs-human",
+      "The local .agents/flows/slice.json would orphan #21 (blocked): its state is gone, so it would go to needs-human.",
     );
   });
 

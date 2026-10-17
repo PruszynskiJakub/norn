@@ -72,7 +72,7 @@ describe("a repository flow", () => {
     const res = await w.norn("take", "40");
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toContain('You now hold issue #40 "Crash on empty input". Its step is reproducing.');
+    expect(res.stdout).toContain('You now hold bug #40 "Crash on empty input". Its step is reproducing.');
     expect(res.stdout.replace(/\s+/g, " ")).toContain("This step is attended");
     expect(res.stdout).toContain("Invoke the skill: bug-repro\n");
     expect(res.stdout).toContain("norn done 40 reproduced");
@@ -150,6 +150,7 @@ describe("the flow's workspace", () => {
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"], assignees: ["alice"] });
     w.github.seedIssue({ number: 140, title: "Per-key limits", labels: ["type:task", "doing"], assignees: ["alice"] });
     w.github.parents.set(140, 123);
+    w.github.prs.push({ number: 70, head: "123-rate-limiting-140", base: "123-rate-limiting", state: "open" });
     await w.norn("take", "140");
 
     await w.norn("done", "140", "done");
@@ -297,7 +298,7 @@ describe("a broken flow", () => {
     const res = await w.norn("done", "40", "reproduced");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain('  workspace must be "none", "own" or "parent".');
+    expect(res.stdout).toContain('  The field workspace must be "none", "own" or "parent".');
     expect(w.github.labels(40).sort()).toEqual(["in-progress", "reproducing", "type:bug"]);
   });
 
@@ -326,7 +327,7 @@ describe("a broken flow", () => {
     const res = await w.norn("take", "40");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("  states.fixing.behaviours must be an object of behaviour names.\n");
+    expect(res.stdout).toContain("  The field behaviours of the state fixing must be an object of behaviour names.\n");
   });
 
   test("a flow cannot take the name of triage's reject", async () => {
@@ -737,7 +738,7 @@ describe("a state for one mode only (when)", () => {
     expect(b.exitCode).toBe(1);
     expect(b.stdout).toContain("  The state verifying passes through approved, which is not one of its outcomes.");
     expect(c.exitCode).toBe(1);
-    expect(c.stdout).toContain('  states.verifying.when must be "afk" or "hil".');
+    expect(c.stdout).toContain('  The field when of the state verifying must be "afk" or "hil".');
   });
 });
 

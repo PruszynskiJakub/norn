@@ -172,6 +172,7 @@ describe("the dashboard server", () => {
     const s = await started(d);
     await s.idle();
     d.w.setNow("2026-10-13T12:02:00Z");
+    d.w.github.prs.push({ number: 70, head: "10-rate-limiting-11", base: "10-rate-limiting", state: "open" });
     await d.w.norn("take", "11");
     await d.w.norn("done", "11");
 

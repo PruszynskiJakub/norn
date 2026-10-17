@@ -1,17 +1,14 @@
 import { behaviourLines, EVIDENCE_FILES, inFlowOf, readIssue as readIssueLine } from "./behaviours.js";
-import { type Flow, flowStatesOf, gateAhead, hasSpec, type NamedFlow, usedIn, uses } from "./flow.js";
-import { flowOf, validFlow } from "./flow-loading.js";
+import { flowNameOf, flowStatesOf, gateAhead, hasSpec, type NamedFlow, uses } from "./flow.js";
 import type { Issue } from "./github.js";
 import { locate, workIn, type Location, type WorkIn } from "./location.js";
 import type { Step } from "./machine.js";
 import { specPath } from "./text.js";
 import type { Ctx } from "./transitions.js";
 
-/** What an issue of the flow is called: a story when it has slices, a slice when it works in its parent's branch, else an issue. */
-export function noun(flow: Flow | null): "issue" | "story" | "slice" {
-  if (!flow) return "issue";
-  if (usedIn(flow, "slices")) return "story";
-  return flow.workspace === "parent" ? "slice" : "issue";
+/** What an issue is called: its type, the name of the flow it runs, e.g. story or bug; an issue before triage gives it one. */
+export function noun(issue: Issue): string {
+  return flowNameOf(issue) ?? "issue";
 }
 
 /** One way to finish a step: `norn done <issue> <word> ["<note>"] [--evidence <dir>]`. */
@@ -30,7 +27,8 @@ export interface FinishCommand {
 /** Everything a session needs to do an issue's step. */
 export interface Briefing {
   issue: number;
-  noun: "issue" | "story" | "slice";
+  /** What the issue is called, see noun. */
+  noun: string;
   title: string;
   step: { name: string; skill: string; attended: boolean };
   /** Where to work; null when the issue has no branch of its own yet, e.g. in triage. */
@@ -50,7 +48,7 @@ export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: string 
   const loc = await locate(issue, ctx, flow);
   return {
     issue: n,
-    noun: noun(flow),
+    noun: noun(issue),
     title: issue.title,
     step: { name: step.name, skill: step.skill, attended: step.attended },
     workIn: loc ? await workIn(loc, ctx.workspace, ctx.github, ctx.config.provider) : null,
@@ -94,12 +92,11 @@ async function flowLines(issue: Issue, step: Step, ctx: Ctx, from: string | null
   }
   const state = flowStatesOf(issue, flow)[0] ?? null;
   // Work in the parent's branch follows the parent's spec.
-  const what = noun(loc && flow.workspace === "parent" ? validFlow(await flowOf(ctx, loc.story)) : null);
-  const spec = loc && flow.workspace === "parent" ? [`Spec: ${specPath(loc.story.number, loc.slug)} (${what} #${loc.story.number})`] : [];
+  const spec = loc && flow.workspace === "parent" ? [`Spec: ${specPath(loc.story.number, loc.slug)} (${noun(loc.story)} #${loc.story.number})`] : [];
   const lines = [...spec, ...(ownSpec ? [] : [readIssue]), ...(await behaviourLines({ ...inFlowOf(ctx, issue, named), state, from, step, loc }))];
   // An agent's step with evidence is QA: its note is the evidence pack.
   if (state !== null && flow.states[state].evidence && !uses(flow, state, "humanGate"))
-    lines.push(...agentQaLines(n, noun(flow), gateAhead(flow, issue, state)));
+    lines.push(...agentQaLines(n, noun(issue), gateAhead(flow, issue, state)));
   return lines;
 }
 

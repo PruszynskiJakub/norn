@@ -104,6 +104,8 @@ export interface Behaviour {
   briefing?(b: BriefingInput): Promise<string[]>;
   /** Checked by done before an issue leaves a state with the behaviour, before anything changes; a refusal stops done. */
   leave?(o: OutcomeInput): Promise<Refusal | null>;
+  /** Checked by done before an outcome closes an issue of a flow that uses the behaviour in any state, as leave is. */
+  close?(o: OutcomeInput): Promise<Refusal | null>;
   /** Run by done for an outcome into a state with the behaviour, before it is applied: may change what is applied. */
   enter?(o: OutcomeInput, applied: Applied): Promise<Applied>;
   /** Run once done applied an outcome into or out of a state with the behaviour; best effort, see bestEffort. */
@@ -177,9 +179,9 @@ const slices: Behaviour = {
     ];
   },
   /** The issue moves on only once it has a slice; resolving needs-human stays put and needs none. */
-  async leave({ ctx, issue, flow, from, outcome }) {
+  async leave({ ctx, issue, flow, flowName, from, outcome }) {
     if (from === outcome.to || (await slicesOf(ctx.github, issue.number, flow)).length) return null;
-    return { kind: "no-slices", issue: issue.number };
+    return { kind: "no-slices", issue: issue.number, flow: flowName };
   },
 };
 
@@ -209,18 +211,20 @@ const waitsForSlices: Behaviour = {
   workspaces: ["own"],
   holds: true,
   needsBranch: true,
-  async held({ issue, state }) {
-    return { kind: "story-in-implementation", issue: issue.number, state };
+  async held({ issue, flowName, state }) {
+    return { kind: "story-in-implementation", issue: issue.number, flow: flowName, state };
   },
   /**
    * Once the slices are merged, the work is on the issue's own PR: the states after the wait show it and its diff, and
    * a state that fixes what review or QA sent back commits straight onto the branch.
    */
-  async briefing({ flow, flowName, state, loc }) {
+  async briefing({ ctx, flow, flowName, state, loc }) {
     const wait = waitState(flow);
     if (!loc || !wait || state === null || !reachable(flow, wait.to).has(state)) return [];
-    if (uses(flow, state, "countsFixRounds")) return [`Commit the fixes straight onto the ${flowName} branch ${loc.branch} and push them.`];
-    return [`${capitalised(flowName)} PR: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`];
+    const pr = await ctx.github.findPullRequest(loc.branch);
+    const line = `${capitalised(flowName)} PR${pr ? ` #${pr.number}` : ""}: ${loc.branch} into ${loc.base}. Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`;
+    if (uses(flow, state, "countsFixRounds")) return [`Commit the fixes straight onto the ${flowName} branch ${loc.branch} and push them.`, line];
+    return [line];
   },
   async reconcile({ ctx, issue }) {
     return bestEffort("move-story-on", issue.number, issue.number, () => moveOnFromSlices(ctx, issue.number));
@@ -253,7 +257,7 @@ export async function moveOnFromSlices(ctx: Ctx, n: number): Promise<Event[]> {
       }));
     await setState(ctx, issue, wait.to, `Every slice is merged into ${loc.branch}. ${capitalised(loaded.name)} PR: #${pr.number}.`, flow);
   });
-  return moved ? [{ kind: "story-promoted", story: n, to: wait.to }] : [];
+  return moved ? [{ kind: "story-promoted", story: n, flow: loaded.name, to: wait.to }] : [];
 }
 
 const waitsForMerge: Behaviour = {
@@ -262,18 +266,18 @@ const waitsForMerge: Behaviour = {
   /** The PR comes from the issue's own branch into the base branch. */
   workspaces: ["own"],
   holds: true,
-  async held({ issue, state }) {
-    return { kind: "story-in-merge-queue", issue: issue.number, owner: issue.assignees[0] ?? null, state };
+  async held({ issue, flowName, state }) {
+    return { kind: "story-in-merge-queue", issue: issue.number, flow: flowName, owner: issue.assignees[0] ?? null, state };
   },
-  async waiting({ ctx, issue }) {
-    return { issue: issue.number, reason: "owner-merge", owner: issue.assignees[0] ?? null, into: ctx.config.baseBranch };
+  async waiting({ ctx, issue, flowName }) {
+    return { issue: issue.number, reason: "owner-merge", owner: issue.assignees[0] ?? null, into: ctx.config.baseBranch, flow: flowName };
   },
   async reconcile(h) {
     return bestEffort("close-merged-story", h.issue.number, h.issue.number, async () => {
       if (!(await closeMerged(h))) return [];
       h.issue.state = "closed";
       h.issue.labels = h.issue.labels.filter((l) => !Object.hasOwn(h.flow.states, l));
-      return [{ kind: "story-closed", story: h.issue.number }];
+      return [{ kind: "story-closed", story: h.issue.number, flow: h.flowName }];
     });
   },
 };
@@ -307,6 +311,9 @@ const opensPR: Behaviour = {
     const diff = `Diff: git diff ${sh(`origin/${loc.base}...HEAD`)}`;
     const parent = flow.workspace === "parent";
     if (uses(flow, state, "opensPR")) {
+      // On rework the PR is already open: the new commits go into it.
+      const open = await ctx.github.findPullRequest(loc.branch);
+      if (open?.state === "open") return [`Commit on ${loc.branch} and push: they go into PR #${open.number}, ${loc.branch} into ${open.base}.`, diff];
       const body = parent ? `Part of #${loc.story.number}. ${capitalised(flowName)} #${issue.number}.` : `Closes #${issue.number}.`;
       return [
         `Commit on ${loc.branch} and push. Open one PR from ${loc.branch} into ${loc.base} if there is none yet:`,
@@ -320,6 +327,22 @@ const opensPR: Behaviour = {
     if (parent) return [`${capitalised(flowName)} PR: ${loc.branch} into ${loc.base}. ${diff}`];
     const pr = await ctx.github.findPullRequest(loc.branch);
     return pr ? [`PR #${pr.number}: ${loc.branch} into ${pr.base}. ${diff}`] : [];
+  },
+  /** The step opens the PR, so the issue moves on only once there is one; closing it as not planned, or staying put, needs none. */
+  async leave({ ctx, issue, flow, from, outcome }) {
+    if (from === outcome.to || outcome.to === "not-planned") return null;
+    const loc = await locate(issue, ctx, flow);
+    if (!loc || (await ctx.github.findPullRequest(loc.branch))) return null;
+    return { kind: "no-pr", issue: issue.number, head: loc.branch, base: loc.base };
+  },
+  /** An issue whose work is a PR is done once the PR is merged: closing it before would leave the PR open, or the work unmerged. */
+  async close({ ctx, issue, flow }) {
+    const loc = await locate(issue, ctx, flow);
+    if (!loc) return null;
+    const pr = await ctx.github.findPullRequest(loc.branch);
+    if (!pr) return { kind: "no-pr", issue: issue.number, head: loc.branch, base: loc.base };
+    if (pr.state !== "merged") return { kind: "pr-not-merged", issue: issue.number, pr: pr.number, head: loc.branch, base: pr.base };
+    return null;
   },
 };
 
@@ -476,6 +499,16 @@ function inState(flow: Flow, state: string | null): Behaviour[] {
 export async function leaveRefusal(o: OutcomeInput): Promise<Refusal | null> {
   for (const behaviour of inState(o.flow, o.from)) {
     const refusal = await behaviour.leave?.(o);
+    if (refusal) return refusal;
+  }
+  return null;
+}
+
+/** Why the behaviours of the flow stop an outcome that closes the issue; null when none does, or the outcome does not close it. */
+export async function closeRefusal(o: OutcomeInput): Promise<Refusal | null> {
+  if (o.outcome.to !== "closed") return null;
+  for (const behaviour of inFlow(o.flow)) {
+    const refusal = await behaviour.close?.(o);
     if (refusal) return refusal;
   }
   return null;

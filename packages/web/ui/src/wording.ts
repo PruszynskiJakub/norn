@@ -1,6 +1,6 @@
 // The dashboard's renderer: every sentence the page shows is worded here, from
 // the typed read model, so the rest of the UI only lays words out.
-import type { ClaimHolder, Expected, FeedEvent, Flow, FlowError, FlowSource, LoadedFlow, WaitingItem } from "@norn/core";
+import type { ClaimHolder, Expected, FeedEvent, FieldAt, Flow, FlowError, FlowSource, LoadedFlow, WaitingItem } from "@norn/core";
 import type { DashboardState, PollFailure } from "../../src/contract.ts";
 import { atGate, atGateStep, type Item, isSliced, stateOf, stepGroupOf } from "./model.ts";
 
@@ -404,19 +404,39 @@ function expectedText(e: Expected): string {
   }
 }
 
+/** Where a field is in a flow file, as the subject of a sentence. */
+function fieldText(at: FieldAt): string {
+  switch (at.in) {
+    case "flow":
+      return at.field === null ? "The flow" : `The field ${at.field}`;
+    case "state":
+      return at.field === null ? `The state ${at.state}` : `${at.field} of ${at.state}`;
+    case "outcome":
+      return at.field === null ? `The outcome ${at.word} of ${at.state}` : `${at.field} of the outcome ${at.word} of ${at.state}`;
+    case "behaviour":
+      return at.param === null ? `The parameters of ${at.behaviour} on ${at.state}` : `${at.param} of ${at.behaviour} on ${at.state}`;
+    case "renamed":
+      return `What renamed moves ${at.from} to`;
+    default:
+      return unreachable(at);
+  }
+}
+
 /** What is wrong with a flow, as a sentence. */
 export function flowErrorText(e: FlowError): string {
   switch (e.kind) {
     case "not-json":
       return `The file isn't JSON: ${e.detail}`;
     case "field-invalid":
-      return e.path ? `${e.path} must be ${expectedText(e.expected)}.` : `The flow must be ${expectedText(e.expected)}.`;
+      return `${fieldText(e.at)} must be ${expectedText(e.expected)}.`;
     case "field-unknown":
-      return `${e.path} is no field of the flow format.`;
+      return `${fieldText(e.at)} is no field of the flow format.`;
     case "start-unknown":
       return `start names ${e.start}, which is no state of the flow.`;
     case "target-unknown":
       return `The outcome ${e.word} of ${e.state} leads to ${e.to}, which is no state of the flow and no end.`;
+    case "notify-agent-state":
+      return `The outcome ${e.word} of ${e.state} notifies a person, but ${e.to} is an agent's step.`;
     case "renamed-unknown":
       return `renamed moves ${e.from} to ${e.to}, which is no state of the flow.`;
     case "state-reserved":
@@ -428,7 +448,7 @@ export function flowErrorText(e: FlowError): string {
     case "end-unreachable":
       return `No outcomes lead from ${e.state} to closed or not-planned${e.mode ? ` in mode:${e.mode}` : ""}, so an issue there could never end.`;
     case "behaviour-unknown":
-      return `${e.state} uses ${e.behaviour}, a behaviour this norn doesn't have.`;
+      return `${e.state} uses ${e.behaviour}, a behaviour this norn doesn't have${e.like ? `; did you mean ${e.like}?` : "."}`;
     case "behaviours-conflict":
       return `${e.state} uses ${e.behaviours[0]} and ${e.behaviours[1]}, which can't go together.`;
     case "flow-unknown":

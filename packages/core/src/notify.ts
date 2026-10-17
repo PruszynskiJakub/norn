@@ -18,8 +18,8 @@ export type Notification =
   | { kind: "state-left"; issue: number; state: string; flow: string; url: string }
   /** A person QAs it at `gate`. */
   | { kind: "needs-human-qa"; issue: number; gate: Gate; url: string }
-  /** Delivery stopped: what waits for a person that no session holds; empty when nothing does. */
-  | { kind: "story-waiting"; story: number; waiting: WaitItem[] };
+  /** Delivery stopped on issue `story` of the flow `flow`: what waits for a person that no session holds; empty when nothing does. */
+  | { kind: "story-waiting"; story: number; flow: string; waiting: WaitItem[] };
 
 /** The Notify port: shows a notification on a channel. The front end words it. */
 export type Notify = (channel: Channel, notification: Notification) => Promise<void>;

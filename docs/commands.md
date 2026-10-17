@@ -19,7 +19,9 @@ norn answers in prose written as instructions to the agent, always in the same o
 | [`norn escalate <issue> "reason"`](#norn-escalate) | Set `needs-human` and release the claim |
 | [`norn release <issue>`](#norn-release) | Give up the claim without a transition |
 
-`norn --version` prints the running norn's version.
+`norn --version` prints the running norn's version. `norn --help`, or `--help` (`-h`) after any command, prints the list of commands and runs nothing.
+
+norn calls an issue by its type, the flow it runs: a story is `Story #123`, an issue of a repository flow `bug` is `Bug #40`, its PR the bug PR.
 
 ## norn init
 
@@ -119,6 +121,8 @@ npx norn done <issue> [outcome] ["note"] [--evidence <dir>]
 
 Finishes the step: norn makes the transition, posts a comment and releases the claim. The outcome word is needed only when the step can end more than one way (see [steps, skills and outcomes](how-it-works.md#steps-skills-and-outcomes)). The note carries review requests, QA results or a rejection reason. `--evidence <dir>` pushes the QA files in `<dir>` to `norn/qa/<issue>` and embeds them in the comment.
 
+It refuses, changing nothing, while the step's work is not where the flow needs it: leaving a state with `opensPR` needs the issue's PR open, closing an issue of a flow with `opensPR` needs that PR merged, and leaving a state with `slices` needs a slice. When the outcome sets `needs-human`, from the flow's `needsHuman` or the fix-round limit, `done` says so and why.
+
 Follow-ups after the transition (story branch, unblocking slices, story PR, `needs-review`) are best effort; `norn next` catches up on any that failed.
 
 ## norn status
@@ -127,7 +131,7 @@ Follow-ups after the transition (story branch, unblocking slices, story PR, `nee
 npx norn status <story>
 ```
 
-A read-only overview of the story and its slices: the story's owner and branch, and for each item its state, mode, open blockers, `needs-human` and whether a claim holds it (and whether that claim is stale).
+A read-only overview of the issue and its slices: its owner and, when its flow gives it one, its branch, and for each item its state, mode, open blockers, `needs-human` and whether a claim holds it (and whether that claim is stale). An issue whose flow has no slices shows on its own.
 
 ## norn tidy
 
@@ -174,15 +178,15 @@ Checks the whole setup at once and lists every check, each with the exact comman
 | `git` | You are in a git checkout whose `origin` is on GitHub |
 | `base-branch` | `baseBranch` exists on GitHub |
 | `permission` | You have write access or higher to the repository |
-| `labels` | The labels of every valid flow and norn's flags exist, as `init` creates them; a label of norn's that no flow uses (one norn created, by the `(norn)` at the end of its description, a `type:`, or a state a flow renamed) warns, and is never deleted |
-| `flows` | The flows on the base branch, and every flow file in your working copy that differs from it, are valid; the skills they name are installed. It names the type of the slices each flow makes, and lists, as warnings, the labels your local flow edits need that the repository lacks and the open issues they would orphan: those in a state the edit drops without naming it in `renamed` |
+| `labels` | The labels of every valid flow and norn's flags exist, as `init` creates them; a label of norn's that no flow uses, on the base branch or in your working copy's flow files, (one norn created, by the `(norn)` at the end of its description, a `type:`, or a state a flow renamed) warns, and is never deleted |
+| `flows` | The flows on the base branch, and every flow file in your working copy that differs from it, are valid; every `.json` file in `.agents/flows/` is named as a type can be, e.g. not `Bug.json`; the skills they name are installed. It names the type of the slices each flow makes, and lists, as warnings, the labels your local flow edits need that the repository lacks and the open issues they would orphan: those in a state the edit drops without naming it in `renamed` |
 | `config` | The team and local config are valid; their warnings show as a warning |
 | `version` | `nornVersion` is set and compatible with your norn; a compatible difference warns |
 | `skills` | Every skill the briefings name is in `skills/` and linked from `.claude/skills/`; a skill that differs from the bundled copy warns, except under `NORN_SKILLS_SOURCE` |
 | `agent-instructions` | The norn block is in `AGENTS.md` or `CLAUDE.md` |
 | `provider` | The worktree provider matches the environment, as `take` requires |
 
-Each check shows as `✓` ok, `!` warning, `✗` fail, or `-` skipped when a check it needs did not pass, e.g. `skipped, needs gh`. It exits 1 only when a check fails, so CI can run it without failing on a warning. `--json` gives `{ ok, checks: [{ id, level, message, fix }] }`.
+Each check shows as `✓` ok, `!` warning, `✗` fail, or `-` skipped when a check it needs did not pass, e.g. `skipped, needs gh`. A check with several problems lists each on a line of its own. It exits 1 only when a check fails, so CI can run it without failing on a warning. `--json` gives `{ ok, checks: [{ id, level, message, fix }] }`.
 
 The `flows` check validates your uncommitted `.agents/flows/*.json` before you open the PR, so a broken flow never reaches the base branch. A local file the same as the base branch's is reported once, as the base branch's.
 

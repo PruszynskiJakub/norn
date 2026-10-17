@@ -8,7 +8,7 @@ norn runs a team's work through a spec-driven process on GitHub. A developer's a
 A GitHub issue norn works on. At triage a new issue is given its type, e.g. it becomes a story, or is closed as not planned.
 
 **Story**:
-An issue that is one feature, from triage until its story PR is merged into the base branch. It has one spec, one story branch and, once sliced, its slices. It runs the built-in `story` flow; any issue whose flow creates slices is called one.
+An issue that is one feature, from triage until its story PR is merged into the base branch. It has one spec, one story branch and, once sliced, its slices. It runs the built-in `story` flow. norn runs any issue whose flow creates slices as it runs a story, but calls it by its type, e.g. an epic.
 _Avoid_: epic, feature issue
 
 **Slice**:

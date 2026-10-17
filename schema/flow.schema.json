@@ -63,7 +63,10 @@
         "meansSkipped": { "type": "string", "description": "How it is described instead when the issue's mode skips the state it leads to." },
         "note": { "type": "string", "description": "The outcome needs a note; this names it, e.g. reason." },
         "needsHuman": { "type": "string", "description": "After the transition, set needs-human; this says who must do what." },
-        "notify": { "type": "boolean", "description": "After the transition, a person does QA and is notified; a human gate does this on its own." }
+        "notify": {
+          "type": "boolean",
+          "description": "After the transition, a person does QA and is notified; a human gate does this on its own. It leads only into an attended state or a human gate, never an agent's."
+        }
       }
     },
     "behaviours": {

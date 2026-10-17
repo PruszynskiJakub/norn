@@ -2,6 +2,18 @@ import { describe, expect, test } from "vitest";
 import { setup } from "@norn/testing";
 
 describe("norn dashboard", () => {
+  test("--help prints the usage and starts nothing", async () => {
+    const w = setup();
+
+    for (const help of ["--help", "-h"]) {
+      const res = await w.norn("dashboard", help);
+
+      expect(res.exitCode).toBe(0);
+      expect(res.stdout).toContain("norn dashboard [--port <n>] [--interval <duration>] [--no-open]");
+    }
+    expect(w.launches).toEqual([]);
+  });
+
   test("starts the dashboard on the default port and interval, opens the browser and says where", async () => {
     const w = setup();
 

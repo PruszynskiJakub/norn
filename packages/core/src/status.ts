@@ -1,10 +1,9 @@
 import { isStale } from "./claims.js";
 import { slicesOf } from "./behaviours.js";
-import { flowStatesOf } from "./flow.js";
+import { flowNameOf, flowStatesOf, usedIn } from "./flow.js";
 import { flowOf, validFlow } from "./flow-loading.js";
 import type { Issue } from "./github.js";
-import { storySlug } from "./slug.js";
-import { storyBranch } from "./text.js";
+import { locate } from "./location.js";
 import type { Ctx } from "./transitions.js";
 
 export interface Row {
@@ -24,7 +23,11 @@ export interface Row {
 export interface StatusResult {
   ok: true;
   kind: "status";
-  story: Row & { owner: string | null; branch: string };
+  /**
+   * The issue asked about: its type (`flow`, null before triage), owner, and branch (null when its flow gives it none).
+   * `makesSlices` says whether its flow has slices at all.
+   */
+  story: Row & { flow: string | null; owner: string | null; branch: string | null; makesSlices: boolean };
   slices: Row[];
 }
 
@@ -42,7 +45,13 @@ export async function status(ctx: Ctx, n: number): Promise<StatusResult> {
   return {
     ok: true,
     kind: "status",
-    story: { ...head, owner: story.assignees[0] ?? null, branch: storyBranch(n, await storySlug(ctx, story)) },
+    story: {
+      ...head,
+      flow: flowNameOf(story),
+      owner: story.assignees[0] ?? null,
+      branch: (await locate(story, ctx, flow))?.branch ?? null,
+      makesSlices: flow !== null && usedIn(flow, "slices"),
+    },
     slices: rows,
   };
 }

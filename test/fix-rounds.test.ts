@@ -41,7 +41,7 @@ describe("fix-round limit", () => {
 
     expect(w.github.labels(131).sort()).toEqual(["changes-requested", "mode:afk", "needs-human", "type:slice"]);
     expect(w.github.comments(131).at(-1)).toContain('norn: needs-human — escalated: "Redis client times out in tests" (3 fix rounds reached)');
-    expect(res.stdout).toContain("#131 has reached 3 fix rounds, so it now needs a human instead of another round of implement.");
+    expect(res.stdout).toContain("#131 has reached 3 fix rounds, so it now needs a human instead of another round in changes-requested.");
   });
 
   test("QA failures count toward the same limit", async () => {

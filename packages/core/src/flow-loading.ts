@@ -1,7 +1,7 @@
 import { BUILT_IN } from "./built-in-flows.js";
 import { type Flow, flowNameOf } from "./flow.js";
 import type { Issue } from "./github.js";
-import { checkFlowsNamed, type LoadedFlow, parseFlow, RESERVED_FLOWS, validateFlow } from "./flow-validation.js";
+import { type LoadedFlow, RESERVED_FLOWS, readFlow, validateFlow } from "./flow-validation.js";
 
 /**
  * Where norn finds flows: the built-in ones, and the repository's files on the
@@ -71,10 +71,7 @@ export function repositoryFlow(ctx: FlowReader, name: string): Promise<LoadedFlo
       .then((text) =>
         text === null
           ? null
-          : checkFlowsNamed(
-              parseFlow(name, text),
-              async (other) => (await ctx.github.readFileAt(`${FLOWS_DIR}/${other}.json`, ctx.config.baseBranch)) !== null,
-            ),
+          : readFlow(name, text, async (other) => (await ctx.github.readFileAt(`${FLOWS_DIR}/${other}.json`, ctx.config.baseBranch)) !== null),
       );
     ctx.flows.set(name, flow);
   }
@@ -83,6 +80,11 @@ export function repositoryFlow(ctx: FlowReader, name: string): Promise<LoadedFlo
 
 /** A flow file's name is a type name. */
 const FLOW_NAME = /^[a-z0-9][a-z0-9_-]*$/;
+
+/** The JSON files in a list of a flows directory whose names cannot name a type, e.g. Bug.json, so no flow comes of them; sorted. */
+export function misnamedFlowFiles(files: string[]): string[] {
+  return files.filter((file) => file.endsWith(".json") && !FLOW_NAME.test(file.slice(0, -".json".length))).sort();
+}
 
 /** The flow names of the files in a list of a flows directory, sorted; files that cannot name a type are left out. */
 export function flowFileNames(files: string[]): string[] {

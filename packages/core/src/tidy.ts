@@ -18,7 +18,7 @@ export function qaBranch(n: number) {
 export type Removal =
   | { kind: "qa-branch"; branch: string; issue: number }
   /** `of` is what the issue is called, see noun. */
-  | { kind: "worktree"; path: string; of: "story" | "slice" | "issue"; issue: number }
+  | { kind: "worktree"; path: string; of: string; issue: number }
   | { kind: "local-branch"; branch: string; into: string }
   | { kind: "remote-branch"; branch: string; into: string }
   | { kind: "claim"; issue: number };
@@ -126,7 +126,7 @@ export async function tidy(ctx: Ctx, dryRun: boolean): Promise<TidyResult> {
         report.kept.push(keep);
         continue;
       }
-      localFree = await attempt({ kind: "worktree", path: rel, of: noun(owned.flow), issue: n }, () => workspace.removeWorktree(rel, ctx.config.provider));
+      localFree = await attempt({ kind: "worktree", path: rel, of: noun(owned.issue), issue: n }, () => workspace.removeWorktree(rel, ctx.config.provider));
     } else if (checkedOut && merged && local.has(branch)) {
       report.kept.push({ kind: "branch-checked-out", branch, at: checkedOut.path });
     }

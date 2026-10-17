@@ -235,7 +235,7 @@ When nothing is left to do, `norn next` says so explicitly:
 Story #123 "Rate limiting": nothing left that you can do.
 Waiting for a human:
   - #129 needs human QA (mode:hil).
-  - #131 escalated: "Redis client times out in tests" (3 fix rounds reached).
+  - #131 needs a human: escalated: "Redis client times out in tests" (3 fix rounds reached).
 Stop here and report to the user. norn has already notified them.
 ```
 

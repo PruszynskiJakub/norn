@@ -54,6 +54,12 @@ function bugAt(state: string, flow: unknown = bugFlow()) {
   return w;
 }
 
+/** #40's PR, as fixing opens it. */
+function withPr(w: ReturnType<typeof setup>, state: "open" | "merged" = "open") {
+  w.github.prs.push({ number: 90, head: "40-crash-on-empty-input", base: "main", state });
+  return w;
+}
+
 describe("behaviours in a flow", () => {
   test("opensPR needs a flow with a workspace of its own", async () => {
     const w = bugAt("fixing", bugFlow({ workspace: "none" }));
@@ -72,7 +78,7 @@ describe("behaviours in a flow", () => {
     const res = await w.norn("take", "40");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("  states.fixing.behaviours.opensPR must be an object of parameters, {} for none.\n");
+    expect(res.stdout).toContain("  The parameters of the behaviour opensPR of the state fixing must be an object of parameters, {} for none.\n");
   });
 
   test("a state using a behaviour norn does not know fails validation, naming it", async () => {
@@ -84,7 +90,7 @@ describe("behaviours in a flow", () => {
 
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain(
-      "  The state reviewing uses the behaviour autoMerge, which this norn does not know; a flow written for a newer norn needs the nornVersion pin raised.",
+      "  The state reviewing uses the behaviour autoMerge, which this norn does not know. Check its spelling; if the flow is written for a newer norn, raise the nornVersion pin.",
     );
   });
 });
@@ -109,6 +115,72 @@ describe("opensPR", () => {
 
     expect(out).toContain(`PR #${pr.number}: 40-crash-on-empty-input into main. Diff: git diff origin/main...HEAD`);
     expect(out).not.toContain("gh pr create");
+  });
+
+  test("rework adds to the open PR instead of opening one, naming it with its diff", async () => {
+    const w = withPr(bugAt("changes-requested"));
+
+    const out = (await w.norn("take", "40")).stdout;
+
+    expect(out).toContain(
+      "Commit on 40-crash-on-empty-input and push: they go into PR #90, 40-crash-on-empty-input into main.\nDiff: git diff origin/main...HEAD",
+    );
+    expect(out).not.toContain("gh pr create");
+  });
+
+  test("done refuses to leave the state before the PR is open, and changes nothing", async () => {
+    const w = bugAt("fixing");
+    await w.norn("take", "40");
+
+    const res = await w.norn("done", "40", "fixed");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toBe(
+      [
+        "No PR from 40-crash-on-empty-input into main was found, and this step's work is that PR.",
+        "Push 40-crash-on-empty-input, open the PR as the briefing says, then run norn done 40 again.",
+      ].join("\n"),
+    );
+    expect(w.github.labels(40).sort()).toEqual(["fixing", "in-progress", "type:bug"]);
+  });
+
+  test("done refuses to close the issue while its PR is not merged", async () => {
+    const w = withPr(bugAt("verifying"));
+    await w.norn("take", "40");
+
+    const res = await w.norn("done", "40", "pass");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("PR #90 from 40-crash-on-empty-input is not merged, so #40 cannot close yet");
+    expect(res.stdout).toContain("Merge it into main first, then run norn done 40 again.");
+    expect(w.github.issues.get(40)!.state).toBe("open");
+  });
+
+  test("a mode that skips the person's check still needs the PR before the issue closes", async () => {
+    const flow = bugFlow();
+    flow.states.fixing.outcomes = { fixed: { to: "verifying", means: "the fix is pushed" } };
+    Object.assign(flow.states.verifying, { when: "hil", passThrough: "pass" });
+    const w = bugAt("fixing", flow);
+    w.github.issues.get(40)!.labels.push("mode:afk");
+    await w.norn("take", "40");
+
+    const res = await w.norn("done", "40", "fixed");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("No PR from 40-crash-on-empty-input into main was found");
+    expect(w.github.issues.get(40)!.state).toBe("open");
+  });
+
+  test("closing the issue as not planned needs no PR", async () => {
+    const flow = bugFlow();
+    Object.assign(flow.states.fixing.outcomes, { "wont-fix": { to: "not-planned", means: "not worth fixing", note: "reason" } });
+    const w = bugAt("fixing", flow);
+    await w.norn("take", "40");
+
+    const res = await w.norn("done", "40", "wont-fix", "works as designed");
+
+    expect(res.exitCode).toBe(0);
+    expect(w.github.issues.get(40)!.stateReason).toBe("not_planned");
   });
 
   test("a state without it, before any PR, gets neither", async () => {
@@ -158,7 +230,7 @@ describe("countsFixRounds", () => {
   });
 
   test("reaching maxFixRounds turns the issue into needs-human instead of another round", async () => {
-    const w = bugAt("reviewing");
+    const w = withPr(bugAt("reviewing"));
     w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ deliver: { maxFixRounds: 1 } }));
     await sentBack(w);
     await w.norn("take", "40");
@@ -172,7 +244,7 @@ describe("countsFixRounds", () => {
   });
 
   test("every state that counts fix rounds counts toward the same limit", async () => {
-    const w = bugAt("reviewing");
+    const w = withPr(bugAt("reviewing"));
     w.workspace.files.set(".agents/norn.config.json", JSON.stringify({ deliver: { maxFixRounds: 1 } }));
     await sentBack(w);
     await w.norn("take", "40");
@@ -214,7 +286,7 @@ describe("humanGate", () => {
   });
 
   test("evidence can be attached when the gate finishes", async () => {
-    const w = bugAt("verifying");
+    const w = withPr(bugAt("verifying"), "merged");
     w.workspace.evidence.set("/tmp/qa", [{ path: "crash.png", content: Buffer.from("png") }]);
     await w.norn("take", "40");
 
@@ -270,6 +342,19 @@ describe("notify on an outcome", () => {
     expect(w.notifications.map((n) => n.body.split("\n")[0])).toEqual(["needs human QA (bug)"]);
   });
 
+  test("notify into an agent's step fails validation: a person and an agent would both be sent to it", async () => {
+    const flow = bugFlow();
+    Object.assign(flow.states.reviewing.outcomes["request-changes"], { notify: true });
+    const w = bugAt("reviewing", flow);
+
+    const res = await w.norn("take", "40");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain(
+      "  The outcome request-changes of reviewing notifies a person, but changes-requested is an agent's step, so an agent would take it too. Make changes-requested attended or a humanGate, or drop notify.\n",
+    );
+  });
+
   test("notify is true or false, naming no flow or mode", async () => {
     const flow = bugFlow();
     Object.assign(flow.states.reviewing.outcomes.approve, { notify: "story" });
@@ -278,7 +363,27 @@ describe("notify on an outcome", () => {
     const res = await w.norn("take", "40");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("  states.reviewing.outcomes.approve.notify must be true or false.\n");
+    expect(res.stdout).toContain("  The field notify of the outcome approve of the state reviewing must be true or false.\n");
+  });
+});
+
+describe("needsHuman on an outcome", () => {
+  test("done says the issue now needs a human and why, and not to take it again", async () => {
+    const flow = bugFlow();
+    Object.assign(flow.states.reviewing.outcomes["request-changes"], { needsHuman: "the owner decides whether to close it" });
+    const w = bugAt("reviewing", flow);
+    await w.norn("take", "40");
+
+    const done = await w.norn("done", "40", "request-changes", "Too risky");
+    const next = await w.norn("next", "40");
+
+    expect(done.stdout).toBe(
+      [
+        "#40 is now in changes-requested. The claim is released.",
+        "#40 now needs a human: the owner decides whether to close it. Do not take it again; a person picks it up with the norn-resolve skill.",
+      ].join("\n"),
+    );
+    expect(next.stdout).toContain("  - #40 needs a human: the owner decides whether to close it.");
   });
 });
 
@@ -305,11 +410,11 @@ describe("norn next on an issue of a flow", () => {
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toBe(
       [
-        'Issue #40 "Crash on empty input" is in reviewing.',
+        'Bug #40 "Crash on empty input" is in reviewing.',
         "",
         "You can start 1 item now, in its own fresh subagent, told to work in the item's worktree:",
         "",
-        '  - Issue #40 "Crash on empty input" is in reviewing: reviewing.',
+        '  - Bug #40 "Crash on empty input" is in reviewing: reviewing.',
         "    Worktree: /repo/.agents/worktrees/40-crash-on-empty-input",
         "    Start it with: norn take 40",
         "",
@@ -326,7 +431,7 @@ describe("norn next on an issue of a flow", () => {
     const out = (await w.norn("next", "40")).stdout;
 
     expect(out).toContain("You can start 1 item now, with the user:");
-    expect(out).toContain('  - Issue #40 "Crash on empty input" is in reviewing: reviewing (attended: the user takes part).');
+    expect(out).toContain('  - Bug #40 "Crash on empty input" is in reviewing: reviewing (attended: the user takes part).');
   });
 
   test("a human gate is listed for a person, not for an agent", async () => {
@@ -336,7 +441,7 @@ describe("norn next on an issue of a flow", () => {
 
     expect(res.stdout).toBe(
       [
-        'Issue #40 "Crash on empty input": nothing left that you can do.',
+        'Bug #40 "Crash on empty input": nothing left that you can do.',
         "Waiting for a human:",
         "  - #40 needs human QA (bug).",
         "Stop here and report to the user. norn has already notified them.",
@@ -351,7 +456,7 @@ describe("norn next on an issue of a flow", () => {
 
     const out = (await w.norn("next", "40")).stdout;
 
-    expect(out).toContain('  - Issue #40 "Crash on empty input" is in reviewing: Waiting for a second pair of eyes.');
+    expect(out).toContain('  - Bug #40 "Crash on empty input" is in reviewing: Waiting for a second pair of eyes.');
   });
 
   test("next moves an issue in a state its flow renamed to the new state, and offers it there", async () => {
@@ -360,7 +465,7 @@ describe("norn next on an issue of a flow", () => {
     const out = (await w.norn("next", "40")).stdout;
 
     expect(out).toContain("#40 moved from triaged to reviewing: the flow bug renamed the state.");
-    expect(out).toContain('  - Issue #40 "Crash on empty input" is in reviewing: reviewing.');
+    expect(out).toContain('  - Bug #40 "Crash on empty input" is in reviewing: reviewing.');
     expect(w.github.labels(40).sort()).toEqual(["reviewing", "type:bug"]);
     expect(w.github.comments(40)).toEqual(["norn: triaged → reviewing (automatic)\n\nThe flow bug renamed the state triaged to reviewing."]);
     expect(w.github.claim(40)).toBeNull();
@@ -373,7 +478,7 @@ describe("norn next on an issue of a flow", () => {
     const out = (await w.norn("next", "40")).stdout;
 
     expect(out).toContain("#40 was in testing, which the flow bug no longer has, so it now needs a human.");
-    expect(out).toContain("Waiting for a human:\n  - #40 the state testing is no longer in the flow bug.");
+    expect(out).toContain("Waiting for a human:\n  - #40 needs a human: the state testing is no longer in the flow bug.");
     expect(w.github.labels(40).sort()).toEqual(["needs-human", "type:bug"]);
     expect(w.github.comments(40).at(-1)).toBe("norn: needs-human — the state testing is no longer in the flow bug");
     expect(w.github.claim(40)).toBeNull();
@@ -395,7 +500,7 @@ describe("norn next on an issue of a flow", () => {
 
     const out = (await w.norn("next", "40")).stdout;
 
-    expect(out).toBe('Issue #40 "Crash on empty input" is closed. Nothing left that you can do.');
+    expect(out).toBe('Bug #40 "Crash on empty input" is closed. Nothing left that you can do.');
   });
 });
 
@@ -515,7 +620,7 @@ describe("syncsBlocked", () => {
     const res = await w.norn("take", "140");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain("  states.waiting.behaviours.syncsBlocked.to must be a state of the flow.\n");
+    expect(res.stdout).toContain("  The parameter to of the behaviour syncsBlocked of the state waiting must be a state of the flow.\n");
   });
 
   test("an issue in the state has no step while blocked", async () => {
