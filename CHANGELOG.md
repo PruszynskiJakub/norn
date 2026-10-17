@@ -4,6 +4,8 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.10.1] - 2026-10-17
+
 ### Fixed
 
 - `norn --help` and `-h` print the usage outside a git repository too, instead of refusing with `Not inside a git repository's checkout`.
@@ -230,7 +232,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/norn/compare/v0.10.0...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/norn/compare/v0.10.1...HEAD
+[0.10.1]: https://github.com/PruszynskiJakub/norn/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/PruszynskiJakub/norn/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/PruszynskiJakub/norn/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/PruszynskiJakub/norn/compare/v0.7.0...v0.8.0
