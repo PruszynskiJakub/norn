@@ -26,3 +26,9 @@ export function parseArgs(argv: string[]): Parsed {
   }
   return out;
 }
+
+/** Whether the command runs outside a git checkout: doctor reports it as its git check, --version and --help need none. */
+export function runsOutsideCheckout(argv: string[]): boolean {
+  const { positionals, bools } = parseArgs(argv);
+  return positionals[0] === "doctor" || bools.has("version") || bools.has("help");
+}
