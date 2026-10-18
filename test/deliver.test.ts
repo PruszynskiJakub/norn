@@ -215,7 +215,8 @@ describe("norn deliver", () => {
     // A review run and then a QA run for each slice.
     expect(w.runs.supervisors.map((s) => s.issue).sort()).toEqual([131, 131, 132, 132]);
     for (const n of [131, 132]) expect(w.github.labels(n)).toEqual(expect.arrayContaining(["needs-qa", "needs-human"]));
-    expect(lines.filter((l) => l.includes("its agent finished the step"))).toHaveLength(4);
+    expect(lines.filter((l) => l.includes("its agent finished the step"))).toHaveLength(2);
+    expect(lines.filter((l) => l.includes("its agent handed the step to a person with norn escalate"))).toHaveLength(2);
     expect(lines.at(-1)).toBe("Nothing runs and nothing can start.");
   });
 

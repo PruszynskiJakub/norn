@@ -1247,7 +1247,7 @@ const leftInPane = (end: AttemptEnd) => end.kind === "stopped-early" || end.kind
 function settlementText(s: Exclude<Settlement, { kind: "retry" }>): string {
   switch (s.kind) {
     case "finished":
-      return "its agent finished the step.";
+      return s.escalated ? "its agent handed the step to a person with norn escalate." : "its agent finished the step.";
     case "lost":
       return `the run lost its claim to session ${s.session}, so its agent was stopped.`;
     case "escalated":

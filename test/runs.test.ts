@@ -28,7 +28,7 @@ describe("settling a run's attempt from GitHub", () => {
     const { w, ctx, before } = await taken();
     await w.norn("escalate", "131", "only a person can decide");
 
-    expect(await settleRun(ctx, 131, exited(0), before)).toEqual({ kind: "finished" });
+    expect(await settleRun(ctx, 131, exited(0), before)).toEqual({ kind: "finished", escalated: true });
   });
 
   test("labels norn take moved do not count as finished", async () => {

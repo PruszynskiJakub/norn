@@ -37,8 +37,8 @@ export interface Attempt {
 
 /** What the supervisor does after an attempt. */
 export type Settlement =
-  /** The agent finished the step: norn done, escalate or release gave the claim up with the issue moved on. */
-  | { kind: "finished" }
+  /** The agent finished the step with norn done, or, `escalated`, handed it to a person with norn escalate. */
+  | { kind: "finished"; escalated?: true }
   /** Another session holds the claim now, e.g. after the lease ran out. The run stops. */
   | { kind: "lost"; holder: string; session: string }
   /** The step is not done; the attempt is recorded on the issue and the run tries again. */
@@ -107,7 +107,9 @@ export async function settleRun(ctx: Ctx, n: number, attempt: Attempt, commentsB
   if (claim && claim.session !== ctx.session && !otherStale) return { kind: "lost", holder: claim.holder, session: claim.session };
   if (!claim || otherStale) {
     const issue = await github.getIssue(n);
-    if (issue.state === "closed" || (await github.listComments(n)).slice(commentsBefore).some(endsStep)) return { kind: "finished" };
+    const since = (await github.listComments(n)).slice(commentsBefore);
+    if (issue.state === "closed" || since.some((c) => parseTransitionComment(c) !== null)) return { kind: "finished" };
+    if (since.some(endsStep)) return { kind: "finished", escalated: true };
     // Nothing moved: take the claim back to record the attempt, and carry on under it.
     const got = await acquire(
       github,

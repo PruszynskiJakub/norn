@@ -138,6 +138,27 @@ describe("a run's supervisor", () => {
     expect(readRecord(r.w.workspace.root, 131)?.attempts).toHaveLength(1);
   });
 
+  test("makes the agent's tab the one its workspace shows, and gives the person's focus back", async () => {
+    const r = await herdrRun();
+    r.herdr.focused = "w9";
+    r.herdr.active.set("w9", "w9:t4");
+    r.herdr.onPrompt = async (pane) => {
+      await r.agent.take();
+      await r.agent.finish();
+      pane.agent!.status = "done";
+    };
+
+    await r.go();
+
+    const [pane] = r.herdr.allPanes();
+    expect(r.herdr.called("tab", "focus")).toEqual([
+      ["tab", "focus", `${pane.id}:t`],
+      ["tab", "focus", "w9:t4"],
+    ]);
+    expect(r.herdr.active.get(pane.workspace)).toBe(`${pane.id}:t`);
+    expect(r.herdr.focused).toBe("w9");
+  });
+
   test("passes run.env into the agent's pane, reading a $NAME value from its own environment", async () => {
     const r = await herdrRun({ env: { GH_TOKEN: "$NORN_AGENT_TOKEN", MODE: "ci", UNSET: "$NOT_THERE" } });
     r.herdr.onPrompt = async (pane) => {

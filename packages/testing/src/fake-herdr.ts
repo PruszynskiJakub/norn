@@ -35,6 +35,9 @@ export class FakeHerdr {
   private workspaces = new Map<string, string>();
   /** The repository root of each workspace, as `worktree open --cwd` named it. */
   private roots = new Map<string, string>();
+  /** The workspace the person looks at, and the tab each workspace shows. */
+  focused: string | null = null;
+  active = new Map<string, string>();
   private made = 0;
   /** Agents live elsewhere in the session, holding names. */
   private elsewhere = new Set<string>();
@@ -91,7 +94,13 @@ export class FakeHerdr {
       this.panes.set(pane.id, pane);
       return pane;
     };
-    const paneInfo = (p: FakePane) => ({ pane_id: p.id, workspace_id: p.workspace, cwd: p.cwd, agent_status: p.agent?.status ?? "unknown" });
+    const paneInfo = (p: FakePane) => ({
+      pane_id: p.id,
+      tab_id: `${p.id}:t`,
+      workspace_id: p.workspace,
+      cwd: p.cwd,
+      agent_status: p.agent?.status ?? "unknown",
+    });
     const key = `${group} ${cmd}`;
     switch (key) {
       case "worktree open": {
@@ -145,7 +154,15 @@ export class FakeHerdr {
       case "workspace list":
         return {
           ok: true,
-          result: { type: "workspace_list", workspaces: [...this.roots].map(([id, root]) => ({ workspace_id: id, worktree: { repo_root: root } })) },
+          result: {
+            type: "workspace_list",
+            workspaces: [...new Set([...this.roots.keys(), ...(this.focused ? [this.focused] : [])])].map((id) => ({
+              workspace_id: id,
+              focused: this.focused === id,
+              active_tab_id: this.active.get(id) ?? `${id}:t1`,
+              worktree: { repo_root: this.roots.get(id) ?? "" },
+            })),
+          },
         };
       case "tab list": {
         const ws = flag("--workspace");
@@ -153,6 +170,13 @@ export class FakeHerdr {
           .filter((p) => !p.closed && (!ws || p.workspace === ws))
           .map((p) => ({ tab_id: `${p.id}:t`, workspace_id: p.workspace, label: p.label }));
         return { ok: true, result: { type: "tab_list", tabs } };
+      }
+      case "tab focus": {
+        const [tab] = rest;
+        const ws = tab.split(":")[0];
+        this.focused = ws;
+        this.active.set(ws, tab);
+        return { ok: true, result: { type: "ok" } };
       }
       case "tab close": {
         const p = this.allPanes().find((x) => `${x.id}:t` === rest[0] && !x.closed);

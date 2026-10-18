@@ -35,6 +35,21 @@ export async function closePane(herdr: Herdr, pane: string, pauseMs = 1000) {
   await herdr(["pane", "close", pane]);
 }
 
+/**
+ * Makes the agent's tab the one its workspace shows, where herdr would leave
+ * the shell tab it opened the worktree with. Focusing a tab focuses its
+ * workspace too, so the workspace the person was in gets its focus back,
+ * unless it is this one.
+ */
+async function showTab(herdr: Herdr, workspace: string, tab: unknown) {
+  if (typeof tab !== "string") return;
+  const listed = await herdr(["workspace", "list"]);
+  const focused = listed.ok ? ((dig(listed.result, "workspaces") ?? []) as unknown[]).find((w) => dig(w, "focused") === true) : undefined;
+  const back = dig(focused, "active_tab_id");
+  await herdr(["tab", "focus", tab]);
+  if (typeof back === "string" && dig(focused, "workspace_id") !== workspace) await herdr(["tab", "focus", back]);
+}
+
 export function herdrDriver(o: Options): AgentDriver {
   const { herdr } = o;
   return {
@@ -52,6 +67,8 @@ export function herdrDriver(o: Options): AgentDriver {
       const pane = made.ok ? dig(made.result, "root_pane", "pane_id") : undefined;
       if (typeof pane !== "string") return notStarted(`herdr could not make a pane in ${worktree}: ${made.ok ? "no pane in its answer" : made.message}`);
       onPane?.(pane);
+      if (typeof workspace === "string" && made.ok)
+        await showTab(herdr, workspace, dig(made.result, "tab", "tab_id") ?? dig(made.result, "root_pane", "tab_id"));
       // Agent names are unique in the herdr session, and an earlier run may have left a norn-<issue> for a person.
       const name = (await herdr(["agent", "get", label])).ok ? `${label}-${session.split("-").at(-1)}`.slice(0, 32) : label;
       const started = await herdr(["agent", "start", name, "--kind", o.agent.kind, "--pane", pane, ...(o.agent.args.length ? ["--", ...o.agent.args] : [])]);
