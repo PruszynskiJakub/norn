@@ -130,8 +130,20 @@ The instructions an agent follows for a step's craft. A step skill knows nothing
 A skill that runs norn itself: norn-drive, which takes one issue through its steps with the user, and norn-deliver.
 
 **Delivery**:
-Running a sliced story unattended with the norn-deliver skill, a fresh agent per step, until only a person can move it on.
+Running a sliced story unattended, a fresh agent per step, until only a person can move it on. Under herdr `norn deliver` does it as a loop of runs; elsewhere the norn-deliver skill orchestrates agents itself.
 _Avoid_: autopilot
+
+**Run**:
+One item's step done by an agent that norn starts in a herdr pane and watches, through its supervisor, until GitHub says the step finished, the run lost the claim, or the issue needs a human.
+
+**Supervisor**:
+The process of a run that norn owns: it starts the agent, renews the run's lease, stops a stalled or timed-out agent, and settles each attempt from GitHub.
+
+**Attempt**:
+One go of a run's agent at its step. An attempt that ends without the step finished is recorded on the issue; past the attempt limit the issue gets needs-human.
+
+**Lease**:
+How long a run's claim stays fresh without renewal; the supervisor renews it while the agent lives, so a frozen run gives its item up long before a claim goes stale.
 
 **Parallel slot**:
 Room for one more of the user's agents on a story under the parallel limit. Agents already holding items use slots.

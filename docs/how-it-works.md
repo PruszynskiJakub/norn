@@ -206,6 +206,7 @@ A claim is a git ref, `refs/norn/claims/<issue>`, created on GitHub in one step 
 - **Held for the whole step**, for example all of implement on a slice, and released on handing over to the next state. A person's step is claimed too.
 - **Refreshing.** `norn take` on an issue the same session already holds re-briefs it and moves the claim's time forward. Long steps re-run it so a slow session is not mistaken for a crashed one.
 - **Stale claims.** A claim older than `claims.staleAfter` (default 2h) is treated as abandoned, and one session can take it over. Its worktree is kept: the next holder is told to check `git status` there before starting.
+- **A run's lease.** A run's claim carries a short lease of its own (`run.lease`, 10m) that its supervisor renews while the agent lives, so a run that froze or died gives its item up after minutes, not hours.
 - **Your own stopped session.** `norn take <issue> --takeover` takes over a claim of the same GitHub user at any age. It never takes a teammate's claim.
 
 **Which session holds a claim.** norn keeps no state, so it tells sessions apart by their environment: `NORN_SESSION`, else `CLAUDE_CODE_SESSION_ID`, else the herdr pane (`HERDR_PANE_ID`), else host and repository root. Under the git provider, `norn next` gives each agent its own `NORN_SESSION`.
@@ -214,15 +215,18 @@ A claim is a git ref, `refs/norn/claims/<issue>`, created on GitHub in one step 
 
 ## Unattended delivery
 
-`norn-deliver <story>` runs a story's unattended steps, its slices first, until it needs a person. You start it once slicing is done (`norn-drive` offers it).
+Once slicing is done (`norn-drive` offers it), a story's unattended steps run without you, its slices first, until it needs a person.
 
-1. Run `norn tidy` once, then ask `norn next <story>` for work.
-2. Start a fresh subagent per actionable item, in its worktree, up to the free slots `norn next` gives.
-3. Wait for the subagents to finish, then go back to step 1.
-4. Once every slice is merged into the story branch, run story review and story QA the same way, plus fixes if either asks for changes.
-5. Stop when the story reaches a human gate (for the built-in story, `needs-human-qa`, always a person) or only items waiting for a person remain. Run `norn tidy` and report what is done, what is waiting and who needs to act.
+**Under herdr**, norn runs the delivery itself, as code rather than an orchestrating agent: `norn deliver <story>` (the `norn-deliver` skill starts it in a tab of its own).
 
-The orchestrator never does a step's work itself, never touches labels, branches or PRs, and never takes an item flagged `needs-human` or at a human gate.
+1. It asks `norn next <story>` and starts a [run](commands.md#norn-run) for each item an agent can do, up to the free slots.
+2. Each run's supervisor starts a fresh agent in a herdr pane of the item's worktree, keeps its claim alive, and settles the attempt from GitHub when the agent's turn ends: finished, tried again, or escalated to a person. You can watch any agent in its pane and step in.
+3. When a run ends, `norn deliver` asks `norn next` again, so the item's next step, or the story's own review and QA once every slice is merged, gets a new agent.
+4. It stops when nothing runs and nothing can start: the story is at a human gate, only items waiting for a person remain, or it is closed. It ends with the report, and norn has notified you of what waits.
+
+An agent never has to keep itself alive or report back: a process norn owns watches it, and GitHub, not the agent, says whether a step finished.
+
+**Without herdr**, the `norn-deliver` skill orchestrates: it asks `norn next`, starts a fresh subagent (Claude Code) or agent session (plain git) per item, waits for them, and asks again, until `norn next` says nothing is left. It never does a step's work itself, never touches labels, branches or PRs, and never takes an item flagged `needs-human` or at a human gate.
 
 ## Limits
 
@@ -245,6 +249,7 @@ norn sends local notifications itself, so they fire whatever agent tool is in us
 
 - when it sets `needs-human`, or an item reaches `needs-human-qa`;
 - when `norn next` finds nothing left to do, with a summary of what is waiting. Items a session already holds are left out.
+- when a run's agent waits for you in its herdr pane, e.g. at a permission dialog.
 
 The title says who must act on what (`norn: #131 needs you`); the body gives the reason and the issue link. Where they go is set per developer; see [configuration](configuration.md#notifications).
 
@@ -257,4 +262,4 @@ The title says who must act on what (`norn: #131 needs you`); the body gives the
 
 ## Housekeeping
 
-All cleanup is `norn tidy`. It removes what belongs to closed issues: QA evidence branches, worktrees, merged slice and story branches, and claim refs. Anything with uncommitted or unpushed work is named, not removed. It is idempotent, and `--dry-run` only lists. `norn-deliver` runs it when it starts and stops, `norn-drive` when a story finishes. Nothing is cleaned up at merge: the owner merges the story on GitHub, where norn does not run.
+All cleanup is `norn tidy`. It removes what belongs to closed issues: QA evidence branches, worktrees, merged slice and story branches, and claim refs. Anything with uncommitted or unpushed work is named, not removed. It is idempotent, and `--dry-run` only lists. `norn-deliver` runs it when it starts and stops. Under herdr, removing a worktree closes its herdr workspace, with any `norn-<issue>` tab an escalated run left there, `norn-drive` when a story finishes. Nothing is cleaned up at merge: the owner merges the story on GitHub, where norn does not run.

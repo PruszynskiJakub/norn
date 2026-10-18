@@ -37,7 +37,7 @@ flowchart LR
   story --> merge([you merge the story PR])
 ```
 
-You ask your agent `norn-drive <issue>` to shape a story with you. Once it is sliced, `norn-deliver <story>` runs the slices in parallel, each step in a fresh agent in its own git worktree, and merges them into the story branch. It stops when the story is ready for your QA, or when something needs a person, and notifies you. See [how norn works](docs/how-it-works.md) for the full process.
+You ask your agent `norn-drive <issue>` to shape a story with you. Once it is sliced, `norn-deliver <story>` runs the slices in parallel, each step in a fresh agent in its own git worktree, and merges them into the story branch. Under herdr, `norn deliver` runs that loop as code: each agent works in its own pane, watched by a supervisor that keeps it alive, retries it, or calls you in. It stops when the story is ready for your QA, or when something needs a person, and notifies you. See [how norn works](docs/how-it-works.md) for the full process.
 
 ## Requirements
 

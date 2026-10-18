@@ -22,7 +22,7 @@ export interface FakePane {
 
 type Answer = { ok: true; result: unknown } | { ok: false; code: string; message: string };
 
-/** Kinds herdr 0.9.3 starts; any other is refused as herdr's argument parser would. */
+/** Kinds herdr 0.9.3 starts; any other is refused, as herdr refuses it. */
 const KINDS = ["claude", "codex", "gemini", "opencode", "cursor", "amp", "copilot"];
 
 /**
@@ -110,7 +110,7 @@ export class FakeHerdr {
         const [name] = rest;
         const p = live(flag("--pane") ?? "");
         if (!p) return err("pane_not_found");
-        if (!KINDS.includes(flag("--kind") ?? "")) return err("failed", `invalid value '${flag("--kind")}' for '--kind <KIND>'`);
+        if (!KINDS.includes(flag("--kind") ?? "")) return err("failed", `unsupported interactive agent kind: ${flag("--kind")}`);
         if (this.elsewhere.has(name) || live(name)) return err("agent_name_taken");
         const dash = rest.indexOf("--");
         p.agent = { name, kind: flag("--kind") ?? "", args: dash >= 0 ? rest.slice(dash + 1) : [], status: "idle" };

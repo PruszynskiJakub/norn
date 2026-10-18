@@ -11,6 +11,8 @@ norn answers in prose written as instructions to the agent, always in the same o
 | [`norn take <issue>`](#norn-take) | Claim the issue and get the briefing for its step |
 | [`norn done <issue> [outcome] ["note"]`](#norn-done) | Finish the step; norn makes the transition |
 | [`norn status <story>`](#norn-status) | Read-only overview of the story and its slices |
+| [`norn deliver <story>`](#norn-deliver) | Run every step an agent can do, each agent in a herdr pane, until only people can move the story on |
+| [`norn run <issue>`](#norn-run) | Start a supervised run of the issue's step, its agent in a herdr pane |
 | [`norn tidy`](#norn-tidy) | Remove what belongs to closed issues |
 | [`norn dashboard`](#norn-dashboard) | Watch your work in the browser |
 | [`norn doctor`](#norn-doctor) | Check the whole setup and say what to fix |
@@ -76,6 +78,38 @@ Each phase gets a new agent. When an item is done, run norn next 123 again.
 - An item for a person that a session already holds is listed as held by it, with no hand-off.
 - It catches up on follow-ups a `norn done` could not finish (story branch, unblocking slices, story PR, `needs-review`), closes a story whose PR is merged if GitHub did not, and removes state labels left on closed issues.
 - Under the git provider it gives each agent it lists its own `NORN_SESSION`.
+- Under herdr it names `norn run <issue>` for each item an agent can do, and `norn deliver <story>`, which runs them all.
+
+## norn deliver
+
+```sh
+npx norn deliver <story>
+```
+
+Delivers the story: asks `norn next`, starts a [run](#norn-run) for each item an agent can do, up to `deliver.maxParallel`, and when a run finishes asks again, so each step gets a new agent, until nothing runs and nothing can start. It ends with `norn next`'s report: what waits for a person and why. It runs for as long as the story has work for agents, possibly hours, and prints a line for every run it starts and every run that ends.
+
+```text
+09:12:03  Delivering #123: each step an agent can do runs in its own herdr pane. This runs until only people can move the story on.
+09:12:05  #131 implement: started a run with claude (session run-131-a1b2).
+09:12:06  #132 implement: started a run with claude (session run-132-c3d4).
+09:40:51  #131 (1 attempt, 28.8m): its agent finished the step.
+09:40:53  #131 review: started a run with claude (session run-131-e5f6).
+```
+
+- It needs herdr: start it from a herdr pane, not from inside an agent whose permissions keep it from starting agents.
+- One `norn deliver` per story on a machine: a second refuses, naming the first.
+- Stopped and started again, it carries on from GitHub. Runs still going are left to finish, and a run whose supervisor died has its agent stopped; its item is offered again once the run's lease runs out.
+- Attended steps, human QA and `needs-human` are left to people. Once a person moves an issue on, `norn deliver` sees it within two minutes.
+
+## norn run
+
+```sh
+npx norn run <issue> [--agent <name>]
+```
+
+Starts a supervised run of the issue's current step and returns at once. It checks that `norn next` offers the issue to an agent, makes its worktree, and starts a supervisor process that outlives it. The supervisor starts the agent (`--agent`, else `run.agent`) in a `norn-<issue>` tab of the worktree's herdr workspace, tells it to take the issue and finish its step, and watches it as [configuration](configuration.md#runs) describes: it keeps the claim's lease fresh, stops a stalled or timed-out agent, retries an attempt that ended without the step finished, and gets the issue `needs-human` after `run.maxAttempts`. A finished step's pane is closed; an escalated one's is left for the person called in.
+
+It refuses an attended step, an item that waits, and an item that already has a run on this machine. `norn deliver` uses it for every item; run it yourself to hand one item to an agent.
 
 ## norn take
 

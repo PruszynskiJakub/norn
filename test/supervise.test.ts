@@ -268,7 +268,7 @@ describe("a run's supervisor", () => {
 
     expect(settled).toMatchObject({ kind: "escalated", end: { kind: "not-started" } });
     expect(r.herdr.allPanes().every((p) => p.closed)).toBe(true);
-    expect(r.runComments()[0]).toContain("the agent could not start: herdr agent start failed: invalid value 'cluade'");
+    expect(r.runComments()[0]).toContain("the agent could not start: herdr agent start failed: unsupported interactive agent kind: cluade");
   });
 });
 
