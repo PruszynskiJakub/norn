@@ -157,11 +157,27 @@ export interface SuperviseOptions {
   tickMs?: number;
   /** The environment run.env reads `$NAME` values from. */
   env?: Record<string, string | undefined>;
+  /** The waits before each retry of a GitHub call the run cannot go on without. */
+  retryMs?: number[];
   prompt: (n: number, worktree: string, previous: AttemptEnd | null) => string;
   log: (event: RunEvent) => void;
 }
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/** A GitHub call the run cannot go on without, tried again after a failure, e.g. a network blip, before the supervisor gives up. */
+async function retrying<T>(call: () => Promise<T>, log: (e: RunEvent) => void, waitsMs = [5000, 30_000, 120_000]): Promise<T> {
+  for (const wait of waitsMs) {
+    try {
+      return await call();
+    } catch (e) {
+      log({ kind: "tick-failed", detail: (e as Error).message });
+      await sleep(wait);
+    }
+  }
+  return call();
+}
+
 const minutes = (ms: number) => Math.round(ms / 6000) / 10;
 
 /**
@@ -198,7 +214,7 @@ export async function supervise(ctx: RunCtx, start: SupervisorStart, opts: Super
     const number = record.attempts.length + 1;
     const prompt = opts.prompt(n, worktree, previous);
     const startedAt = Date.now();
-    const commentsBefore = (await ctx.github.listComments(n)).length;
+    const commentsBefore = (await retrying(() => ctx.github.listComments(n), opts.log, opts.retryMs)).length;
     if (attempt && (await attempt.nudge(prompt))) opts.log({ kind: "nudged", attempt: number, pane: attempt.pane ?? "" });
     else {
       await attempt?.stop();
@@ -210,7 +226,7 @@ export async function supervise(ctx: RunCtx, start: SupervisorStart, opts: Super
     const watched = await watch(ctx, n, attempt, { tickMs, startedAt, alreadyNotified: notified, log: opts.log });
     notified ||= watched.notified;
     const mins = minutes(Date.now() - startedAt);
-    const settled = await settleRun(ctx, n, { end: watched.end, minutes: mins }, commentsBefore);
+    const settled = await retrying(() => settleRun(ctx, n, { end: watched.end, minutes: mins }, commentsBefore), opts.log, opts.retryMs);
     opts.log({ kind: "settled", attempt: number, end: watched.end, minutes: mins, settled });
     record.attempts.push({ startedAt: new Date(startedAt).toISOString(), end: watched.end, minutes: mins, settled: settled.kind });
     writeRecord(root, record);

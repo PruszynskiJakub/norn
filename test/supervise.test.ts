@@ -335,6 +335,43 @@ describe("a run and its claim", () => {
   });
 });
 
+describe("a run and GitHub failing", () => {
+  test("a GitHub call that fails while settling is tried again, not the end of the run", async () => {
+    const r = await herdrRun();
+    let blip = false;
+    r.herdr.onPrompt = async (pane) => {
+      await r.agent.take();
+      await r.agent.finish();
+      blip = true;
+      pane.agent!.status = "done";
+    };
+    const listComments = r.w.github.listComments.bind(r.w.github);
+    r.w.github.listComments = async (n: number) => {
+      // Settling's read fails once, as a network blip would.
+      if (blip) {
+        blip = false;
+        throw new Error("gh: connection reset");
+      }
+      return listComments(n);
+    };
+
+    const settled = await supervise(
+      r.ctx,
+      { issue: 131, story: 131, session: SESSION, agent: "claude", worktree: r.worktree, log: "" },
+      {
+        driver: herdrDriver({ herdr: r.herdr.run, root: r.w.workspace.root, issue: 131, agent: { kind: "claude", args: [] }, graceMs: 0, pauseMs: 0 }),
+        tickMs: 5,
+        retryMs: [1],
+        prompt: runPrompt,
+        log: (e) => r.events.push(e),
+      },
+    );
+
+    expect(settled).toEqual({ kind: "finished" });
+    expect(r.events).toContainEqual({ kind: "tick-failed", detail: "gh: connection reset" });
+  });
+});
+
 describe("a run with a scripted process for its agent", () => {
   test("an agent that exits without finishing its step is retried, then escalated", async () => {
     const w = setup({ session: SESSION });
