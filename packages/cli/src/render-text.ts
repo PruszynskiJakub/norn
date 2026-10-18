@@ -1231,6 +1231,9 @@ export function renderNotification(n: Notification): { title: string; body: stri
 
 // Runs and delivery
 
+/** Whether an escalated run's agent is still in its pane for the person called in: only one that stopped on its own or waits on them. */
+const leftInPane = (end: AttemptEnd) => end.kind === "stopped-early" || end.kind === "blocked";
+
 /** How a run ended, after its issue number. */
 function settlementText(s: Exclude<Settlement, { kind: "retry" }>): string {
   switch (s.kind) {
@@ -1239,7 +1242,7 @@ function settlementText(s: Exclude<Settlement, { kind: "retry" }>): string {
     case "lost":
       return `the run lost its claim to session ${s.session}, so its agent was stopped.`;
     case "escalated":
-      return `it needs a human after ${s.attempts} attempt${s.attempts === 1 ? "" : "s"}; the last: ${attemptEndText(s.end)}. Its agent is left in its pane.`;
+      return `it needs a human after ${s.attempts} attempt${s.attempts === 1 ? "" : "s"}; the last: ${attemptEndText(s.end)}.${leftInPane(s.end) ? " Its agent is left in its pane." : ""}`;
     default:
       return unreachable(s);
   }

@@ -14,6 +14,7 @@ import {
   supervise,
   writeRecord,
 } from "@norn/cli";
+import type { AttemptEnd } from "@norn/core";
 import { type FakePane, setup } from "@norn/testing";
 
 const HERDR = { HERDR_ENV: "1" };
@@ -156,6 +157,30 @@ describe("norn run", () => {
     const json = JSON.parse((await w.norn("run", "131", "--json")).stdout);
 
     expect(json).toMatchObject({ ok: true, issue: 131, story: 123, step: "review", agent: "claude", session: "run-131-ab12" });
+  });
+});
+
+describe("norn deliver's progress lines", () => {
+  test("an escalated run says its agent is left in its pane only when it is there", () => {
+    const woke = (end: AttemptEnd) =>
+      renderDeliverEvent({
+        kind: "woke",
+        wake: {
+          issue: 131,
+          story: 123,
+          session: "run-131-a",
+          settled: { kind: "escalated", attempts: 3, end },
+          attempts: 3,
+          minutes: 12,
+          at: "2026-10-13T12:00:00Z",
+        },
+      });
+
+    expect(woke({ kind: "stopped-early", state: "idle" })).toBe(
+      "#131 (3 attempts, 12m): it needs a human after 3 attempts; the last: the agent stopped (idle) without finishing its step. Its agent is left in its pane.",
+    );
+    expect(woke({ kind: "not-started", detail: "no such agent" })).not.toContain("left in its pane");
+    expect(woke({ kind: "stalled", afterMs: 600_000 })).not.toContain("left in its pane");
   });
 });
 
