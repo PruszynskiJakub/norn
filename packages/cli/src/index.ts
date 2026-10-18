@@ -14,3 +14,4 @@ export * from "./herdr.js";
 export * from "./herdr-driver.js";
 export * from "./run-records.js";
 export * from "./supervise.js";
+export * from "./run-tabs.js";

@@ -44,6 +44,7 @@ import { type CheckFact, type DoctorCheck, type DoctorResult, doctorFailed, type
 import type { FlowExported, FlowsRefusal } from "./flows.js";
 import type { InitResult, InitWouldDowngrade, MissingSkills } from "./init.js";
 import type { DeliverEvent, Delivered, DeliverRefusal } from "./deliver.js";
+import type { RunTab } from "./run-tabs.js";
 import type { RunBlocker, RunEvent, RunRefusal, RunStarted } from "./supervise.js";
 import type { RunOver } from "./cli.js";
 
@@ -62,7 +63,7 @@ export type Answer =
   | AddSliceResult
   | NextResult
   | StatusResult
-  | TidyResult
+  | CliTidy
   | InitResult
   | DashboardResult
   | DoctorResult
@@ -70,6 +71,9 @@ export type Answer =
   | RunStarted
   | RunOver
   | Delivered;
+
+/** norn tidy's answer, with the run tabs it closed under herdr, or with --dry-run would close. */
+export type CliTidy = TidyResult & { runTabs?: RunTab[] };
 
 /** Refusals only the CLI makes: how it was called, init's skill install, the dashboard and flows export. */
 export type CliRefusal =
@@ -1003,11 +1007,16 @@ export function tidyNotes(r: TidyResult): string[] {
 
 export const renderFailure = (f: TidyResult["failed"][number]) => `${renderRemoval(f.removal)}: ${f.detail}`;
 
-function renderTidy(r: TidyResult): string {
+function renderTidy(r: CliTidy): string {
   const notes = tidyNotes(r);
   const out: string[] = [...notes];
-  if (r.removed.length) {
-    out.push(r.dryRun ? "norn tidy would remove (dry run, nothing was changed):" : "norn tidy removed:", ...r.removed.map((x) => `  - ${renderRemoval(x)}`));
+  const tabs = (r.runTabs ?? []).map((t) => `herdr tab ${t.tab}, left by a run of #${t.issue}`);
+  if (r.removed.length || tabs.length) {
+    out.push(
+      r.dryRun ? "norn tidy would remove (dry run, nothing was changed):" : "norn tidy removed:",
+      ...r.removed.map((x) => `  - ${renderRemoval(x)}`),
+      ...tabs.map((t) => `  - ${t}`),
+    );
   }
   if (r.kept.length) out.push("Kept, so no work is lost:", ...r.kept.map((x) => `  - ${renderKept(x)}`));
   if (r.failed.length) out.push("Could not remove, the rest still ran:", ...r.failed.map((x) => `  - ${renderFailure(x)}`));

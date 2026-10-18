@@ -175,6 +175,8 @@ npx norn tidy [--dry-run]
 
 Removes what belongs to closed issues: QA evidence branches, worktrees, merged branches and claim refs. Anything with uncommitted or unpushed work is named and kept. `--dry-run` only lists. `norn-deliver` and `norn-drive` run it for you.
 
+Under herdr it also closes the `norn-<issue>` tabs that runs left in the repository's herdr workspaces, e.g. of a step worked in the main checkout, keeping those of a live run and of an issue that still needs a human, who finds the escalated run's agent there.
+
 ## norn dashboard
 
 ```sh

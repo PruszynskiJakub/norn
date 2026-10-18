@@ -33,6 +33,8 @@ export class FakeHerdr {
   calls: string[][] = [];
   private panes = new Map<string, FakePane>();
   private workspaces = new Map<string, string>();
+  /** The repository root of each workspace, as `worktree open --cwd` named it. */
+  private roots = new Map<string, string>();
   private made = 0;
   /** Agents live elsewhere in the session, holding names. */
   private elsewhere = new Set<string>();
@@ -96,6 +98,7 @@ export class FakeHerdr {
         const path = flag("--path") ?? "";
         const id = this.workspaces.get(path) ?? `w${this.workspaces.size + 1}`;
         this.workspaces.set(path, id);
+        this.roots.set(id, flag("--cwd") ?? "");
         return { ok: true, result: { type: "worktree_opened", workspace: { workspace_id: id } } };
       }
       case "tab create": {
@@ -138,6 +141,24 @@ export class FakeHerdr {
         if (!p?.agent) return err("agent_not_found");
         p.keys.push(...keys);
         return { ok: true, result: null };
+      }
+      case "workspace list":
+        return {
+          ok: true,
+          result: { type: "workspace_list", workspaces: [...this.roots].map(([id, root]) => ({ workspace_id: id, worktree: { repo_root: root } })) },
+        };
+      case "tab list": {
+        const ws = flag("--workspace");
+        const tabs = this.allPanes()
+          .filter((p) => !p.closed && (!ws || p.workspace === ws))
+          .map((p) => ({ tab_id: `${p.id}:t`, workspace_id: p.workspace, label: p.label }));
+        return { ok: true, result: { type: "tab_list", tabs } };
+      }
+      case "tab close": {
+        const p = this.allPanes().find((x) => `${x.id}:t` === rest[0] && !x.closed);
+        if (!p) return err("tab_not_found");
+        this.closePane(p.id);
+        return { ok: true, result: { type: "ok" } };
       }
       case "pane get": {
         const p = live(rest[0]);

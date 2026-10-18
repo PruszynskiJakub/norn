@@ -10,6 +10,7 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 - `norn run <issue> [--agent <name>]`: a supervised run of one item's step. A supervisor process starts the agent in a `norn-<issue>` tab of the worktree's herdr workspace as a session of its own, renews the claim's lease while it lives, stops it when its pane stalls or it times out, prompts it again or starts a fresh one after an attempt that did not finish the step, and escalates after `run.maxAttempts` or when the agent waits on a person longer than `run.blockedAfter`. Whether a step finished comes from GitHub only. See [norn run](docs/commands.md#norn-run).
 - The `run` settings: `agent`, `agents` (herdr agent kind and arguments by name), `env` (local only, e.g. a token scoped to the repository), `lease`, `stallAfter`, `timeout`, `blockedAfter` and `maxAttempts`. See [Runs](docs/configuration.md#runs) and [Sandboxing agents](docs/configuration.md#sandboxing-agents).
 - A claim may carry its own lease, which the staleness check honours, so a run that froze gives its item up after `run.lease` instead of `claims.staleAfter`.
+- Under herdr, `norn tidy` closes the `norn-<issue>` tabs runs left behind in the repository's workspaces, except a live run's and one whose issue still needs a human.
 - `norn doctor`'s `runs` check says whether `norn run` and `norn deliver` can start agents here, and warns when `run.agents` turns an agent's permission checks off.
 
 ### Changed

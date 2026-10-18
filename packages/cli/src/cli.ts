@@ -23,6 +23,7 @@ import { flows } from "./flows.js";
 import { init } from "./init.js";
 import { deliver } from "./deliver.js";
 import { underHerdr } from "./herdr.js";
+import { closeRunTabs, leftoverRunTabs } from "./run-tabs.js";
 import { renderJson } from "./render-json.js";
 import {
   type Answer,
@@ -128,6 +129,11 @@ async function dispatch(argv: string[], input: Deps): Promise<Reply> {
     : cmd === "dashboard"
       ? await dashboard({ ...ctx, dashboard: input.dashboard }, flags, bools)
       : ((await runCommand(cmd, rest, flags, { ...ctx, runs: input.runs })) ?? (await command(cmd, rest, flags, bools, ctx)));
+  // Under herdr, tidy closes the tabs runs left behind too.
+  if (answer.ok && answer.kind === "tidy" && underHerdr(ctx.workspace.env)) {
+    const left = await leftoverRunTabs(ctx, input.runs.herdr);
+    return { answer: { ...answer, runTabs: answer.dryRun ? left : await closeRunTabs(input.runs.herdr, left) }, warnings };
+  }
   return { answer, warnings };
 }
 

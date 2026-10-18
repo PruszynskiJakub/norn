@@ -51,6 +51,7 @@ function data(a: Answer): Record<string, unknown> {
         removed: a.removed.map(renderRemoval),
         kept: a.kept.map(renderKept),
         failed: a.failed.map(renderFailure),
+        ...(a.runTabs ? { runTabs: a.runTabs } : {}),
         notes: tidyNotes(a),
       };
     case "next":

@@ -389,3 +389,46 @@ describe("norn deliver", () => {
     expect(existsSync(join(w.workspace.root, ".agents/runs/deliver-123.json"))).toBe(false);
   });
 });
+
+describe("norn tidy under herdr", () => {
+  test("closes the tabs runs left behind, keeping a live run's, an escalation's and another repository's", async () => {
+    const w = story([]);
+    const root = w.workspace.root;
+    w.github.seedIssue({ number: 131, title: "Done", labels: [], state: "closed" });
+    w.github.seedIssue({ number: 132, title: "Escalated", labels: ["type:slice", "needs-review", "needs-human"] });
+    w.github.seedIssue({ number: 133, title: "Running", labels: ["type:slice", "needs-review"] });
+    w.github.seedIssue({ number: 134, title: "Resolved", labels: ["type:slice", "needs-review"] });
+    const tab = async (cwd: string, label: string) => {
+      const ws = await w.herdr.run(["worktree", "open", "--cwd", cwd, "--path", `${cwd}/wt-${label}`, "--no-focus"]);
+      const id = (ws as { result: { workspace: { workspace_id: string } } }).result.workspace.workspace_id;
+      await w.herdr.run(["tab", "create", "--workspace", id, "--cwd", cwd, "--label", label]);
+    };
+    for (const label of ["norn-131", "norn-132", "norn-133", "norn-134-ab12", "1", "norn-deliver-123"]) await tab(root, label);
+    await tab("/elsewhere", "norn-131");
+    writeRecord(root, {
+      issue: 133,
+      story: 123,
+      session: "run-133-a",
+      agent: "claude",
+      worktree: root,
+      pid: process.pid,
+      pane: null,
+      startedAt: "2026-10-13T12:00:00Z",
+      state: "running",
+      attempts: [],
+    });
+
+    const dry = await w.norn("tidy", "--dry-run");
+    expect(w.herdr.allPanes().filter((p) => p.closed)).toEqual([]);
+    expect(dry.stdout).toContain("left by a run of #131");
+
+    const res = await w.norn("tidy");
+
+    expect(res.stdout).toContain("norn tidy removed:");
+    const open = w.herdr
+      .allPanes()
+      .filter((p) => !p.closed)
+      .map((p) => `${p.label}${p.cwd === "/elsewhere" ? " elsewhere" : ""}`);
+    expect(open.sort()).toEqual(["1", "norn-131 elsewhere", "norn-132", "norn-133", "norn-deliver-123"]);
+  });
+});
