@@ -9,6 +9,7 @@ import {
   lockDelivery,
   readRecord,
   renderDeliverEvent,
+  renderNext,
   runPrompt,
   type SupervisorStart,
   supervise,
@@ -257,6 +258,42 @@ describe("norn deliver", () => {
 
     await deliverIt(w);
 
+    expect(w.runs.supervisors).toEqual([]);
+  });
+
+  test("a run that ends while norn next reads GitHub is not taken for one at work elsewhere: deliver asks again", async () => {
+    const w = story([{ n: 131, state: "needs-review" }]);
+    w.nonces.push("ab12");
+    writeRecord(w.workspace.root, {
+      issue: 131,
+      story: 123,
+      session: "run-131-old",
+      agent: "claude",
+      worktree: w.workspace.root,
+      pid: process.pid,
+      pane: null,
+      startedAt: "2026-10-13T12:00:00Z",
+      state: "running",
+      attempts: [],
+    });
+    await w.github.createClaim(131, { holder: "alice", session: "run-131-old", since: "2026-10-13T12:00:00Z", leaseMs: 600_000 });
+    // The run escalates and ends just after norn next has read its claim.
+    const readClaim = w.github.readClaim.bind(w.github);
+    let ended = false;
+    w.github.readClaim = async (n: number) => {
+      const claim = await readClaim(n);
+      if (n === 131 && !ended && claim) {
+        ended = true;
+        await w.github.addLabels(131, ["needs-human"]);
+        await w.github.deleteClaim(131);
+        writeRecord(w.workspace.root, { ...readRecord(w.workspace.root, 131)!, state: "escalated" });
+      }
+      return claim;
+    };
+
+    const { r } = await deliverIt(w);
+
+    expect(r.ok && renderNext(r.report)).toContain("#131 needs a human");
     expect(w.runs.supervisors).toEqual([]);
   });
 

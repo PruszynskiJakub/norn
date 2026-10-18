@@ -84,17 +84,21 @@ async function loop(ctx: Ctx & { runs: RunHost }, story: number, opts: DeliverOp
     if (ask || Date.now() - lastNext >= nextEveryMs) {
       ask = false;
       lastNext = Date.now();
+      // Taken before asking: a run that ends while norn next reads GitHub leaves a report that still shows it at work.
+      const liveBefore = nowLive;
       const answer = await next(ctx, story);
       if (!answer.ok) return answer;
       const { report } = answer;
       const live = new Set(liveRuns(root, story).map((r) => r.issue));
+      if ([...liveBefore].some((n) => !live.has(n))) ask = true;
       lastLive = live;
+      const running = new Set([...liveBefore, ...live]);
       // A run counts against the slots from its start, before its agent's take makes it a claim of yours.
-      const busy = new Set([...live, ...report.waiting.flatMap((w) => (w.reason === "held" && w.holder.mine ? [w.issue] : []))]);
+      const busy = new Set([...running, ...report.waiting.flatMap((w) => (w.reason === "held" && w.holder.mine ? [w.issue] : []))]);
       let slots = Math.max(0, ctx.config.maxParallel - busy.size);
       let started = 0;
       for (const item of report.closed ? [] : report.start) {
-        if (item.attended || live.has(item.issue) || slots === 0) continue;
+        if (item.attended || running.has(item.issue) || slots === 0) continue;
         const r = await startRun(ctx, item.issue);
         if (r.ok) {
           started++;
@@ -102,7 +106,7 @@ async function loop(ctx: Ctx & { runs: RunHost }, story: number, opts: DeliverOp
           print({ kind: "run-started", issue: item.issue, step: item.step, agent: r.agent, session: r.session });
         } else print({ kind: "run-refused", issue: item.issue, step: item.step, refusal: r.refusal });
       }
-      if (started === 0 && live.size === 0) {
+      if (started === 0 && running.size === 0) {
         print({ kind: "stopping" });
         return { ok: true, kind: "delivered", story, report };
       }
