@@ -3,7 +3,20 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { type Ctx, RUN_MARK } from "@norn/core";
-import { cleanEnv, herdrDriver, paneEnv, type RunEvent, readRecord, runAgent, runPrompt, supervise, supervisorEnv, type Wake, writeRecord } from "@norn/cli";
+import {
+  cleanEnv,
+  herdrDriver,
+  paneEnv,
+  type RunEvent,
+  readRecord,
+  renderRunEvent,
+  runAgent,
+  runPrompt,
+  supervise,
+  supervisorEnv,
+  type Wake,
+  writeRecord,
+} from "@norn/cli";
 import { processDriver, setup } from "@norn/testing";
 
 const SESSION = "run-131-ab12";
