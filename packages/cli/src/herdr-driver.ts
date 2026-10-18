@@ -37,7 +37,7 @@ export async function closePane(herdr: Herdr, pane: string, pauseMs = 1000) {
 
 /**
  * Makes the agent's tab the one its workspace shows, where herdr would leave
- * the shell tab it opened the worktree with. Focusing a tab focuses its
+ * a tab someone kept open in the worktree. Focusing a tab focuses its
  * workspace too, so the workspace the person was in gets its focus back,
  * unless it is this one.
  */
@@ -48,6 +48,23 @@ async function showTab(herdr: Herdr, workspace: string, tab: unknown) {
   const back = dig(focused, "active_tab_id");
   await herdr(["tab", "focus", tab]);
   if (typeof back === "string" && dig(focused, "workspace_id") !== workspace) await herdr(["tab", "focus", back]);
+}
+
+/**
+ * Closes the shell tab herdr opens a worktree's workspace with, which cannot
+ * carry the run's environment, so the agent's tab is the workspace's only one.
+ * A tab someone works in stays: one with more panes, or a shell running
+ * anything, an agent included.
+ */
+async function closeSpareShell(herdr: Herdr, opened: unknown) {
+  const tab = dig(opened, "tab", "tab_id");
+  const pane = dig(opened, "root_pane", "pane_id");
+  if (typeof tab !== "string" || typeof pane !== "string" || dig(opened, "tab", "pane_count") !== 1) return;
+  const info = await herdr(["pane", "process-info", "--pane", pane]);
+  if (!info.ok) return;
+  const shell = dig(info.result, "process_info", "shell_pid");
+  const fg = (dig(info.result, "process_info", "foreground_processes") ?? []) as unknown[];
+  if (fg.length > 0 && fg.every((p) => dig(p, "pid") === shell)) await herdr(["tab", "close", tab]);
 }
 
 export function herdrDriver(o: Options): AgentDriver {
@@ -67,6 +84,7 @@ export function herdrDriver(o: Options): AgentDriver {
       const pane = made.ok ? dig(made.result, "root_pane", "pane_id") : undefined;
       if (typeof pane !== "string") return notStarted(`herdr could not make a pane in ${worktree}: ${made.ok ? "no pane in its answer" : made.message}`);
       onPane?.(pane);
+      if (opened.ok) await closeSpareShell(herdr, opened.result);
       if (typeof workspace === "string" && made.ok)
         await showTab(herdr, workspace, dig(made.result, "tab", "tab_id") ?? dig(made.result, "root_pane", "tab_id"));
       // Agent names are unique in the herdr session, and an earlier run may have left a norn-<issue> for a person.

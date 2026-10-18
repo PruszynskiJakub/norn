@@ -39,6 +39,8 @@ export class FakeHerdr {
   focused: string | null = null;
   active = new Map<string, string>();
   private made = 0;
+  /** Whether opening a worktree's workspace gives it a shell tab, as herdr does; off unless a test needs it. */
+  openShell = false;
   /** Agents live elsewhere in the session, holding names. */
   private elsewhere = new Set<string>();
   /** What the agent does with a prompt; tests script it, e.g. take the item and set its status. */
@@ -105,10 +107,14 @@ export class FakeHerdr {
     switch (key) {
       case "worktree open": {
         const path = flag("--path") ?? "";
+        const already = this.workspaces.has(path);
         const id = this.workspaces.get(path) ?? `w${this.workspaces.size + 1}`;
         this.workspaces.set(path, id);
         this.roots.set(id, flag("--cwd") ?? "");
-        return { ok: true, result: { type: "worktree_opened", workspace: { workspace_id: id } } };
+        if (this.openShell && !already) newPane(id, path).label = "1";
+        const shell = this.allPanes().find((p) => p.workspace === id && p.label === "1" && !p.closed);
+        const extra = shell ? { root_pane: paneInfo(shell), tab: { tab_id: `${shell.id}:t`, label: shell.label, pane_count: 1 } } : {};
+        return { ok: true, result: { type: "worktree_opened", already_open: already, workspace: { workspace_id: id }, ...extra } };
       }
       case "tab create": {
         const pane = newPane(flag("--workspace") ?? "", flag("--cwd") ?? "");
@@ -187,6 +193,14 @@ export class FakeHerdr {
       case "pane get": {
         const p = live(rest[0]);
         return p ? { ok: true, result: { type: "pane_info", pane: paneInfo(p) } } : err("pane_not_found");
+      }
+      case "pane process-info": {
+        const p = live(flag("--pane") ?? "");
+        if (!p) return err("pane_not_found");
+        // The shell is in the foreground until something runs in it: an agent, or what the test put on its screen.
+        const shell = !p.agent && p.screen === "$ ";
+        const fg = shell ? [{ pid: 1, name: "zsh" }] : [{ pid: 2, name: p.agent?.kind ?? "vim" }];
+        return { ok: true, result: { type: "pane_process_info", process_info: { pane_id: p.id, shell_pid: 1, foreground_processes: fg } } };
       }
       case "pane read": {
         const p = live(rest[0]);

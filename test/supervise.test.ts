@@ -159,6 +159,42 @@ describe("a run's supervisor", () => {
     expect(r.herdr.focused).toBe("w9");
   });
 
+  test("closes the shell tab herdr opened the worktree's workspace with, so the agent's tab is the only one", async () => {
+    const r = await herdrRun();
+    r.herdr.openShell = true;
+    r.herdr.onPrompt = async (pane) => {
+      await r.agent.take();
+      await r.agent.finish();
+      pane.agent!.status = "done";
+    };
+
+    expect(await r.go()).toEqual({ kind: "finished" });
+
+    const [shell, pane] = r.herdr.allPanes();
+    expect(shell.label).toBe("1");
+    expect(pane.label).toBe("norn-131");
+    expect(r.herdr.called("tab", "close")).toEqual([["tab", "close", `${shell.id}:t`]]);
+    expect(shell.closed).toBe(true);
+  });
+
+  test("leaves the workspace's first tab to a person who works in it", async () => {
+    const r = await herdrRun();
+    r.herdr.openShell = true;
+    await r.herdr.run(["worktree", "open", "--cwd", r.w.workspace.root, "--path", r.worktree, "--no-focus"]);
+    const [shell] = r.herdr.allPanes();
+    shell.screen = "$ vim notes.md";
+    r.herdr.onPrompt = async (pane) => {
+      await r.agent.take();
+      await r.agent.finish();
+      pane.agent!.status = "done";
+    };
+
+    await r.go();
+
+    expect(r.herdr.called("tab", "close")).toEqual([]);
+    expect(shell.closed).toBe(false);
+  });
+
   test("passes run.env into the agent's pane, reading a $NAME value from its own environment", async () => {
     const r = await herdrRun({ env: { GH_TOKEN: "$NORN_AGENT_TOKEN", MODE: "ci", UNSET: "$NOT_THERE" } });
     r.herdr.onPrompt = async (pane) => {
