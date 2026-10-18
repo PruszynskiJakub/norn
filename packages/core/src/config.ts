@@ -27,7 +27,40 @@ export interface Config {
   nornVersion: string | null;
   /** Whether the repository has a team file, i.e. norn init has run. */
   teamFile: boolean;
+  /** How norn run and norn deliver start and watch agents. */
+  run: RunConfig;
 }
+
+/** How a run starts its agent in a herdr pane, and when it gives up on it. */
+export interface RunConfig {
+  /** The agent norn run starts when it is given none: a name from `agents`, or a herdr agent kind such as claude or codex. */
+  agent: string;
+  /** Agents by name, each a herdr agent kind and the arguments it starts with. */
+  agents: Record<string, RunAgent>;
+  /** Variables set in each agent's pane, e.g. a token scoped to the repository; a value `$NAME` is read from norn's own environment. */
+  env: Record<string, string>;
+  /** How long a run's claim stays fresh without a renewal; its supervisor renews it while the agent lives. */
+  leaseMs: number;
+  /** An agent whose screen does not change for this long has stalled and is stopped. */
+  stallAfterMs: number;
+  /** An attempt that runs longer than this, time blocked on a person aside, is stopped. */
+  timeoutMs: number;
+  /** An agent that waits on a person this long, e.g. at a permission dialog, needs a human: the issue is escalated. */
+  blockedAfterMs: number;
+  /** Attempts at one step that end without the step finished before the issue needs a human. */
+  maxAttempts: number;
+}
+
+/** An agent as herdr starts it: `herdr agent start --kind <kind> ... -- <args>`. */
+export interface RunAgent {
+  kind: string;
+  args: string[];
+}
+
+export const DEFAULT_RUN = { agent: "claude", lease: "10m", stallAfter: "10m", timeout: "2h", blockedAfter: "30m", maxAttempts: 3 };
+
+const RUN_KEYS = ["agent", "agents", "env", "lease", "stallAfter", "timeout", "blockedAfter", "maxAttempts"] as const;
+export type RunSetting = (typeof RUN_KEYS)[number];
 
 const PROVIDERS = ["auto", "herdr", "claude-code", "git"] as const;
 const NOTIFICATIONS = ["auto", "herdr", "os", "none"];
@@ -52,6 +85,16 @@ interface Raw {
   deliver?: { maxParallel?: number; maxFixRounds?: number };
   notifications?: string;
   dashboard?: { port?: number; interval?: string };
+  run?: {
+    agent?: string;
+    agents?: Record<string, { kind: string; args?: string[] }>;
+    env?: Record<string, string>;
+    lease?: string;
+    stallAfter?: string;
+    timeout?: string;
+    blockedAfter?: string;
+    maxAttempts?: number;
+  };
 }
 
 /** A setting norn cannot use, so it refuses until the file is fixed. */
@@ -68,7 +111,10 @@ export type ConfigProblem =
   | { kind: "dashboard-in-team-file"; file: string; local: string }
   | { kind: "bad-dashboard-setting"; file: string; key: "port" | "interval" }
   | { kind: "norn-version-in-local-file"; file: string; team: string }
-  | { kind: "bad-norn-version"; file: string };
+  | { kind: "bad-norn-version"; file: string }
+  | { kind: "bad-run-setting"; file: string; key: RunSetting | "run" }
+  | { kind: "unknown-run-setting"; file: string; key: string }
+  | { kind: "run-env-in-team-file"; file: string; local: string };
 
 /** A setting norn ignores or clamps, and says so. */
 export type ConfigWarning =
@@ -89,7 +135,7 @@ function check(file: string, raw: unknown): { problems: ConfigProblem[]; warning
   const warnings: ConfigWarning[] = [];
   const r = raw as Record<string, unknown>;
   for (const key of Object.keys(r)) {
-    if (!["nornVersion", "baseBranch", "worktrees", "claims", "deliver", "notifications", "dashboard"].includes(key))
+    if (!["nornVersion", "baseBranch", "worktrees", "claims", "deliver", "notifications", "dashboard", "run"].includes(key))
       problems.push({ kind: "unknown-setting", file, key });
   }
   if ("nornVersion" in r) {
@@ -140,7 +186,49 @@ function check(file: string, raw: unknown): { problems: ConfigProblem[]; warning
     const v = deliver[key];
     if (v !== undefined && !(Number.isInteger(v) && (v as number) > 0)) problems.push({ kind: "bad-deliver-number", file, key });
   }
+  if ("run" in r) {
+    const checked = checkRun(file, r.run);
+    problems.push(...checked.problems);
+    warnings.push(...checked.warnings);
+  }
   return { problems, warnings };
+}
+
+const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v);
+
+function checkRun(file: string, raw: unknown): { problems: ConfigProblem[]; warnings: ConfigWarning[] } {
+  const bad = (key: RunSetting | "run"): ConfigProblem => ({ kind: "bad-run-setting", file, key });
+  if (!isRecord(raw)) return { problems: [bad("run")], warnings: [] };
+  const problems: ConfigProblem[] = [];
+  const warnings: ConfigWarning[] = [];
+  for (const key of Object.keys(raw)) if (!(RUN_KEYS as readonly string[]).includes(key)) problems.push({ kind: "unknown-run-setting", file, key });
+  if (raw.agent !== undefined && (typeof raw.agent !== "string" || !raw.agent)) problems.push(bad("agent"));
+  if (raw.agents !== undefined && !validAgents(raw.agents)) problems.push(bad("agents"));
+  if (raw.env !== undefined) {
+    // A token in the team file would be committed; each developer passes their own.
+    if (file === TEAM_CONFIG) problems.push({ kind: "run-env-in-team-file", file, local: LOCAL_CONFIG });
+    else if (!isRecord(raw.env) || Object.values(raw.env).some((v) => typeof v !== "string")) problems.push(bad("env"));
+  }
+  for (const key of ["lease", "stallAfter", "timeout", "blockedAfter"] as const)
+    if (raw[key] !== undefined && (typeof raw[key] !== "string" || durationMs(raw[key]) === null)) problems.push(bad(key));
+  if (raw.maxAttempts !== undefined && !(Number.isInteger(raw.maxAttempts) && (raw.maxAttempts as number) > 0)) problems.push(bad("maxAttempts"));
+  // How long a claim may sit unrenewed, and how often a step is retried, bind every developer's runs alike.
+  if (file === LOCAL_CONFIG)
+    for (const key of ["lease", "maxAttempts"] as const)
+      if (raw[key] !== undefined) warnings.push({ kind: "team-setting-in-local-file", file, setting: `run.${key}`, team: TEAM_CONFIG });
+  return { problems, warnings };
+}
+
+function validAgents(raw: unknown): boolean {
+  if (!isRecord(raw)) return false;
+  return Object.values(raw).every(
+    (a) =>
+      isRecord(a) &&
+      Object.keys(a).every((k) => k === "kind" || k === "args") &&
+      typeof a.kind === "string" &&
+      a.kind !== "" &&
+      (a.args === undefined || (Array.isArray(a.args) && a.args.every((x) => typeof x === "string"))),
+  );
 }
 
 async function read(workspace: Workspace, file: string): Promise<{ raw: Raw; exists: boolean; problems: ConfigProblem[]; warnings: ConfigWarning[] }> {
@@ -189,8 +277,24 @@ export async function loadConfig(workspace: Workspace): Promise<Loaded> {
       },
       nornVersion: team.raw.nornVersion ?? null,
       teamFile: team.exists,
+      run: runConfig(team.raw.run ?? {}, local.raw.run ?? {}),
     },
     warnings: [...team.warnings, ...local.warnings],
+  };
+}
+
+/** The developer's own choices win, except the lease and the attempt budget, which are the team's. */
+function runConfig(team: NonNullable<Raw["run"]>, local: NonNullable<Raw["run"]>): RunConfig {
+  const agents = { ...team.agents, ...local.agents };
+  return {
+    agent: local.agent ?? team.agent ?? DEFAULT_RUN.agent,
+    agents: Object.fromEntries(Object.entries(agents).map(([name, a]) => [name, { kind: a.kind, args: a.args ?? [] }])),
+    env: { ...local.env },
+    leaseMs: toMs(team.lease ?? DEFAULT_RUN.lease),
+    stallAfterMs: toMs(local.stallAfter ?? team.stallAfter ?? DEFAULT_RUN.stallAfter),
+    timeoutMs: toMs(local.timeout ?? team.timeout ?? DEFAULT_RUN.timeout),
+    blockedAfterMs: toMs(local.blockedAfter ?? team.blockedAfter ?? DEFAULT_RUN.blockedAfter),
+    maxAttempts: team.maxAttempts ?? DEFAULT_RUN.maxAttempts,
   };
 }
 

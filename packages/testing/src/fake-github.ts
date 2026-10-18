@@ -234,7 +234,7 @@ export class FakeGitHub implements GitHub {
   claimShas = new Map<number, string>();
   private commits = 0;
   private point(n: number, record: ClaimRecord) {
-    this.claims.set(n, { holder: record.holder, session: record.session, since: record.since });
+    this.claims.set(n, { holder: record.holder, session: record.session, since: record.since, ...(record.leaseMs ? { leaseMs: record.leaseMs } : {}) });
     this.claimShas.set(n, `claim${++this.commits}`);
   }
   async createClaim(n: number, record: ClaimRecord) {

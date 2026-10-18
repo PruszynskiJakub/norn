@@ -51,6 +51,7 @@ function strip(claim: (ClaimRecord & { sha?: string }) | null): ClaimRecord | nu
   return record;
 }
 
+/** A run's claim carries its own short lease, so a frozen run gives its item up long before claims.staleAfter. */
 export function isStale(claim: ClaimRecord, now: Date, staleAfterMs: number) {
-  return now.getTime() - new Date(claim.since).getTime() > staleAfterMs;
+  return now.getTime() - new Date(claim.since).getTime() > (claim.leaseMs ?? staleAfterMs);
 }

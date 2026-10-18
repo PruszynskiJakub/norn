@@ -19,7 +19,9 @@ export type Notification =
   /** A person QAs it at `gate`. */
   | { kind: "needs-human-qa"; issue: number; gate: Gate; url: string }
   /** Delivery stopped on issue `story` of the flow `flow`: what waits for a person that no session holds; empty when nothing does. */
-  | { kind: "story-waiting"; story: number; flow: string; waiting: WaitItem[] };
+  | { kind: "story-waiting"; story: number; flow: string; waiting: WaitItem[] }
+  /** A run's agent waits on a person, e.g. at a permission dialog, in the herdr pane `pane`. */
+  | { kind: "run-blocked"; issue: number; pane: string; url: string };
 
 /** The Notify port: shows a notification on a channel. The front end words it. */
 export type Notify = (channel: Channel, notification: Notification) => Promise<void>;
@@ -47,4 +49,9 @@ export async function notifyStateLeft(ctx: Ctx, n: number, state: string, flow: 
 /** An issue reached QA by a person. */
 export async function notifyHumanQa(ctx: Ctx, n: number, gate: Gate) {
   await send(ctx, { kind: "needs-human-qa", issue: n, gate, url: `${await ctx.github.repoUrl()}/issues/${n}` });
+}
+
+/** A run's agent is waiting for input from a person in its pane. */
+export async function notifyRunBlocked(ctx: Ctx, n: number, pane: string) {
+  await send(ctx, { kind: "run-blocked", issue: n, pane, url: `${await ctx.github.repoUrl()}/issues/${n}` });
 }

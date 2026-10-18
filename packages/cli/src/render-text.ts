@@ -28,6 +28,7 @@ import {
   type ReleaseResult,
   type Removal,
   type Row,
+  type RunSetting,
   sh,
   type StatusResult,
   type TakeResult,
@@ -186,10 +187,28 @@ function problem(p: ConfigProblem): string {
       return `${p.file}: nornVersion is the team's; norn init sets it in ${p.team}`;
     case "bad-norn-version":
       return `${p.file}: nornVersion must be a plain version such as 1.2.3`;
+    case "bad-run-setting":
+      return `${p.file}: ${p.key === "run" ? "run must be an object" : `run.${p.key} ${RUN_SETTING[p.key]}`}`;
+    case "unknown-run-setting":
+      return `${p.file}: unknown setting "run.${p.key}"`;
+    case "run-env-in-team-file":
+      return `${p.file}: run.env is each developer's own, since it may hold a token; set it in ${p.local}`;
     default:
       return unreachable(p);
   }
 }
+
+/** What a valid run setting looks like. */
+const RUN_SETTING: Record<RunSetting, string> = {
+  agent: "must be an agent's name, e.g. claude",
+  agents: 'must map names to agents like { "kind": "claude", "args": ["--model", "opus"] }',
+  env: "must map variable names to strings",
+  lease: "must be a duration like 10m",
+  stallAfter: "must be a duration like 10m",
+  timeout: "must be a duration like 2h",
+  blockedAfter: "must be a duration like 30m",
+  maxAttempts: "must be a whole number above 0",
+};
 
 export function renderWarning(w: ConfigWarning): string {
   switch (w.kind) {
@@ -1115,6 +1134,8 @@ export function renderNotification(n: Notification): { title: string; body: stri
         title: `norn: ${n.flow} #${n.story} is waiting for you`,
         body: n.waiting.map(waitText).join("\n") || `Nothing left to do on the ${n.flow}.`,
       };
+    case "run-blocked":
+      return { title: `norn: #${n.issue} needs you`, body: `Its agent waits for you in herdr pane ${n.pane}. Answer it there and the run carries on.\n${n.url}` };
     default:
       return unreachable(n);
   }

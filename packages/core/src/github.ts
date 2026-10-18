@@ -29,6 +29,8 @@ export interface ClaimRecord {
   session: string;
   /** ISO timestamp */
   since: string;
+  /** A run's own lease: the claim goes stale this long after `since`, in place of claims.staleAfter. */
+  leaseMs?: number;
 }
 
 /** A claim as read back: its record and the commit its ref points at. */
