@@ -151,7 +151,7 @@ async function runCommand(cmd: string, rest: string[], flags: Record<string, str
       const start = { issue: n, story: Number(story), session, agent, worktree, log: "" };
       const settled = await supervise({ ...ctx, session }, start, {
         env: ctx.workspace.env,
-        prompt: runPrompt,
+        prompt: (issue, worktree, previous) => runPrompt(issue, worktree, previous, ctx.runs.norn),
         log: (e) => print(progressLine(new Date(), `#${n} ${renderRunEvent(e)}`)),
       });
       return { ok: true, kind: "run-over", issue: n, settled };

@@ -36,6 +36,8 @@ export interface RunHost {
   startSupervisor: (start: SupervisorStart) => Promise<number>;
   /** Prints one line of a long command's progress as it happens. */
   print: (line: string) => void;
+  /** The command that runs this norn, which a run's agent uses for every norn command of its step. */
+  norn: string;
 }
 
 /** What a supervisor is started with. */

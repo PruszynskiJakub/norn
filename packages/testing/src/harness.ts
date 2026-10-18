@@ -59,6 +59,7 @@ export function setup(opts: { now?: string; session?: string; user?: string; ver
         return runs.onSupervisor(s);
       },
       print: (line) => runs.printed.push(line),
+      norn: "/opt/norn/dist/bin.js",
     },
   };
   return {

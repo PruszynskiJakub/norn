@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { closeSync, openSync } from "node:fs";
+import { closeSync, openSync, realpathSync } from "node:fs";
 import { SUPERVISE } from "./cli.js";
 import { herdrCli } from "./herdr.js";
 import { type RunHost, supervisorEnv } from "./supervise.js";
@@ -32,5 +32,7 @@ export function localRunHost(root: string, env: Record<string, string | undefine
       return pid;
     },
     print: (line) => process.stdout.write(`${line}\n`),
+    // The file norn runs from, executable on its own: the agents of its runs use this norn, whatever norn is on their PATH.
+    norn: realpathSync(process.argv[1]),
   };
 }

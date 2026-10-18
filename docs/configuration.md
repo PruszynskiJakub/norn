@@ -9,7 +9,7 @@ norn reads two files at the repository root. Both are optional; `norn init` crea
 
 The local file wins over the team file, except for `claims.staleAfter`, `deliver.maxFixRounds`, `run.lease` and `run.maxAttempts`. Those bind everyone's claims, fix rounds and runs, so norn reads them from the team file only; in the local file they are ignored with a warning.
 
-An unknown key or an invalid value makes norn refuse every command and name the problem, until the file is fixed. `norn doctor` reports these, and every other setup problem, at once.
+A norn older than a setting refuses it as unknown: upgrade every teammate's norn before adding `run` settings to the team file. An unknown key or an invalid value makes norn refuse every command and name the problem, until the file is fixed. `norn doctor` reports these, and every other setup problem, at once.
 
 ```jsonc
 // .agents/norn.config.json (committed)
@@ -92,7 +92,7 @@ The worktree location is fixed at `.agents/worktrees/`.
 
 ## Runs
 
-`norn run` and `norn deliver` start each agent in a herdr pane of its item's worktree and watch it; they need herdr and refuse outside it. A run's agent works as the run's own session (`NORN_SESSION=run-<issue>-<nonce>` in its pane), so its claims are the run's.
+`norn run` and `norn deliver` start each agent in a herdr pane of its item's worktree and watch it; they need herdr and refuse outside it. A run's agent works as the run's own session (`NORN_SESSION=run-<issue>-<nonce>` in its pane), so its claims are the run's. Its prompt names the norn that runs the supervisor, e.g. the project's `node_modules/norn/dist/bin.js`, and the agent runs every norn command of its step with it, since the `norn` on its PATH may be another version.
 
 - **Lease.** Once the agent has taken its item, the supervisor writes `run.lease` into the claim and renews it while the agent lives. A run whose machine sleeps or whose supervisor dies gives its item up after the lease, not after `claims.staleAfter`.
 - **Stall and timeout.** An agent whose pane shows no change for `run.stallAfter`, or whose attempt runs past `run.timeout`, is stopped with Ctrl-C twice and its pane closed. An agent busy in a single long tool call can keep its screen changing, so only the timeout catches it.

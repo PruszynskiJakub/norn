@@ -1257,11 +1257,16 @@ function settlementText(s: Exclude<Settlement, { kind: "retry" }>): string {
   }
 }
 
-/** The prompt a run gives its agent, and the one that nudges it after an attempt that did not finish the step. */
-export function runPrompt(n: number, worktree: string, previous: AttemptEnd | null): string {
+/**
+ * The prompt a run gives its agent, and the one that nudges it after an attempt that did not finish the step.
+ * `norn` is the command of the norn that runs the supervisor: the agent runs every norn command of the step with
+ * it, since the norn on its PATH may be another version, e.g. a global one beside the project's own.
+ */
+export function runPrompt(n: number, worktree: string, previous: AttemptEnd | null, norn = "norn"): string {
   const lines = [
-    `Work in ${worktree}. Run norn take ${n}, follow its briefing to the end, and finish with the norn command it gives.`,
-    `You run unattended under norn: no one answers questions. Decide on your own, or run norn escalate ${n} "reason" if only a person can decide.`,
+    `Work in ${worktree}. Run ${norn} take ${n}, follow its briefing to the end, and finish with the norn command it gives.`,
+    ...(norn === "norn" ? [] : [`Run every norn command of this step as ${norn}, where the briefing says norn: the norn on your PATH may be another version.`]),
+    `You run unattended under norn: no one answers questions. Decide on your own, or run ${norn} escalate ${n} "reason" if only a person can decide.`,
     "Never end your turn while you hold the claim: finish the step with its norn command, or escalate it.",
     "Commit and push at each milestone, so the next attempt can carry on if this one stops.",
   ];

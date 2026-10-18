@@ -482,6 +482,16 @@ describe("a run with a scripted process for its agent", () => {
   });
 });
 
+describe("a run's prompt", () => {
+  test("names the norn that runs the supervisor for every norn command, since another may be on the agent's PATH", () => {
+    const prompt = runPrompt(131, "/repo/wt", null, "/repo/node_modules/norn/dist/bin.js");
+
+    expect(prompt).toContain("Run /repo/node_modules/norn/dist/bin.js take 131, follow its briefing to the end");
+    expect(prompt).toContain("Run every norn command of this step as /repo/node_modules/norn/dist/bin.js, where the briefing says norn");
+    expect(prompt).toContain('run /repo/node_modules/norn/dist/bin.js escalate 131 "reason"');
+  });
+});
+
 describe("a supervisor's log", () => {
   test("an attempt that finished its step gives no reason; one that did not says why", () => {
     const end = { kind: "exited" as const, code: 0, signal: null };
