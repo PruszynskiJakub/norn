@@ -38,7 +38,7 @@ export async function closePane(herdr: Herdr, pane: string, pauseMs = 1000) {
 export function herdrDriver(o: Options): AgentDriver {
   const { herdr } = o;
   return {
-    async start({ prompt, worktree, session, env, log }) {
+    async start({ prompt, worktree, session, env, log, onPane }) {
       const label = `norn-${o.issue}`;
       const vars = Object.entries({ ...env, NORN_SESSION: session, NORN_RUN: String(o.issue) }).flatMap(([k, v]) => ["--env", `${k}=${v}`]);
       // The worktree's own workspace, which herdr opens once and finds again after.
@@ -51,6 +51,7 @@ export function herdrDriver(o: Options): AgentDriver {
           : await herdr(["workspace", "create", "--cwd", worktree, "--label", label, ...vars, "--no-focus"]);
       const pane = made.ok ? dig(made.result, "root_pane", "pane_id") : undefined;
       if (typeof pane !== "string") return notStarted(`herdr could not make a pane in ${worktree}: ${made.ok ? "no pane in its answer" : made.message}`);
+      onPane?.(pane);
       // Agent names are unique in the herdr session, and an earlier run may have left a norn-<issue> for a person.
       const name = (await herdr(["agent", "get", label])).ok ? `${label}-${session.split("-").at(-1)}`.slice(0, 32) : label;
       const started = await herdr(["agent", "start", name, "--kind", o.agent.kind, "--pane", pane, ...(o.agent.args.length ? ["--", ...o.agent.args] : [])]);

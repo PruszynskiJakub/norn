@@ -7,8 +7,19 @@ import type { AttemptEnd } from "@norn/core";
  * agent in a herdr pane; tests drive scripted agents through the same seam.
  */
 export interface AgentDriver {
-  /** Starts an agent working in `worktree` as `session`, the run's own norn session, with `env` set for it. `log` is the attempt's log file. */
-  start(a: { prompt: string; worktree: string; session: string; env: Record<string, string>; log: string }): Promise<AgentAttempt>;
+  /**
+   * Starts an agent working in `worktree` as `session`, the run's own norn session, with `env` set for it. `log` is
+   * the attempt's log file. `onPane` hears of the agent's pane as soon as it exists, before the agent is ready, so a
+   * run whose supervisor dies while the agent starts still says where its agent is.
+   */
+  start(a: {
+    prompt: string;
+    worktree: string;
+    session: string;
+    env: Record<string, string>;
+    log: string;
+    onPane?: (pane: string) => void;
+  }): Promise<AgentAttempt>;
 }
 
 /** How a driver's agent turn ends; the supervisor adds the ends it causes itself, such as a stall. */

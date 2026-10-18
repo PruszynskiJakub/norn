@@ -218,7 +218,14 @@ export async function supervise(ctx: RunCtx, start: SupervisorStart, opts: Super
     if (attempt && (await attempt.nudge(prompt))) opts.log({ kind: "nudged", attempt: number, pane: attempt.pane ?? "" });
     else {
       await attempt?.stop();
-      attempt = await driver.start({ prompt, worktree, session: ctx.session, env, log: join(runDirFor(root, n), `attempt-${number}.log`) });
+      attempt = await driver.start({
+        prompt,
+        worktree,
+        session: ctx.session,
+        env,
+        log: join(runDirFor(root, n), `attempt-${number}.log`),
+        onPane: (pane) => writeRecord(root, { ...record, pane }),
+      });
       opts.log({ kind: "attempt-started", attempt: number, agent, pane: attempt.pane });
     }
     record.pane = attempt.pane;

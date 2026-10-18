@@ -20,7 +20,7 @@ async function herdrRun(rules: Partial<Ctx["config"]["run"]> = {}) {
   ctx.config.notifications = "herdr";
   const worktree = join(w.workspace.root, ".agents/worktrees/131-per-key-limits");
   const driver = herdrDriver({
-    herdr: w.herdr.run,
+    herdr: (args) => w.herdr.run(args),
     root: w.workspace.root,
     issue: 131,
     agent: { kind: "claude", args: ["--model", "opus"] },
@@ -75,6 +75,26 @@ describe("a run's supervisor", () => {
     // A finished step's pane is closed; what it showed stays in the attempt's log.
     expect(pane.closed).toBe(true);
     expect(readRecord(r.w.workspace.root, 131)).toMatchObject({ state: "finished", pane: pane.id, session: SESSION });
+  });
+
+  test("records the agent's pane as soon as it exists, before the agent is ready", async () => {
+    const r = await herdrRun();
+    let recorded: string | null | undefined;
+    r.herdr.onPrompt = async (pane) => {
+      await r.agent.take();
+      await r.agent.finish();
+      pane.agent!.status = "done";
+    };
+    const run = r.herdr.run;
+    r.herdr.run = async (args) => {
+      // While herdr starts the agent, the run's record already names its pane.
+      if (args[0] === "agent" && args[1] === "start") recorded = readRecord(r.w.workspace.root, 131)?.pane;
+      return run(args);
+    };
+
+    await r.go();
+
+    expect(recorded).toBe(r.herdr.allPanes()[0].id);
   });
 
   test("passes run.env into the agent's pane, reading a $NAME value from its own environment", async () => {
