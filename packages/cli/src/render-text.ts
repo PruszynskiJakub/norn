@@ -1276,7 +1276,8 @@ export function runPrompt(n: number, worktree: string, previous: AttemptEnd | nu
 export function renderRunEvent(e: RunEvent): string {
   switch (e.kind) {
     case "attempt-started":
-      return e.pane ? `attempt ${e.attempt}: started ${e.agent} in herdr pane ${e.pane}` : `attempt ${e.attempt}: ${e.agent} did not start`;
+      // An agent that could not start has no pane; the attempt's end says why.
+      return `attempt ${e.attempt}: starting ${e.agent}${e.pane ? ` in herdr pane ${e.pane}` : ""}`;
     case "nudged":
       return `attempt ${e.attempt}: prompted the agent again in herdr pane ${e.pane}`;
     case "taken":
@@ -1286,6 +1287,8 @@ export function renderRunEvent(e: RunEvent): string {
     case "stopping":
       return e.why.kind === "lost-claim" ? "stopping the agent: another session holds the claim now" : `stopping the agent: ${attemptEndText(e.why)}`;
     case "settled":
+      // How the agent ended says why a step is not done; a finished step needs no reason.
+      if (e.settled.kind === "finished") return `attempt ${e.attempt} ended after ${e.minutes}m: ${settlementText(e.settled)}`;
       return `attempt ${e.attempt} ended after ${e.minutes}m (${attemptEndText(e.end)}): ${e.settled.kind === "retry" ? "trying again" : settlementText(e.settled)}`;
     case "tick-failed":
       return `a check failed and is retried at the next tick: ${e.detail}`;

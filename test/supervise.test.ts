@@ -469,6 +469,19 @@ describe("a run with a scripted process for its agent", () => {
   });
 });
 
+describe("a supervisor's log", () => {
+  test("an attempt that finished its step gives no reason; one that did not says why", () => {
+    const end = { kind: "exited" as const, code: 0, signal: null };
+    expect(renderRunEvent({ kind: "settled", attempt: 1, end, minutes: 2, settled: { kind: "finished" } })).toBe(
+      "attempt 1 ended after 2m: its agent finished the step.",
+    );
+    expect(renderRunEvent({ kind: "settled", attempt: 1, end, minutes: 2, settled: { kind: "retry", attempts: 1, end } })).toBe(
+      "attempt 1 ended after 2m (the agent exited 0 without finishing its step): trying again",
+    );
+    expect(renderRunEvent({ kind: "attempt-started", attempt: 2, agent: "claude", pane: "w1:p2" })).toBe("attempt 2: starting claude in herdr pane w1:p2");
+  });
+});
+
 describe("a run's environment", () => {
   test("the supervisor keeps herdr's socket; neither it nor the agent gets the caller's pane, agent tool or session", () => {
     const env = { PATH: "/bin", HERDR_ENV: "1", HERDR_SOCKET_PATH: "/s.sock", HERDR_PANE_ID: "w1:p1", NORN_SESSION: "me", CLAUDECODE: "1" };
