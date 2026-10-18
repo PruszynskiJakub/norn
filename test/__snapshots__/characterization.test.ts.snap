@@ -204,6 +204,12 @@ exports[`output of every command, text and --json > doctor with problems > json 
       "level": "ok",
       "message": "claude-code matches the environment",
       "fix": null
+    },
+    {
+      "id": "runs",
+      "level": "ok",
+      "message": "norn run and norn deliver need herdr; start them from a herdr pane",
+      "fix": null
     }
   ]
 }"
@@ -226,6 +232,7 @@ exports[`output of every command, text and --json > doctor with problems > text 
 ✗ agent-instructions: neither AGENTS.md nor CLAUDE.md has the norn block
   fix: norn init
 ✓ provider: claude-code matches the environment
+✓ runs: norn run and norn deliver need herdr; start them from a herdr pane
 
 3 checks failed and 1 warned. Run the fixes above, then norn doctor again."
 `;
@@ -300,6 +307,12 @@ exports[`output of every command, text and --json > doctor without gh > json 1`]
       "level": "ok",
       "message": "claude-code matches the environment",
       "fix": null
+    },
+    {
+      "id": "runs",
+      "level": "ok",
+      "message": "norn run and norn deliver need herdr; start them from a herdr pane",
+      "fix": null
     }
   ]
 }"
@@ -322,6 +335,7 @@ exports[`output of every command, text and --json > doctor without gh > text 1`]
 ✗ agent-instructions: neither AGENTS.md nor CLAUDE.md has the norn block
   fix: norn init
 ✓ provider: claude-code matches the environment
+✓ runs: norn run and norn deliver need herdr; start them from a herdr pane
 
 3 checks failed and 1 warned. Run the fixes above, then norn doctor again."
 `;

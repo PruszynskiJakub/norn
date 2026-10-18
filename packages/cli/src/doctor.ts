@@ -30,7 +30,19 @@ import { filesWithAgentInstructions, labelDefinitions, SKILLS } from "./init.js"
 import { SKILLS_DIR, sameTree } from "./install-skills.js";
 
 /** The checks norn doctor makes, in the order it reports them. */
-export type CheckId = "gh" | "git" | "base-branch" | "permission" | "labels" | "flows" | "config" | "version" | "skills" | "agent-instructions" | "provider";
+export type CheckId =
+  | "gh"
+  | "git"
+  | "base-branch"
+  | "permission"
+  | "labels"
+  | "flows"
+  | "config"
+  | "version"
+  | "skills"
+  | "agent-instructions"
+  | "provider"
+  | "runs";
 
 /** Only `fail` makes doctor exit 1; `skipped` means a check it depends on did not pass. */
 export type CheckLevel = "ok" | "warning" | "fail" | "skipped";
@@ -55,7 +67,9 @@ export type CheckFact =
   /** `drifted` is null when the skills come from NORN_SKILLS_SOURCE and are not compared. */
   | { kind: "skills"; total: number; missing: string[]; unlinked: string[]; drifted: string[] | null }
   | { kind: "agent-instructions"; files: string[] }
-  | { kind: "provider"; provider: Provider; unsetVariable: string | null };
+  | { kind: "provider"; provider: Provider; unsetVariable: string | null }
+  /** How norn run starts agents: whether herdr is here, and the agents whose arguments turn their permission checks off. */
+  | { kind: "runs"; herdr: boolean; bypassing: { agent: string; arg: string }[] };
 
 /**
  * What the flows check found: the flows in effect by name; the invalid ones on the base branch, and in the checkout's
@@ -266,7 +280,21 @@ export async function doctor(d: DoctorDeps): Promise<DoctorResult> {
     add("provider", mismatch ? "fail" : "ok", { kind: "provider", provider: c.provider, unsetVariable: mismatch?.variable ?? null });
   }
 
+  if (!withConfig.ok) skip("runs", withConfig.needs);
+  else {
+    const bypassing = bypassingAgents(withConfig.value);
+    add("runs", bypassing.length ? "warning" : "ok", { kind: "runs", herdr: d.workspace.env.HERDR_ENV === "1", bypassing });
+  }
+
   return { ok: true, kind: "doctor", checks };
+}
+
+/** Arguments that turn an agent's own permission checks and sandbox off, e.g. Claude Code's bypassPermissions mode. */
+const BYPASS = /^(bypassPermissions|--dangerously-skip-permissions|--dangerously-bypass-approvals-and-sandbox|--yolo)$/;
+
+/** The run agents that start with their permission checks off, so they can run anything on this machine unattended. */
+function bypassingAgents(c: Config): { agent: string; arg: string }[] {
+  return Object.entries(c.run.agents).flatMap(([agent, a]) => a.args.filter((arg) => BYPASS.test(arg)).map((arg) => ({ agent, arg })));
 }
 
 /** The flow files of the checkout's working copy that differ from the base branch, checked as the team would have them once merged. */

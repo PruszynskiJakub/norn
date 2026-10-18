@@ -84,6 +84,7 @@ describe("norn doctor on a healthy setup", () => {
         "✓ skills: all 16 skills are in .agents/skills/ and linked from .claude/skills/",
         "✓ agent-instructions: the norn block is in AGENTS.md",
         "✓ provider: claude-code matches the environment",
+        "✓ runs: norn run and norn deliver need herdr; start them from a herdr pane",
         "",
         "Everything norn needs is set up.",
       ].join("\n"),
@@ -109,6 +110,7 @@ describe("norn doctor on a healthy setup", () => {
       "skills",
       "agent-instructions",
       "provider",
+      "runs",
     ]);
     expect(body.checks[0]).toEqual({ id: "gh", level: "ok", message: "logged in to github.com", fix: null });
   });
@@ -224,6 +226,7 @@ describe("norn doctor: gh and git", () => {
       "- skills: skipped, needs git",
       "- agent-instructions: skipped, needs git",
       "- provider: skipped, needs git",
+      "- runs: skipped, needs git",
     ]);
   });
 });
@@ -693,6 +696,40 @@ describe("norn doctor: skills, instructions and provider", () => {
       level: "fail",
       message: "the worktree provider is herdr, but HERDR_ENV is not set",
       fix: `start norn from a herdr pane, or set worktrees.provider in ${LOCAL}`,
+    });
+  });
+});
+
+describe("norn doctor: runs", () => {
+  test("says whether norn run and norn deliver can start agents here", async () => {
+    const { w, norn } = await healthy();
+    expect(await check(norn, "runs")).toMatchObject({ level: "ok", message: "norn run and norn deliver need herdr; start them from a herdr pane" });
+    w.workspace.env = { ...w.workspace.env, HERDR_ENV: "1" };
+    w.workspace.files.set(LOCAL, JSON.stringify({ worktrees: { provider: "herdr" } }));
+    expect(await check(norn, "runs")).toMatchObject({ level: "ok", message: "norn run and norn deliver can start agents here" });
+  });
+
+  test("warns when an agent starts with its permission checks off", async () => {
+    const { w, norn } = await healthy();
+    w.workspace.files.set(
+      LOCAL,
+      JSON.stringify({
+        run: {
+          agents: {
+            opus: { kind: "claude", args: ["--permission-mode", "bypassPermissions"] },
+            codex: { kind: "codex", args: ["--full-auto"] },
+            yolo: { kind: "codex", args: ["--dangerously-bypass-approvals-and-sandbox"] },
+          },
+        },
+      }),
+    );
+
+    expect(await check(norn, "runs")).toEqual({
+      id: "runs",
+      level: "warning",
+      message:
+        "run.agents.opus (bypassPermissions), run.agents.yolo (--dangerously-bypass-approvals-and-sandbox) turns the agent's permission checks off, so an unattended agent can run anything on this machine",
+      fix: "give the agent its own sandbox instead, e.g. Claude Code's sandbox with auto-allowed commands; see Sandboxing agents in docs/configuration.md",
     });
   });
 });

@@ -801,6 +801,15 @@ export function renderCheck(c: DoctorCheck): { message: string; fix: string | nu
         fix: `${start}, or set worktrees.provider in ${LOCAL_CONFIG}`,
       };
     }
+    case "runs": {
+      const where = f.herdr ? "norn run and norn deliver can start agents here" : "norn run and norn deliver need herdr; start them from a herdr pane";
+      if (!f.bypassing.length) return { message: where, fix: null };
+      const which = f.bypassing.map((b) => `run.agents.${b.agent} (${b.arg})`).join(", ");
+      return {
+        message: `${which} turns the agent's permission checks off, so an unattended agent can run anything on this machine`,
+        fix: "give the agent its own sandbox instead, e.g. Claude Code's sandbox with auto-allowed commands; see Sandboxing agents in docs/configuration.md",
+      };
+    }
     default:
       return unreachable(f);
   }
