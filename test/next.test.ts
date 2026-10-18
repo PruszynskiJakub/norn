@@ -177,23 +177,19 @@ describe("next names how to start fresh agents for the worktree tool", () => {
     expect(s131).not.toContain("Create the worktree");
   });
 
-  test("herdr: create the worktree if missing, then a new herdr agent in its pane", async () => {
+  test("herdr: each item an agent can do is run with norn run, which makes its worktree; norn deliver runs them all", async () => {
     const w = prdExample();
     w.workspace.env = { HERDR_ENV: "1" };
-    w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting-128");
 
     const res = await w.norn("next", "123");
 
-    expect(res.stdout.replace(/\s+/g, " ")).toContain("each as a new herdr agent in the item's worktree pane:");
-    expect(res.stdout).toContain(
-      "    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-131 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-131 --path /repo/.agents/worktrees/123-rate-limiting-131 --no-focus",
-    );
-    expect(res.stdout).toContain("    Start an agent: herdr agent start norn-131 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-131>");
-    expect(res.stdout).toContain(
-      '    Then prompt it: herdr agent prompt norn-131 "Work in /repo/.agents/worktrees/123-rate-limiting-131. Run norn take 131, follow its briefing to the end, and finish with the norn command it gives."',
-    );
-    const s128 = res.stdout.slice(res.stdout.indexOf("#128"), res.stdout.indexOf("#127"));
-    expect(s128).not.toContain("Create the worktree");
+    expect(res.stdout.replace(/\s+/g, " ")).toContain("each with norn run, which starts its agent in a herdr pane of the item's worktree and sees it through:");
+    const s131 = res.stdout.slice(res.stdout.indexOf("#131"), res.stdout.indexOf("#128"));
+    expect(s131).toContain("    Run it: norn run 131");
+    expect(s131).not.toContain("Create the worktree");
+    expect(s131).not.toContain("herdr agent start");
+    expect(s131).not.toContain("Start it with: norn take");
+    expect(res.stdout.replace(/\s+/g, " ")).toContain("norn deliver 123 does all of this on its own");
   });
 
   test("herdr: an attended step is handed to an agent in the worktree, which drives the story", async () => {

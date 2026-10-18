@@ -10,6 +10,7 @@ import { installSkills } from "./install-skills.js";
 import { BUNDLED_SKILLS, NORN_VERSION } from "./package.js";
 import { LocalWorkspace, makeNotifier, RootError, runCommand } from "@norn/workspace-local";
 import { launchDashboard } from "@norn/web";
+import { localRunHost } from "./run-host.js";
 
 const argv = process.argv.slice(2);
 
@@ -42,6 +43,7 @@ try {
     version: NORN_VERSION,
     bundledSkills: BUNDLED_SKILLS,
     checkoutProblem,
+    runs: localRunHost(root, process.env),
   });
   process.stdout.write(`${res.stdout}\n`);
   process.exitCode = res.exitCode;

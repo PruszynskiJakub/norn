@@ -1,7 +1,8 @@
-import { type Deps, renderNotification, run } from "@norn/cli";
+import { type Deps, renderNotification, run, type SupervisorStart } from "@norn/cli";
 import type { DashboardLaunch, DashboardOptions } from "@norn/web";
 import { type Ctx, loadConfig } from "@norn/core";
 import { FakeGitHub } from "./fake-github.js";
+import { FakeHerdr } from "./fake-herdr.js";
 import { FakeWorkspace } from "./fake-workspace.js";
 
 export function setup(opts: { now?: string; session?: string; user?: string; version?: string } = {}) {
@@ -16,6 +17,16 @@ export function setup(opts: { now?: string; session?: string; user?: string; ver
   /** What norn dashboard asked to start, and what the start answers. */
   const launches: DashboardOptions[] = [];
   const dashboard = { answer: null as DashboardLaunch | null };
+  const herdr = new FakeHerdr();
+  /** What norn run and norn deliver did on the machine; tests set what a supervisor start does and what a shell command exits with. */
+  const runs = {
+    supervisors: [] as SupervisorStart[],
+    shell: [] as string[],
+    shellExit: 0,
+    printed: [] as string[],
+    /** Starting a supervisor; by default it is recorded and given this process's pid, so its run counts as live. */
+    onSupervisor: (_s: SupervisorStart): number => process.pid,
+  };
   const deps: Deps = {
     github,
     workspace,
@@ -37,12 +48,27 @@ export function setup(opts: { now?: string; session?: string; user?: string; ver
     version: opts.version ?? "1.4.2",
     bundledSkills: "/nonexistent",
     checkoutProblem: null,
+    runs: {
+      herdr: herdr.run,
+      shell: async (command) => {
+        runs.shell.push(command);
+        return runs.shellExit;
+      },
+      startSupervisor: async (s) => {
+        runs.supervisors.push(s);
+        return runs.onSupervisor(s);
+      },
+      print: (line) => runs.printed.push(line),
+    },
   };
   return {
     github,
     workspace,
     notifications,
     nonces,
+    herdr,
+    runs,
+    deps,
     launches,
     set launchAnswer(a: DashboardLaunch) {
       dashboard.answer = a;

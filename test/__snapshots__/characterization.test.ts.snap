@@ -1393,7 +1393,7 @@ exports[`output of every command, text and --json > next on a story in implement
   "notified": true,
   "running": 0,
   "slots": 2,
-  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each as a new herdr agent in the item's worktree pane:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue: Queued to merge.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n    Start an agent: herdr agent start norn-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>\\n    Then prompt it: herdr agent prompt norn-127 \\"Work in /repo/.agents/worktrees/123-rate-limiting-127. Run norn take 127, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 127\\n  - Slice #128 \\"Limit headers\\" is in needs-review: Waiting for review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus\\n    Start an agent: herdr agent start norn-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>\\n    Then prompt it: herdr agent prompt norn-128 \\"Work in /repo/.agents/worktrees/123-rate-limiting-128. Run norn take 128, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 128\\n  - Slice #132 \\"Docs\\" is in ready-for-agent: Ready for an agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Start an agent: herdr agent start norn-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>\\n    Then prompt it: herdr agent prompt norn-132 \\"Work in /repo/.agents/worktrees/123-rate-limiting-132. Run norn take 132, follow its briefing to the end, and finish with the norn command it gives.\\"\\n    Start it with: norn take 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus\\n      herdr agent start norn-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>\\n      herdr agent prompt norn-133 \\"norn-drive 133\\"\\n      herdr agent focus norn-133\\n\\nEach phase gets a new agent. When an item is done, run norn next 123 again."
+  "message": "Story #123 \\"Rate limiting\\" is in implementation. 1 of 6 slices are merged\\ninto 123-rate-limiting.\\n\\nYou can start 3 items now. They are independent, so run them in parallel, at\\nmost 2 at a time, each with norn run, which starts its agent in a herdr pane\\nof the item's worktree and sees it through:\\n\\n  - Slice #127 \\"Redis store\\" is in merge-queue: Queued to merge.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-127\\n    Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n  - Slice #128 \\"Limit headers\\" is in needs-review: Waiting for review.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-128\\n    Run it: norn run 128\\n  - Slice #132 \\"Docs\\" is in ready-for-agent: Ready for an agent.\\n    Worktree: /repo/.agents/worktrees/123-rate-limiting-132\\n    Run it: norn run 132\\n\\nWaiting, nothing to do for you:\\n  - #131 is blocked by #127.\\n  - #133 needs human QA (mode:hil). Do not take it.\\n    If the user does it now, hand it to an agent in its worktree:\\n      Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-133 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-133 --path /repo/.agents/worktrees/123-rate-limiting-133 --no-focus\\n      herdr agent start norn-133 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-133>\\n      herdr agent prompt norn-133 \\"norn-drive 133\\"\\n      herdr agent focus norn-133\\n\\nnorn deliver 123 does all of this on its own: it runs each item an agent can\\ndo, and the next step of each once one finishes, until only people can move\\nthe story on."
 }"
 `;
 
@@ -1403,25 +1403,18 @@ Story #123 "Rate limiting" is in implementation. 1 of 6 slices are merged
 into 123-rate-limiting.
 
 You can start 3 items now. They are independent, so run them in parallel, at
-most 2 at a time, each as a new herdr agent in the item's worktree pane:
+most 2 at a time, each with norn run, which starts its agent in a herdr pane
+of the item's worktree and sees it through:
 
   - Slice #127 "Redis store" is in merge-queue: Queued to merge.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-127
     Branch 123-rate-limiting-127 is checked out at /elsewhere; work there or switch that checkout to another branch.
-    Start an agent: herdr agent start norn-127 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-127>
-    Then prompt it: herdr agent prompt norn-127 "Work in /repo/.agents/worktrees/123-rate-limiting-127. Run norn take 127, follow its briefing to the end, and finish with the norn command it gives."
-    Start it with: norn take 127
   - Slice #128 "Limit headers" is in needs-review: Waiting for review.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-128
-    Create the worktree: git -C /repo fetch origin 123-rate-limiting && git -C /repo branch --no-track 123-rate-limiting-128 origin/123-rate-limiting && herdr worktree create --cwd /repo --branch 123-rate-limiting-128 --path /repo/.agents/worktrees/123-rate-limiting-128 --no-focus
-    Start an agent: herdr agent start norn-128 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-128>
-    Then prompt it: herdr agent prompt norn-128 "Work in /repo/.agents/worktrees/123-rate-limiting-128. Run norn take 128, follow its briefing to the end, and finish with the norn command it gives."
-    Start it with: norn take 128
+    Run it: norn run 128
   - Slice #132 "Docs" is in ready-for-agent: Ready for an agent.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-132
-    Start an agent: herdr agent start norn-132 --kind claude --pane <pane of /repo/.agents/worktrees/123-rate-limiting-132>
-    Then prompt it: herdr agent prompt norn-132 "Work in /repo/.agents/worktrees/123-rate-limiting-132. Run norn take 132, follow its briefing to the end, and finish with the norn command it gives."
-    Start it with: norn take 132
+    Run it: norn run 132
 
 Waiting, nothing to do for you:
   - #131 is blocked by #127.
@@ -1432,7 +1425,9 @@ Waiting, nothing to do for you:
       herdr agent prompt norn-133 "norn-drive 133"
       herdr agent focus norn-133
 
-Each phase gets a new agent. When an item is done, run norn next 123 again."
+norn deliver 123 does all of this on its own: it runs each item an agent can
+do, and the next step of each once one finishes, until only people can move
+the story on."
 `;
 
 exports[`output of every command, text and --json > next on a story in merge-queue > json 1`] = `
@@ -2830,7 +2825,7 @@ exports[`output of every command, text and --json > unknown command > json 1`] =
 "exit 2
 {
   "ok": false,
-  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
+  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn deliver <story>               Run every step an agent can do, each agent in its own\\n                                     herdr pane, until only people can move the story on\\n  norn run <issue> [--agent <name>]  Start a supervised run of the issue's step, its agent\\n                                     in a herdr pane\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -2849,6 +2844,10 @@ norn runs work through the SDD process. Commands on an issue take its number exp
   norn escalate <issue> "reason"     Set needs-human and release the claim
   norn release <issue>               Give up the claim without a transition
   norn status <story>                Read-only overview of the story and its slices
+  norn deliver <story>               Run every step an agent can do, each agent in its own
+                                     herdr pane, until only people can move the story on
+  norn run <issue> [--agent <name>]  Start a supervised run of the issue's step, its agent
+                                     in a herdr pane
   norn tidy [--dry-run]              Remove what belongs to closed issues
   norn dashboard [--port <n>] [--interval <duration>] [--no-open]
                                      Watch your work in the browser; Ctrl-C stops it
@@ -2864,7 +2863,7 @@ exports[`output of every command, text and --json > usage > json 1`] = `
 "exit 2
 {
   "ok": false,
-  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
+  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn deliver <story>               Run every step an agent can do, each agent in its own\\n                                     herdr pane, until only people can move the story on\\n  norn run <issue> [--agent <name>]  Start a supervised run of the issue's step, its agent\\n                                     in a herdr pane\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -2883,6 +2882,10 @@ norn runs work through the SDD process. Commands on an issue take its number exp
   norn escalate <issue> "reason"     Set needs-human and release the claim
   norn release <issue>               Give up the claim without a transition
   norn status <story>                Read-only overview of the story and its slices
+  norn deliver <story>               Run every step an agent can do, each agent in its own
+                                     herdr pane, until only people can move the story on
+  norn run <issue> [--agent <name>]  Start a supervised run of the issue's step, its agent
+                                     in a herdr pane
   norn tidy [--dry-run]              Remove what belongs to closed issues
   norn dashboard [--port <n>] [--interval <duration>] [--no-open]
                                      Watch your work in the browser; Ctrl-C stops it

@@ -82,32 +82,30 @@ export function abandonedAttempts(comments: string[]): number {
   return n;
 }
 
-/** The labels that say where an issue is, without the in-progress flag that mirrors the claim. */
-function place(labels: string[]) {
-  return labels
-    .filter((l) => l !== "in-progress")
-    .sort()
-    .join(",");
+/** Whether a comment says a step ended: a transition norn done made, or an escalation. */
+function endsStep(body: string) {
+  return parseTransitionComment(body) !== null || body.startsWith(NEEDS_HUMAN_MARK);
 }
 
 /**
  * After an attempt, GitHub says what happened, never the agent's own state.
  * Another session holds the claim: the run lost it. No claim, and the issue
- * moved on from `before`, its labels once the agent had taken it: the step is
- * finished. Otherwise the step is not done (the agent stopped holding the
- * claim, gave it up without moving the issue, or never took it): the attempt
- * is recorded on the issue under the run's claim, and the run tries again, or
- * escalates once `maxAttempts` are spent or when the agent waited on a person
- * too long, since that dialog would only come back. `ctx.session` is the
- * run's session.
+ * closed or a transition or escalation written since the attempt began, when
+ * it had `commentsBefore` comments: the step is finished. Labels alone do not
+ * say so, since norn take moves them too. Otherwise the step is not done (the
+ * agent stopped holding the claim, gave it up without a transition, or never
+ * took it): the attempt is recorded on the issue under the run's claim, and
+ * the run tries again, or escalates once `maxAttempts` are spent or when the
+ * agent waited on a person too long, since that dialog would only come back.
+ * `ctx.session` is the run's session.
  */
-export async function settleRun(ctx: Ctx, n: number, attempt: Attempt, before: string[]): Promise<Settlement> {
+export async function settleRun(ctx: Ctx, n: number, attempt: Attempt, commentsBefore: number): Promise<Settlement> {
   const { github } = ctx;
   const claim = await github.readClaim(n);
   if (claim && claim.session !== ctx.session) return { kind: "lost", holder: claim.holder, session: claim.session };
   if (!claim) {
     const issue = await github.getIssue(n);
-    if (issue.state === "closed" || place(issue.labels) !== place(before)) return { kind: "finished" };
+    if (issue.state === "closed" || (await github.listComments(n)).slice(commentsBefore).some(endsStep)) return { kind: "finished" };
     // Nothing moved: take the claim back to record the attempt, and carry on under it.
     const got = await acquire(
       github,

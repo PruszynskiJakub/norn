@@ -1,6 +1,8 @@
 import { parseArgs } from "./args.js";
 import {
   type AddSliceResult,
+  type AttemptEnd,
+  attemptEndText,
   type Briefing,
   type ConfigProblem,
   type BehaviourName,
@@ -29,6 +31,7 @@ import {
   type Removal,
   type Row,
   type RunSetting,
+  type Settlement,
   sh,
   type StatusResult,
   type TakeResult,
@@ -40,6 +43,9 @@ import type { DashboardRefusal, DashboardResult } from "./dashboard.js";
 import { type CheckFact, type DoctorCheck, type DoctorResult, doctorFailed, type FlowsFact } from "./doctor.js";
 import type { FlowExported, FlowsRefusal } from "./flows.js";
 import type { InitResult, InitWouldDowngrade, MissingSkills } from "./init.js";
+import type { DeliverEvent, Delivered, DeliverRefusal } from "./deliver.js";
+import type { RunBlocker, RunEvent, RunRefusal, RunStarted } from "./supervise.js";
+import type { RunOver } from "./cli.js";
 
 /**
  * Every sentence norn prints. Each union is switched on exhaustively, so a
@@ -60,10 +66,22 @@ export type Answer =
   | InitResult
   | DashboardResult
   | DoctorResult
-  | FlowExported;
+  | FlowExported
+  | RunStarted
+  | RunOver
+  | Delivered;
 
 /** Refusals only the CLI makes: how it was called, init's skill install, the dashboard and flows export. */
-export type CliRefusal = { kind: "usage" } | { kind: "needs-number"; command: string } | MissingSkills | InitWouldDowngrade | DashboardRefusal | FlowsRefusal;
+export type CliRefusal =
+  | { kind: "usage" }
+  | { kind: "needs-number"; command: string }
+  | MissingSkills
+  | InitWouldDowngrade
+  | DashboardRefusal
+  | FlowsRefusal
+  | { kind: "needs-herdr"; command: string }
+  | RunRefusal
+  | DeliverRefusal;
 
 export function unreachable(x: never): never {
   throw new Error(`no wording for ${JSON.stringify(x)}`);
@@ -112,6 +130,10 @@ export const USAGE = [
   '  norn escalate <issue> "reason"     Set needs-human and release the claim',
   "  norn release <issue>               Give up the claim without a transition",
   "  norn status <story>                Read-only overview of the story and its slices",
+  "  norn deliver <story>               Run every step an agent can do, each agent in its own",
+  "                                     herdr pane, until only people can move the story on",
+  "  norn run <issue> [--agent <name>]  Start a supervised run of the issue's step, its agent",
+  "                                     in a herdr pane",
   "  norn tidy [--dry-run]              Remove what belongs to closed issues",
   "  norn dashboard [--port <n>] [--interval <duration>] [--no-open]",
   "                                     Watch your work in the browser; Ctrl-C stops it",
@@ -132,6 +154,8 @@ export const NEEDS_NUMBER: Record<string, string> = {
   escalate: 'norn escalate <issue> "reason"',
   release: "norn release <issue>",
   status: "norn status <story>",
+  run: "norn run <issue> [--agent <name>]",
+  deliver: "norn deliver <story>",
 };
 
 /**
@@ -253,6 +277,20 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       return [
         `Missing skills: ${r.missing.join(", ")}. The skill install did not provide them into .agents/skills/.`,
         "Fix the install and run norn init again.",
+      ];
+    case "needs-herdr":
+      return [
+        `norn ${r.command} starts each agent in a herdr pane, where you can watch it and step in, so it runs only inside herdr.`,
+        `Start it from a herdr pane. Without herdr, run each item yourself: norn next <story> lists them.`,
+      ];
+    case "run-already-running":
+      return [`#${r.issue} already has a run on this machine: session ${r.session}, supervisor pid ${r.pid}. Leave it to finish.`];
+    case "run-not-startable":
+      return [`#${r.issue} cannot be run now: ${runBlocker(r.why)}`, `See norn next ${r.story}.`];
+    case "delivery-running":
+      return [
+        `#${r.story} is already being delivered on this machine, by the norn deliver with pid ${r.lock.pid} (since ${hhmm(r.lock.since)}).`,
+        "Leave it running; it carries on until only people can move the story on. Stop that process first to start again.",
       ];
     case "flows-usage":
       return ["Usage: norn flows export <name>", "  Writes the built-in flow <name> to .agents/flows/<name>.json, e.g. norn flows export story."];
@@ -623,6 +661,18 @@ export function renderAnswer(a: Answer): string[] {
       return renderDashboard(a);
     case "doctor":
       return renderDoctor(a);
+    case "run-started":
+      return [
+        `Started a run of #${a.issue} (${a.step}) with ${a.agent}: session ${a.session}, supervisor pid ${a.pid}.`,
+        wrap(
+          `Its agent works in a herdr pane of ${a.worktree}. The supervisor keeps the claim fresh while the agent lives, and retries or escalates if the agent stops without finishing its step. Do not take #${a.issue} yourself.`,
+        ),
+        `Supervisor log: ${a.log}`,
+      ];
+    case "run-over":
+      return [`#${a.issue}: ${settlementText(a.settled)}`];
+    case "delivered":
+      return [renderNext(a.report)];
     case "flow-exported":
       return [
         `Wrote ${a.file}, a copy of the built-in ${a.flow} flow.`,
@@ -777,6 +827,23 @@ function renderDashboard(a: DashboardResult): string[] {
 }
 
 /** git checks a branch out in one worktree only, so no create command can work. */
+function runBlocker(b: RunBlocker): string {
+  switch (b.kind) {
+    case "waits":
+      return `it ${waitDetail(b.wait)}.`;
+    case "not-offered":
+      return "norn next offers nothing on it.";
+    case "attended":
+      return `its step, ${b.step}, is attended: a person takes part, so it is driven with norn-drive, not run.`;
+    case "checked-out":
+      return checkedOutElsewhere(b.branch, b.at);
+    case "worktree-failed":
+      return `its worktree could not be created with: ${b.command}`;
+    default:
+      return unreachable(b);
+  }
+}
+
 function checkedOutElsewhere(branch: string, path: string) {
   return `Branch ${branch} is checked out at ${path}; work there or switch that checkout to another branch.`;
 }
@@ -1069,7 +1136,7 @@ export function renderNext(r: NextReport): string {
     const attendedOnly = r.start.every((s) => s.attended);
     const count = `You can start ${r.start.length} item${r.start.length === 1 ? "" : "s"} now`;
     const agent = {
-      herdr: "each as a new herdr agent in the item's worktree pane:",
+      herdr: "each with norn run, which starts its agent in a herdr pane of the item's worktree and sees it through:",
       "claude-code": "each in its own fresh subagent, told to work in the item's worktree:",
       git: "each in a new agent session started in the item's worktree:",
     }[r.provider];
@@ -1085,13 +1152,13 @@ export function renderNext(r: NextReport): string {
       const what = itemWhat(s);
       out.push(`  - ${what} ${startState(s)}${s.attended ? " (attended: the user takes part)" : ""}.`);
       if (s.worktree) out.push(`    Worktree: ${s.worktree}`);
-      if (s.createWorktree) out.push(`    Create the worktree: ${s.createWorktree}`);
+      // norn run makes the worktree of an item it runs.
+      if (s.createWorktree && !(r.provider === "herdr" && !s.attended)) out.push(`    Create the worktree: ${s.createWorktree}`);
       if (s.checkedOutAt && s.branch) out.push(`    ${checkedOutElsewhere(s.branch, s.checkedOutAt)}`);
       if (r.provider === "herdr" && s.worktree) {
         const start = `herdr agent start norn-${s.issue} --kind claude --pane <pane of ${s.worktree}>`;
         if (!s.attended) {
-          const prompt = `Work in ${s.worktree}. Run norn take ${s.issue}, follow its briefing to the end, and finish with the norn command it gives.`;
-          out.push(`    Start an agent: ${start}`, `    Then prompt it: herdr agent prompt norn-${s.issue} "${prompt}"`);
+          if (!s.checkedOutAt) out.push(`    Run it: norn run ${s.issue}`);
         } else if (s.here) out.push("    You are in its worktree: take it in this session.");
         else {
           // An attended step needs the user, so the new agent drives the issue from its worktree and this session stops.
@@ -1104,14 +1171,23 @@ export function renderNext(r: NextReport): string {
         }
       }
       if (s.session && s.worktree) out.push(`    Start an agent in ${s.worktree} with NORN_SESSION=${s.session} set.`);
-      out.push(`    Start it with: ${s.command}`);
+      // Under herdr, norn run starts the agent, which takes the item itself.
+      if (r.provider !== "herdr" || s.attended) out.push(`    Start it with: ${s.command}`);
     }
   }
   if (r.waiting.length) {
     out.push("", "Waiting, nothing to do for you:");
     for (const w of r.waiting) out.push(waitLine(w), ...humanHandOff(w));
   }
-  if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. When an item is done, run norn next ${r.issue} again.`);
+  if (r.start.some((s) => !s.attended))
+    out.push(
+      "",
+      r.provider === "herdr"
+        ? wrap(
+            `norn deliver ${r.issue} does all of this on its own: it runs each item an agent can do, and the next step of each once one finishes, until only people can move the ${r.flow} on.`,
+          )
+        : `Each phase gets a new agent. When an item is done, run norn next ${r.issue} again.`,
+    );
   return out.join("\n");
 }
 
@@ -1135,8 +1211,92 @@ export function renderNotification(n: Notification): { title: string; body: stri
         body: n.waiting.map(waitText).join("\n") || `Nothing left to do on the ${n.flow}.`,
       };
     case "run-blocked":
-      return { title: `norn: #${n.issue} needs you`, body: `Its agent waits for you in herdr pane ${n.pane}. Answer it there and the run carries on.\n${n.url}` };
+      return {
+        title: `norn: #${n.issue} needs you`,
+        body: `Its agent waits for you in herdr pane ${n.pane}. Answer it there and the run carries on.\n${n.url}`,
+      };
     default:
       return unreachable(n);
   }
+}
+
+// Runs and delivery
+
+/** How a run ended, after its issue number. */
+function settlementText(s: Exclude<Settlement, { kind: "retry" }>): string {
+  switch (s.kind) {
+    case "finished":
+      return "its agent finished the step.";
+    case "lost":
+      return `the run lost its claim to session ${s.session}, so its agent was stopped.`;
+    case "escalated":
+      return `it needs a human after ${s.attempts} attempt${s.attempts === 1 ? "" : "s"}; the last: ${attemptEndText(s.end)}. Its agent is left in its pane.`;
+    default:
+      return unreachable(s);
+  }
+}
+
+/** The prompt a run gives its agent, and the one that nudges it after an attempt that did not finish the step. */
+export function runPrompt(n: number, worktree: string, previous: AttemptEnd | null): string {
+  const lines = [
+    `Work in ${worktree}. Run norn take ${n}, follow its briefing to the end, and finish with the norn command it gives.`,
+    `You run unattended under norn: no one answers questions. Decide on your own, or run norn escalate ${n} "reason" if only a person can decide.`,
+    "Never end your turn while you hold the claim: finish the step with its norn command, or escalate it.",
+    "Commit and push at each milestone, so the next attempt can carry on if this one stops.",
+  ];
+  if (previous)
+    lines.push(
+      `Your previous attempt at this step ended without finishing it (${attemptEndText(previous)}). Check git status in the worktree and carry on from where it stopped.`,
+    );
+  return lines.join(" ");
+}
+
+/** A line of a supervisor's log. */
+export function renderRunEvent(e: RunEvent): string {
+  switch (e.kind) {
+    case "attempt-started":
+      return e.pane ? `attempt ${e.attempt}: started ${e.agent} in herdr pane ${e.pane}` : `attempt ${e.attempt}: ${e.agent} did not start`;
+    case "nudged":
+      return `attempt ${e.attempt}: prompted the agent again in herdr pane ${e.pane}`;
+    case "taken":
+      return "the agent took the claim; renewing its lease from now on";
+    case "blocked":
+      return `the agent waits for a person in herdr pane ${e.pane}; the stall and timeout clocks are paused`;
+    case "stopping":
+      return e.why.kind === "lost-claim" ? "stopping the agent: another session holds the claim now" : `stopping the agent: ${attemptEndText(e.why)}`;
+    case "settled":
+      return `attempt ${e.attempt} ended after ${e.minutes}m (${attemptEndText(e.end)}): ${e.settled.kind === "retry" ? "trying again" : settlementText(e.settled)}`;
+    case "tick-failed":
+      return `a check failed and is retried at the next tick: ${e.detail}`;
+    default:
+      return unreachable(e);
+  }
+}
+
+/** A line of norn deliver's progress. */
+export function renderDeliverEvent(e: DeliverEvent): string {
+  switch (e.kind) {
+    case "delivering":
+      return `Delivering #${e.story}: each step an agent can do runs in its own herdr pane. This runs until only people can move the story on.`;
+    case "run-started":
+      return `#${e.issue} ${e.step}: started a run with ${e.agent} (session ${e.session}).`;
+    case "run-refused":
+      return `#${e.issue} ${e.step}: not started. ${renderRefusal(e.refusal).join(" ")}`;
+    case "woke": {
+      const w = e.wake;
+      const took = `${w.attempts} attempt${w.attempts === 1 ? "" : "s"}, ${w.minutes}m`;
+      return `#${w.issue} (${took}): ${settlementText(w.settled)}`;
+    }
+    case "supervisor-gone":
+      return `#${e.issue}: its run's supervisor (pid ${e.pid}) is gone${e.pane ? `, so its agent in herdr pane ${e.pane} is stopped` : ""}. The item is offered again once its lease runs out.`;
+    case "stopping":
+      return "Nothing runs and nothing can start.";
+    default:
+      return unreachable(e);
+  }
+}
+
+/** A progress line with the time it happened. */
+export function progressLine(at: Date, text: string) {
+  return `${at.toISOString().slice(11, 19)}  ${text}`;
 }

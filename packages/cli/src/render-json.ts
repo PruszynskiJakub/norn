@@ -68,6 +68,12 @@ function data(a: Answer): Record<string, unknown> {
       return { checks: a.checks };
     case "flow-exported":
       return { flow: a.flow, file: a.file };
+    case "run-started":
+      return { issue: a.issue, story: a.story, step: a.step, agent: a.agent, session: a.session, pid: a.pid, worktree: a.worktree, log: a.log };
+    case "run-over":
+      return { issue: a.issue, settled: a.settled };
+    case "delivered":
+      return { story: a.story, report: { ...a.report, waiting: a.report.waiting.map(wait), notes: a.report.notes.flatMap(renderEvent) } };
     default:
       return unreachable(a);
   }

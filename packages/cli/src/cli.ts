@@ -10,6 +10,7 @@ import {
   providerRefusal,
   type Refusal,
   release,
+  type Settlement,
   type Slugs,
   status,
   take,
@@ -20,8 +21,23 @@ import { dashboard, type StartDashboard } from "./dashboard.js";
 import { doctor, doctorFailed } from "./doctor.js";
 import { flows } from "./flows.js";
 import { init } from "./init.js";
+import { deliver } from "./deliver.js";
+import { underHerdr } from "./herdr.js";
 import { renderJson } from "./render-json.js";
-import { type Answer, type CliRefusal, NEEDS_NUMBER, renderAnswer, renderRefusal, renderWarning, USAGE } from "./render-text.js";
+import {
+  type Answer,
+  type CliRefusal,
+  NEEDS_NUMBER,
+  progressLine,
+  renderAnswer,
+  renderDeliverEvent,
+  renderRefusal,
+  renderRunEvent,
+  renderWarning,
+  runPrompt,
+  USAGE,
+} from "./render-text.js";
+import { type RunHost, startRun, supervise } from "./supervise.js";
 
 export type Deps = Omit<Ctx, "config" | "slugs"> & {
   cwd: string;
@@ -35,7 +51,17 @@ export type Deps = Omit<Ctx, "config" | "slugs"> & {
   bundledSkills: string;
   /** Why norn is not in a checkout it can work in; null when it is. Only doctor runs without one. */
   checkoutProblem: string | null;
+  /** What norn run and norn deliver start and watch agents with. */
+  runs: RunHost;
 };
+
+/** A run's supervisor finished: how its run ended. */
+export interface RunOver {
+  ok: true;
+  kind: "run-over";
+  issue: number;
+  settled: Exclude<Settlement, { kind: "retry" }>;
+}
 
 export interface Result {
   stdout: string;
@@ -65,8 +91,14 @@ export async function run(argv: string[], deps: Deps): Promise<Result> {
   return { exitCode, stdout: [...head, ...body].join("\n") };
 }
 
+/** The hidden command a run's supervisor process runs: __supervise <issue> <story> <session> <agent> <worktree>. */
+export const SUPERVISE = "__supervise";
+
 /** Commands that name or touch worktrees, and so need the provider to match the environment. */
-const USES_WORKTREES = new Set(["take", "next", "done", "tidy"]);
+const USES_WORKTREES = new Set(["take", "next", "done", "tidy", "run", "deliver"]);
+
+/** Commands that start agents in herdr panes, so they run only inside herdr. */
+const NEEDS_HERDR = new Set(["run", "deliver", SUPERVISE]);
 
 /** Commands that take no issue number. */
 const NO_NUMBER = new Set(["init", "tidy", "dashboard", "doctor", "flows"]);
@@ -76,7 +108,7 @@ const refused = (refusal: Refusal | CliRefusal): Refused => ({ ok: false, refusa
 async function dispatch(argv: string[], input: Deps): Promise<Reply> {
   const { positionals, flags, bools } = parseArgs(argv);
   const [cmd, ...rest] = positionals;
-  if (!cmd || !(cmd in NEEDS_NUMBER || NO_NUMBER.has(cmd))) return { answer: refused({ kind: "usage" }), warnings: [] };
+  if (!cmd || !(cmd in NEEDS_NUMBER || NO_NUMBER.has(cmd) || cmd === SUPERVISE)) return { answer: refused({ kind: "usage" }), warnings: [] };
   if (cmd in NEEDS_NUMBER && !/^\d+$/.test(rest[0] ?? "")) return { answer: refused({ kind: "needs-number", command: cmd }), warnings: [] };
   if (cmd === "init") return { answer: await init(input), warnings: [] };
   // doctor reports a bad config, version or provider as checks, so none of them stops it.
@@ -89,13 +121,37 @@ async function dispatch(argv: string[], input: Deps): Promise<Reply> {
   const warnings = [...loaded.warnings, ...version.warnings];
   if (version.refusal) return { answer: refused(version.refusal), warnings };
   const ctx: Ctx = { ...input, config: loaded.config, slugs: new Map() as Slugs };
+  if (NEEDS_HERDR.has(cmd) && !underHerdr(ctx.workspace.env)) return { answer: refused({ kind: "needs-herdr", command: cmd }), warnings };
   const provider = USES_WORKTREES.has(cmd) ? providerRefusal(ctx.config, ctx.workspace.env) : null;
   const answer = provider
     ? refused(provider)
     : cmd === "dashboard"
       ? await dashboard({ ...ctx, dashboard: input.dashboard }, flags, bools)
-      : await command(cmd, rest, flags, bools, ctx);
+      : ((await runCommand(cmd, rest, flags, { ...ctx, runs: input.runs })) ?? (await command(cmd, rest, flags, bools, ctx)));
   return { answer, warnings };
+}
+
+/** The commands that start and watch agents; null for any other. */
+async function runCommand(cmd: string, rest: string[], flags: Record<string, string[]>, ctx: Ctx & { runs: RunHost }): Promise<Answer | Refused | null> {
+  const n = Number(rest[0]);
+  const { print } = ctx.runs;
+  switch (cmd) {
+    case "run":
+      return startRun(ctx, n, { agent: flags.agent?.[0] });
+    case "deliver":
+      return deliver(ctx, n, { print: (e) => print(progressLine(new Date(), renderDeliverEvent(e))) });
+    case SUPERVISE: {
+      const [, story, session, agent, worktree] = rest;
+      const start = { issue: n, story: Number(story), session, agent, worktree, log: "" };
+      const settled = await supervise({ ...ctx, session }, start, {
+        env: ctx.workspace.env,
+        prompt: runPrompt,
+        log: (e) => print(progressLine(new Date(), `#${n} ${renderRunEvent(e)}`)),
+      });
+      return { ok: true, kind: "run-over", issue: n, settled };
+    }
+  }
+  return null;
 }
 
 async function command(cmd: string, rest: string[], flags: Record<string, string[]>, bools: Set<string>, ctx: Ctx): Promise<Answer | Refused> {

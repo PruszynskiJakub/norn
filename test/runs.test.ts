@@ -13,16 +13,36 @@ async function taken() {
   const w = setup({ session: "run-131-a" });
   w.github.seedIssue(issue);
   expect((await w.norn("take", "131")).exitCode).toBe(0);
-  return { w, ctx: await w.ctx(), before: [...w.github.labels(131)] };
+  return { w, ctx: await w.ctx(), before: w.github.comments(131).length };
 }
 
 describe("settling a run's attempt from GitHub", () => {
-  test("an agent that gave the claim up with the issue moved on has finished", async () => {
+  test("an agent that finished its step with norn done has finished", async () => {
     const { w, ctx, before } = await taken();
-    await w.github.addLabels(131, ["type:story", "needs-refinement"]);
-    await w.github.deleteClaim(131);
+    expect((await w.norn("done", "131", "story")).exitCode).toBe(0);
 
     expect(await settleRun(ctx, 131, exited(0), before)).toEqual({ kind: "finished" });
+  });
+
+  test("an agent that escalated has finished its attempt: a person has the issue now", async () => {
+    const { w, ctx, before } = await taken();
+    await w.norn("escalate", "131", "only a person can decide");
+
+    expect(await settleRun(ctx, 131, exited(0), before)).toEqual({ kind: "finished" });
+  });
+
+  test("labels norn take moved do not count as finished", async () => {
+    const w = setup({ session: "run-131-a" });
+    w.github.seedIssue({ number: 140, title: "Slice", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+    w.github.seedIssue({ number: 123, title: "Story", labels: ["type:story", "implementation"] });
+    w.github.parents.set(140, 123);
+    w.github.branches.add("123-story");
+    const labels = [...w.github.labels(140)];
+    await w.norn("take", "140");
+    expect(w.github.labels(140)).not.toEqual(labels);
+    await w.norn("release", "140");
+
+    expect(await settleRun(await w.ctx(), 140, exited(0), 0)).toMatchObject({ kind: "retry" });
   });
 
   test("an agent that ends holding the claim is retried, and the attempt is recorded on the issue", async () => {
@@ -55,9 +75,7 @@ describe("settling a run's attempt from GitHub", () => {
     expect(s).toMatchObject({ kind: "escalated", attempts: 3 });
     expect(w.github.labels(131)).toContain("needs-human");
     expect(w.github.claim(131)).toBeNull();
-    expect(w.github.comments(131).at(-1)).toContain(
-      "3 runs ended without finishing the step; the last: stalled: its screen did not change for 3m",
-    );
+    expect(w.github.comments(131).at(-1)).toContain("3 runs ended without finishing the step; the last: stalled: its screen did not change for 3m");
   });
 
   test("an agent that waited on a person too long escalates at once: the dialog would only come back", async () => {
@@ -74,7 +92,7 @@ describe("settling a run's attempt from GitHub", () => {
     w.github.seedIssue(issue);
     const ctx = await w.ctx();
 
-    const s = await settleRun(ctx, 131, { end: { kind: "not-started", detail: "no such agent" }, minutes: 0 }, w.github.labels(131));
+    const s = await settleRun(ctx, 131, { end: { kind: "not-started", detail: "no such agent" }, minutes: 0 }, 0);
 
     expect(s).toMatchObject({ kind: "retry", attempts: 1 });
     expect(w.github.claim(131)?.session).toBe("run-131-a");
@@ -167,7 +185,9 @@ describe("the run settings", () => {
     );
     w.workspace.files.set(
       LOCAL,
-      JSON.stringify({ run: { agent: "b", agents: { b: { kind: "codex", args: ["--full-auto"] } }, timeout: "3h", stallAfter: "20m", lease: "1h", maxAttempts: 9 } }),
+      JSON.stringify({
+        run: { agent: "b", agents: { b: { kind: "codex", args: ["--full-auto"] } }, timeout: "3h", stallAfter: "20m", lease: "1h", maxAttempts: 9 },
+      }),
     );
 
     const loaded = await loadConfig(w.workspace);
@@ -200,10 +220,7 @@ describe("the run settings", () => {
   test("a bad setting is refused with what it should be", async () => {
     const w = setup();
     w.github.seedIssue(issue);
-    w.workspace.files.set(
-      LOCAL,
-      JSON.stringify({ run: { agents: { opus: { args: ["--x"] } }, stallAfter: "soon", maxAttempts: 0, driver: "process" } }),
-    );
+    w.workspace.files.set(LOCAL, JSON.stringify({ run: { agents: { opus: { args: ["--x"] } }, stallAfter: "soon", maxAttempts: 0, driver: "process" } }));
 
     const res = await w.norn("take", "131");
 
