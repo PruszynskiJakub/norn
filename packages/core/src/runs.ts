@@ -1,4 +1,4 @@
-import { acquire } from "./claims.js";
+import { acquire, isStale } from "./claims.js";
 import { escalate, release } from "./operations.js";
 import { type Ctx, NEEDS_HUMAN_MARK, parseTransitionComment } from "./transitions.js";
 
@@ -89,7 +89,7 @@ function endsStep(body: string) {
 
 /**
  * After an attempt, GitHub says what happened, never the agent's own state.
- * Another session holds the claim: the run lost it. No claim, and the issue
+ * Another session holds a live claim: the run lost it. No claim, and the issue
  * closed or a transition or escalation written since the attempt began, when
  * it had `commentsBefore` comments: the step is finished. Labels alone do not
  * say so, since norn take moves them too. Otherwise the step is not done (the
@@ -102,8 +102,10 @@ function endsStep(body: string) {
 export async function settleRun(ctx: Ctx, n: number, attempt: Attempt, commentsBefore: number): Promise<Settlement> {
   const { github } = ctx;
   const claim = await github.readClaim(n);
-  if (claim && claim.session !== ctx.session) return { kind: "lost", holder: claim.holder, session: claim.session };
-  if (!claim) {
+  // A stale claim of another session, e.g. of a run whose supervisor died, was never taken from this run: it takes it over below.
+  const otherStale = claim !== null && claim.session !== ctx.session && isStale(claim, ctx.now(), ctx.config.staleAfterMs);
+  if (claim && claim.session !== ctx.session && !otherStale) return { kind: "lost", holder: claim.holder, session: claim.session };
+  if (!claim || otherStale) {
     const issue = await github.getIssue(n);
     if (issue.state === "closed" || (await github.listComments(n)).slice(commentsBefore).some(endsStep)) return { kind: "finished" };
     // Nothing moved: take the claim back to record the attempt, and carry on under it.

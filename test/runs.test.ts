@@ -98,6 +98,17 @@ describe("settling a run's attempt from GitHub", () => {
     expect(w.github.claim(131)?.session).toBe("run-131-a");
   });
 
+  test("a stale claim of a dead run, which this run's agent never took over, is taken over and the attempt recorded", async () => {
+    const w = setup({ session: "run-131-b" });
+    w.github.seedIssue(issue);
+    await w.github.createClaim(131, { holder: "alice", session: "run-131-a", since: "2026-10-13T11:00:00Z", leaseMs: 60_000 });
+
+    const s = await settleRun(await w.ctx(), 131, { end: { kind: "not-started", detail: "no such agent" }, minutes: 0 }, 0);
+
+    expect(s).toMatchObject({ kind: "retry", attempts: 1 });
+    expect(w.github.claim(131)?.session).toBe("run-131-b");
+  });
+
   test("a claim another session holds now means the run lost it, and nothing is written", async () => {
     const { w, ctx, before } = await taken();
     await w.github.deleteClaim(131);
