@@ -1,10 +1,12 @@
-import { existsSync, mkdtempSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import {
   type DeliverEvent,
+  deadRuns,
   deliver,
+  liveRuns,
   herdrDriver,
   lockDelivery,
   readRecord,
@@ -71,7 +73,7 @@ function inProcessRuns(w: W, act: (n: number, state: string, as: (...argv: strin
 
 async function deliverIt(w: W, story = 123) {
   const events: DeliverEvent[] = [];
-  const r = await deliver({ ...(await w.ctx()), runs: w.deps.runs }, story, { pollMs: 5, print: (e) => events.push(e) });
+  const r = await deliver({ ...(await w.ctx()), runs: w.deps.runs }, story, { pollMs: 5, nextEveryMs: 50, print: (e) => events.push(e) });
   return { r, events, lines: events.map(renderDeliverEvent) };
 }
 
@@ -297,7 +299,7 @@ describe("norn deliver", () => {
     expect(w.runs.supervisors).toEqual([]);
   });
 
-  test("a run whose supervisor died has its agent stopped and is reported once; the item waits for the lease", async () => {
+  test("a run whose supervisor died has its agent stopped and is reported once; deliver waits out its lease", async () => {
     const w = story([{ n: 131, state: "needs-review" }]);
     await w.herdr.run(["tab", "create", "--workspace", "w1", "--cwd", w.workspace.root, "--label", "norn-131"]);
     const [pane] = w.herdr.allPanes();
@@ -317,7 +319,17 @@ describe("norn deliver", () => {
       attempts: [],
     });
 
+    // While deliver waits for the lease, a person takes the item over and escalates it.
+    let released = 0;
+    setTimeout(async () => {
+      await w.github.deleteClaim(131);
+      await w.github.addLabels(131, ["needs-human"]);
+      released = Date.now();
+    }, 1500);
+
     const { lines } = await deliverIt(w);
+
+    expect(released).toBeGreaterThan(0);
 
     expect(pane.closed).toBe(true);
     expect(lines.filter((l) => l.includes("its run's supervisor (pid"))).toEqual([
@@ -325,6 +337,35 @@ describe("norn deliver", () => {
     ]);
     expect(readRecord(w.workspace.root, 131)?.state).toBe("lost");
     expect(w.runs.supervisors).toEqual([]);
+  });
+
+  test("a running record whose pid lives but whose supervisor has not beaten for long is of a process that reused the pid", async () => {
+    const w = story([{ n: 129, state: "needs-human-qa" }]);
+    const record = {
+      issue: 131,
+      story: 123,
+      session: "run-131-old",
+      agent: "claude",
+      worktree: w.workspace.root,
+      pid: process.pid,
+      pane: null,
+      startedAt: "2026-10-13T12:00:00Z",
+      state: "running" as const,
+      attempts: [],
+    };
+    writeRecord(w.workspace.root, { ...record, beatAt: new Date(Date.now() - 31 * 60_000).toISOString() });
+    expect(liveRuns(w.workspace.root, 123)).toEqual([]);
+    expect(deadRuns(w.workspace.root, 123)).toHaveLength(1);
+    writeRecord(w.workspace.root, { ...record, beatAt: new Date().toISOString() });
+    expect(liveRuns(w.workspace.root, 123)).toHaveLength(1);
+  });
+
+  test("a delivery lock being written, unreadable for a moment, is not taken over", async () => {
+    const w = story([]);
+    mkdirSync(join(w.workspace.root, ".agents/runs"), { recursive: true });
+    writeFileSync(join(w.workspace.root, ".agents/runs/deliver-123.json"), "");
+
+    expect(lockDelivery(w.workspace.root, 123, process.pid, new Date())).toMatchObject({ ok: false });
   });
 
   test("only one norn deliver runs on a story on this machine", async () => {

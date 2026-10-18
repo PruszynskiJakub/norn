@@ -64,8 +64,18 @@ async function loop(ctx: Ctx & { runs: RunHost }, story: number, opts: DeliverOp
   let lastNext = 0;
   let ask = true;
   let lastLive = new Set<number>();
+  // Items whose run's supervisor died while its claim held: offered again once the lease runs out, so deliver waits for them.
+  const leased = new Set<number>();
+  let lastLoop = Date.now();
   print({ kind: "delivering", story });
   for (;;) {
+    // Back from a sleep, supervisors have not beaten yet: give them a few ticks before judging any of them dead.
+    if (Date.now() - lastLoop > pollMs + 60_000) {
+      lastLoop = Date.now();
+      await sleep(15_000);
+      continue;
+    }
+    lastLoop = Date.now();
     for (const wake of takeWakes(root, story)) {
       print({ kind: "woke", wake });
       ask = true;
@@ -74,6 +84,7 @@ async function loop(ctx: Ctx & { runs: RunHost }, story: number, opts: DeliverOp
       // Its agent may still work in its pane, and its claim runs out with its lease: then the item is offered again.
       await stopOrphan(ctx.runs.herdr, r);
       markGone(root, r);
+      leased.add(r.issue);
       print({ kind: "supervisor-gone", issue: r.issue, pid: r.pid, pane: r.pane });
       ask = true;
     }
@@ -106,7 +117,9 @@ async function loop(ctx: Ctx & { runs: RunHost }, story: number, opts: DeliverOp
           print({ kind: "run-started", issue: item.issue, step: item.step, agent: r.agent, session: r.session });
         } else print({ kind: "run-refused", issue: item.issue, step: item.step, refusal: r.refusal });
       }
-      if (started === 0 && running.size === 0) {
+      const held = new Set(report.waiting.flatMap((w) => (w.reason === "held" ? [w.issue] : [])));
+      for (const n of leased) if (!held.has(n)) leased.delete(n);
+      if (started === 0 && running.size === 0 && leased.size === 0) {
         print({ kind: "stopping" });
         return { ok: true, kind: "delivered", story, report };
       }

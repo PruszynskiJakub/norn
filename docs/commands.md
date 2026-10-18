@@ -98,7 +98,7 @@ Delivers the story: asks `norn next`, starts a [run](#norn-run) for each item an
 
 - It needs herdr: start it from a herdr pane, not from inside an agent whose permissions keep it from starting agents.
 - One `norn deliver` per story on a machine: a second refuses, naming the first.
-- Stopped and started again, it carries on from GitHub. Runs still going are left to finish, and a run whose supervisor died has its agent stopped; its item is offered again once the run's lease runs out.
+- Stopped and started again, it carries on from GitHub. Runs still going are left to finish, and a run whose supervisor died has its agent stopped; its item is offered again once the run's lease runs out, and `norn deliver` waits for that.
 - Attended steps, human QA and `needs-human` are left to people. Once a person moves an issue on, `norn deliver` sees it within two minutes.
 
 ## norn run

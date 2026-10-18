@@ -151,5 +151,9 @@ export async function renewLease(ctx: Ctx, n: number, takenOnce: boolean): Promi
     since: ctx.now().toISOString(),
     leaseMs: ctx.config.run.leaseMs,
   });
-  return ok ? "renewed" : "lost";
+  if (ok) return "renewed";
+  // The ref moved under the renewal: often the agent itself, refreshing it with norn take or giving it up with norn done.
+  const now = await ctx.github.readClaim(n);
+  if (!now) return "released";
+  return now.session === ctx.session ? "renewed" : "lost";
 }

@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, test } from "vitest";
 import { type Ctx, RUN_MARK } from "@norn/core";
-import { cleanEnv, herdrDriver, paneEnv, type RunEvent, readRecord, runAgent, runPrompt, supervise, supervisorEnv, type Wake } from "@norn/cli";
+import { cleanEnv, herdrDriver, paneEnv, type RunEvent, readRecord, runAgent, runPrompt, supervise, supervisorEnv, type Wake, writeRecord } from "@norn/cli";
 import { processDriver, setup } from "@norn/testing";
 
 const SESSION = "run-131-ab12";
@@ -95,6 +95,34 @@ describe("a run's supervisor", () => {
     await r.go();
 
     expect(recorded).toBe(r.herdr.allPanes()[0].id);
+  });
+
+  test("starts a record of its own over an earlier run's, so the earlier run's end does not hide it", async () => {
+    const r = await herdrRun();
+    writeRecord(r.w.workspace.root, {
+      issue: 131,
+      story: 131,
+      session: "run-131-earlier",
+      agent: "claude",
+      worktree: r.worktree,
+      pid: 1,
+      pane: "w9:p9",
+      startedAt: "2026-10-13T11:00:00Z",
+      state: "escalated",
+      attempts: [{ startedAt: "2026-10-13T11:00:00Z", end: { kind: "stalled", afterMs: 1 }, minutes: 1, settled: "escalated" }],
+    });
+    let during: unknown;
+    r.herdr.onPrompt = async (pane) => {
+      during = readRecord(r.w.workspace.root, 131);
+      await r.agent.take();
+      await r.agent.finish();
+      pane.agent!.status = "done";
+    };
+
+    await r.go();
+
+    expect(during).toMatchObject({ session: SESSION, state: "running", attempts: [] });
+    expect(readRecord(r.w.workspace.root, 131)?.attempts).toHaveLength(1);
   });
 
   test("passes run.env into the agent's pane, reading a $NAME value from its own environment", async () => {

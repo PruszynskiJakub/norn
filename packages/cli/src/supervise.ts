@@ -14,7 +14,7 @@ import {
 import type { AgentAttempt, AgentDriver, AgentEnd } from "./agent-driver.js";
 import type { Herdr } from "./herdr.js";
 import { closePane, herdrDriver } from "./herdr-driver.js";
-import { alive, readRecord, type RunRecord, runDirFor, writeRecord, writeWake } from "./run-records.js";
+import { readRecord, type RunRecord, runDirFor, supervisorLives, writeRecord, writeWake } from "./run-records.js";
 
 /**
  * norn run: a supervisor per item, so an agent never has to keep itself
@@ -93,7 +93,7 @@ export async function startRun(ctx: RunCtx, n: number, opts: { agent?: string } 
   const root = ctx.workspace.root;
   const agent = opts.agent ?? ctx.config.run.agent;
   const existing = readRecord(root, n);
-  if (existing?.state === "running" && alive(existing.pid))
+  if (existing?.state === "running" && supervisorLives(existing))
     return refuse({ kind: "run-already-running", issue: n, session: existing.session, pid: existing.pid });
   const story = (await ctx.github.parentOf(n)) ?? n;
   const answer = await next(ctx, story);
@@ -192,7 +192,9 @@ export async function supervise(ctx: RunCtx, start: SupervisorStart, opts: Super
   const { run } = ctx.config;
   const driver = opts.driver ?? herdrDriver({ herdr: ctx.runs.herdr, root, issue: n, agent: runAgent(run.agents, agent) });
   const tickMs = opts.tickMs ?? 5000;
-  const record: RunRecord = readRecord(root, n) ?? {
+  const recorded = readRecord(root, n);
+  // A record of another session is an earlier run's, which this run must not carry on.
+  const record: RunRecord = (recorded?.session === ctx.session ? recorded : null) ?? {
     issue: n,
     story: start.story,
     session: ctx.session,
@@ -230,7 +232,11 @@ export async function supervise(ctx: RunCtx, start: SupervisorStart, opts: Super
     }
     record.pane = attempt.pane;
     writeRecord(root, record);
-    const watched = await watch(ctx, n, attempt, { tickMs, startedAt, alreadyNotified: notified, log: opts.log });
+    const beat = () => {
+      record.beatAt = new Date().toISOString();
+      writeRecord(root, record);
+    };
+    const watched = await watch(ctx, n, attempt, { tickMs, startedAt, alreadyNotified: notified, log: opts.log, beat });
     notified ||= watched.notified;
     const mins = minutes(Date.now() - startedAt);
     const settled = await retrying(() => settleRun(ctx, n, { end: watched.end, minutes: mins }, commentsBefore), opts.log, opts.retryMs);
@@ -270,7 +276,7 @@ async function watch(
   ctx: RunCtx,
   n: number,
   attempt: AgentAttempt,
-  o: { tickMs: number; startedAt: number; alreadyNotified: boolean; log: (e: RunEvent) => void },
+  o: { tickMs: number; startedAt: number; alreadyNotified: boolean; log: (e: RunEvent) => void; beat: () => void },
 ): Promise<{ end: AttemptEnd; notified: boolean }> {
   const { run } = ctx.config;
   // Renewed well inside the lease, so one slow GitHub call cannot let it lapse.
@@ -322,6 +328,7 @@ async function watch(
   while (!turn.end) {
     await Promise.race([sleep(o.tickMs), attempt.ended()]);
     if (turn.end) break;
+    o.beat();
     let verdict: AttemptEnd | { kind: "lost-claim" } | null = null;
     try {
       verdict = await tick();

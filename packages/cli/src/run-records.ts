@@ -1,4 +1,4 @@
-import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync, writeSync } from "node:fs";
+import { closeSync, existsSync, mkdirSync, openSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync, writeSync } from "node:fs";
 import { join } from "node:path";
 import type { AttemptEnd, Settlement } from "@norn/core";
 
@@ -20,6 +20,8 @@ export interface RunRecord {
   worktree: string;
   /** The supervisor's process. */
   pid: number;
+  /** When the supervisor last showed it lives; a record of a pid that lives but has not beaten for long is of another process that reused the pid. */
+  beatAt?: string;
   /** The herdr pane of the current attempt's agent; null before it has one. */
   pane: string | null;
   startedAt: string;
@@ -92,14 +94,22 @@ function records(root: string, story: number): RunRecord[] {
     .filter((r): r is RunRecord => r !== null && r.story === story && r.state === "running");
 }
 
+/** A supervisor beats on every tick; this long without a beat, a live pid is another process's after a restart. */
+export const BEAT_LOST_MS = 30 * 60_000;
+
+/** Whether a run's supervisor still lives on this machine: its process is there, and it is the supervisor's. */
+export function supervisorLives(r: RunRecord, now = Date.now()) {
+  return alive(r.pid) && (!r.beatAt || now - new Date(r.beatAt).getTime() < BEAT_LOST_MS);
+}
+
 /** Runs of the story whose supervisor still lives on this machine. */
 export function liveRuns(root: string, story: number): RunRecord[] {
-  return records(root, story).filter((r) => alive(r.pid));
+  return records(root, story).filter((r) => supervisorLives(r));
 }
 
 /** Runs of the story recorded as running whose supervisor is gone: it crashed, was killed, or the machine restarted. */
 export function deadRuns(root: string, story: number): RunRecord[] {
-  return records(root, story).filter((r) => !alive(r.pid));
+  return records(root, story).filter((r) => !supervisorLives(r));
 }
 
 /** Marks a dead run as over, so it is reported once. */
@@ -145,9 +155,13 @@ export function lockDelivery(root: string, story: number, pid: number, now: Date
       return { ok: true };
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e;
-      const held = readJson<DeliveryLock>(path);
+      const text = readText(path);
+      const held = text === null ? null : parse<DeliveryLock>(text);
       if (held && held.pid !== pid && alive(held.pid)) return { ok: false, held };
-      rmSync(path, { force: true });
+      // Unreadable: another deliver may be writing it this instant, unless it is old.
+      if (!held && text !== null && Date.now() - mtime(path) < 10_000) return { ok: false, held: { story, pid: 0, since: now.toISOString() } };
+      // Taken over only if it is still the stale lock read, so of two taking it over, the second leaves the first's lock alone.
+      if (readText(path) === text) rmSync(path, { force: true });
     }
   }
   return { ok: false, held: readJson<DeliveryLock>(path) ?? { story, pid: 0, since: now.toISOString() } };
@@ -156,6 +170,30 @@ export function lockDelivery(root: string, story: number, pid: number, now: Date
 export function unlockDelivery(root: string, story: number, pid: number) {
   const path = lockFile(root, story);
   if (readJson<DeliveryLock>(path)?.pid === pid) rmSync(path, { force: true });
+}
+
+function readText(path: string): string | null {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    return null;
+  }
+}
+
+function parse<T>(text: string): T | null {
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return null;
+  }
+}
+
+function mtime(path: string) {
+  try {
+    return statSync(path).mtimeMs;
+  } catch {
+    return 0;
+  }
 }
 
 function readJson<T>(path: string): T | null {

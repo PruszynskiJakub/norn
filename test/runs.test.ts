@@ -150,6 +150,22 @@ describe("a run's lease", () => {
     expect((await w.as("another-session")("take", "131")).exitCode).toBe(1);
   });
 
+  test("a renewal that loses a race with the agent's own norn take is not a lost claim", async () => {
+    const { w, ctx } = await taken();
+    const replace = w.github.replaceClaim.bind(w.github);
+    let raced = false;
+    w.github.replaceClaim = async (n, sha, record) => {
+      if (!raced) {
+        raced = true;
+        // The agent refreshes the claim with norn take just before the renewal lands.
+        await w.as("run-131-a")("take", "131");
+      }
+      return replace(n, sha, record);
+    };
+
+    expect(await renewLease(ctx, 131, true)).toBe("renewed");
+  });
+
   test("says not-taken before the agent's take, released after it gave the claim up, and lost once another session holds it", async () => {
     const w = setup({ session: "run-131-a" });
     w.github.seedIssue(issue);
