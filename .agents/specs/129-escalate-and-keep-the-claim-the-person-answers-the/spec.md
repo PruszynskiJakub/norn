@@ -51,3 +51,30 @@ Escalating becomes the cheap, normal way to ask. `norn escalate <issue> "questio
 ## Open questions
 
 ## Plan
+
+### Seams
+
+1. **The norn command line over the testing harness** (fake GitHub, fake notifier, fake workspace, driven as `norn <command>`). Observes Behaviour 1–10 (escalate `--wait`, `resume`, the refusals while waiting, release, takeover, a waiting claim never going stale), 11–14 for `next` and `status` in text and `--json` and the notification, and 16–18 through the briefings `take` prints. Prior art: the escalate, release and resolving needs-human tests, and the take, next, status, notifications and briefing-process tests.
+2. **The dashboard's read model (`observe`)**. Observes Behaviour 11–12 for the dashboard: waiting escalations first, with the question, since when, the worktree and the focus command. Prior art: "lists my items in needs-human or needs-human-qa with the command that picks them up".
+
+Beside them, the gh adapter's existing claim round-trip tests gain one case: the waiting marker survives the claim commit. The dashboard's copy button (the UI has no tests; it reuses the existing copy-command component) and the norn-deliver skill text are checked in QA, not by tests. Behaviour 15 is how the person and the agent work; `resume` covers its part.
+
+### Prefactoring
+
+None. Staleness is already decided in one place from the claim record, every claim-gated command already passes one held check, and next, observe and the notifications already have a variant per waiting reason, so the change is one more of each.
+
+### Implementation decisions
+
+- **The claim record** gains an optional `waiting: { question, since }`. `escalate --wait` replaces the session's claim with one that carries it; `resume` replaces it with a fresh claim without it. Claims without the field read as before, so existing claims stay valid.
+- **Staleness**: the claim module's stale check treats a waiting claim as never stale, so `take`, `next`, `observe` and the dashboard feed's claim events agree on it. `--takeover` by the same holder works on a waiting claim as on any of their stopped sessions; the fresh claim it writes has no `waiting`, which leaves the item in the ordinary resolving needs-human step.
+- **The held check** refuses `done`, `escalate` and a `take` from the same session while the claim waits, saying to run `norn resume <issue> "<answer>"` first. `release` and `resume` pass it. `resume` is refused when the session does not hold the claim, when the claim is not waiting, and without the answer text.
+- **`resume`** comments a transition `norn: <state> → <state> (needs-human answered)` with the answer in its own paragraph, removes needs-human, adds in-progress back and refreshes the claim without `waiting`. The step and its briefing are unchanged.
+- **`escalate --wait`** sets needs-human, removes in-progress and writes the usual needs-human comment with the reason worded `asked: "<question>"` (the full question in its own paragraph when it has line breaks, as today), so every reader of needs-human reasons keeps working.
+- **A new waiting kind, `agent-asks`**, in `next`'s report and in the dashboard's waiting list: the issue, the question (from the claim), when it was asked, the holder, the worktree and, under herdr only, `herdr agent focus norn-<issue>`; other providers show the worktree only. It counts as for a person and sorts first, is listed although a session holds it, carries no take, resolve or hand-off command, and is never shown as free or stale. `--json` exposes it as `reason: "agent-asks"`. Delivery's story-waiting notification includes `agent-asks` items, unlike other held items.
+- **Notifications**: a new `agent-asks` kind with the question, the issue's URL and how to reach the agent; the front end words it, as for the other kinds.
+- **Briefings**: briefings of unattended steps add the line to escalate with `--wait` and wait in the session, and never end a turn on a question; briefings of attended steps are unchanged. Plain `escalate` stays in every briefing.
+- **Alongside the code**: the commands reference gains `escalate --wait` and `resume`; the glossary's Claim and Escalation entries are updated and a waiting claim (an agent asks) gets an entry; the norn-deliver skill source gains the rule.
+
+### Testing decisions
+
+A good test drives norn as a user or agent would, through one of the two seams, and checks what they observe: labels, comments, the claim, stdout and `--json`, notifications sent, and the dashboard read model. No test reaches into internals. GitHub, the notifier and the workspace are the system boundaries and are the harness's fakes; time comes from the harness's clock, so staleness and "waited 25m" are tested by setting it.
