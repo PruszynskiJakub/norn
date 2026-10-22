@@ -35,6 +35,9 @@ export type Refusal =
   | { kind: "held-by-teammate"; issue: number; slice: boolean; holder: string; since: string | null }
   | { kind: "not-claimed"; issue: number }
   | { kind: "held-by-other-session"; issue: number; since: string }
+  /** This session's claim waits on a person: it resumes with the answer before anything else. */
+  | { kind: "waits-on-person"; issue: number }
+  | { kind: "not-waiting"; issue: number }
   // Finishing a step
   | { kind: "outcome-missing"; issue: number; step: string; finish: FinishCommand[] }
   | { kind: "outcome-unknown"; issue: number; word: string; step: string; finish: FinishCommand[] }
@@ -52,6 +55,7 @@ export type Refusal =
   | BaseBranchMissing
   // Other commands
   | { kind: "reason-missing"; issue: number }
+  | { kind: "answer-missing"; issue: number }
   | { kind: "add-slice-usage"; story: number }
   /** Slices are added only in `slicing`, the state of the issue's flow with slices; null when its flow has none. */
   | { kind: "story-not-slicing"; story: number; flow: string | null; state: string | null; slicing: string | null }

@@ -603,6 +603,20 @@ exports[`output of every command, text and --json > done when a follow-up fails 
 Could not move #40 on now that its slices are merged: HTTP 502. norn next 40 will retry this."
 `;
 
+exports[`output of every command, text and --json > done while waiting on a person > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "#50 waits on a person: run norn resume 50 \\"<answer>\\" first\\nOnce the person has answered in this session, record the answer with it and carry on. To give the item up instead: norn release 50"
+}"
+`;
+
+exports[`output of every command, text and --json > done while waiting on a person > text 1`] = `
+"exit 1
+#50 waits on a person: run norn resume 50 "<answer>" first
+Once the person has answered in this session, record the answer with it and carry on. To give the item up instead: norn release 50"
+`;
+
 exports[`output of every command, text and --json > done with an unknown outcome > json 1`] = `
 "exit 1
 {
@@ -754,6 +768,21 @@ exports[`output of every command, text and --json > escalate > text 1`] = `
 "exit 0
 #50 now needs a human. The claim is released.
 Do not work on it further. A person picks it up with the norn-resolve skill."
+`;
+
+exports[`output of every command, text and --json > escalate --wait > json 1`] = `
+"exit 0
+{
+  "ok": true,
+  "waiting": true,
+  "message": "#50 now needs a human, and you keep the claim, waiting on a person.\\nWait in this session for the answer; do not end your turn. Once answered, run: norn resume 50 \\"<answer>\\""
+}"
+`;
+
+exports[`output of every command, text and --json > escalate --wait > text 1`] = `
+"exit 0
+#50 now needs a human, and you keep the claim, waiting on a person.
+Wait in this session for the answer; do not end your turn. Once answered, run: norn resume 50 "<answer>""
 `;
 
 exports[`output of every command, text and --json > escalate without a reason > json 1`] = `
@@ -1892,6 +1921,46 @@ exports[`output of every command, text and --json > release without the claim > 
 You do not hold #50. Claim it first with: norn take 50"
 `;
 
+exports[`output of every command, text and --json > resume > json 1`] = `
+"exit 0
+{
+  "ok": true,
+  "message": "#50's answer is recorded and the claim is yours again. Carry on with the step; its briefing still holds."
+}"
+`;
+
+exports[`output of every command, text and --json > resume > text 1`] = `
+"exit 0
+#50's answer is recorded and the claim is yours again. Carry on with the step; its briefing still holds."
+`;
+
+exports[`output of every command, text and --json > resume when nothing waits > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "#50 does not wait on a person, so there is nothing to resume. To ask one and wait: norn escalate 50 \\"question\\" --wait"
+}"
+`;
+
+exports[`output of every command, text and --json > resume when nothing waits > text 1`] = `
+"exit 1
+#50 does not wait on a person, so there is nothing to resume. To ask one and wait: norn escalate 50 "question" --wait"
+`;
+
+exports[`output of every command, text and --json > resume without an answer > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "The answer is required, so the issue records what was decided. Run:\\n  norn resume 50 \\"<answer>\\""
+}"
+`;
+
+exports[`output of every command, text and --json > resume without an answer > text 1`] = `
+"exit 1
+The answer is required, so the issue records what was decided. Run:
+  norn resume 50 "<answer>""
+`;
+
 exports[`output of every command, text and --json > status of a story with slices > json 1`] = `
 "exit 0
 {
@@ -2830,7 +2899,7 @@ exports[`output of every command, text and --json > unknown command > json 1`] =
 "exit 2
 {
   "ok": false,
-  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
+  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\" [--wait]\\n                                     Set needs-human and release the claim; with --wait,\\n                                     keep it and wait in this session for the answer\\n  norn resume <issue> \\"answer\\"       Record the answer to escalate --wait and carry on\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -2846,7 +2915,10 @@ norn runs work through the SDD process. Commands on an issue take its number exp
                                      Finish the step; norn makes the transition.
                                      --evidence attaches the QA files in <dir>
   norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...
-  norn escalate <issue> "reason"     Set needs-human and release the claim
+  norn escalate <issue> "reason" [--wait]
+                                     Set needs-human and release the claim; with --wait,
+                                     keep it and wait in this session for the answer
+  norn resume <issue> "answer"       Record the answer to escalate --wait and carry on
   norn release <issue>               Give up the claim without a transition
   norn status <story>                Read-only overview of the story and its slices
   norn tidy [--dry-run]              Remove what belongs to closed issues
@@ -2864,7 +2936,7 @@ exports[`output of every command, text and --json > usage > json 1`] = `
 "exit 2
 {
   "ok": false,
-  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\"     Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
+  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"note\\"] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"title\\" --mode afk|hil [--blocked-by <issue>]...\\n  norn escalate <issue> \\"reason\\" [--wait]\\n                                     Set needs-human and release the claim; with --wait,\\n                                     keep it and wait in this session for the answer\\n  norn resume <issue> \\"answer\\"       Record the answer to escalate --wait and carry on\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -2880,7 +2952,10 @@ norn runs work through the SDD process. Commands on an issue take its number exp
                                      Finish the step; norn makes the transition.
                                      --evidence attaches the QA files in <dir>
   norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...
-  norn escalate <issue> "reason"     Set needs-human and release the claim
+  norn escalate <issue> "reason" [--wait]
+                                     Set needs-human and release the claim; with --wait,
+                                     keep it and wait in this session for the answer
+  norn resume <issue> "answer"       Record the answer to escalate --wait and carry on
   norn release <issue>               Give up the claim without a transition
   norn status <story>                Read-only overview of the story and its slices
   norn tidy [--dry-run]              Remove what belongs to closed issues

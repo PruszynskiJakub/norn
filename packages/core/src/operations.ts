@@ -17,7 +17,7 @@ import { acquire } from "./claims.js";
 import type { Event } from "./events.js";
 import { flowStatesOf, flowStep, type NamedFlow, offerFlows, passThrough, usedIn, uses } from "./flow.js";
 import { flowOf, loadFlow, triageFlows } from "./flow-loading.js";
-import type { Issue } from "./github.js";
+import type { ClaimRecord, HeldClaim, Issue } from "./github.js";
 import { locate } from "./location.js";
 import { type Step, TRIAGE } from "./machine.js";
 import { computeNext, type NextReport, nextRefusal, notifyWaiting } from "./next.js";
@@ -99,6 +99,14 @@ export interface EscalateResult {
   ok: true;
   kind: "escalated";
   issue: number;
+  /** escalate --wait: the session keeps its claim, marked waiting on a person, and resumes with the answer. */
+  waiting: boolean;
+}
+
+export interface ResumeResult {
+  ok: true;
+  kind: "resumed";
+  issue: number;
 }
 
 export interface ReleaseResult {
@@ -166,6 +174,10 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
   const left = first.flow && !first.step ? await leftState(ctx, before, first.flow.flow) : null;
   if ((!first.step && !left) || before.state === "closed") return refuse(await noStepRefusal(before, ctx, first.flow));
 
+  // This session waits on a person: refreshing its claim would clear the wait without recording the answer.
+  const own = await github.readClaim(n);
+  if (own?.session === ctx.session && own.waiting) return refuse({ kind: "waits-on-person", issue: n });
+
   const user = await github.currentUser();
   const record = { holder: user, session: ctx.session, since: ctx.now().toISOString() };
   const claim = await acquire(github, n, record, ctx.now(), ctx.config.staleAfterMs, { takeover: opts.takeover });
@@ -229,12 +241,26 @@ export async function take(ctx: Ctx, n: number, opts: { takeover: boolean }): Pr
   };
 }
 
-/** Refuses unless this session holds the claim on n. */
-async function checkHeld(ctx: Ctx, n: number): Promise<Refused | null> {
+/** This session's claim on n; refused when it holds none, or when its claim waits on a person and `waiting` does not allow that. */
+async function heldClaim(ctx: Ctx, n: number, opts: { waiting?: boolean } = {}): Promise<{ ok: true; claim: HeldClaim } | Refused> {
   const claim = await ctx.github.readClaim(n);
   if (!claim) return refuse({ kind: "not-claimed", issue: n });
   if (claim.session !== ctx.session) return refuse({ kind: "held-by-other-session", issue: n, since: claim.since });
-  return null;
+  if (claim.waiting && !opts.waiting) return refuse({ kind: "waits-on-person", issue: n });
+  return { ok: true, claim };
+}
+
+/** Refuses unless this session holds the claim on n and does not wait on a person. */
+async function checkHeld(ctx: Ctx, n: number): Promise<Refused | null> {
+  const held = await heldClaim(ctx, n);
+  return held.ok ? null : held;
+}
+
+/** Points the claim on n at `record`; refused when the claim changed since it was read. */
+async function replaceHeld(ctx: Ctx, n: number, held: HeldClaim, record: ClaimRecord): Promise<Refused | null> {
+  if (await ctx.github.replaceClaim(n, held.sha, record)) return null;
+  const now = await ctx.github.readClaim(n);
+  return refuse(now ? { kind: "held-by-other-session", issue: n, since: now.since } : { kind: "not-claimed", issue: n });
 }
 
 export async function done(ctx: Ctx, n: number, input: { word?: string; note?: string; evidenceDir?: string }): Promise<DoneResult | Refused> {
@@ -312,24 +338,50 @@ export async function done(ctx: Ctx, n: number, input: { word?: string; note?: s
   };
 }
 
-export async function escalate(ctx: Ctx, n: number, reason: string | undefined): Promise<EscalateResult | Refused> {
+/** Sets needs-human with the reason. The claim is released, or with `wait` kept, marked waiting on a person, until resume. */
+export async function escalate(ctx: Ctx, n: number, reason: string | undefined, opts: { wait?: boolean } = {}): Promise<EscalateResult | Refused> {
   if (!reason) return refuse({ kind: "reason-missing", issue: n });
-  const notHeld = await checkHeld(ctx, n);
-  if (notHeld) return notHeld;
+  const held = await heldClaim(ctx, n);
+  if (!held.ok) return held;
   const { github } = ctx;
+  const wait = opts.wait ?? false;
+  if (wait) {
+    const { sha: _sha, ...record } = held.claim;
+    const changed = await replaceHeld(ctx, n, held.claim, { ...record, waiting: { question: reason, since: ctx.now().toISOString() } });
+    if (changed) return changed;
+  }
   await github.addLabels(n, ["needs-human"]);
   await github.removeLabels(n, ["in-progress"]);
-  const why = `escalated: "${oneLine(reason)}"`;
+  const why = `${wait ? "asked" : "escalated"}: "${oneLine(reason)}"`;
   // The full reason keeps its line breaks in its own paragraph; the marker line stays single-line.
   await github.comment(n, [needsHumanLine(why), ...(reason.includes("\n") ? ["", reason] : [])].join("\n"));
   await notifyNeedsHuman(ctx, n, why);
-  await github.deleteClaim(n);
-  return { ok: true, kind: "escalated", issue: n };
+  if (!wait) await github.deleteClaim(n);
+  return { ok: true, kind: "escalated", issue: n, waiting: wait };
+}
+
+/** Ends this session's wait on a person: records the answer, clears needs-human and refreshes the claim, so the step carries on. */
+export async function resume(ctx: Ctx, n: number, answer: string | undefined): Promise<ResumeResult | Refused> {
+  if (!answer) return refuse({ kind: "answer-missing", issue: n });
+  const held = await heldClaim(ctx, n, { waiting: true });
+  if (!held.ok) return held;
+  if (!held.claim.waiting) return refuse({ kind: "not-waiting", issue: n });
+  const { github } = ctx;
+  const issue = await github.getIssue(n);
+  const of = await flowOf(ctx, issue);
+  const state = (of?.ok ? flowStatesOf(issue, of.flow)[0] : null) ?? "triage";
+  const { holder, session } = held.claim;
+  const changed = await replaceHeld(ctx, n, held.claim, { holder, session, since: ctx.now().toISOString() });
+  if (changed) return changed;
+  await github.addLabels(n, ["in-progress"]);
+  await github.comment(n, `norn: ${state} → ${state} (needs-human answered)\n\n${answer}`);
+  await github.removeLabels(n, ["needs-human"]);
+  return { ok: true, kind: "resumed", issue: n };
 }
 
 export async function release(ctx: Ctx, n: number): Promise<ReleaseResult | Refused> {
-  const notHeld = await checkHeld(ctx, n);
-  if (notHeld) return notHeld;
+  const held = await heldClaim(ctx, n, { waiting: true });
+  if (!held.ok) return held;
   await ctx.github.removeLabels(n, ["in-progress"]);
   await ctx.github.deleteClaim(n);
   return { ok: true, kind: "released", issue: n };

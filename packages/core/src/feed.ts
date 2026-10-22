@@ -117,7 +117,7 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
           continue;
         }
         const c = parseTransitionComment(t.body);
-        if (!c || c.why === "needs-human resolved") continue;
+        if (!c || clearsNeedsHuman(c.why)) continue;
         const from = states.includes(c.from) ? c.from : null;
         const to = targetOf(c.to);
         const at = { ...base, at: t.at, actor: t.actor, url: t.url };
@@ -157,7 +157,7 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
       if (t.kind === "labeled" || t.kind === "unlabeled") {
         if (t.label === "needs-human") {
           const raised = t.kind === "labeled";
-          const said = raised ? near(markers, t.at, (m) => m.reason !== null) : near(transitions, t.at, (x) => x.c.why === "needs-human resolved");
+          const said = raised ? near(markers, t.at, (m) => m.reason !== null) : near(transitions, t.at, (x) => clearsNeedsHuman(x.c.why));
           const reason = raised ? ((said as { reason: string | null } | undefined)?.reason ?? null) : null;
           events.push({
             ...ofIssue,
@@ -219,6 +219,11 @@ export function feedOf(story: ObservedStory, fc: FeedContext): FeedEvent[] {
 
 /** How far apart a label change and the norn comment that explains it can be. */
 const MATCH_MS = 60_000;
+
+/** A transition that only clears needs-human: resolved by a person, or answered to an agent that waited. It shows as needs-human resolved, not as an outcome. */
+function clearsNeedsHuman(why: string | null): boolean {
+  return why === "needs-human resolved" || why === "needs-human answered";
+}
 
 function targetOf(to: string): string {
   return to === "closed as not planned" ? "not-planned" : to;

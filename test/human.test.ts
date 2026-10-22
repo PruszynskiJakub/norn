@@ -11,8 +11,9 @@ describe("norn escalate", () => {
 
     expect(res.exitCode).toBe(0);
     expect(w.github.labels(131).sort()).toEqual(["implementation", "mode:afk", "needs-human", "type:slice"]);
-    expect(w.github.comments(131).at(-1)).toContain("Redis is not available in CI");
+    expect(w.github.comments(131).at(-1)).toBe('norn: needs-human — escalated: "Redis is not available in CI"');
     expect(w.github.claim(131)).toBeNull();
+    expect(res.stdout).toContain("The claim is released.");
   });
 
   test("needs a reason", async () => {

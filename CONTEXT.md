@@ -89,7 +89,7 @@ The flag saying a person must act before the issue can go on: an escalation or a
 _Avoid_: blocked (a state of its own), stuck
 
 **Escalation**:
-An agent setting needs-human on an issue it holds, with the reason.
+An agent setting needs-human on an issue it holds, with the reason. It releases the claim, or with `--wait` keeps it as a waiting claim, so the agent carries on once a person answers.
 
 **Fix round**:
 One trip back to implement after review asks for changes or QA fails. Past the fix-round limit the issue gets needs-human instead.
@@ -97,8 +97,11 @@ One trip back to implement after review asks for changes or QA fails. Past the f
 ## Working on an item
 
 **Claim**:
-The lock on an issue that lets one session work on it, taken for a whole step and released on handover. It goes stale after a while and can then be taken over.
+The lock on an issue that lets one session work on it, taken for a whole step and released on handover. It goes stale after a while and can then be taken over, unless it is a waiting claim.
 _Avoid_: lock, assignment
+
+**Waiting claim**:
+A claim kept through an escalation with `--wait`: an agent asks a person, with the question and since when on the claim, and waits in its session. It never goes stale. `norn resume` records the answer and makes it a normal claim again; until then the session can only release it.
 
 **Session**:
 One running agent as norn tells them apart, so claims know who holds them.

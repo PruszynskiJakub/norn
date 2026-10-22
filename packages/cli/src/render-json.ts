@@ -60,6 +60,8 @@ function data(a: Answer): Record<string, unknown> {
         ? { url: a.launch.url, port: a.launch.port, intervalMs: a.intervalMs, opened: a.launch.opened }
         : { url: a.launch.url, alreadyRunning: true };
     case "escalated":
+      return a.waiting ? { waiting: true } : {};
+    case "resumed":
     case "released":
     case "slice-added":
     case "initialized":

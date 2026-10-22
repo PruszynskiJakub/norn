@@ -29,6 +29,8 @@ export interface ClaimRecord {
   session: string;
   /** ISO timestamp */
   since: string;
+  /** Set while the session waits on a person for an answer: escalate --wait marks it, resume clears it. */
+  waiting?: { question: string; since: string };
 }
 
 /** A claim as read back: its record and the commit its ref points at. */

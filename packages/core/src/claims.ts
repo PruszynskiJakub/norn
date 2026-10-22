@@ -51,6 +51,8 @@ function strip(claim: (ClaimRecord & { sha?: string }) | null): ClaimRecord | nu
   return record;
 }
 
+/** Whether a claim may be taken over by age. A claim that waits on a person never goes stale: the person may answer at any time. */
 export function isStale(claim: ClaimRecord, now: Date, staleAfterMs: number) {
+  if (claim.waiting) return false;
   return now.getTime() - new Date(claim.since).getTime() > staleAfterMs;
 }
