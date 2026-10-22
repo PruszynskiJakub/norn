@@ -27,6 +27,7 @@ import { storySlug } from "./slug.js";
 import { qaBranch } from "./tidy.js";
 import { specPath } from "./text.js";
 import {
+  answeredComment,
   applyOutcome,
   type Ctx,
   ensureOwnBranch,
@@ -369,12 +370,11 @@ export async function resume(ctx: Ctx, n: number, answer: string | undefined): P
   const { github } = ctx;
   const issue = await github.getIssue(n);
   const of = await flowOf(ctx, issue);
-  const state = (of?.ok ? flowStatesOf(issue, of.flow)[0] : null) ?? "triage";
   const { holder, session } = held.claim;
   const changed = await replaceHeld(ctx, n, held.claim, { holder, session, since: ctx.now().toISOString() });
   if (changed) return changed;
   await github.addLabels(n, ["in-progress"]);
-  await github.comment(n, `norn: ${state} → ${state} (needs-human answered)\n\n${answer}`);
+  await github.comment(n, await answeredComment(ctx, issue, of?.ok ? of.flow : null, answer));
   await github.removeLabels(n, ["needs-human"]);
   return { ok: true, kind: "resumed", issue: n };
 }

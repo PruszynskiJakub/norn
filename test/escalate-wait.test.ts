@@ -11,6 +11,17 @@ async function waiting() {
   return { w, res };
 }
 
+/** As waiting, with #42 a slice of story #123, whose spec it links. */
+async function waitingInStory() {
+  const w = setup();
+  w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+  w.github.seedIssue({ number: 42, labels: ["type:slice", "mode:afk", "implementation"] });
+  await w.github.addSubIssue(123, 42);
+  await w.norn("take", "42");
+  await w.norn("escalate", "42", "Keep it?", "--wait");
+  return w;
+}
+
 describe("norn escalate --wait", () => {
   test("sets needs-human, comments the question and notifies as escalate does", async () => {
     const { w, res } = await waiting();
@@ -103,13 +114,16 @@ describe("while a claim waits", () => {
   });
 
   test("release gives the item up; it keeps needs-human and the resolve step is next", async () => {
-    const { w } = await waiting();
+    const w = await waitingInStory();
 
     const res = await w.norn("release", "42");
 
     expect(res.exitCode).toBe(0);
     expect(w.github.claim(42)).toBeNull();
     expect(w.github.labels(42)).toContain("needs-human");
+    const next = await w.norn("next", "123");
+    // Listed as any needs-human item, for a person to resolve.
+    expect(next.stdout).toContain('#42 needs a human: asked: "Keep it?".');
     const take = await w.as("session-2")("take", "42");
     expect(take.stdout).toContain("Invoke the skill: norn-resolve");
   });
@@ -127,6 +141,16 @@ describe("norn resume", () => {
     expect(w.github.labels(42).sort()).toEqual(["implementation", "in-progress", "mode:afk", "type:slice"]);
     expect(w.github.claim(42)).toEqual({ holder: "alice", session: "session-1", since: "2026-10-13T12:35:00.000Z" });
     expect(res.stdout).toContain("Carry on");
+  });
+
+  test("the answered comment links the spec, as every transition comment does", async () => {
+    const w = await waitingInStory();
+
+    await w.norn("resume", "42", "Yes");
+
+    expect(w.github.comments(42).at(-1)).toBe(
+      "norn: implementation → implementation (needs-human answered)\n\nSpec: https://github.com/acme/app/blob/123-rate-limiting/.agents/specs/123-rate-limiting/spec.md\n\nYes",
+    );
   });
 
   test("the step carries on without a new take: done finishes it", async () => {

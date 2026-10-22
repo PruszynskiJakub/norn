@@ -149,7 +149,7 @@ Each state has a step, a skill that does its work, and the outcomes the agent re
 | needs-qa | `norn-auto-qa` | | `pass` → merge-queue (`mode:afk` slice) or needs-human-qa (`mode:hil` slice, story) · `fail` → qa-failed |
 | needs-human-qa | `norn-qa` | ✓ | `pass` → merge-queue · `fail` → qa-failed |
 | merge-queue (slice) | `norn-merge` | | → closed; dependents recomputed |
-| needs-human (flag) | `norn-resolve` | ✓ | → flag cleared, state kept |
+| needs-human (flag) | `norn-resolve` | ✓ | → flag cleared, state kept (an escalation with `--wait` is not resolved here: the waiting agent runs `norn resume`) |
 
 Two process skills sit above the step skills: `norn-drive <issue>` takes an issue through the attended steps with you, and `norn-deliver <story>` runs the rest unattended. The step skills lean on three reference skills that norn also installs: `norn-interview` (refine, clarify, plan, resolve), `norn-codebase-design` (plan) and `norn-tdd` (implement).
 
@@ -205,7 +205,8 @@ A claim is a git ref, `refs/norn/claims/<issue>`, created on GitHub in one step 
 
 - **Held for the whole step**, for example all of implement on a slice, and released on handing over to the next state. A person's step is claimed too.
 - **Refreshing.** `norn take` on an issue the same session already holds re-briefs it and moves the claim's time forward. Long steps re-run it so a slow session is not mistaken for a crashed one.
-- **Stale claims.** A claim older than `claims.staleAfter` (default 2h) is treated as abandoned, and one session can take it over. Its worktree is kept: the next holder is told to check `git status` there before starting.
+- **Stale claims.** A claim older than `claims.staleAfter` (default 2h) is treated as abandoned, and one session can take it over. Its worktree is kept: the next holder is told to check `git status` there before starting. A [waiting claim](../CONTEXT.md) never goes stale.
+- **Waiting on a person.** `norn escalate <issue> "question" --wait` sets `needs-human` but keeps the claim, marked waiting with the question, and the agent waits in its session for the answer. Until then `norn done`, another `norn escalate` and `norn take` from that session are refused. `norn resume <issue> "answer"` records the answer on the issue, clears `needs-human` and refreshes the claim in the same session, so the step carries on without a new take. `norn release` gives the item up instead, leaving `needs-human` for the resolve step.
 - **Your own stopped session.** `norn take <issue> --takeover` takes over a claim of the same GitHub user at any age. It never takes a teammate's claim.
 
 **Which session holds a claim.** norn keeps no state, so it tells sessions apart by their environment: `NORN_SESSION`, else `CLAUDE_CODE_SESSION_ID`, else the herdr pane (`HERDR_PANE_ID`), else host and repository root. Under the git provider, `norn next` gives each agent its own `NORN_SESSION`.

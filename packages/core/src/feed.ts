@@ -4,7 +4,7 @@ import type { Issue, ObservedStory } from "./github.js";
 import { ENGINE_FLAGS, type Step } from "./machine.js";
 import { recordedSlug } from "./slug.js";
 import { sliceBranch, slugify, storyBranch } from "./text.js";
-import { type Evidence, fixRounds, needsHumanIn, parseTransitionComment } from "./transitions.js";
+import { type Evidence, fixRounds, NEEDS_HUMAN_ANSWERED, NEEDS_HUMAN_RESOLVED, needsHumanIn, parseTransitionComment } from "./transitions.js";
 
 /** What every feed event carries. `actor` is a GitHub login, null for a deleted account. */
 interface FeedBase {
@@ -222,7 +222,7 @@ const MATCH_MS = 60_000;
 
 /** A transition that only clears needs-human: resolved by a person, or answered to an agent that waited. It shows as needs-human resolved, not as an outcome. */
 function clearsNeedsHuman(why: string | null): boolean {
-  return why === "needs-human resolved" || why === "needs-human answered";
+  return why === NEEDS_HUMAN_RESOLVED || why === NEEDS_HUMAN_ANSWERED;
 }
 
 function targetOf(to: string): string {
