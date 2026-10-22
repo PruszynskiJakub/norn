@@ -1,5 +1,5 @@
 {
-  "nornVersion": "0.10.1",
+  "nornVersion": "0.11.0",
   "baseBranch": "main",
   "worktrees": {
     "provider": "auto"
