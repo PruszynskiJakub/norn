@@ -4,6 +4,8 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-22
+
 ### Changed
 
 - The `norn-refine`, `norn-clarify` and `norn-plan` skills say how to do their step, not only what it produces. Refine gathers context first, interviews in a set order while checking terms and claims against the glossary and the code, walks an edge checklist, and holds Behaviour items to a standard shown in a new example spec. Clarify sorts the open questions before asking, drafts self-contained questions for people who are not there, and rereads the whole spec after folding in each answer. Plan maps every Behaviour item to a seam in a coverage table, sets rules for seams and prefactoring, names risks, offers decision records only when they are warranted, and freezes the Behaviour numbers. The Plan section gains a Risks subsection.
@@ -236,7 +238,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/norn/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/norn/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/PruszynskiJakub/norn/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/PruszynskiJakub/norn/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/PruszynskiJakub/norn/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/PruszynskiJakub/norn/compare/v0.8.0...v0.9.0
