@@ -107,14 +107,15 @@ export const USAGE = [
   "  norn next <story>                  What can be done on the story now",
   "  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;",
   "                                     --takeover takes it from a stopped session of yours",
-  '  norn done <issue> [outcome] ["note"] [--evidence <dir>]',
+  '  norn done <issue> [outcome] ["<note>" | --note-file <file>] [--evidence <dir>]',
   "                                     Finish the step; norn makes the transition.",
+  "                                     --note-file reads the note from <file>;",
   "                                     --evidence attaches the QA files in <dir>",
-  '  norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
-  '  norn escalate <issue> "reason" [--wait]',
+  '  norn add-slice <story> "<title>" --mode afk|hil [--blocked-by <slice>]...',
+  '  norn escalate <issue> "<reason>" [--wait]',
   "                                     Set needs-human and release the claim; with --wait,",
   "                                     keep it and wait in this session for the answer",
-  '  norn resume <issue> "answer"       Record the answer to escalate --wait and carry on',
+  '  norn resume <issue> "<answer>"     Record the answer to escalate --wait and carry on',
   "  norn release <issue>               Give up the claim without a transition",
   "  norn status <story>                Read-only overview of the story and its slices",
   "  norn tidy [--dry-run]              Remove what belongs to closed issues",
@@ -132,10 +133,10 @@ export const USAGE = [
 export const NEEDS_NUMBER: Record<string, string> = {
   next: "norn next <story>",
   take: "norn take <issue>",
-  done: 'norn done <issue> [outcome] ["note"] [--evidence <dir>]',
-  "add-slice": 'norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
-  escalate: 'norn escalate <issue> "reason" [--wait]',
-  resume: 'norn resume <issue> "answer"',
+  done: 'norn done <issue> [outcome] ["<note>" | --note-file <file>] [--evidence <dir>]',
+  "add-slice": 'norn add-slice <story> "<title>" --mode afk|hil [--blocked-by <slice>]...',
+  escalate: 'norn escalate <issue> "<reason>" [--wait]',
+  resume: 'norn resume <issue> "<answer>"',
   release: "norn release <issue>",
   status: "norn status <story>",
 };
@@ -217,10 +218,18 @@ export function renderWarning(w: ConfigWarning): string {
 
 // Refusals
 
-/** The ways to finish a step, aligned, with what each means. */
+/** What a note holds, as a placeholder, e.g. "<evidence>": never a value to type as it is. */
+const notePlaceholder = (note: string) => `"<${note}>"`;
+
+/** How to give a note too long, or too full of quotes, $ or backticks, for a shell argument. */
+const NOTE_FILE =
+  "A note of more than one line, or with quotes, $ or backticks, goes in a file outside the repository: pass --note-file <file> in place of the quoted note.";
+
+/** The ways to finish a step, aligned, with what each means; a step that ends one way says what it does too. */
 function finishLines(finish: FinishCommand[]): string[] {
-  if (finish.length === 1 && finish[0].word === "") return [`  norn done ${finish[0].issue}`];
-  const cmds = finish.map((f) => `norn done ${f.issue} ${f.word}${f.note ? ` "${f.note}"` : ""}${f.evidence ? " [--evidence <dir>]" : ""}`);
+  const cmds = finish.map(
+    (f) => `norn done ${f.issue}${f.word ? ` ${f.word}` : ""}${f.note ? ` ${notePlaceholder(f.note)}` : ""}${f.evidence ? " [--evidence <dir>]" : ""}`,
+  );
   const width = Math.max(...cmds.map((c) => c.length)) + 3;
   return cmds.map((c, i) => `  ${c.padEnd(width)}(${finish[i].means})`);
 }
@@ -308,7 +317,11 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
         "Ask them to release it, or wait until the claim goes stale.",
       ];
     case "not-claimed":
-      return [`You do not hold #${r.issue}. Claim it first with: norn take ${r.issue}`];
+      return [
+        `You do not hold #${r.issue}.`,
+        `If you finished its step with norn done, or released or escalated it, stop: its next step is for a new session.`,
+        `Otherwise claim it first with: norn take ${r.issue}`,
+      ];
     case "held-by-other-session":
       return [`#${r.issue} is held by another session (since ${hhmm(r.since)}). Do not work on it or finish it.`];
     case "waits-on-person":
@@ -317,7 +330,7 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
         `Once the person has answered in this session, record the answer with it and carry on. To give the item up instead: norn release ${r.issue}`,
       ];
     case "not-waiting":
-      return [`#${r.issue} does not wait on a person, so there is nothing to resume. To ask one and wait: norn escalate ${r.issue} "question" --wait`];
+      return [`#${r.issue} does not wait on a person, so there is nothing to resume. To ask one and wait: norn escalate ${r.issue} "<question>" --wait`];
     case "outcome-missing":
       return [`${r.step} can end more than one way. Say which.`, "Finish with one of:", ...finishLines(r.finish)];
     case "outcome-unknown":
@@ -325,8 +338,13 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
     case "note-missing":
       return [
         `${r.word ? `The outcome ${r.word}` : "This outcome"} needs a note: the ${r.note}. Run:`,
-        `  norn done ${r.issue}${r.word ? ` ${r.word}` : ""} "${r.note}"${r.evidence ? " [--evidence <dir>]" : ""}`,
+        `  norn done ${r.issue}${r.word ? ` ${r.word}` : ""} ${notePlaceholder(r.note)}${r.evidence ? " [--evidence <dir>]" : ""}`,
+        NOTE_FILE,
       ];
+    case "note-twice":
+      return [`Give the note of #${r.issue} once: either quoted or with --note-file, not both.`];
+    case "note-file-missing":
+      return [`${r.file} is not a file. Write the note to a file and pass its path to --note-file.`];
     case "evidence-not-allowed":
       return [`--evidence is for QA steps; ${r.step} takes none. Finish without it:`, ...finishLines(r.finish)];
     case "evidence-not-a-directory":
@@ -341,7 +359,7 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
     case "no-slices":
       return [
         `${capitalise(r.flow)} #${r.issue} has no slices yet. Create them first, one per slice, with:`,
-        `  norn add-slice ${r.issue} "title" --mode afk|hil [--blocked-by <issue>]`,
+        `  norn add-slice ${r.issue} "<title>" --mode afk|hil [--blocked-by <slice>]...`,
       ];
     case "no-pr":
       return [
@@ -354,7 +372,7 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
         `Merge it into ${r.base} first, then run norn done ${r.issue} again.`,
       ];
     case "not-in-story":
-      return [`#${r.issue} is not a sub-issue of another issue.`];
+      return [`#${r.issue} is not a sub-issue of another issue, so it has no parent branch to work in. A person must add it to its parent first.`];
     case "no-slice-pr":
       return [`No PR from ${r.head} was found. Open and merge it before running norn done ${r.issue}.`];
     case "slice-pr-wrong-base":
@@ -372,11 +390,11 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
         `Set baseBranch in ${TEAM_CONFIG} to the repository's default branch and run the command again.`,
       ];
     case "reason-missing":
-      return ["Say why a human is needed. Run:", `  norn escalate ${r.issue} "reason"`];
+      return ["Say why a human is needed. Run:", `  norn escalate ${r.issue} "<reason>"`];
     case "answer-missing":
       return ["The answer is required, so the issue records what was decided. Run:", `  norn resume ${r.issue} "<answer>"`];
     case "add-slice-usage":
-      return ["add-slice needs a title and a mode. Run:", `  norn add-slice ${r.story} "title" --mode afk|hil [--blocked-by <issue>]...`];
+      return ["add-slice needs a title and a mode. Run:", `  norn add-slice ${r.story} "<title>" --mode afk|hil [--blocked-by <slice>]...`];
     case "story-not-slicing":
       return [
         r.slicing
@@ -785,8 +803,11 @@ function checkedOutElsewhere(branch: string, path: string) {
   return `Branch ${branch} is checked out at ${path}; work there or switch that checkout to another branch.`;
 }
 
-/** Briefing in fixed order: where you are, what to do, how to finish, what not to do. */
-export function renderBriefing(b: Briefing): string[] {
+/**
+ * Briefing in fixed order: where you are, what to do, how to finish, what not to do. `refresh`: the session already
+ * held the issue and is mid-step, so what the worktree holds is its own work, and it is not caught up under it.
+ */
+export function renderBriefing(b: Briefing, refresh = false): string[] {
   const n = b.issue;
   const { step } = b;
   let where = `You now hold ${b.noun} #${n} "${b.title}". Its step is ${step.name}.`;
@@ -798,7 +819,7 @@ export function renderBriefing(b: Briefing): string[] {
     workIn.push(`Work in: ${path} (branch ${branch})`);
     if (worktree.kind === "checked-out-elsewhere") workIn.push(checkedOutElsewhere(branch, worktree.at));
     else if (worktree.kind === "missing") workIn.push("It does not exist yet. Create it first:", `  ${worktree.create}`);
-    else {
+    else if (!refresh) {
       if (worktree.dirty) workIn.push("It has uncommitted changes, e.g. from an earlier session. Check git status there before you start.");
       if (worktree.update) workIn.push("Bring it up to date first:", `  ${worktree.update}`);
     }
@@ -813,14 +834,16 @@ export function renderBriefing(b: Briefing): string[] {
     "",
     `${when}, run${b.finish.length > 1 ? " one of" : ""}:`,
     ...finishLines(b.finish),
+    ...(b.finish.some((f) => f.note) ? [NOTE_FILE] : []),
     "",
-    `On a long step, run norn take ${n} again now and then: it keeps your claim fresh.`,
+    `Your claim goes stale ${duration(b.staleAfterMs)} after you last took #${n}, and another session can then take it over.`,
+    `On a long step, run norn take ${n} again before then: it refreshes the claim, and you carry on where you are.`,
     `If you have to stop, run: norn release ${n}`,
     // Unattended, a question left in the session reaches nobody; escalating keeps the claim and notifies the person.
     ...(step.attended
       ? []
-      : [`When you need a person, run: norn escalate ${n} "question" --wait, and wait for the answer in this session.`, "Never end a turn on a question."]),
-    `If something is wrong and a person is needed, run: norn escalate ${n} "reason"`,
+      : [`When you need a person, run: norn escalate ${n} "<question>" --wait, and wait for the answer in this session.`, "Never end a turn on a question."]),
+    `If something is wrong and a person is needed, run: norn escalate ${n} "<reason>"`,
     "",
     "Do not change labels yourself. Only norn changes them.",
   ];
@@ -828,7 +851,7 @@ export function renderBriefing(b: Briefing): string[] {
 
 function renderTake(t: TakeResult): string[] {
   const n = t.issue;
-  const lines = renderBriefing(t.briefing);
+  const lines = renderBriefing(t.briefing, t.reacquired);
   if (t.tookOver) {
     const since = hhmm(t.tookOver.since);
     const was = t.tookOver.own
@@ -837,7 +860,12 @@ function renderTake(t: TakeResult): string[] {
     const note = `${was}${t.tookOver.worktreeKept ? "; its worktree is kept with what it left. Check git status there before you start." : "."}`;
     lines.splice(lines.indexOf(""), 0, "", note);
   }
-  if (t.reacquired) lines.unshift(`You already held #${n}; the claim is refreshed. Here is its briefing again.`, "");
+  if (t.reacquired)
+    lines.unshift(
+      `You already held #${n}; the claim is refreshed. Carry on with the step where you left off: what is in the worktree is your own work.`,
+      "Here is its briefing again.",
+      "",
+    );
   return lines;
 }
 
@@ -849,7 +877,11 @@ function renderDone(d: DoneResult): string[] {
     const count = d.evidence.files.length;
     lines.push(`Pushed ${count} evidence file${count === 1 ? "" : "s"} to ${d.evidence.branch} and embedded them in the comment.`);
   }
-  if (d.fixLimit !== null) lines.push(`#${n} has reached ${d.fixLimit} fix rounds, so it now needs a human instead of another round in ${d.to}.`);
+  if (d.fixLimit !== null)
+    lines.push(
+      `#${n} has reached ${d.fixLimit} fix rounds, so it now needs a human instead of another round in ${d.to}.`,
+      `Do not take it again; a person picks it up with the norn-resolve skill.`,
+    );
   else if (d.needsHuman !== null)
     lines.push(`#${n} now needs a human: ${d.needsHuman}. Do not take it again; a person picks it up with the norn-resolve skill.`);
   if (d.storyBranchCreated) lines.push(...renderEvent({ kind: "story-branch-created", flow: d.flow ?? "issue", branch: d.storyBranchCreated }));
@@ -1061,9 +1093,12 @@ function renderNothingLeft(r: NextReport): string {
   return out.join("\n");
 }
 
+/** How many of the user's agents run, e.g. "1 of your agents is running". */
+const agentsRunning = (n: number) => `${n} of your agents ${n === 1 ? "is" : "are"} running`;
+
 function runningNote(r: NextReport) {
   if (!r.running) return "";
-  return ` (${r.running} of your agents ${r.running === 1 ? "is" : "are"} running, the limit is ${r.maxParallel})`;
+  return ` (${agentsRunning(r.running)}, the limit is ${r.maxParallel})`;
 }
 
 /** What next is about, called by its type, e.g. `Story #123 "Rate limiting"`. */
@@ -1093,9 +1128,7 @@ export function renderNext(r: NextReport): string {
   } else if (r.slots === 0 && r.start.every((s) => !s.attended)) {
     const ready = `${r.start.length} item${r.start.length === 1 ? " is" : "s are"} ready`;
     out.push(
-      wrap(
-        `${ready}, but ${r.running} of your agents are running, the limit of deliver.maxParallel. Wait for one to finish, then run norn next ${r.issue} again.`,
-      ),
+      wrap(`${ready}, but ${agentsRunning(r.running)}, the limit of deliver.maxParallel. Wait for one to finish, then run norn next ${r.issue} again.`),
       "",
       ...r.start.map((s) => `  - ${itemWhat(s)} ${startState(s)}.`),
     );
@@ -1122,7 +1155,11 @@ export function renderNext(r: NextReport): string {
       if (s.worktree) out.push(`    Worktree: ${s.worktree}`);
       if (s.createWorktree) out.push(`    Create the worktree: ${s.createWorktree}`);
       if (s.checkedOutAt && s.branch) out.push(`    ${checkedOutElsewhere(s.branch, s.checkedOutAt)}`);
-      if (r.provider === "herdr" && s.worktree) {
+      // The prompt runs take in the new agent, or norn-drive does with the user; this session must not take it as well.
+      let prompted = false;
+      // With the branch checked out elsewhere there is no worktree pane to start an agent in.
+      if (r.provider === "herdr" && s.worktree && !s.checkedOutAt) {
+        prompted = !s.here;
         const start = `herdr agent start norn-${s.issue} --kind claude --pane <pane of ${s.worktree}>`;
         if (!s.attended) {
           const prompt = `Work in ${s.worktree}. Run norn take ${s.issue}, follow its briefing to the end, and finish with the norn command it gives.`;
@@ -1139,7 +1176,7 @@ export function renderNext(r: NextReport): string {
         }
       }
       if (s.session && s.worktree) out.push(`    Start an agent in ${s.worktree} with NORN_SESSION=${s.session} set.`);
-      out.push(`    Start it with: ${s.command}`);
+      if (!prompted) out.push(s.attended ? `    Take it with: ${s.command}` : `    Its agent starts with: ${s.command}`);
     }
   }
   const asks = r.waiting.filter((w) => w.reason === "agent-asks");

@@ -14,7 +14,7 @@ An unknown key or an invalid value makes norn refuse every command and name the 
 ```jsonc
 // .agents/norn.config.json (committed)
 {
-  "nornVersion": "0.10.1",
+  "nornVersion": "0.11.0",
   "baseBranch": "main",
   "worktrees": { "provider": "auto" },
   "claims": { "staleAfter": "2h" },
@@ -49,7 +49,7 @@ Durations are a number followed by `s`, `m`, `h` or `d`.
 
 ## The norn version
 
-`nornVersion` records the norn version the committed skills and labels belong to. `norn init` writes it, and on an upgrade changes it and nothing else. It is a plain version such as `0.10.1`; anything else, or `nornVersion` in the local file, is a config problem.
+`nornVersion` records the norn version the committed skills and labels belong to. `norn init` writes it, and on an upgrade changes it and nothing else. It is a plain version such as `0.11.0`; anything else, or `nornVersion` in the local file, is a config problem.
 
 Every command except `init` and `doctor` compares it with the norn that runs:
 

@@ -21,7 +21,7 @@ describe("briefing carries the process", () => {
     w.github.seedIssue({ number: 7, title: "Something", labels: [] });
     const res = await w.norn("take", "7");
     expect(res.stdout).toContain("Read the issue: gh issue view 7 --comments");
-    expect(res.stdout).toContain("Unless you reject it, post what triage established on the issue first: gh issue comment 7");
+    expect(res.stdout).toContain("Unless you reject it, post what triage established on the issue before norn done: gh issue comment 7 --body-file <file>");
   });
 
   test("plan: commit and push the spec on the story branch", async () => {
@@ -31,7 +31,7 @@ describe("briefing carries the process", () => {
 
   test("slice: how to create slices and their bodies, then push the story branch", async () => {
     const res = await storyAt("needs-slicing").norn("take", "123");
-    expect(res.stdout).toContain('  norn add-slice 123 "title" --mode afk|hil [--blocked-by <slice>]...');
+    expect(res.stdout).toContain('  norn add-slice 123 "<title>" --mode afk|hil [--blocked-by <slice>]...');
     expect(res.stdout).toContain("  --mode afk when an agent can verify every criterion, hil when a person must also look at it.");
     expect(res.stdout).toContain("Then give each slice its body: gh issue edit <slice> --body-file <file>");
     expect(res.stdout).toContain("Push 123-rate-limiting once the slices exist, so slice PRs can target it.");
@@ -67,7 +67,7 @@ describe("briefing carries the process", () => {
 
 /** Unattended, nobody reads a question the agent leaves in its session, so it asks where norn sees it. */
 describe("how a briefing says to ask a person", () => {
-  const askLine = 'When you need a person, run: norn escalate 131 "question" --wait, and wait for the answer in this session.';
+  const askLine = 'When you need a person, run: norn escalate 131 "<question>" --wait, and wait for the answer in this session.';
 
   test("an unattended step asks with escalate --wait and never ends a turn on a question", async () => {
     const w = setup();
@@ -79,7 +79,7 @@ describe("how a briefing says to ask a person", () => {
 
     expect(out).toContain(askLine);
     expect(out).toContain("Never end a turn on a question.");
-    expect(out).toContain('If something is wrong and a person is needed, run: norn escalate 131 "reason"');
+    expect(out).toContain('If something is wrong and a person is needed, run: norn escalate 131 "<reason>"');
   });
 
   test("an attended step asks the user directly, so it has no --wait line", async () => {
@@ -90,6 +90,6 @@ describe("how a briefing says to ask a person", () => {
 
     expect(out).not.toContain("--wait");
     expect(out).not.toContain("Never end a turn on a question.");
-    expect(out).toContain('If something is wrong and a person is needed, run: norn escalate 123 "reason"');
+    expect(out).toContain('If something is wrong and a person is needed, run: norn escalate 123 "<reason>"');
   });
 });

@@ -40,7 +40,7 @@ describe("the norn-deliver skill matches what norn next says", () => {
 
   test("it asks a person as the unattended briefings do", () => {
     const md = readFileSync(join(BUNDLED_SKILLS, "norn-deliver", "SKILL.md"), "utf8");
-    expect(md).toContain('run `norn escalate <issue> "question" --wait` and wait for the answer in this session; never end a turn on a question.');
+    expect(md).toContain('run `norn escalate <issue> "<question>" --wait` and wait for the answer in this session; never end a turn on a question.');
   });
 });
 

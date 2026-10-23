@@ -264,11 +264,23 @@ async function replaceHeld(ctx: Ctx, n: number, held: HeldClaim, record: ClaimRe
   return refuse(now ? { kind: "held-by-other-session", issue: n, since: now.since } : { kind: "not-claimed", issue: n });
 }
 
-export async function done(ctx: Ctx, n: number, input: { word?: string; note?: string; evidenceDir?: string }): Promise<DoneResult | Refused> {
+/** `noteFile` is a file holding the note, in place of `note`, e.g. an evidence pack too long or too full of quotes for a shell argument. */
+export async function done(
+  ctx: Ctx,
+  n: number,
+  input: { word?: string; note?: string; noteFile?: string; evidenceDir?: string },
+): Promise<DoneResult | Refused> {
   const { github } = ctx;
-  const { word, note, evidenceDir } = input;
+  const { word, noteFile, evidenceDir } = input;
+  let { note } = input;
   const notHeld = await checkHeld(ctx, n);
   if (notHeld) return notHeld;
+  if (noteFile !== undefined) {
+    if (note !== undefined) return refuse({ kind: "note-twice", issue: n });
+    const text = await ctx.workspace.readNote(noteFile);
+    if (text === null) return refuse({ kind: "note-file-missing", file: noteFile });
+    note = text.trim();
+  }
   const issue = await github.getIssue(n);
   const resolved = await stepOf(ctx, issue);
   if (!resolved.ok) return resolved;

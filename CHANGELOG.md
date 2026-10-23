@@ -6,11 +6,31 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ### Added
 
-- `norn escalate <issue> "question" --wait`: an agent asks a person and keeps its claim, marked as waiting on them. It sets `needs-human`, comments `asked: "<question>"` and notifies you as escalate does. A waiting claim never goes stale; while it waits, `done`, `escalate` and `take` from the same session are refused, `release` gives the item up, and `take --takeover` from another of your sessions frees a dead one into the resolve step. Without `--wait`, escalate is unchanged.
-- `norn resume <issue> "answer"`: records the answer to `escalate --wait` as a `needs-human answered` comment, clears `needs-human`, puts `in-progress` back and refreshes the claim, so the agent carries on in the same step.
+- `norn escalate <issue> "<question>" --wait`: an agent asks a person and keeps its claim, marked as waiting on them. It sets `needs-human`, comments `asked: "<question>"` and notifies you as escalate does. A waiting claim never goes stale; while it waits, `done`, `escalate` and `take` from the same session are refused, `release` gives the item up, and `take --takeover` from another of your sessions frees a dead one into the resolve step. Without `--wait`, escalate is unchanged.
+- `norn resume <issue> "<answer>"`: records the answer to `escalate --wait` as a `needs-human answered` comment, clears `needs-human`, puts `in-progress` back and refreshes the claim, so the agent carries on in the same step.
 - The dashboard lists an agent waiting on you first, as "An agent asks": its question, how long it has waited, its worktree and, under herdr, `herdr agent focus norn-<issue>` with a copy button. It offers no command that takes or resolves the item, and never shows it as stale.
 - What agents ask with `escalate --wait` is listed first in `norn next` and `norn status`, as `agent-asks` in `--json`: the question, how long it has waited, the agent's worktree and, under herdr, `herdr agent focus norn-<issue>`, never with a take command or as stale. `escalate --wait` sends an `agent-asks` notification with the question and how to reach the agent, and the nothing-left notification lists what agents ask although a session holds it.
-- Briefings of unattended steps, and the norn-deliver skill, tell the agent to ask a person with `norn escalate <issue> "question" --wait` and wait in its session, never ending a turn on a question. Attended briefings are unchanged, and plain `escalate` stays in every briefing.
+- Briefings of unattended steps, and the norn-deliver skill, tell the agent to ask a person with `norn escalate <issue> "<question>" --wait` and wait in its session, never ending a turn on a question. Attended briefings are unchanged, and plain `escalate` stays in every briefing.
+- `norn done --note-file <file>` reads the note from a file, so an evidence pack or review requests of several lines, with quotes, `$` or backticks, reach the comment as written instead of going through a shell argument. Briefings and the missing-note refusal point to it. A note given both quoted and as a file is refused, and so is a `--note-file` that names no file.
+
+### Changed
+
+- Briefings, refusals and `norn --help` write what a command takes as a placeholder, such as `"<evidence>"`, `"<reason>"` and `"<title>"`, so an agent no longer reads `"evidence"` as the value to type. `add-slice` names its blockers `<slice>` everywhere.
+- A step that ends one way says what `norn done` does, for example `norn done 64   (clears needs-human, stays in needs-clarification)`.
+- The briefing says when the claim goes stale (`claims.staleAfter`) instead of "now and then", and `--json` carries it as `briefing.staleAfterMs`. Taking an issue you already hold says to carry on where you are, and leaves out the worktree's uncommitted changes and the command that catches it up, since they are your own work.
+- Agent QA before a person says that what only a person can check does not fail the step on its own, and names the slice's verifier only for a slice.
+- Human QA: a dropped remark goes in the note, which an outcome that needs none still takes, and the person runs "the change" rather than "the app".
+- A slice that is no sub-issue is briefed to escalate instead of getting an almost empty briefing. Resolving a slice names its parent's spec and where changes to it go.
+- Triage and resolve post their comment with `gh issue comment <n> --body-file <file>`, which needs no editor, and triage posts it before `norn done`.
+- The read-issue line appears once when a behaviour already says to read the issue, as for rework and human QA.
+- `norn done` without the claim says to stop when the step is already finished, released or escalated, instead of only to claim the issue again. Reaching the fix-round limit says not to take the issue again.
+- `norn next` labels each item's command for who runs it: `Its agent starts with` or `Take it with`. Under herdr it drops the command when the agent's prompt runs it, and offers no agent for an item whose branch is checked out elsewhere.
+
+## [0.11.0] - 2026-10-22
+
+### Changed
+
+- The `norn-refine`, `norn-clarify` and `norn-plan` skills say how to do their step, not only what it produces. Refine gathers context first, interviews in a set order while checking terms and claims against the glossary and the code, walks an edge checklist, and holds Behaviour items to a standard shown in a new example spec. Clarify sorts the open questions before asking, drafts self-contained questions for people who are not there, and rereads the whole spec after folding in each answer. Plan maps every Behaviour item to a seam in a coverage table, sets rules for seams and prefactoring, names risks, offers decision records only when they are warranted, and freezes the Behaviour numbers. The Plan section gains a Risks subsection.
 
 ## [0.10.1] - 2026-10-17
 
@@ -240,7 +260,8 @@ First release.
 - Local notifications through herdr or the OS when an issue needs a human or nothing is left to do.
 - Bundled skills, one per step (triage, refine, clarify, plan, slice, implement, review, qa, merge, resolve, deliver), plus the reference skills `interview`, `codebase-design` and `tdd`, installed by `psdd init`.
 
-[Unreleased]: https://github.com/PruszynskiJakub/norn/compare/v0.10.1...HEAD
+[Unreleased]: https://github.com/PruszynskiJakub/norn/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/PruszynskiJakub/norn/compare/v0.10.1...v0.11.0
 [0.10.1]: https://github.com/PruszynskiJakub/norn/compare/v0.10.0...v0.10.1
 [0.10.0]: https://github.com/PruszynskiJakub/norn/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/PruszynskiJakub/norn/compare/v0.8.0...v0.9.0

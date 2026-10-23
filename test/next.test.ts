@@ -38,13 +38,13 @@ describe("norn next", () => {
         "",
         '  - Slice #131 "Per-key limits" is in ready-for-agent: Ready for an agent.',
         "    Worktree: /repo/.agents/worktrees/123-rate-limiting-131",
-        "    Start it with: norn take 131",
+        "    Its agent starts with: norn take 131",
         '  - Slice #128 "Limit headers" is in needs-review: Waiting for review.',
         "    Worktree: /repo/.agents/worktrees/123-rate-limiting-128",
-        "    Start it with: norn take 128",
+        "    Its agent starts with: norn take 128",
         '  - Slice #127 "Redis store" is in merge-queue: Queued to merge.',
         "    Worktree: /repo/.agents/worktrees/123-rate-limiting-127",
-        "    Start it with: norn take 127",
+        "    Its agent starts with: norn take 127",
         "",
         "Waiting, nothing to do for you:",
         "  - #132 is blocked by #131.",
@@ -85,7 +85,7 @@ describe("norn next", () => {
     expect(res.stdout).toContain('Story #123 "Rate limiting" is in needs-refinement.');
     expect(res.stdout).toContain("You can start 1 item now, with the user:");
     expect(res.stdout).toContain("refinement (attended: the user takes part)");
-    expect(res.stdout).toContain("Start it with: norn take 123");
+    expect(res.stdout).toContain("Take it with: norn take 123");
   });
 
   test("a story waiting for its owner to merge has nothing to start", async () => {
@@ -434,7 +434,7 @@ describe("running agents count against the parallel limit", () => {
         '  - Slice #134 "Slice 134" is in ready-for-agent: Ready for an agent.',
       ].join("\n"),
     );
-    expect(res.stdout).not.toContain("Start it with");
+    expect(res.stdout).not.toContain("norn take 13");
     expect(JSON.parse((await w.norn("next", "123", "--json")).stdout)).toMatchObject({ running: 2, slots: 0 });
   });
 

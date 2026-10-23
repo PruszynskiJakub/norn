@@ -9,15 +9,15 @@ norn answers in prose written as instructions to the agent, always in the same o
 | [`norn init`](#norn-init) | Set up the project: skills, agent instructions, `.agents/`, labels |
 | [`norn next <story>`](#norn-next) | What can be done on the story now |
 | [`norn take <issue>`](#norn-take) | Claim the issue and get the briefing for its step |
-| [`norn done <issue> [outcome] ["note"]`](#norn-done) | Finish the step; norn makes the transition |
+| [`norn done <issue> [outcome] ["<note>"]`](#norn-done) | Finish the step; norn makes the transition |
 | [`norn status <story>`](#norn-status) | Read-only overview of the story and its slices |
 | [`norn tidy`](#norn-tidy) | Remove what belongs to closed issues |
 | [`norn dashboard`](#norn-dashboard) | Watch your work in the browser |
 | [`norn doctor`](#norn-doctor) | Check the whole setup and say what to fix |
 | [`norn flows export <name>`](#norn-flows-export) | Copy a built-in flow into the repository to change it |
-| [`norn add-slice <story> "title"`](#norn-add-slice) | Create a slice (used by the `norn-slice` skill) |
-| [`norn escalate <issue> "reason" [--wait]`](#norn-escalate) | Set `needs-human` and release the claim, or with `--wait` keep it and wait for the answer |
-| [`norn resume <issue> "answer"`](#norn-resume) | Record the answer to `escalate --wait` and carry on |
+| [`norn add-slice <story> "<title>"`](#norn-add-slice) | Create a slice (used by the `norn-slice` skill) |
+| [`norn escalate <issue> "<reason>" [--wait]`](#norn-escalate) | Set `needs-human` and release the claim, or with `--wait` keep it and wait for the answer |
+| [`norn resume <issue> "<answer>"`](#norn-resume) | Record the answer to `escalate --wait` and carry on |
 | [`norn release <issue>`](#norn-release) | Give up the claim without a transition |
 
 `norn --version` prints the running norn's version. `norn --help`, or `--help` (`-h`) after any command, prints the list of commands and runs nothing.
@@ -58,13 +58,13 @@ worktree:
 
   - Slice #131 "Per-key limits" is in ready-for-agent: Ready for an agent.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-131
-    Start it with: norn take 131
+    Its agent starts with: norn take 131
   - Slice #128 "Limit headers" is in needs-review: Waiting for review.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-128
-    Start it with: norn take 128
+    Its agent starts with: norn take 128
   - Slice #127 "Redis store" is in merge-queue: Queued to merge.
     Worktree: /repo/.agents/worktrees/123-rate-limiting-127
-    Start it with: norn take 127
+    Its agent starts with: norn take 127
 
 Waiting, nothing to do for you:
   - #132 is blocked by #131.
@@ -94,7 +94,7 @@ Work in: /repo/.agents/worktrees/123-rate-limiting (branch 123-rate-limiting)
 It does not exist yet. Create it first:
   git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting -b 123-rate-limiting origin/main
 
-Invoke the skill: refine
+Invoke the skill: norn-refine
 Spec to work on: .agents/specs/123-rate-limiting/spec.md
 Read the issue: gh issue view 123 --comments
 Commit the spec on 123-rate-limiting and push it, so the link norn posts resolves.
@@ -103,26 +103,27 @@ When the user agrees refinement is finished, run one of:
   norn done 123 clear       (no open questions, moves on to planning)
   norn done 123 questions   (open questions, moves to clarification)
 
-On a long step, run norn take 123 again now and then: it keeps your claim fresh.
+Your claim goes stale 2h after you last took #123, and another session can then take it over.
+On a long step, run norn take 123 again before then: it refreshes the claim, and you carry on where you are.
 If you have to stop, run: norn release 123
-If something is wrong and a person is needed, run: norn escalate 123 "reason"
+If something is wrong and a person is needed, run: norn escalate 123 "<reason>"
 
 Do not change labels yourself. Only norn changes them.
 ```
 
-The briefing of an unattended step adds two lines before the escalate line: `When you need a person, run: norn escalate <issue> "question" --wait, and wait for the answer in this session.` and `Never end a turn on a question.` No person watches such a session, so a question asked in it reaches nobody; an attended step's agent simply asks the user.
+The briefing of an unattended step adds two lines before the escalate line: `When you need a person, run: norn escalate <issue> "<question>" --wait, and wait for the answer in this session.` and `Never end a turn on a question.` No person watches such a session, so a question asked in it reaches nobody; an attended step's agent simply asks the user.
 
-- Running `take` again on an issue you hold re-briefs you and refreshes the claim.
+- Running `take` again on an issue you hold re-briefs you and refreshes the claim. It tells you to carry on where you are, and leaves out the worktree's uncommitted changes and the command that catches it up, since they are your own work.
 - A stale claim (older than `claims.staleAfter`) is taken over by one session only.
 - `--takeover` takes over a claim of your own GitHub user at any age, for a session of yours that stopped. It never takes a teammate's claim.
 
 ## norn done
 
 ```sh
-npx norn done <issue> [outcome] ["note"] [--evidence <dir>]
+npx norn done <issue> [outcome] ["<note>" | --note-file <file>] [--evidence <dir>]
 ```
 
-Finishes the step: norn makes the transition, posts a comment and releases the claim. The outcome word is needed only when the step can end more than one way (see [steps, skills and outcomes](how-it-works.md#steps-skills-and-outcomes)). The note carries review requests, QA results or a rejection reason. `--evidence <dir>` pushes the QA files in `<dir>` to `norn/qa/<issue>` and embeds them in the comment.
+Finishes the step: norn makes the transition, posts a comment and releases the claim. The outcome word is needed only when the step can end more than one way (see [steps, skills and outcomes](how-it-works.md#steps-skills-and-outcomes)). The note carries review requests, QA results or a rejection reason; an outcome that needs none still takes one. `--note-file <file>` reads the note from a file instead, for one of more than one line or with quotes, `$` or backticks that a shell argument would mangle; a note given both ways is refused. `--evidence <dir>` pushes the QA files in `<dir>` to `norn/qa/<issue>` and embeds them in the comment.
 
 It refuses, changing nothing, while the step's work is not where the flow needs it: leaving a state with `opensPR` needs the issue's PR open, closing an issue of a flow with `opensPR` needs that PR merged, and leaving a state with `slices` needs a slice. When the outcome sets `needs-human`, from the flow's `needsHuman` or the fix-round limit, `done` says so and why.
 
@@ -213,7 +214,7 @@ It refuses when the file exists, leaving it as it is, and names the built-in flo
 ## norn add-slice
 
 ```sh
-npx norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...
+npx norn add-slice <story> "<title>" --mode afk|hil [--blocked-by <slice>]...
 ```
 
 Creates a slice as a sub-issue of the story, with its labels, the story's assignee, its native "blocked by" relations and its mode. The slice gets the type the story's flow names and starts in that type's start state, or held while a blocker is open; the answer names that state. A missing label for either is created first, with its colour and description. The `norn-slice` skill calls it; you rarely need it by hand.
@@ -221,7 +222,7 @@ Creates a slice as a sub-issue of the story, with its labels, the story's assign
 ## norn escalate
 
 ```sh
-npx norn escalate <issue> "reason" [--wait]
+npx norn escalate <issue> "<reason>" [--wait]
 ```
 
 Sets `needs-human` with the reason as a comment, notifies you and releases the claim. A person clears it with `norn-drive <issue>`, which runs the `norn-resolve` skill.
@@ -233,7 +234,7 @@ A waiting claim never goes stale, so no other session takes it over however long
 ## norn resume
 
 ```sh
-npx norn resume <issue> "answer"
+npx norn resume <issue> "<answer>"
 ```
 
 Ends the wait of `escalate --wait`: comments `norn: <state> → <state> (needs-human answered)` with the answer under it, clears `needs-human`, puts `in-progress` back and refreshes the claim. The step and its briefing are unchanged, so the agent carries on without a new `norn take`. The answer is required, so the issue always records what was decided. It is refused when the session does not hold the claim, or when its claim does not wait.

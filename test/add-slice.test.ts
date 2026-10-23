@@ -77,7 +77,7 @@ describe("finishing slicing", () => {
     const res = await w.norn("done", "123");
     expect(res.exitCode).toBe(1);
     expect(res.stdout).toContain("Story #123 has no slices yet");
-    expect(res.stdout).toContain('norn add-slice 123 "title" --mode afk|hil');
+    expect(res.stdout).toContain('norn add-slice 123 "<title>" --mode afk|hil');
     expect(w.github.labels(123)).toContain("needs-slicing");
   });
 

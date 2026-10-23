@@ -22,7 +22,7 @@ describe("norn escalate", () => {
     await w.norn("take", "131");
     const res = await w.norn("escalate", "131");
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain('norn escalate 131 "reason"');
+    expect(res.stdout).toContain('norn escalate 131 "<reason>"');
   });
 
   test("needs the claim", async () => {

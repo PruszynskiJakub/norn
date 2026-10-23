@@ -10,7 +10,7 @@ describe("slice implementation", () => {
 
     expect(res.exitCode).toBe(0);
     expect(res.stdout).toContain("Invoke the skill: norn-implement");
-    expect(res.stdout).toContain("  norn done 131\n");
+    expect(res.stdout).toContain("  norn done 131   (implementation done, PR open)\n");
     expect(w.github.labels(131).sort()).toEqual(["implementation", "in-progress", "mode:afk", "type:slice"]);
   });
 
