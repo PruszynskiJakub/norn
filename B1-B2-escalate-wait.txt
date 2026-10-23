@@ -1,0 +1,13 @@
+implementation,type:slice,in-progress,mode:afk
+$ NORN_SESSION=qaA nb escalate 93 Keep the old flag as an alias? --wait
+#93 now needs a human, and you keep the claim, waiting on a person.
+Wait in this session for the answer; do not end your turn. Once answered, run: norn resume 93 "<answer>"
+[exit 0]
+labels after:
+implementation,type:slice,needs-human,mode:afk
+last comment:
+norn: needs-human — asked: "Keep the old flag as an alias?"
+claim ref:
+ddb8e5de386eddeaab2b9bec7c8d0bfd82608eb9	refs/norn/claims/93
+c73e11f74289e299c63227a7c3653198dce9323d	refs/pull/23/head
+83cfd06c9693b15047bfda096e2a0ef9a93771cc	refs/pull/45/head

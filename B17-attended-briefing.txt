@@ -1,0 +1,30 @@
+$ NORN_SESSION=qaS nb take 92
+You already held #92; the claim is refreshed. Carry on with the step where you left off: what is in the worktree is your own work.
+Here is its briefing again.
+
+You now hold story #92 "[qa #129] waiting escalation story". Its step is
+slicing. This step is attended: the user takes part, and you do not decide
+on your own.
+
+Work in: /Users/jakubpruszynski/Projects/norn-qa-sandbox/.agents/worktrees/92-qa-129-waiting-escalation-story (branch 92-qa-129-waiting-escalation-story)
+It does not exist yet. Create it first:
+  git -C /Users/jakubpruszynski/Projects/norn-qa-sandbox fetch origin main && git -C /Users/jakubpruszynski/Projects/norn-qa-sandbox branch --no-track 92-qa-129-waiting-escalation-story origin/main && herdr worktree create --cwd /Users/jakubpruszynski/Projects/norn-qa-sandbox --branch 92-qa-129-waiting-escalation-story --path /Users/jakubpruszynski/Projects/norn-qa-sandbox/.agents/worktrees/92-qa-129-waiting-escalation-story --no-focus
+
+Invoke the skill: norn-slice
+Spec to work on: .agents/specs/92-qa-129-waiting-escalation-story/spec.md
+Create the slices in dependency order, blockers first, one command per slice:
+  norn add-slice 92 "<title>" --mode afk|hil [--blocked-by <slice>]...
+  --mode afk when an agent can verify every criterion, hil when a person must also look at it.
+Then give each slice its body: gh issue edit <slice> --body-file <file>
+Push 92-qa-129-waiting-escalation-story once the slices exist, so slice PRs can target it.
+
+When the user agrees slicing is finished, run:
+  norn done 92   (slices created, moves on to implementation)
+
+Your claim goes stale 2h after you last took #92, and another session can then take it over.
+On a long step, run norn take 92 again before then: it refreshes the claim, and you carry on where you are.
+If you have to stop, run: norn release 92
+If something is wrong and a person is needed, run: norn escalate 92 "<reason>"
+
+Do not change labels yourself. Only norn changes them.
+[exit 0]

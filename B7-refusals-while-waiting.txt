@@ -1,0 +1,16 @@
+$ NORN_SESSION=qaA nb done 93 implemented
+#93 waits on a person: run norn resume 93 "<answer>" first
+Once the person has answered in this session, record the answer with it and carry on. To give the item up instead: norn release 93
+[exit 1]
+$ NORN_SESSION=qaA nb escalate 93 another question --wait
+#93 waits on a person: run norn resume 93 "<answer>" first
+Once the person has answered in this session, record the answer with it and carry on. To give the item up instead: norn release 93
+[exit 1]
+$ NORN_SESSION=qaA nb escalate 93 plain
+#93 waits on a person: run norn resume 93 "<answer>" first
+Once the person has answered in this session, record the answer with it and carry on. To give the item up instead: norn release 93
+[exit 1]
+$ NORN_SESSION=qaA nb take 93
+#93 waits on a person: run norn resume 93 "<answer>" first
+Once the person has answered in this session, record the answer with it and carry on. To give the item up instead: norn release 93
+[exit 1]

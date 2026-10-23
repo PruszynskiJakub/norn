@@ -1,0 +1,33 @@
+== #93 waiting session qaA 'died'; person in session qaT:
+$ NORN_SESSION=qaT nb take 93 --takeover
+You now hold slice #93 "[qa #129] Ask a question". Its step is resolving
+needs-human. This step is attended: the user takes part, and you do not
+decide on your own.
+
+You took #93 over from another session of yours (since 09:17).
+
+Work in: /Users/jakubpruszynski/Projects/norn-qa-sandbox/.agents/worktrees/92-qa-129-waiting-escalation-story-93 (branch 92-qa-129-waiting-escalation-story-93)
+It does not exist yet. Create it first:
+  git -C /Users/jakubpruszynski/Projects/norn-qa-sandbox fetch origin 92-qa-129-waiting-escalation-story && git -C /Users/jakubpruszynski/Projects/norn-qa-sandbox branch --no-track 92-qa-129-waiting-escalation-story-93 origin/92-qa-129-waiting-escalation-story && herdr worktree create --cwd /Users/jakubpruszynski/Projects/norn-qa-sandbox --branch 92-qa-129-waiting-escalation-story-93 --path /Users/jakubpruszynski/Projects/norn-qa-sandbox/.agents/worktrees/92-qa-129-waiting-escalation-story-93 --no-focus
+
+Invoke the skill: norn-resolve
+The latest needs-human comment gives the reason. Read the issue: gh issue view 93 --comments
+Record the outcome on the issue: gh issue comment 93 --body-file <file>
+Spec: .agents/specs/92-qa-129-waiting-escalation-story/spec.md (story #92). Spec changes go on 92-qa-129-waiting-escalation-story, not 92-qa-129-waiting-escalation-story-93.
+
+When the user agrees resolving needs-human is finished, run:
+  norn done 93   (clears needs-human, stays in implementation)
+
+Your claim goes stale 10m after you last took #93, and another session can then take it over.
+On a long step, run norn take 93 again before then: it refreshes the claim, and you carry on where you are.
+If you have to stop, run: norn release 93
+If something is wrong and a person is needed, run: norn escalate 93 "<reason>"
+
+Do not change labels yourself. Only norn changes them.
+[exit 0]
+labels: implementation,type:slice,in-progress,needs-human,mode:afk
+claim: {"holder":"PruszynskiJakub","session":"qaT","since":"2026-10-23T09:30:07.937Z"}
+== the dead session's resume is refused:
+$ NORN_SESSION=qaA nb resume 93 late
+#93 is held by another session (since 09:30). Do not work on it or finish it.
+[exit 1]

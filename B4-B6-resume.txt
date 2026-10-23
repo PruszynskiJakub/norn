@@ -1,0 +1,21 @@
+$ NORN_SESSION=qaA nb resume 93 Yes, keep the old flag as an alias
+#93's answer is recorded and the claim is yours again. Carry on with the step; its briefing still holds.
+[exit 0]
+labels:
+implementation,type:slice,in-progress,mode:afk
+comments:
+---
+norn: needs-human — asked: "Keep the old flag as an alias?"
+---
+norn: implementation → implementation (needs-human answered)
+
+Spec: https://github.com/PruszynskiJakub/norn-qa-sandbox/blob/92-qa-129-waiting-escalation-story/.agents/specs/92-qa-129-waiting-escalation-story/spec.md
+
+Yes, keep the old flag as an alias
+claim: {"holder":"PruszynskiJakub","session":"qaA","since":"2026-10-23T09:16:47.400Z"}
+$ NORN_SESSION=qaA nb resume 93 again
+#93 does not wait on a person, so there is nothing to resume. To ask one and wait: norn escalate 93 "<question>" --wait
+[exit 1]
+$ NORN_SESSION=qaA nb take 93
+You already held #93; the claim is refreshed. Carry on with the step where you left off: what is in the worktree is your own work.
+Here is its briefing again.

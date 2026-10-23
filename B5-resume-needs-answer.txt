@@ -1,0 +1,4 @@
+$ NORN_SESSION=qaA nb resume 93
+The answer is required, so the issue records what was decided. Run:
+  norn resume 93 "<answer>"
+[exit 1]

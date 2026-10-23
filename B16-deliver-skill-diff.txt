@@ -1,0 +1,12 @@
+diff --git a/.agents/skills/norn-deliver/SKILL.md b/.agents/skills/norn-deliver/SKILL.md
+index 12821d3..e07dd06 100644
+--- a/.agents/skills/norn-deliver/SKILL.md
++++ b/.agents/skills/norn-deliver/SKILL.md
+@@ -31,6 +31,7 @@ Done when you have run the final `norn tidy` and given the user the report: what
+ 
+ - Each phase goes to a new subagent; your own context stays for orchestration.
+ - A claim not renewed for `claims.staleAfter` (2h by default) counts as abandoned. Tell subagents on long steps to run `norn take <issue>` again before that; it refreshes their claim, and they carry on where they are.
++- When you need a person, run `norn escalate <issue> "<question>" --wait` and wait for the answer in this session; never end a turn on a question. The briefings tell subagents the same. Once answered, `norn resume <issue> "<answer>"` records it and the work carries on.
+ - Change state only through norn. Labels, branches and PRs belong to norn and the subagents.
+ - Never use `norn take --takeover`. An item held by another session may be a sibling still at work; leave it to go stale.
+ - Items marked "needs a human" or "needs human QA" are for people; leave them to them and carry on with the rest.
