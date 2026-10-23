@@ -815,6 +815,10 @@ export function renderBriefing(b: Briefing): string[] {
     "",
     `On a long step, run norn take ${n} again now and then: it keeps your claim fresh.`,
     `If you have to stop, run: norn release ${n}`,
+    // Unattended, a question left in the session reaches nobody; escalating keeps the claim and notifies the person.
+    ...(step.attended
+      ? []
+      : [`When you need a person, run: norn escalate ${n} "question" --wait, and wait for the answer in this session.`, "Never end a turn on a question."]),
     `If something is wrong and a person is needed, run: norn escalate ${n} "reason"`,
     "",
     "Do not change labels yourself. Only norn changes them.",
