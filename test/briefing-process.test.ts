@@ -64,3 +64,32 @@ describe("briefing carries the process", () => {
     expect(out).toContain("Spec changes go in .agents/specs/123-rate-limiting/spec.md; commit and push them on 123-rate-limiting.");
   });
 });
+
+/** Unattended, nobody reads a question the agent leaves in its session, so it asks where norn sees it. */
+describe("how a briefing says to ask a person", () => {
+  const askLine = 'When you need a person, run: norn escalate 131 "question" --wait, and wait for the answer in this session.';
+
+  test("an unattended step asks with escalate --wait and never ends a turn on a question", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
+    w.github.seedIssue({ number: 131, title: "Per-key limits", labels: ["type:slice", "mode:afk", "ready-for-agent"] });
+    w.github.parents.set(131, 123);
+
+    const out = (await w.norn("take", "131")).stdout;
+
+    expect(out).toContain(askLine);
+    expect(out).toContain("Never end a turn on a question.");
+    expect(out).toContain('If something is wrong and a person is needed, run: norn escalate 131 "reason"');
+  });
+
+  test("an attended step asks the user directly, so it has no --wait line", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "needs-plan"] });
+
+    const out = (await w.norn("take", "123")).stdout;
+
+    expect(out).not.toContain("--wait");
+    expect(out).not.toContain("Never end a turn on a question.");
+    expect(out).toContain('If something is wrong and a person is needed, run: norn escalate 123 "reason"');
+  });
+});

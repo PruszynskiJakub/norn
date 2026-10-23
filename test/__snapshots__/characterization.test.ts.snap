@@ -2185,7 +2185,7 @@ exports[`output of every command, text and --json > take a ready slice > json 1`
   "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132\\n\\nOn a long step, run norn take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132\\n\\nOn a long step, run norn take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 132\\nWhen you need a person, run: norn escalate 132 \\"question\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2208,6 +2208,8 @@ When implementation is finished, run:
 
 On a long step, run norn take 132 again now and then: it keeps your claim fresh.
 If you have to stop, run: norn release 132
+When you need a person, run: norn escalate 132 "question" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 132 "reason"
 
 Do not change labels yourself. Only norn changes them."
@@ -2223,7 +2225,7 @@ exports[`output of every command, text and --json > take a slice checked out els
   "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nBranch 123-rate-limiting-132 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132\\n\\nOn a long step, run norn take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nBranch 123-rate-limiting-132 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132\\n\\nOn a long step, run norn take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 132\\nWhen you need a person, run: norn escalate 132 \\"question\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2245,6 +2247,8 @@ When implementation is finished, run:
 
 On a long step, run norn take 132 again now and then: it keeps your claim fresh.
 If you have to stop, run: norn release 132
+When you need a person, run: norn escalate 132 "question" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 132 "reason"
 
 Do not change labels yourself. Only norn changes them."
@@ -2263,7 +2267,7 @@ exports[`output of every command, text and --json > take a slice for agent QA (a
     "pass",
     "fail"
   ],
-  "message": "You now hold slice #60 \\"QA me\\". Its step is agent QA.\\n\\nInvoke the skill: norn-auto-qa\\n\\nWhen agent QA is finished, run one of:\\n  norn done 60 pass \\"evidence\\" [--evidence <dir>]   (every criterion passed, moves to the merge queue)\\n  norn done 60 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run norn take 60 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 60\\nIf something is wrong and a person is needed, run: norn escalate 60 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #60 \\"QA me\\". Its step is agent QA.\\n\\nInvoke the skill: norn-auto-qa\\n\\nWhen agent QA is finished, run one of:\\n  norn done 60 pass \\"evidence\\" [--evidence <dir>]   (every criterion passed, moves to the merge queue)\\n  norn done 60 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run norn take 60 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 60\\nWhen you need a person, run: norn escalate 60 \\"question\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 60 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2279,6 +2283,8 @@ When agent QA is finished, run one of:
 
 On a long step, run norn take 60 again now and then: it keeps your claim fresh.
 If you have to stop, run: norn release 60
+When you need a person, run: norn escalate 60 "question" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 60 "reason"
 
 Do not change labels yourself. Only norn changes them."
@@ -2343,7 +2349,7 @@ exports[`output of every command, text and --json > take a slice for merge > jso
   "skill": "norn-merge",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #127 \\"Redis store\\". Its step is merge.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-127 (branch 123-rate-limiting-127)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n\\nInvoke the skill: norn-merge\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 127 --comments\\nMerge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.\\nThen merge the PR: gh pr merge 123-rate-limiting-127 --merge\\n\\nWhen merge is finished, run:\\n  norn done 127\\n\\nOn a long step, run norn take 127 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 127\\nIf something is wrong and a person is needed, run: norn escalate 127 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #127 \\"Redis store\\". Its step is merge.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-127 (branch 123-rate-limiting-127)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n\\nInvoke the skill: norn-merge\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 127 --comments\\nMerge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.\\nThen merge the PR: gh pr merge 123-rate-limiting-127 --merge\\n\\nWhen merge is finished, run:\\n  norn done 127\\n\\nOn a long step, run norn take 127 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 127\\nWhen you need a person, run: norn escalate 127 \\"question\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 127 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2366,6 +2372,8 @@ When merge is finished, run:
 
 On a long step, run norn take 127 again now and then: it keeps your claim fresh.
 If you have to stop, run: norn release 127
+When you need a person, run: norn escalate 127 "question" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 127 "reason"
 
 Do not change labels yourself. Only norn changes them."
@@ -2384,7 +2392,7 @@ exports[`output of every command, text and --json > take a slice for review > js
     "approve",
     "request-changes"
   ],
-  "message": "You now hold slice #128 \\"Limit headers\\". Its step is review.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-128 (branch 123-rate-limiting-128)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-128 -b 123-rate-limiting-128 origin/123-rate-limiting\\n\\nInvoke the skill: norn-review\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 128 --comments\\nSlice PR: 123-rate-limiting-128 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\n\\nWhen review is finished, run one of:\\n  norn done 128 approve                      (no requests, moves on to QA by an agent)\\n  norn done 128 request-changes \\"requests\\"   (put the requests in the note)\\n\\nOn a long step, run norn take 128 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 128\\nIf something is wrong and a person is needed, run: norn escalate 128 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #128 \\"Limit headers\\". Its step is review.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-128 (branch 123-rate-limiting-128)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-128 -b 123-rate-limiting-128 origin/123-rate-limiting\\n\\nInvoke the skill: norn-review\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 128 --comments\\nSlice PR: 123-rate-limiting-128 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\n\\nWhen review is finished, run one of:\\n  norn done 128 approve                      (no requests, moves on to QA by an agent)\\n  norn done 128 request-changes \\"requests\\"   (put the requests in the note)\\n\\nOn a long step, run norn take 128 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 128\\nWhen you need a person, run: norn escalate 128 \\"question\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 128 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2407,6 +2415,8 @@ When review is finished, run one of:
 
 On a long step, run norn take 128 again now and then: it keeps your claim fresh.
 If you have to stop, run: norn release 128
+When you need a person, run: norn escalate 128 "question" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 128 "reason"
 
 Do not change labels yourself. Only norn changes them."
@@ -2436,7 +2446,7 @@ exports[`output of every command, text and --json > take a slice with a dirty wo
   "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt has uncommitted changes, e.g. from an earlier session. Check git status there before you start.\\nBring it up to date first:\\n  git -C /repo/.agents/worktrees/123-rate-limiting-132 fetch origin 123-rate-limiting-132 && git -C /repo/.agents/worktrees/123-rate-limiting-132 merge --ff-only origin/123-rate-limiting-132\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132\\n\\nOn a long step, run norn take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt has uncommitted changes, e.g. from an earlier session. Check git status there before you start.\\nBring it up to date first:\\n  git -C /repo/.agents/worktrees/123-rate-limiting-132 fetch origin 123-rate-limiting-132 && git -C /repo/.agents/worktrees/123-rate-limiting-132 merge --ff-only origin/123-rate-limiting-132\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132\\n\\nOn a long step, run norn take 132 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 132\\nWhen you need a person, run: norn escalate 132 \\"question\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2460,6 +2470,8 @@ When implementation is finished, run:
 
 On a long step, run norn take 132 again now and then: it keeps your claim fresh.
 If you have to stop, run: norn release 132
+When you need a person, run: norn escalate 132 "question" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 132 "reason"
 
 Do not change labels yourself. Only norn changes them."
@@ -2478,7 +2490,7 @@ exports[`output of every command, text and --json > take a story for agent QA > 
     "pass",
     "fail"
   ],
-  "message": "You now hold story #61 \\"QA story\\". Its step is agent QA.\\n\\nWork in: /repo/.agents/worktrees/61-qa-story (branch 61-qa-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/61-qa-story -b 61-qa-story origin/main\\n\\nInvoke the skill: norn-auto-qa\\nSpec to work on: .agents/specs/61-qa-story/spec.md\\nStory PR: 61-qa-story into main. Diff: git diff origin/main...HEAD\\nYour note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.\\nKeep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.\\nA person QAs this after you. For what only a person can check (the slice's verifier reason), list it in the note\\nwith what you could prepare: how to run it, a URL, screenshots up to where you had to stop. Then pass.\\n\\nWhen agent QA is finished, run one of:\\n  norn done 61 pass \\"evidence\\" [--evidence <dir>]   (every criterion you could check passed; moves on to QA by a person)\\n  norn done 61 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run norn take 61 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 61\\nIf something is wrong and a person is needed, run: norn escalate 61 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold story #61 \\"QA story\\". Its step is agent QA.\\n\\nWork in: /repo/.agents/worktrees/61-qa-story (branch 61-qa-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/61-qa-story -b 61-qa-story origin/main\\n\\nInvoke the skill: norn-auto-qa\\nSpec to work on: .agents/specs/61-qa-story/spec.md\\nStory PR: 61-qa-story into main. Diff: git diff origin/main...HEAD\\nYour note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.\\nKeep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.\\nA person QAs this after you. For what only a person can check (the slice's verifier reason), list it in the note\\nwith what you could prepare: how to run it, a URL, screenshots up to where you had to stop. Then pass.\\n\\nWhen agent QA is finished, run one of:\\n  norn done 61 pass \\"evidence\\" [--evidence <dir>]   (every criterion you could check passed; moves on to QA by a person)\\n  norn done 61 fail \\"evidence\\" [--evidence <dir>]   (put the failures with their repros in the note)\\n\\nOn a long step, run norn take 61 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 61\\nWhen you need a person, run: norn escalate 61 \\"question\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 61 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2504,6 +2516,8 @@ When agent QA is finished, run one of:
 
 On a long step, run norn take 61 again now and then: it keeps your claim fresh.
 If you have to stop, run: norn release 61
+When you need a person, run: norn escalate 61 "question" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 61 "reason"
 
 Do not change labels yourself. Only norn changes them."
@@ -2625,7 +2639,7 @@ exports[`output of every command, text and --json > take a story in rework > jso
   "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold story #62 \\"Fix story\\". Its step is fixing.\\n\\nWork in: /repo/.agents/worktrees/62-fix-story (branch 62-fix-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/62-fix-story -b 62-fix-story origin/main\\n\\nInvoke the skill: norn-implement\\nSpec to work on: .agents/specs/62-fix-story/spec.md\\nThis is rework: the latest review or QA comment on #62 lists what to fix. Read the issue: gh issue view 62 --comments\\nCommit the fixes straight onto the story branch 62-fix-story and push them.\\nStory PR: 62-fix-story into main. Diff: git diff origin/main...HEAD\\n\\nWhen fixing is finished, run:\\n  norn done 62\\n\\nOn a long step, run norn take 62 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 62\\nIf something is wrong and a person is needed, run: norn escalate 62 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold story #62 \\"Fix story\\". Its step is fixing.\\n\\nWork in: /repo/.agents/worktrees/62-fix-story (branch 62-fix-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/62-fix-story -b 62-fix-story origin/main\\n\\nInvoke the skill: norn-implement\\nSpec to work on: .agents/specs/62-fix-story/spec.md\\nThis is rework: the latest review or QA comment on #62 lists what to fix. Read the issue: gh issue view 62 --comments\\nCommit the fixes straight onto the story branch 62-fix-story and push them.\\nStory PR: 62-fix-story into main. Diff: git diff origin/main...HEAD\\n\\nWhen fixing is finished, run:\\n  norn done 62\\n\\nOn a long step, run norn take 62 again now and then: it keeps your claim fresh.\\nIf you have to stop, run: norn release 62\\nWhen you need a person, run: norn escalate 62 \\"question\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 62 \\"reason\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2648,6 +2662,8 @@ When fixing is finished, run:
 
 On a long step, run norn take 62 again now and then: it keeps your claim fresh.
 If you have to stop, run: norn release 62
+When you need a person, run: norn escalate 62 "question" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 62 "reason"
 
 Do not change labels yourself. Only norn changes them."
