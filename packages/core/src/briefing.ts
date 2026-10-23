@@ -36,6 +36,8 @@ export interface Briefing {
   /** The process around the skill: what to read, where the work goes, the commands for it. Content, not formatting. */
   instructions: string[];
   finish: FinishCommand[];
+  /** How long a claim lasts after the last take before another session can take it over, see claims.staleAfter. */
+  staleAfterMs: number;
 }
 
 /**
@@ -54,6 +56,7 @@ export async function briefing(issue: Issue, step: Step, ctx: Ctx, from: string 
     workIn: loc ? await workIn(loc, ctx.workspace, ctx.github, ctx.config.provider) : null,
     instructions: named ? await flowLines(issue, step, ctx, from, named, loc) : triageLines(n),
     finish: finishCommands(n, step),
+    staleAfterMs: ctx.config.staleAfterMs,
   };
 }
 
@@ -69,7 +72,7 @@ export function finishCommands(n: number, step: Step): FinishCommand[] {
 
 /** Triage, before the issue has a flow: read it, and record what triage found before choosing its type. */
 function triageLines(n: number): string[] {
-  return [readIssueLine(n), `Unless you reject it, post what triage established on the issue first: gh issue comment ${n}`];
+  return [readIssueLine(n), `Unless you reject it, post what triage established on the issue before norn done: gh issue comment ${n} --body-file <file>`];
 }
 
 /**
@@ -81,35 +84,53 @@ async function flowLines(issue: Issue, step: Step, ctx: Ctx, from: string | null
   const n = issue.number;
   const { flow } = named;
   const readIssue = readIssueLine(n);
-  // Without the branch its workspace names, e.g. a parent, norn has nothing to say about the work.
-  if (flow.workspace !== "none" && !loc) return [];
+  // Without the branch its workspace names, norn has nothing to say about the work; a parent missing is a person's to fix.
+  if (flow.workspace !== "none" && !loc)
+    return flow.workspace === "parent"
+      ? [
+          `#${n} is not a sub-issue of another issue, so it has no parent branch, spec or PR to work on. Do not start, and do not finish with norn done: run norn escalate ${n} "<reason>"`,
+        ]
+      : [];
   // An issue with a spec of its own works from the spec; the states that write it say when to read the issue.
   const ownSpec = loc && hasSpec(flow) ? specPath(n, loc.slug) : null;
   if (step.skill === "norn-resolve") {
-    const lines = [`The latest needs-human comment gives the reason. ${readIssue}`, `Record the outcome on the issue: gh issue comment ${n}`];
+    const lines = [
+      `The latest needs-human comment gives the reason. ${readIssue}`,
+      `Record the outcome on the issue: gh issue comment ${n} --body-file <file>`,
+    ];
     if (loc && ownSpec) lines.push(`Spec changes go in ${ownSpec}; commit and push them on ${loc.branch}.`);
+    // A slice follows its parent's spec, which lives on the parent's branch, not the slice's.
+    else if (loc && flow.workspace === "parent")
+      lines.push(`Spec: ${specPath(loc.story.number, loc.slug)} (${noun(loc.story)} #${loc.story.number}). Spec changes go on ${loc.base}, not ${loc.branch}.`);
     return lines;
   }
   const state = flowStatesOf(issue, flow)[0] ?? null;
   // Work in the parent's branch follows the parent's spec.
   const spec = loc && flow.workspace === "parent" ? [`Spec: ${specPath(loc.story.number, loc.slug)} (${noun(loc.story)} #${loc.story.number})`] : [];
-  const lines = [...spec, ...(ownSpec ? [] : [readIssue]), ...(await behaviourLines({ ...inFlowOf(ctx, issue, named), state, from, step, loc }))];
+  const behaviours = await behaviourLines({ ...inFlowOf(ctx, issue, named), state, from, step, loc });
+  // A behaviour may say when to read the issue, e.g. for rework; then once is enough.
+  const read = ownSpec || behaviours.some((l) => l.includes(readIssue)) ? [] : [readIssue];
+  const lines = [...spec, ...read, ...behaviours];
   // An agent's step with evidence is QA: its note is the evidence pack.
   if (state !== null && flow.states[state].evidence && !uses(flow, state, "humanGate"))
-    lines.push(...agentQaLines(n, noun(issue), gateAhead(flow, issue, state)));
+    lines.push(...agentQaLines(n, noun(issue), gateAhead(flow, issue, state), flow.workspace === "parent"));
   return lines;
 }
 
-/** How an agent's QA reaches issue n: the note is the evidence pack; what is left goes to the person after, or escalates without one. */
-function agentQaLines(n: number, noun: string, personAfter: boolean): string[] {
+/**
+ * How an agent's QA reaches issue n: the note is the evidence pack; what is left goes to the person after, or escalates
+ * without one. A slice's verifier says why a person must look at it.
+ */
+function agentQaLines(n: number, noun: string, personAfter: boolean, slice: boolean): string[] {
   return [
     "Your note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.",
     EVIDENCE_FILES,
     ...(personAfter
       ? [
-          "A person QAs this after you. For what only a person can check (the slice's verifier reason), list it in the note",
-          "with what you could prepare: how to run it, a URL, screenshots up to where you had to stop. Then pass.",
+          `A person QAs this after you. List in the note what only a person can check${slice ? " (the slice's verifier reason)" : ""},`,
+          "with what you could prepare: how to run it, a URL, screenshots up to where you had to stop.",
+          "Those items do not fail the step on their own: pass when everything you could check passed, fail when anything did not.",
         ]
-      : [`No person checks this ${noun} after you. A criterion you cannot check is never passed: run norn escalate ${n} "reason".`]),
+      : [`No person checks this ${noun} after you. A criterion you cannot check is never passed: run norn escalate ${n} "<reason>".`]),
   ];
 }

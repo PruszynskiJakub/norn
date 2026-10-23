@@ -77,7 +77,7 @@ describe("a repository flow", () => {
     expect(res.stdout).toContain("Invoke the skill: bug-repro\n");
     expect(res.stdout).toContain("norn done 40 reproduced");
     expect(res.stdout).toContain("the bug is reproduced, moves on to the fix");
-    expect(res.stdout).toContain('norn done 40 cannot-reproduce "attempts"');
+    expect(res.stdout).toContain('norn done 40 cannot-reproduce "<attempts>"');
     expect(w.github.labels(40).sort()).toEqual(["in-progress", "reproducing", "type:bug"]);
   });
 });
@@ -462,9 +462,9 @@ describe("triage offers the flows", () => {
 
     expect(out).toContain(
       [
-        "  norn done 7 story             (a story: moves to refinement)",
-        "  norn done 7 bug               (A defect: reproduce it, fix it, close it.)",
-        '  norn done 7 reject "reason"   (closed as not planned; give the reason)',
+        "  norn done 7 story               (a story: moves to refinement)",
+        "  norn done 7 bug                 (A defect: reproduce it, fix it, close it.)",
+        '  norn done 7 reject "<reason>"   (closed as not planned; give the reason)',
       ].join("\n"),
     );
   });
@@ -766,7 +766,7 @@ describe("a repository flow named like a built-in one", () => {
     const out = (await w.norn("take", "7")).stdout;
     await w.norn("done", "7", "story");
 
-    expect(out).toContain("norn done 7 story             (Our story: write it up, then ship it.)");
+    expect(out).toContain("norn done 7 story               (Our story: write it up, then ship it.)");
     expect(w.github.labels(7).sort()).toEqual(["drafting", "type:story"]);
   });
 

@@ -106,7 +106,7 @@ async function command(cmd: string, rest: string[], flags: Record<string, string
     case "take":
       return take(ctx, n, { takeover: bools.has("takeover") });
     case "done":
-      return done(ctx, n, { word: rest[1], note: rest[2], evidenceDir: flags.evidence?.[0] });
+      return done(ctx, n, { word: rest[1], note: rest[2], noteFile: flags["note-file"]?.[0], evidenceDir: flags.evidence?.[0] });
     case "tidy":
       return tidy(ctx, bools.has("dry-run"));
     case "escalate":

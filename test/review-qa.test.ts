@@ -85,7 +85,7 @@ describe("agent QA (needs-qa)", () => {
     await w.norn("take", "131");
     const res = await w.norn("done", "131", "pass");
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain('norn done 131 pass "evidence" [--evidence <dir>]');
+    expect(res.stdout).toContain('norn done 131 pass "<evidence>" [--evidence <dir>]');
   });
 
   test("an afk slice's briefing says what cannot be checked is escalated, never passed", async () => {
@@ -93,8 +93,8 @@ describe("agent QA (needs-qa)", () => {
     w.github.seedIssue({ number: 123, title: "Rate limiting", labels: ["type:story", "implementation"] });
     w.github.parents.set(131, 123);
     const take = await w.norn("take", "131");
-    expect(take.stdout).toContain('A criterion you cannot check is never passed: run norn escalate 131 "reason".');
-    expect(take.stdout).toContain('norn done 131 pass "evidence" [--evidence <dir>]');
+    expect(take.stdout).toContain('A criterion you cannot check is never passed: run norn escalate 131 "<reason>".');
+    expect(take.stdout).toContain('norn done 131 pass "<evidence>" [--evidence <dir>]');
   });
 
   test("a hil slice's briefing says to list what is left for a person", async () => {

@@ -33,6 +33,34 @@ describe("triage", () => {
   });
 });
 
+describe("a note from a file", () => {
+  test("--note-file gives the note, so a multi-line one with quotes, $ and backticks reaches the comment as written", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 8, title: "Dark mode for the CLI" });
+    const note = 'Out of scope:\n- `npm test` says "no"\n- costs $5';
+    w.workspace.notes.set("/tmp/note.md", `${note}\n`);
+    await w.norn("take", "8");
+
+    const res = await w.norn("done", "8", "reject", "--note-file", "/tmp/note.md");
+
+    expect(res.exitCode).toBe(0);
+    expect(w.github.comments(8).at(-1)).toContain(note);
+  });
+
+  test("an empty note file is no note", async () => {
+    const w = setup();
+    w.github.seedIssue({ number: 8, title: "Dark mode for the CLI" });
+    w.workspace.notes.set("note.md", "  \n");
+    await w.norn("take", "8");
+
+    const res = await w.norn("done", "8", "reject", "--note-file", "note.md");
+
+    expect(res.exitCode).toBe(1);
+    expect(res.stdout).toContain("The outcome reject needs a note");
+    expect(w.github.claim(8)).not.toBeNull();
+  });
+});
+
 describe("done refusals", () => {
   test("done without holding the claim is refused and nothing changes", async () => {
     const w = setup();
@@ -91,7 +119,7 @@ describe("done refusals", () => {
     const res = await w.norn("done", "7", "reject");
 
     expect(res.exitCode).toBe(1);
-    expect(res.stdout).toContain('norn done 7 reject "reason"');
+    expect(res.stdout).toContain('norn done 7 reject "<reason>"');
     expect(w.github.issues.get(7)!.state).toBe("open");
   });
 });

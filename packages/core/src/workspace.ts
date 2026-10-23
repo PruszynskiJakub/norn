@@ -57,4 +57,6 @@ export interface Workspace {
    * to it; null when it is not a directory.
    */
   readEvidence(dir: string): Promise<{ path: string; content: Buffer }[] | null>;
+  /** The text of the file at `path` (relative to cwd, or absolute), e.g. a note for norn done; null when it is not a file. */
+  readNote(path: string): Promise<string | null>;
 }

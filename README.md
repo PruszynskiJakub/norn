@@ -86,7 +86,7 @@ For a guided first run in a throwaway repository, follow the [sandbox tutorial](
 | `norn init` | Set up the project: skills, agent instructions, `.agents/`, labels |
 | `norn next <story>` | What can be done on the story now |
 | `norn take <issue>` | Claim the issue and get the briefing for its step |
-| `norn done <issue> [outcome] ["note"]` | Finish the step; norn makes the transition |
+| `norn done <issue> [outcome] ["<note>"]` | Finish the step; norn makes the transition |
 | `norn status <story>` | Read-only overview of the story and its slices |
 | `norn tidy` | Remove what belongs to closed issues |
 | `norn dashboard` | Watch your work in the browser |

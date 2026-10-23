@@ -43,6 +43,10 @@ export type Refusal =
   | { kind: "evidence-not-a-directory"; dir: string }
   | { kind: "evidence-empty"; dir: string }
   | { kind: "evidence-too-big"; files: string[]; limitBytes: number }
+  /** A quoted note and --note-file both, so norn cannot tell which is the note. */
+  | { kind: "note-twice"; issue: number }
+  /** --note-file names no file. */
+  | { kind: "note-file-missing"; file: string }
   | { kind: "no-slices"; issue: number; flow: string }
   /** The step opens a PR from `head` into `base`, and there is none. */
   | { kind: "no-pr"; issue: number; head: string; base: string }

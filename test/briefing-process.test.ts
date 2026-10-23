@@ -21,7 +21,7 @@ describe("briefing carries the process", () => {
     w.github.seedIssue({ number: 7, title: "Something", labels: [] });
     const res = await w.norn("take", "7");
     expect(res.stdout).toContain("Read the issue: gh issue view 7 --comments");
-    expect(res.stdout).toContain("Unless you reject it, post what triage established on the issue first: gh issue comment 7");
+    expect(res.stdout).toContain("Unless you reject it, post what triage established on the issue before norn done: gh issue comment 7 --body-file <file>");
   });
 
   test("plan: commit and push the spec on the story branch", async () => {
@@ -31,7 +31,7 @@ describe("briefing carries the process", () => {
 
   test("slice: how to create slices and their bodies, then push the story branch", async () => {
     const res = await storyAt("needs-slicing").norn("take", "123");
-    expect(res.stdout).toContain('  norn add-slice 123 "title" --mode afk|hil [--blocked-by <slice>]...');
+    expect(res.stdout).toContain('  norn add-slice 123 "<title>" --mode afk|hil [--blocked-by <slice>]...');
     expect(res.stdout).toContain("  --mode afk when an agent can verify every criterion, hil when a person must also look at it.");
     expect(res.stdout).toContain("Then give each slice its body: gh issue edit <slice> --body-file <file>");
     expect(res.stdout).toContain("Push 123-rate-limiting once the slices exist, so slice PRs can target it.");

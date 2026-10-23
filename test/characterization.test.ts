@@ -306,7 +306,23 @@ const scenarios: Scenario[] = [
     },
     argv: ["take", "50"],
   },
+  {
+    name: "take again with a dirty worktree",
+    arrange: async (w) => {
+      story(w);
+      w.workspace.worktrees.add(".agents/worktrees/123-rate-limiting-132");
+      w.github.branches.add("123-rate-limiting-132");
+      await w.norn("take", "132");
+      w.workspace.dirty.add(".agents/worktrees/123-rate-limiting-132");
+    },
+    argv: ["take", "132"],
+  },
   { name: "take a ready slice", arrange: story, argv: ["take", "132"] },
+  {
+    name: "take a slice outside a story",
+    arrange: (w) => w.github.seedIssue({ number: 66, title: "Orphan", labels: ["type:slice", "mode:afk", "ready-for-agent"] }),
+    argv: ["take", "66"],
+  },
   {
     name: "take a slice with a dirty worktree",
     arrange: (w) => {
@@ -330,7 +346,11 @@ const scenarios: Scenario[] = [
   { name: "take a slice for human QA", arrange: story, argv: ["take", "133"] },
   {
     name: "take a slice for agent QA (afk)",
-    arrange: (w) => w.github.seedIssue({ number: 60, title: "QA me", labels: ["type:slice", "mode:afk", "needs-qa"] }),
+    arrange: (w) => {
+      story(w);
+      w.github.seedIssue({ number: 60, title: "QA me", labels: ["type:slice", "mode:afk", "needs-qa"] });
+      w.github.parents.set(60, 123);
+    },
     argv: ["take", "60"],
   },
   {
@@ -392,6 +412,23 @@ const scenarios: Scenario[] = [
       await w.norn("take", "60");
     },
     argv: ["done", "60", "fail"],
+  },
+  {
+    name: "done with a note file that is missing",
+    arrange: async (w) => {
+      w.github.seedIssue({ number: 7, title: "New" });
+      await w.norn("take", "7");
+    },
+    argv: ["done", "7", "reject", "--note-file", "nope.md"],
+  },
+  {
+    name: "done with a note and a note file",
+    arrange: async (w) => {
+      w.github.seedIssue({ number: 7, title: "New" });
+      w.workspace.notes.set("note.md", "Out of scope");
+      await w.norn("take", "7");
+    },
+    argv: ["done", "7", "reject", "Out of scope", "--note-file", "note.md"],
   },
   {
     name: "done with evidence on a step that takes none",

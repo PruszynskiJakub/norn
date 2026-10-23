@@ -4,6 +4,23 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- `norn done --note-file <file>` reads the note from a file, so an evidence pack or review requests of several lines, with quotes, `$` or backticks, reach the comment as written instead of going through a shell argument. Briefings and the missing-note refusal point to it. A note given both quoted and as a file is refused, and so is a `--note-file` that names no file.
+
+### Changed
+
+- Briefings, refusals and `norn --help` write what a command takes as a placeholder, such as `"<evidence>"`, `"<reason>"` and `"<title>"`, so an agent no longer reads `"evidence"` as the value to type. `add-slice` names its blockers `<slice>` everywhere.
+- A step that ends one way says what `norn done` does, for example `norn done 64   (clears needs-human, stays in needs-clarification)`.
+- The briefing says when the claim goes stale (`claims.staleAfter`) instead of "now and then", and `--json` carries it as `briefing.staleAfterMs`. Taking an issue you already hold says to carry on where you are, and leaves out the worktree's uncommitted changes and the command that catches it up, since they are your own work.
+- Agent QA before a person says that what only a person can check does not fail the step on its own, and names the slice's verifier only for a slice.
+- Human QA: a dropped remark goes in the note, which an outcome that needs none still takes, and the person runs "the change" rather than "the app".
+- A slice that is no sub-issue is briefed to escalate instead of getting an almost empty briefing. Resolving a slice names its parent's spec and where changes to it go.
+- Triage and resolve post their comment with `gh issue comment <n> --body-file <file>`, which needs no editor, and triage posts it before `norn done`.
+- The read-issue line appears once when a behaviour already says to read the issue, as for rework and human QA.
+- `norn done` without the claim says to stop when the step is already finished, released or escalated, instead of only to claim the issue again. Reaching the fix-round limit says not to take the issue again.
+- `norn next` labels each item's command for who runs it: `Its agent starts with` or `Take it with`. Under herdr it drops the command when the agent's prompt runs it, and offers no agent for an item whose branch is checked out elsewhere.
+
 ## [0.11.0] - 2026-10-22
 
 ### Changed

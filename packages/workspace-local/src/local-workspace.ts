@@ -147,6 +147,17 @@ export class LocalWorkspace implements Workspace {
     return files.sort((a, b) => a.path.localeCompare(b.path));
   }
 
+  async readNote(path: string) {
+    const abs = resolve(this.cwd, path);
+    try {
+      if (!(await stat(abs)).isFile()) return null;
+    } catch (e) {
+      if ((e as NodeJS.ErrnoException).code === "ENOENT") return null;
+      throw e;
+    }
+    return readFile(abs, "utf8");
+  }
+
   async removeWorktree(rel: string, provider: Provider) {
     const path = join(this.root, rel);
     if (provider === "herdr") {
