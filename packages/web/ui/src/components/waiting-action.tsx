@@ -1,6 +1,6 @@
 import type { WaitingItem } from "@norn/core";
 import { cn } from "../lib/utils.ts";
-import { answerIn } from "../wording.ts";
+import { answerIn, focusCommand } from "../wording.ts";
 import { CopyCommand } from "./copy-command.tsx";
 
 /**
@@ -12,7 +12,7 @@ export function WaitingAction({ w, className }: { w: WaitingItem; className?: st
   if (w.kind !== "agent-asks") return <CopyCommand command={w.command} />;
   return (
     <span className={cn("flex flex-col gap-1", className)}>
-      {w.focus && <CopyCommand command={w.focus} />}
+      {w.herdr && <CopyCommand command={focusCommand(w.issue)} />}
       <span className="break-all text-[12.5px] text-faint">{answerIn(w.worktree)}</span>
     </span>
   );

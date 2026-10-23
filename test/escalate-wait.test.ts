@@ -79,6 +79,16 @@ describe("norn escalate --wait", () => {
     expect(w.github.claim(42)?.session).toBe("session-1");
   });
 
+  test("a teammate's --takeover is refused: only the holder can free a waiting claim", async () => {
+    const { w } = await waiting();
+
+    const res = await w.asTeammate("bob", "bob-1")("take", "42", "--takeover");
+
+    expect(res.exitCode).toBe(1);
+    expect(w.github.claim(42)).toMatchObject({ holder: "alice", session: "session-1", waiting: { question: "Keep the old flag as an alias?" } });
+    expect(w.github.labels(42)).toContain("needs-human");
+  });
+
   test("the holder's --takeover from another session frees it into the ordinary resolve step", async () => {
     const { w } = await waiting();
 

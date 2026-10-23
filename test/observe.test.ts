@@ -133,7 +133,7 @@ describe("observe: waiting for me", () => {
     ]);
   });
 
-  test("lists an agent's question first, with since when, its worktree and, under herdr, the focus command", async () => {
+  test("lists an agent's question first, with since when, its worktree and whether it runs under herdr", async () => {
     const w = story();
     w.workspace.env = { HERDR_ENV: "1" };
     w.github.seedIssue({ number: 13, title: "Docs", labels: ["type:slice", "mode:hil", "needs-qa"], assignees: ["alice"] });
@@ -162,13 +162,13 @@ describe("observe: waiting for me", () => {
       since: "2026-10-13T12:10:00.000Z",
       holder: { login: "alice", session: "session-1", since: "2026-10-13T12:10:00.000Z", stale: false },
       worktree: "/repo/.agents/worktrees/10-rate-limiting-11",
-      focus: "herdr agent focus norn-11",
+      herdr: true,
     });
     const held = res.board[0].slices.find((s) => s.number === 11)!.holder!;
     expect(held.stale).toBe(false);
   });
 
-  test("an agent's question has no focus command outside herdr, and a question another person's agent asks is not mine", async () => {
+  test("an agent's question outside herdr says so, and a question another person's agent asks is not mine", async () => {
     const w = story();
     w.workspace.env = {};
     // My story, its question asked by bob's agent: bob answers it in his session.
@@ -190,7 +190,7 @@ describe("observe: waiting for me", () => {
         since: "2026-10-13T12:00:00.000Z",
         holder: { login: "alice", session: "session-1", since: "2026-10-13T12:00:00.000Z", stale: false },
         worktree: "/repo/.agents/worktrees/10-rate-limiting-11",
-        focus: null,
+        herdr: false,
       },
     ]);
   });

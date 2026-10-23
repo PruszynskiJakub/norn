@@ -172,3 +172,45 @@ describe("notifications of what agents ask", () => {
     });
   });
 });
+
+describe("what another person's agent asks", () => {
+  /** As story, with #133 of the same story, whose claim bob's agent holds while it waits on bob's answer. */
+  async function withTeammateAsking() {
+    const w = await story();
+    w.github.seedIssue({ number: 133, title: "Metrics", labels: ["type:slice", "mode:afk", "needs-human", "implementation"] });
+    w.github.parents.set(133, 123);
+    const asked = { question: "Which metrics?", since: "2026-10-13T12:20:00Z" };
+    w.github.claims.set(133, { holder: "bob", session: "bob-1", since: "2026-10-13T12:20:00Z", waiting: asked });
+    return w;
+  }
+
+  test("next lists it as held by another session, not as waiting on me", async () => {
+    const w = await withTeammateAsking();
+
+    const res = await w.norn("next", "123");
+    const data = JSON.parse((await w.norn("next", "123", "--json")).stdout);
+
+    expect(res.stdout).not.toContain("Which metrics?");
+    expect(res.stdout).toContain("#133 is held by another session (since 12:20).");
+    expect(data.waiting.find((x: { issue: number }) => x.issue === 133)).toMatchObject({ reason: "held" });
+  });
+
+  test("status does not list it among what agents ask me", async () => {
+    const w = await withTeammateAsking();
+
+    const res = await w.norn("status", "123");
+    const data = JSON.parse((await w.norn("status", "123", "--json")).stdout);
+
+    expect(data.asks.map((x: { issue: number }) => x.issue)).toEqual([131]);
+    expect(res.stdout).not.toContain("Which metrics?");
+    expect(res.stdout).toMatch(/#133 "Metrics" +implementation · mode:afk · needs-human · held since 12:20$/m);
+  });
+
+  test("delivery's story-waiting notification leaves it out", async () => {
+    const w = await withTeammateAsking();
+
+    await w.norn("next", "123");
+
+    expect(w.notifications.at(-1)?.body).not.toContain("#133");
+  });
+});

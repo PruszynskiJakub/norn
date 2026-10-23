@@ -269,6 +269,9 @@ export function waitingReason(w: WaitingItem, x: Item | undefined): string {
   }
 }
 
+/** The herdr command that brings the pane of the agent at work on an issue forward. */
+export const focusCommand = (n: number) => `herdr agent focus norn-${n}`;
+
 /** Where to answer an agent that asks: in its session, which works in the worktree when the item has one. */
 export function answerIn(worktree: string | null): string {
   return worktree ? `Answer in the agent's session, in ${worktree}.` : "Answer in the agent's session.";

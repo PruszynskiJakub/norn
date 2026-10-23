@@ -196,9 +196,10 @@ async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, named:
     return;
   }
   // An agent waits in its session on a person's answer: whatever else holds the item, the person answers first.
+  // Another person's agent asks them, in their session: for the user it is held, as any item of theirs.
   const asks = await agentAsks(ctx, issue, flow);
-  if (asks) {
-    report.waiting.push(asks);
+  if (asks?.reason === "agent-asks") {
+    report.waiting.push(asks.holder.mine ? asks : { issue: n, reason: "held", holder: asks.holder });
     return;
   }
   if (issue.labels.includes("needs-human")) {

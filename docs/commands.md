@@ -226,7 +226,7 @@ npx norn escalate <issue> "reason" [--wait]
 
 Sets `needs-human` with the reason as a comment, notifies you and releases the claim. A person clears it with `norn-drive <issue>`, which runs the `norn-resolve` skill.
 
-With `--wait`, the reason is a question and the session keeps its claim, marked as waiting on a person: a [waiting claim](../CONTEXT.md). The comment says `asked: "<question>"`, and the notification is the same. You answer in the agent's own session; if you answered on the issue, tell the agent. The agent then records the answer with [`norn resume`](#norn-resume) and carries on in the same step, with its context intact.
+With `--wait`, the reason is a question and the session keeps its claim, marked as waiting on a person: a [waiting claim](../CONTEXT.md). The comment says `asked: "<question>"`, and the notification says an agent asks you: it gives the question, how to reach the agent (its worktree and, under herdr, the command that focuses its pane) and the issue link. You answer in the agent's own session; if you answered on the issue, tell the agent. The agent then records the answer with [`norn resume`](#norn-resume) and carries on in the same step, with its context intact.
 
 A waiting claim never goes stale, so no other session takes it over however long it waits. While it waits, `norn done`, another `norn escalate` and `norn take` from the same session are refused until it resumes. `norn release` still gives the item up; it then keeps `needs-human` for the resolve step, as after a plain escalate. If the waiting session died, `norn take <issue> --takeover` from another session of yours frees it, into the same resolve step.
 

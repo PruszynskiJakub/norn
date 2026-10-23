@@ -80,8 +80,8 @@ export type WaitingItem = {
       holder: ClaimHolder;
       /** Absolute path of the agent's worktree; null when the item has none. */
       worktree: string | null;
-      /** Under herdr, the command that brings the agent's pane forward; null elsewhere. */
-      focus: string | null;
+      /** Whether the agent runs under herdr, where its pane can be brought forward. */
+      herdr: boolean;
     }
 );
 
@@ -205,7 +205,7 @@ export async function observe(given: Ctx, opts: { since?: string | null; previou
         since: new Date(asked.since).toISOString(),
         holder: holder(i.number)!,
         worktree: branch ? join(ctx.workspace.root, worktreePath(branch)) : null,
-        focus: ctx.config.provider === "herdr" ? `herdr agent focus norn-${i.number}` : null,
+        herdr: ctx.config.provider === "herdr",
       });
     }
   }

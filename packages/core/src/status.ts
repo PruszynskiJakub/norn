@@ -18,7 +18,7 @@ export interface Row {
   mode: "afk" | "hil" | null;
   blockedBy: number[];
   needsHuman: boolean;
-  /** The agent holding it waits on a person's answer; `asks` on the result says what it asked. */
+  /** The user's own agent holding it waits on their answer; `asks` on the result says what it asked. */
   agentAsks: boolean;
   heldSince: string | null;
   stale: boolean;
@@ -52,7 +52,8 @@ export async function status(ctx: Ctx, n: number): Promise<StatusResult> {
   for (const i of [story, ...slices]) {
     if (i.state !== "open") continue;
     const item = await agentAsks(ctx, i, i === story ? flow : validFlow(await flowOf(ctx, i)));
-    if (item) asks.push(item);
+    // Another person's agent asks them, not the user.
+    if (item?.reason === "agent-asks" && item.holder.mine) asks.push(item);
   }
   return {
     ok: true,
@@ -83,7 +84,7 @@ async function row(ctx: Ctx, issue: Issue, now: Date, staleAfterMs: number): Pro
     mode: issue.labels.includes("mode:hil") ? "hil" : issue.labels.includes("mode:afk") ? "afk" : null,
     blockedBy: blockers.filter((b) => b.state === "open").map((b) => b.number),
     needsHuman: issue.labels.includes("needs-human"),
-    agentAsks: claim?.waiting !== undefined,
+    agentAsks: claim?.waiting !== undefined && claim.holder === (await github.currentUser()),
     heldSince: claim?.since ?? null,
     stale: claim ? isStale(claim, now, staleAfterMs) : false,
   };
