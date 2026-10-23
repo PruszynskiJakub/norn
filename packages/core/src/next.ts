@@ -2,9 +2,9 @@ import { isStale } from "./claims.js";
 import type { Event } from "./events.js";
 import { send } from "./notify.js";
 import { join } from "node:path";
-import { branchAt, createWorktreeCommand, locate } from "./location.js";
+import { agentPlace, branchAt, createWorktreeCommand, locate } from "./location.js";
 import { isWithin, type Provider } from "./workspace.js";
-import type { GitHub, Issue } from "./github.js";
+import type { ClaimRecord, GitHub, Issue } from "./github.js";
 import type { NextRefusal } from "./refusals.js";
 import { gateOf, heldInput, heldWaiting, holds, inFlowOf, needsBranch, reconcileState, releaseBlocked, slicesOf } from "./behaviours.js";
 import { type Flow, flowStatesOf, flowStep, type NamedFlow, usedIn, uses } from "./flow.js";
@@ -160,6 +160,8 @@ export async function computeNext(ctx: Ctx, n: number, loaded: LoadedFlow): Prom
     if (slice.state !== "open") continue;
     await classify(ctx, slice, report);
   }
+  // What agents ask a person comes first among what waits.
+  report.waiting.sort((a, b) => Number(b.reason === "agent-asks") - Number(a.reason === "agent-asks"));
   report.nothingLeft = report.start.length === 0 && !report.waiting.some((w) => w.reason === "held");
   report.running = report.waiting.filter((w) => w.reason === "held" && w.holder.mine).length;
   report.slots = Math.max(0, ctx.config.maxParallel - report.running);
@@ -191,6 +193,12 @@ async function classifyInFlow(ctx: Ctx, issue: Issue, report: NextReport, named:
   const states = flowStatesOf(issue, flow);
   if (states.length > 1) {
     report.waiting.push({ issue: n, reason: "ambiguous-state", states });
+    return;
+  }
+  // An agent waits in its session on a person's answer: whatever else holds the item, the person answers first.
+  const asks = await agentAsks(ctx, issue, flow);
+  if (asks) {
+    report.waiting.push(asks);
     return;
   }
   if (issue.labels.includes("needs-human")) {
@@ -289,8 +297,28 @@ async function place(ctx: Ctx, issue: Issue, flow: Flow | null = null) {
 async function heldBy(ctx: Ctx, n: number): Promise<Holder | null> {
   const claim = await ctx.github.readClaim(n);
   if (!claim || isStale(claim, ctx.now(), ctx.config.staleAfterMs)) return null;
+  return holderOf(ctx, claim);
+}
+
+async function holderOf(ctx: Ctx, claim: ClaimRecord): Promise<Holder> {
   const mine = claim.holder === (await ctx.github.currentUser());
   return { session: claim.session === ctx.session ? "this" : mine ? "yours" : "other", mine, since: claim.since };
+}
+
+/** The question the agent holding an item asked a person, when its claim waits on one; else null. */
+export async function agentAsks(ctx: Ctx, issue: Issue, flow: Flow | null): Promise<WaitItem | null> {
+  const claim = await ctx.github.readClaim(issue.number);
+  if (!claim?.waiting) return null;
+  const { question, since } = claim.waiting;
+  return {
+    issue: issue.number,
+    reason: "agent-asks",
+    question,
+    since,
+    waitedMs: ctx.now().getTime() - new Date(since).getTime(),
+    holder: await holderOf(ctx, claim),
+    ...(await agentPlace(issue, ctx, flow)),
+  };
 }
 
 /**
@@ -306,7 +334,16 @@ async function humanWork(ctx: Ctx, issue: Issue, flow: Flow | null = null): Prom
 }
 
 /** Waiting items only a person can move on. */
-export const FOR_HUMAN: WaitItem["reason"][] = ["needs-human", "human-qa", "owner-merge", "no-state", "ambiguous-state", "state-left", "flow-invalid"];
+export const FOR_HUMAN: WaitItem["reason"][] = [
+  "agent-asks",
+  "needs-human",
+  "human-qa",
+  "owner-merge",
+  "no-state",
+  "ambiguous-state",
+  "state-left",
+  "flow-invalid",
+];
 
 /** Why next refuses the issue, of `loaded` flow: one with no flow yet, or one that works in its parent's branch, which moves on with it. */
 export async function nextRefusal(github: GitHub, issue: Issue, loaded: LoadedFlow | null): Promise<NextRefusal | null> {
@@ -315,7 +352,7 @@ export async function nextRefusal(github: GitHub, issue: Issue, loaded: LoadedFl
   return loaded ? null : { kind: "not-a-story", issue: n };
 }
 
-/** What waits for a person that no session holds. */
+/** What waits for a person that no session holds, and what agents ask a person although they hold it. */
 function toNotify(r: NextReport) {
   return r.waiting.filter((w) => FOR_HUMAN.includes(w.reason) && !("heldBy" in w && w.heldBy));
 }

@@ -8,6 +8,7 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 - `norn escalate <issue> "question" --wait`: an agent asks a person and keeps its claim, marked as waiting on them. It sets `needs-human`, comments `asked: "<question>"` and notifies you as escalate does. A waiting claim never goes stale; while it waits, `done`, `escalate` and `take` from the same session are refused, `release` gives the item up, and `take --takeover` from another of your sessions frees a dead one into the resolve step. Without `--wait`, escalate is unchanged.
 - `norn resume <issue> "answer"`: records the answer to `escalate --wait` as a `needs-human answered` comment, clears `needs-human`, puts `in-progress` back and refreshes the claim, so the agent carries on in the same step.
+- What agents ask with `escalate --wait` is listed first in `norn next` and `norn status`, as `agent-asks` in `--json`: the question, how long it has waited, the agent's worktree and, under herdr, `herdr agent focus norn-<issue>`, never with a take command or as stale. `escalate --wait` sends an `agent-asks` notification with the question and how to reach the agent, and the nothing-left notification lists what agents ask although a session holds it.
 - Briefings of unattended steps, and the norn-deliver skill, tell the agent to ask a person with `norn escalate <issue> "question" --wait` and wait in its session, never ending a turn on a question. Attended briefings are unchanged, and plain `escalate` stays in every briefing.
 
 ## [0.10.1] - 2026-10-17
