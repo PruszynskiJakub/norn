@@ -2,6 +2,7 @@ import type { ConfigWarning, Refusal, Row, WaitItem } from "@norn/core";
 import {
   type Answer,
   type CliRefusal,
+  focusCommand,
   holderText,
   unreachable,
   renderAnswer,
@@ -94,7 +95,8 @@ function wait(w: WaitItem) {
   const base = { issue: w.issue, reason: w.reason, detail: waitDetail(w) };
   if (w.reason === "held") return { ...base, mine: w.holder.mine };
   if (w.reason === "agent-asks") {
-    const { question, since, waitedMs, worktree, focus } = w;
+    const { question, since, waitedMs, worktree } = w;
+    const focus = w.herdr ? focusCommand(w.issue) : null;
     return { ...base, question, since, waitedMs, heldBy: holderText(w.holder), mine: w.holder.mine, worktree, focus };
   }
   if (w.reason !== "needs-human" && w.reason !== "human-qa") return base;

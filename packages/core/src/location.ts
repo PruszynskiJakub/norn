@@ -43,7 +43,7 @@ export async function locate(
   return null;
 }
 
-/** Where a person reaches the agent at work on an issue: its worktree and, under herdr, how to focus its pane. */
+/** Where a person reaches the agent at work on an issue: its worktree, and whether it runs under herdr. */
 export async function agentPlace(
   issue: Issue,
   ctx: { github: GitHub; slugs: Slugs; config: { baseBranch: string; provider: Provider }; workspace: { root: string } },
@@ -52,7 +52,7 @@ export async function agentPlace(
   const loc = await locate(issue, ctx, flow);
   return {
     worktree: loc ? join(ctx.workspace.root, loc.worktree) : null,
-    focus: ctx.config.provider === "herdr" ? `herdr agent focus norn-${issue.number}` : null,
+    herdr: ctx.config.provider === "herdr",
   };
 }
 

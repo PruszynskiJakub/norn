@@ -163,8 +163,7 @@ export async function computeNext(ctx: Ctx, n: number, loaded: LoadedFlow): Prom
   // What agents ask a person comes first among what waits.
   report.waiting.sort((a, b) => Number(b.reason === "agent-asks") - Number(a.reason === "agent-asks"));
   report.nothingLeft = report.start.length === 0 && !report.waiting.some((w) => w.reason === "held");
-  // An agent that waits on a person still holds its session, so it counts against the parallel limit.
-  report.running = report.waiting.filter((w) => (w.reason === "held" || w.reason === "agent-asks") && w.holder.mine).length;
+  report.running = report.waiting.filter((w) => w.reason === "held" && w.holder.mine).length;
   report.slots = Math.max(0, ctx.config.maxParallel - report.running);
   // A person already at work on everything waiting for one needs no notice.
   report.notified &&= toNotify(report).length > 0 || !report.waiting.some((w) => "heldBy" in w && w.heldBy);

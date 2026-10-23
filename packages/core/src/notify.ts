@@ -14,7 +14,7 @@ export interface Gate {
 export type Notification =
   /** `reason` is the needs-human reason norn recorded on the issue, as written there. */
   | { kind: "needs-human"; issue: number; reason: string; url: string }
-  /** The agent holding the issue asked a person `question` and waits in its session, reached at `worktree` or with `focus`. */
+  /** The agent holding the issue asked a person `question` and waits in its session, reached at `worktree` or, under `herdr`, by focusing its pane. */
   | ({ kind: "agent-asks"; issue: number; question: string; url: string } & AgentPlace)
   /** The issue was in `state`, which the flow `flow` no longer has, so norn set needs-human on it. */
   | { kind: "state-left"; issue: number; state: string; flow: string; url: string }

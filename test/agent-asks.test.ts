@@ -147,6 +147,16 @@ describe("notifications of what agents ask", () => {
     });
   });
 
+  test("other providers give the worktree and no focus command", async () => {
+    const w = await story();
+
+    expect(w.notifications.at(-1)).toEqual({
+      channel: "os",
+      title: "norn: an agent on #131 asks you",
+      body: `Keep the old flag\nas an alias?\nAnswer in its session: worktree ${WORKTREE}\nhttps://github.com/acme/app/issues/131`,
+    });
+  });
+
   test("delivery's story-waiting notification lists the question although a session holds the item", async () => {
     const w = await story();
 

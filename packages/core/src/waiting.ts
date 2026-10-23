@@ -24,10 +24,10 @@ export interface HumanPlace {
   heldBy?: Holder;
 }
 
-/** Where a person reaches the agent that holds an item: its worktree and, under herdr only, the command that focuses its pane. */
+/** Where a person reaches the agent that holds an item: its worktree, and whether it runs under herdr, where its pane can be focused. */
 export interface AgentPlace {
   worktree: string | null;
-  focus: string | null;
+  herdr: boolean;
 }
 
 export type WaitItem = { issue: number } & (

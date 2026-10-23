@@ -969,14 +969,17 @@ export function waited(ms: number) {
   return h % 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h / 24}d`;
 }
 
+/** The herdr command that focuses the pane of the agent at work on an issue. */
+export const focusCommand = (n: number) => `herdr agent focus norn-${n}`;
+
 /** How a person reaches the agent that waits on them: its worktree and, under herdr, the command that focuses it. */
-const reachText = (p: AgentPlace) => [...(p.worktree ? [`worktree ${p.worktree}`] : []), ...(p.focus ? [p.focus] : [])].join(", ");
+const reachText = (n: number, p: AgentPlace) => [...(p.worktree ? [`worktree ${p.worktree}`] : []), ...(p.herdr ? [focusCommand(n)] : [])].join(", ");
 
 /** What an item waits on, as said after its number. */
 export function waitDetail(w: WaitItem): string {
   switch (w.reason) {
     case "agent-asks": {
-      const reach = reachText(w);
+      const reach = reachText(w.issue, w);
       return `waits on you, an agent asked (${waited(w.waitedMs)}): ${w.question.replace(/\s+/g, " ").trim()}${reach ? ` — ${reach}` : ""}`;
     }
     case "blocked":
@@ -1015,7 +1018,7 @@ function humanHandOff(w: WaitItem): string[] {
     ...(w.createWorktree ? [`      Create the worktree: ${w.createWorktree}`] : []),
     `      herdr agent start norn-${w.issue} --kind claude --pane <pane of ${w.worktree}>`,
     `      herdr agent prompt norn-${w.issue} "norn-drive ${w.issue}"`,
-    `      herdr agent focus norn-${w.issue}`,
+    `      ${focusCommand(w.issue)}`,
   ];
 }
 
@@ -1127,7 +1130,7 @@ export function renderNext(r: NextReport): string {
             `    Hand the ${r.flow} to an agent in its worktree, which drives it on with the user:`,
             `      ${start}`,
             `      herdr agent prompt norn-${s.issue} "norn-drive ${r.issue}"`,
-            `      herdr agent focus norn-${s.issue}`,
+            `      ${focusCommand(s.issue)}`,
           );
         }
       }
@@ -1154,7 +1157,7 @@ export function renderNotification(n: Notification): { title: string; body: stri
     case "needs-human":
       return { title: `norn: #${n.issue} needs you`, body: `${n.reason}\n${n.url}` };
     case "agent-asks": {
-      const reach = reachText(n);
+      const reach = reachText(n.issue, n);
       return { title: `norn: an agent on #${n.issue} asks you`, body: `${n.question}\nAnswer in its session${reach ? `: ${reach}` : ""}\n${n.url}` };
     }
     case "needs-human-qa":
