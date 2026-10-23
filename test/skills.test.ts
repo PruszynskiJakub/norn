@@ -37,6 +37,11 @@ describe("the norn-deliver skill matches what norn next says", () => {
     expect(md).not.toContain("norn has already notified the user of anything waiting for them.");
     expect(md).toContain("if notifications are off it says nothing about it");
   });
+
+  test("it asks a person as the unattended briefings do", () => {
+    const md = readFileSync(join(BUNDLED_SKILLS, "norn-deliver", "SKILL.md"), "utf8");
+    expect(md).toContain('run `norn escalate <issue> "question" --wait` and wait for the answer in this session; never end a turn on a question.');
+  });
 });
 
 describe("the process skills hint at what they take", () => {
