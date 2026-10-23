@@ -1,3 +1,0 @@
-$ NORN_SESSION=qaZ nb resume 93 not mine
-#93 is held by another session (since 09:11). Do not work on it or finish it.
-[exit 1]

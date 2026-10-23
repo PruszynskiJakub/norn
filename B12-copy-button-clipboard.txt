@@ -1,0 +1,4 @@
+$ pbpaste  # after clicking copy on the #97 card
+sbx run claude … -- auth login
+$ pbpaste  # after the second click on copy on the #97 card
+herdr agent focus norn-97

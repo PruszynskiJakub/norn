@@ -1,9 +1,0 @@
-local config: {"claims":{"staleAfter":"1m"}}
-$ NORN_SESSION=qaA nb escalate 93 Should the alias warn on use? --wait
-norn warning:
-  .agents/norn.config.local.json: claims.staleAfter is shared by the team, so norn ignores it here; set it in .agents/norn.config.json
-
-#93 now needs a human, and you keep the claim, waiting on a person.
-Wait in this session for the answer; do not end your turn. Once answered, run: norn resume 93 "<answer>"
-[exit 0]
-09:18:24
