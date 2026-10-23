@@ -33,7 +33,7 @@ export function Hero() {
               select(w.issue);
             }
           }}
-          className="mb-2.5 grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 rounded-[14px] border border-border bg-card px-[18px] py-4 transition-[border-color,box-shadow] hover:border-faint hover:shadow-[0_2px_10px_rgba(0,0,0,.04)]"
+          className="mb-2.5 grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-1 rounded-[14px] border border-border bg-card px-[18px] py-4 transition-[border-color,box-shadow] hover:border-faint hover:shadow-[0_2px_10px_rgba(0,0,0,.04)]"
         >
           <div className="font-medium text-[15.5px]">{w.title}</div>
           <div className="col-start-1 whitespace-pre-line text-[14px] text-muted-foreground">{waitingReason(w, item(w.issue))}</div>
@@ -42,8 +42,10 @@ export function Hero() {
               {waitingKind(w)}
               {w.since && ` · ${ago(w.since, now)}`}
             </span>
-            <WaitingAction w={w} className="items-end text-right" />
+            {w.kind !== "agent-asks" && <WaitingAction w={w} />}
           </div>
+          {/* The worktree path is long: below the question it takes the card's width, not the title's. */}
+          {w.kind === "agent-asks" && <WaitingAction w={w} className="col-span-2 mt-1.5 items-start" />}
         </div>
       ))}
       {(quiet.length > 0 || close.length > 0) && (
