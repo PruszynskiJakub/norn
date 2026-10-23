@@ -4,6 +4,8 @@ import { flowNameOf, flowStatesOf, usedIn } from "./flow.js";
 import { flowOf, validFlow } from "./flow-loading.js";
 import type { Issue } from "./github.js";
 import { locate } from "./location.js";
+import { agentAsks } from "./next.js";
+import type { WaitItem } from "./waiting.js";
 import type { Ctx } from "./transitions.js";
 
 export interface Row {
@@ -16,6 +18,8 @@ export interface Row {
   mode: "afk" | "hil" | null;
   blockedBy: number[];
   needsHuman: boolean;
+  /** The agent holding it waits on a person's answer; `asks` on the result says what it asked. */
+  agentAsks: boolean;
   heldSince: string | null;
   stale: boolean;
 }
@@ -29,6 +33,8 @@ export interface StatusResult {
    */
   story: Row & { flow: string | null; owner: string | null; branch: string | null; makesSlices: boolean };
   slices: Row[];
+  /** What agents holding the issue or its slices ask a person, listed first: items of reason agent-asks. */
+  asks: WaitItem[];
 }
 
 /** Read-only overview. Makes no changes. */
@@ -42,6 +48,12 @@ export async function status(ctx: Ctx, n: number): Promise<StatusResult> {
   const rows: Row[] = [];
   for (const s of slices) rows.push(await row(ctx, s, now, staleAfterMs));
   const head = await row(ctx, story, now, staleAfterMs);
+  const asks: WaitItem[] = [];
+  for (const i of [story, ...slices]) {
+    if (i.state !== "open") continue;
+    const item = await agentAsks(ctx, i, i === story ? flow : validFlow(await flowOf(ctx, i)));
+    if (item) asks.push(item);
+  }
   return {
     ok: true,
     kind: "status",
@@ -53,6 +65,7 @@ export async function status(ctx: Ctx, n: number): Promise<StatusResult> {
       makesSlices: flow !== null && usedIn(flow, "slices"),
     },
     slices: rows,
+    asks,
   };
 }
 
@@ -70,6 +83,7 @@ async function row(ctx: Ctx, issue: Issue, now: Date, staleAfterMs: number): Pro
     mode: issue.labels.includes("mode:hil") ? "hil" : issue.labels.includes("mode:afk") ? "afk" : null,
     blockedBy: blockers.filter((b) => b.state === "open").map((b) => b.number),
     needsHuman: issue.labels.includes("needs-human"),
+    agentAsks: claim?.waiting !== undefined,
     heldSince: claim?.since ?? null,
     stale: claim ? isStale(claim, now, staleAfterMs) : false,
   };

@@ -18,10 +18,10 @@ import type { Event } from "./events.js";
 import { flowStatesOf, flowStep, type NamedFlow, offerFlows, passThrough, usedIn, uses } from "./flow.js";
 import { flowOf, loadFlow, triageFlows } from "./flow-loading.js";
 import type { ClaimRecord, HeldClaim, Issue } from "./github.js";
-import { locate } from "./location.js";
+import { agentPlace, locate } from "./location.js";
 import { type Step, TRIAGE } from "./machine.js";
 import { computeNext, type NextReport, nextRefusal, notifyWaiting } from "./next.js";
-import { notifyNeedsHuman } from "./notify.js";
+import { notifyAgentAsks, notifyNeedsHuman } from "./notify.js";
 import { type Refusal, type Refused, refuse } from "./refusals.js";
 import { storySlug } from "./slug.js";
 import { qaBranch } from "./tidy.js";
@@ -356,8 +356,14 @@ export async function escalate(ctx: Ctx, n: number, reason: string | undefined, 
   const why = `${wait ? "asked" : "escalated"}: "${oneLine(reason)}"`;
   // The full reason keeps its line breaks in its own paragraph; the marker line stays single-line.
   await github.comment(n, [needsHumanLine(why), ...(reason.includes("\n") ? ["", reason] : [])].join("\n"));
-  await notifyNeedsHuman(ctx, n, why);
-  if (!wait) await github.deleteClaim(n);
+  if (wait) {
+    const issue = await github.getIssue(n);
+    const of = await flowOf(ctx, issue);
+    await notifyAgentAsks(ctx, n, reason, await agentPlace(issue, ctx, of?.ok ? of.flow : null));
+  } else {
+    await notifyNeedsHuman(ctx, n, why);
+    await github.deleteClaim(n);
+  }
   return { ok: true, kind: "escalated", issue: n, waiting: wait };
 }
 

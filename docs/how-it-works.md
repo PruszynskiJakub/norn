@@ -206,7 +206,7 @@ A claim is a git ref, `refs/norn/claims/<issue>`, created on GitHub in one step 
 - **Held for the whole step**, for example all of implement on a slice, and released on handing over to the next state. A person's step is claimed too.
 - **Refreshing.** `norn take` on an issue the same session already holds re-briefs it and moves the claim's time forward. Long steps re-run it so a slow session is not mistaken for a crashed one.
 - **Stale claims.** A claim older than `claims.staleAfter` (default 2h) is treated as abandoned, and one session can take it over. Its worktree is kept: the next holder is told to check `git status` there before starting. A [waiting claim](../CONTEXT.md) never goes stale.
-- **Waiting on a person.** `norn escalate <issue> "question" --wait` sets `needs-human` but keeps the claim, marked waiting with the question, and the agent waits in its session for the answer. Until then `norn done`, another `norn escalate` and `norn take` from that session are refused. `norn resume <issue> "answer"` records the answer on the issue, clears `needs-human` and refreshes the claim in the same session, so the step carries on without a new take. `norn release` gives the item up instead, leaving `needs-human` for the resolve step.
+- **Waiting on a person.** `norn escalate <issue> "question" --wait` sets `needs-human` but keeps the claim, marked waiting with the question, and the agent waits in its session for the answer. Until then `norn done`, another `norn escalate` and `norn take` from that session are refused. `norn resume <issue> "answer"` records the answer on the issue, clears `needs-human` and refreshes the claim in the same session, so the step carries on without a new take. `norn release` gives the item up instead, leaving `needs-human` for the resolve step. `norn next` and `norn status` list what agents ask first, under "Agents wait on your answer", with the question, how long it has waited, the agent's worktree and, under herdr, `herdr agent focus norn-<issue>`; never with a take command, and never as stale.
 - **Your own stopped session.** `norn take <issue> --takeover` takes over a claim of the same GitHub user at any age. It never takes a teammate's claim.
 
 **Which session holds a claim.** norn keeps no state, so it tells sessions apart by their environment: `NORN_SESSION`, else `CLAUDE_CODE_SESSION_ID`, else the herdr pane (`HERDR_PANE_ID`), else host and repository root. Under the git provider, `norn next` gives each agent its own `NORN_SESSION`.
@@ -245,9 +245,10 @@ Stop here and report to the user. norn has already notified them.
 norn sends local notifications itself, so they fire whatever agent tool is in use:
 
 - when it sets `needs-human`, or an item reaches `needs-human-qa`;
-- when `norn next` finds nothing left to do, with a summary of what is waiting. Items a session already holds are left out.
+- when an agent asks with `norn escalate --wait`: the question, the agent's worktree and, under herdr, `herdr agent focus norn-<issue>`;
+- when `norn next` finds nothing left to do, with a summary of what is waiting. Items a session already holds are left out, except what agents ask.
 
-The title says who must act on what (`norn: #131 needs you`); the body gives the reason and the issue link. Where they go is set per developer; see [configuration](configuration.md#notifications).
+The title says who must act on what (`norn: #131 needs you`, or `norn: an agent on #131 asks you`); the body gives the reason and the issue link. Where they go is set per developer; see [configuration](configuration.md#notifications).
 
 ## Artifacts
 

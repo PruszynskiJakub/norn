@@ -110,12 +110,14 @@ exports[`output of every command, text and --json > config warnings before the a
     "mode": null,
     "blockedBy": [],
     "needsHuman": false,
+    "agentAsks": false,
     "heldSince": null,
     "stale": false,
     "owner": null,
     "branch": "1-a-story"
   },
   "slices": [],
+  "asks": [],
   "message": "Story #1 \\"A story\\": needs-plan · owner none · branch 1-a-story\\nNo slices yet.",
   "warnings": [
     ".agents/norn.config.json: claims.staleAfter 1m is below the 10m minimum, so norn uses 10m; shorter, and live claims get taken over",
@@ -1972,6 +1974,7 @@ exports[`output of every command, text and --json > status of a story with slice
     "mode": null,
     "blockedBy": [],
     "needsHuman": false,
+    "agentAsks": false,
     "heldSince": null,
     "stale": false,
     "owner": "alice",
@@ -1985,6 +1988,7 @@ exports[`output of every command, text and --json > status of a story with slice
       "mode": "afk",
       "blockedBy": [],
       "needsHuman": false,
+      "agentAsks": false,
       "heldSince": null,
       "stale": false
     },
@@ -1995,6 +1999,7 @@ exports[`output of every command, text and --json > status of a story with slice
       "mode": "hil",
       "blockedBy": [],
       "needsHuman": true,
+      "agentAsks": false,
       "heldSince": "2026-10-13T09:00:00Z",
       "stale": true
     },
@@ -2007,6 +2012,7 @@ exports[`output of every command, text and --json > status of a story with slice
         127
       ],
       "needsHuman": false,
+      "agentAsks": false,
       "heldSince": null,
       "stale": false
     },
@@ -2017,6 +2023,7 @@ exports[`output of every command, text and --json > status of a story with slice
       "mode": "afk",
       "blockedBy": [],
       "needsHuman": false,
+      "agentAsks": false,
       "heldSince": "2026-10-13T11:30:00Z",
       "stale": false
     },
@@ -2027,6 +2034,7 @@ exports[`output of every command, text and --json > status of a story with slice
       "mode": "hil",
       "blockedBy": [],
       "needsHuman": false,
+      "agentAsks": false,
       "heldSince": null,
       "stale": false
     },
@@ -2037,10 +2045,12 @@ exports[`output of every command, text and --json > status of a story with slice
       "mode": "afk",
       "blockedBy": [],
       "needsHuman": false,
+      "agentAsks": false,
       "heldSince": null,
       "stale": false
     }
   ],
+  "asks": [],
   "message": "Story #123 \\"Rate limiting\\": implementation · owner @alice · branch 123-rate-limiting\\nSlices (1 of 6 merged):\\n  #127 \\"Redis store\\"      merge-queue · mode:afk\\n  #128 \\"Limit headers\\"    needs-review · mode:hil · needs-human · held since 09:00 (stale)\\n  #131 \\"Per-key limits\\"   blocked by #127 · mode:afk\\n  #132 \\"Docs\\"             ready-for-agent · mode:afk · held since 11:30\\n  #133 \\"Metrics\\"          needs-human-qa · mode:hil\\n  #134 \\"Old\\"              merged"
 }"
 `;
@@ -2068,12 +2078,14 @@ exports[`output of every command, text and --json > status of a story without sl
     "mode": null,
     "blockedBy": [],
     "needsHuman": false,
+    "agentAsks": false,
     "heldSince": null,
     "stale": false,
     "owner": "alice",
     "branch": "50-search"
   },
   "slices": [],
+  "asks": [],
   "message": "Story #50 \\"Search\\": needs-slicing · owner @alice · branch 50-search\\nNo slices yet."
 }"
 `;
@@ -2095,12 +2107,14 @@ exports[`output of every command, text and --json > status with two state labels
     "mode": null,
     "blockedBy": [],
     "needsHuman": false,
+    "agentAsks": false,
     "heldSince": null,
     "stale": false,
     "owner": null,
     "branch": "9-twice"
   },
   "slices": [],
+  "asks": [],
   "message": "Story #9 \\"Twice\\": needs-plan + needs-slicing (more than one state label) · owner none · branch 9-twice\\nNo slices yet."
 }"
 `;

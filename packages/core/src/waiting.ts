@@ -24,8 +24,16 @@ export interface HumanPlace {
   heldBy?: Holder;
 }
 
+/** Where a person reaches the agent that holds an item: its worktree and, under herdr only, the command that focuses its pane. */
+export interface AgentPlace {
+  worktree: string | null;
+  focus: string | null;
+}
+
 export type WaitItem = { issue: number } & (
   | { reason: "blocked"; blockers: number[] }
+  /** Its agent asked a person `question` with escalate --wait at `since`, `waitedMs` ago, and waits in its session for the answer. */
+  | ({ reason: "agent-asks"; question: string; since: string; waitedMs: number; holder: Holder } & AgentPlace)
   /** `why` is the reason norn recorded when it set needs-human, as written; null when none is found. */
   | ({ reason: "needs-human"; why: string | null } & HumanPlace)
   /** A person QAs it at `gate`. */

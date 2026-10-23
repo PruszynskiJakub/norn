@@ -46,7 +46,7 @@ It ends by suggesting `norn doctor`, which checks what `init` cannot set up.
 npx norn next <story>
 ```
 
-Lists what can be done on the story now, each item with the command that starts it, and what is waiting and why. It is the entry point for `norn-deliver`. On an issue of a [repository flow](flows.md) it lists the issue itself: for a person at a human gate, else to start, attended as its state says.
+Lists what can be done on the story now, each item with the command that starts it, and what is waiting and why. What agents ask a person with `escalate --wait` comes first, under "Agents wait on your answer", with the question, how long it has waited and how to reach the agent; `--json` gives it as `reason: "agent-asks"`. It is the entry point for `norn-deliver`. On an issue of a [repository flow](flows.md) it lists the issue itself: for a person at a human gate, else to start, attended as its state says.
 
 ```text
 Story #123 "Rate limiting" is in implementation. 2 of 7 slices are merged
@@ -132,7 +132,7 @@ Follow-ups after the transition (story branch, unblocking slices, story PR, `nee
 npx norn status <story>
 ```
 
-A read-only overview of the issue and its slices: its owner and, when its flow gives it one, its branch, and for each item its state, mode, open blockers, `needs-human` and whether a claim holds it (and whether that claim is stale). An issue whose flow has no slices shows on its own.
+A read-only overview of the issue and its slices: its owner and, when its flow gives it one, its branch, and for each item its state, mode, open blockers, `needs-human` and whether a claim holds it (and whether that claim is stale). What agents ask with `escalate --wait` comes first, as in `norn next`, and their items say an agent waits on your answer instead. An issue whose flow has no slices shows on its own.
 
 ## norn tidy
 

@@ -44,7 +44,7 @@ function data(a: Answer): Record<string, unknown> {
     case "done":
       return { issue: a.issue, from: a.from, to: a.to, ...(a.evidence ? { evidence: a.evidence } : {}) };
     case "status":
-      return { story: { ...row(a.story), owner: a.story.owner, branch: a.story.branch }, slices: a.slices.map(row) };
+      return { story: { ...row(a.story), owner: a.story.owner, branch: a.story.branch }, slices: a.slices.map(row), asks: a.asks.map(wait) };
     case "tidy":
       return {
         dryRun: a.dryRun,
@@ -83,6 +83,7 @@ function row(r: Row) {
     mode: r.mode,
     blockedBy: r.blockedBy,
     needsHuman: r.needsHuman,
+    agentAsks: r.agentAsks,
     heldSince: r.heldSince,
     stale: r.stale,
   };
@@ -92,6 +93,10 @@ function row(r: Row) {
 function wait(w: WaitItem) {
   const base = { issue: w.issue, reason: w.reason, detail: waitDetail(w) };
   if (w.reason === "held") return { ...base, mine: w.holder.mine };
+  if (w.reason === "agent-asks") {
+    const { question, since, waitedMs, worktree, focus } = w;
+    return { ...base, question, since, waitedMs, heldBy: holderText(w.holder), mine: w.holder.mine, worktree, focus };
+  }
   if (w.reason !== "needs-human" && w.reason !== "human-qa") return base;
   if (w.heldBy) return { ...base, heldBy: holderText(w.heldBy) };
   if (w.branch === undefined) return base;
