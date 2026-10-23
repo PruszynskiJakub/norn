@@ -110,6 +110,8 @@ If something is wrong and a person is needed, run: norn escalate 123 "reason"
 Do not change labels yourself. Only norn changes them.
 ```
 
+The briefing of an unattended step adds two lines before the escalate line: `When you need a person, run: norn escalate <issue> "question" --wait, and wait for the answer in this session.` and `Never end a turn on a question.` No person watches such a session, so a question asked in it reaches nobody; an attended step's agent simply asks the user.
+
 - Running `take` again on an issue you hold re-briefs you and refreshes the claim.
 - A stale claim (older than `claims.staleAfter`) is taken over by one session only.
 - `--takeover` takes over a claim of your own GitHub user at any age, for a session of yours that stopped. It never takes a teammate's claim.
