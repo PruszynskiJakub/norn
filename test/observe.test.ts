@@ -407,6 +407,19 @@ describe("observe: claims", () => {
     expect(claims(third)).toEqual([["stale", 12, "s2", "2026-10-13T14:05:00.000Z", "alice"]]);
     expect(third.board[0].slices[1].holder).toMatchObject({ session: "s2", stale: true });
   });
+
+  test("a claim waiting on an answer never goes stale in the feed", async () => {
+    const w = story();
+    await w.norn("take", "11");
+    await w.norn("escalate", "11", "Which store?", "--wait");
+    const first = await observe(await w.ctx(), {});
+
+    w.setNow("2026-10-13T14:10:00Z");
+    const second = await observe(await w.ctx(), { since: first.at, previous: first });
+
+    expect(second.feed.filter((e) => e.kind === "claim" && e.action === "stale")).toEqual([]);
+    expect(second.board[0].slices[0].holder).toMatchObject({ stale: false });
+  });
 });
 
 describe("observe: the story PR", () => {

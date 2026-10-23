@@ -85,8 +85,8 @@ export type WaitingItem = {
     }
 );
 
-/** The claim refs of one read, passed back to the next so it can tell what changed. */
-export type ClaimSnapshot = { issue: number; sha: string; login: string; session: string; since: string }[];
+/** The claim refs of one read, passed back to the next so it can tell what changed; `waiting` when the holder waits on an answer. */
+export type ClaimSnapshot = { issue: number; sha: string; login: string; session: string; since: string; waiting?: true }[];
 
 /** One read of the developer's work, for the dashboard. */
 export interface Observation {
@@ -239,7 +239,14 @@ export async function observe(given: Ctx, opts: { since?: string | null; previou
   const order: WaitingItem["kind"][] = ["agent-asks", "needs-human", "needs-human-qa"];
   waiting.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || (a.since ?? "").localeCompare(b.since ?? ""));
 
-  const snapshot: ClaimSnapshot = [...claims].map(([issue, c]) => ({ issue, sha: c.sha, login: c.holder, session: c.session, since: c.since }));
+  const snapshot: ClaimSnapshot = [...claims].map(([issue, c]) => ({
+    issue,
+    sha: c.sha,
+    login: c.holder,
+    session: c.session,
+    since: c.since,
+    ...(c.waiting && { waiting: true as const }),
+  }));
   const feed = ours.filter(mine).flatMap((s) => feedOf(s, { flows: valid, maxFixRounds: ctx.config.maxFixRounds, since: opts.since ?? null }));
   if (opts.previous) feed.push(...claimEvents(board, opts.previous, snapshot, now, ctx.config.staleAfterMs));
 
@@ -266,7 +273,8 @@ function gated(flow: Flow, issue: ObservedIssue): boolean {
 /**
  * Claim events from two reads of the claim refs, for items on the board. A
  * claim is taken when its ref is new or points at a new commit, released when
- * its ref is gone, and stale once it outlives staleAfter after the last read.
+ * its ref is gone, and stale once it outlives staleAfter after the last read,
+ * unless it waits on an answer, as isStale has it.
  */
 function claimEvents(board: BoardStory[], last: Pick<Observation, "at" | "claims">, current: ClaimSnapshot, now: Date, staleAfterMs: number): FeedEvent[] {
   const previous = last.claims;
@@ -285,7 +293,7 @@ function claimEvents(board: BoardStory[], last: Pick<Observation, "at" | "claims
     if (before.get(c.issue)?.sha !== c.sha) event(c, "taken", c.since);
     const staleAt = new Date(Date.parse(c.since) + staleAfterMs).toISOString();
     // Stale since the last read, not since the feed's `since`: that reaches back before it, and the claim was stale then already.
-    if (staleAt <= now.toISOString() && staleAt > last.at) event(c, "stale", staleAt);
+    if (!c.waiting && staleAt <= now.toISOString() && staleAt > last.at) event(c, "stale", staleAt);
   }
   return events;
 }
