@@ -16,7 +16,7 @@ import { briefing, type Briefing, finishCommands } from "./briefing.js";
 import { acquire } from "./claims.js";
 import type { Event } from "./events.js";
 import { flowStatesOf, flowStep, type NamedFlow, offerFlows, passThrough, usedIn, uses } from "./flow.js";
-import { flowOf, loadFlow, triageFlows } from "./flow-loading.js";
+import { flowOf, loadFlow, triageFlows, validFlow } from "./flow-loading.js";
 import type { ClaimRecord, HeldClaim, Issue } from "./github.js";
 import { agentPlace, locate } from "./location.js";
 import { type Step, TRIAGE } from "./machine.js";
@@ -370,8 +370,7 @@ export async function escalate(ctx: Ctx, n: number, reason: string | undefined, 
   await github.comment(n, [needsHumanLine(why), ...(reason.includes("\n") ? ["", reason] : [])].join("\n"));
   if (wait) {
     const issue = await github.getIssue(n);
-    const of = await flowOf(ctx, issue);
-    await notifyAgentAsks(ctx, n, reason, await agentPlace(issue, ctx, of?.ok ? of.flow : null));
+    await notifyAgentAsks(ctx, n, reason, await agentPlace(issue, ctx, validFlow(await flowOf(ctx, issue))));
   } else {
     await notifyNeedsHuman(ctx, n, why);
     await github.deleteClaim(n);
@@ -387,12 +386,12 @@ export async function resume(ctx: Ctx, n: number, answer: string | undefined): P
   if (!held.claim.waiting) return refuse({ kind: "not-waiting", issue: n });
   const { github } = ctx;
   const issue = await github.getIssue(n);
-  const of = await flowOf(ctx, issue);
+  const flow = validFlow(await flowOf(ctx, issue));
   const { holder, session } = held.claim;
   const changed = await replaceHeld(ctx, n, held.claim, { holder, session, since: ctx.now().toISOString() });
   if (changed) return changed;
   await github.addLabels(n, ["in-progress"]);
-  await github.comment(n, await answeredComment(ctx, issue, of?.ok ? of.flow : null, answer));
+  await github.comment(n, await answeredComment(ctx, issue, flow, answer));
   await github.removeLabels(n, ["needs-human"]);
   return { ok: true, kind: "resumed", issue: n };
 }

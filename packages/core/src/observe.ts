@@ -9,6 +9,7 @@ import { agentPlace } from "./location.js";
 import { recordedSlug } from "./slug.js";
 import { sliceBranch, slugify, storyBranch } from "./text.js";
 import { type Ctx, fixRounds, lastNeedsHumanReason, needsHumanIn, parseTransitionComment } from "./transitions.js";
+import type { AgentPlace } from "./waiting.js";
 
 /** Who holds an item's claim now. */
 export interface ClaimHolder {
@@ -72,17 +73,13 @@ export type WaitingItem = {
       /** What to tell an agent, e.g. "norn-drive 61". */
       command: string;
     }
-  | {
+  | ({
       /** A session of the developer's holds it and waits for their answer, asked with escalate --wait. It is answered in that session, so nothing takes it. */
       kind: "agent-asks";
       question: string;
       /** The session that asks, and waits for the answer. */
       holder: ClaimHolder;
-      /** Absolute path of the agent's worktree; null when the item has none. */
-      worktree: string | null;
-      /** Whether the agent runs under herdr, where its pane can be brought forward. */
-      herdr: boolean;
-    }
+    } & AgentPlace)
 );
 
 /** The claim refs of one read, passed back to the next so it can tell what changed; `waiting` when the holder waits on an answer. */

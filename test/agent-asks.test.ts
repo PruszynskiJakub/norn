@@ -40,6 +40,7 @@ describe("norn next lists what agents ask", () => {
       `  - #131 waits on you, an agent asked (25m): Keep the old flag as an alias? — worktree ${WORKTREE}. Answer it in the agent's session; do not take it.`,
     );
     expect(lines.findIndex((l) => l.includes("#132 needs a human"))).toBeGreaterThan(asks + 1);
+    expect(lines.findIndex((l) => l.includes("norn take 133"))).toBeGreaterThan(asks + 1);
   });
 
   test("under herdr, with the command that focuses the agent", async () => {

@@ -1122,6 +1122,9 @@ export function renderNext(r: NextReport): string {
   let head = `${subject(r)} is in ${r.state ?? "no state"}.`;
   if (r.slices.total) head += ` ${r.slices.merged} of ${r.slices.total} slices are merged into ${r.branch}.`;
   out.push(wrap(head), "");
+  // What agents ask comes before anything to start, so the user answers them first.
+  const asks = asksLines(r.waiting.filter((w) => w.reason === "agent-asks"));
+  if (asks.length) out.push(...asks, "");
 
   if (r.start.length === 0) {
     out.push(`Nothing can be started now. Wait for the running items to finish, then run norn next ${r.issue} again.`);
@@ -1179,8 +1182,6 @@ export function renderNext(r: NextReport): string {
       if (!prompted) out.push(s.attended ? `    Take it with: ${s.command}` : `    Its agent starts with: ${s.command}`);
     }
   }
-  const asks = r.waiting.filter((w) => w.reason === "agent-asks");
-  if (asks.length) out.push("", ...asksLines(asks));
   const rest = r.waiting.filter((w) => w.reason !== "agent-asks");
   if (rest.length) {
     out.push("", "Waiting, nothing to do for you:");
