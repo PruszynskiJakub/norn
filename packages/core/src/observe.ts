@@ -1,4 +1,3 @@
-import { join } from "node:path";
 import { fixStatesOf, slicesAmong } from "./behaviours.js";
 import { isStale } from "./claims.js";
 import { byTime, type FeedEvent, feedOf } from "./feed.js";
@@ -6,8 +5,9 @@ import { type Flow, flowNameOf, flowStatesOf, modeOf, uses } from "./flow.js";
 import { loadFlow, repositoryFlows, type SourcedFlow } from "./flow-loading.js";
 import type { LoadedFlow } from "./flow-validation.js";
 import type { ObservedIssue, ObservedStory } from "./github.js";
+import { agentPlace } from "./location.js";
 import { recordedSlug } from "./slug.js";
-import { sliceBranch, slugify, storyBranch, worktreePath } from "./text.js";
+import { sliceBranch, slugify, storyBranch } from "./text.js";
 import { type Ctx, fixRounds, lastNeedsHumanReason, needsHumanIn, parseTransitionComment } from "./transitions.js";
 
 /** Who holds an item's claim now. */
@@ -195,7 +195,6 @@ export async function observe(given: Ctx, opts: { since?: string | null; previou
       // Only my own agents' questions: another person's agent asks them, in their session.
       if (!claim?.waiting || claim.holder !== me) continue;
       const asked = claim.waiting;
-      const branch = branchOf(s, i);
       waiting.push({
         issue: i.number,
         story: s.number,
@@ -204,8 +203,8 @@ export async function observe(given: Ctx, opts: { since?: string | null; previou
         question: asked.question,
         since: new Date(asked.since).toISOString(),
         holder: holder(i.number)!,
-        worktree: branch ? join(ctx.workspace.root, worktreePath(branch)) : null,
-        herdr: ctx.config.provider === "herdr",
+        // Where norn next and the notification send the person, so all three agree.
+        ...(await agentPlace(i, ctx, flowFor(i))),
       });
     }
   }

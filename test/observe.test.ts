@@ -168,6 +168,23 @@ describe("observe: waiting for me", () => {
     expect(held.stale).toBe(false);
   });
 
+  test("an agent's question on a slice with its own workspace names the worktree norn next names", async () => {
+    const w = story();
+    // A slice worked on a branch of its own, rather than one off its story's.
+    w.github.seedFlow("slice", {
+      description: "A slice on its own branch.",
+      start: "ready-for-agent",
+      workspace: "own",
+      states: { "ready-for-agent": { skill: "norn-implement", attended: false, outcomes: { "": { to: "closed", means: "built" } } } },
+    });
+    await w.norn("take", "11");
+    await w.norn("escalate", "11", "Which store?", "--wait");
+
+    const res = await observe(await w.ctx(), {});
+
+    expect(res.waiting[0]).toMatchObject({ issue: 11, kind: "agent-asks", worktree: "/repo/.agents/worktrees/11-redis-store" });
+  });
+
   test("an agent's question outside herdr says so, and a question another person's agent asks is not mine", async () => {
     const w = story();
     w.workspace.env = {};
