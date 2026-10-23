@@ -27,7 +27,7 @@ import {
   waitingHeading,
   waitingReason,
 } from "../wording.ts";
-import { CopyCommand } from "./copy-command.tsx";
+import { WaitingAction } from "./waiting-action.tsx";
 import { Badge } from "./ui/badge.tsx";
 import { EvidenceBlock } from "./evidence.tsx";
 
@@ -91,8 +91,8 @@ export function Detail({ x }: { x: Item }) {
       {waiting && (
         <div className="mb-[22px] rounded-xl bg-warn-bg px-4 py-3.5">
           <b className="mb-0.5 block font-medium text-[14px] text-warn">{waitingHeading(waiting)}</b>
-          <p className="mt-0 mb-2.5 text-[14px] text-soft">{waitingReason(waiting, x)}</p>
-          <CopyCommand command={waiting.command} />
+          <p className="mt-0 mb-2.5 whitespace-pre-line text-[14px] text-soft">{waitingReason(waiting, x)}</p>
+          <WaitingAction w={waiting} />
         </div>
       )}
       {!sliced && !isHeld(x) && stops.length > 0 && (

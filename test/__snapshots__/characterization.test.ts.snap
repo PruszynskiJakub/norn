@@ -112,12 +112,14 @@ exports[`output of every command, text and --json > config warnings before the a
     "mode": null,
     "blockedBy": [],
     "needsHuman": false,
+    "agentAsks": false,
     "heldSince": null,
     "stale": false,
     "owner": null,
     "branch": "1-a-story"
   },
   "slices": [],
+  "asks": [],
   "message": "Story #1 \\"A story\\": needs-plan · owner none · branch 1-a-story\\nNo slices yet.",
   "warnings": [
     ".agents/norn.config.json: claims.staleAfter 1m is below the 10m minimum, so norn uses 10m; shorter, and live claims get taken over",
@@ -606,6 +608,20 @@ exports[`output of every command, text and --json > done when a follow-up fails 
 Could not move #40 on now that its slices are merged: HTTP 502. norn next 40 will retry this."
 `;
 
+exports[`output of every command, text and --json > done while waiting on a person > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "#50 waits on a person: run norn resume 50 \\"<answer>\\" first\\nOnce the person has answered in this session, record the answer with it and carry on. To give the item up instead: norn release 50"
+}"
+`;
+
+exports[`output of every command, text and --json > done while waiting on a person > text 1`] = `
+"exit 1
+#50 waits on a person: run norn resume 50 "<answer>" first
+Once the person has answered in this session, record the answer with it and carry on. To give the item up instead: norn release 50"
+`;
+
 exports[`output of every command, text and --json > done with a note and a note file > json 1`] = `
 "exit 1
 {
@@ -786,6 +802,21 @@ exports[`output of every command, text and --json > escalate > text 1`] = `
 "exit 0
 #50 now needs a human. The claim is released.
 Do not work on it further. A person picks it up with the norn-resolve skill."
+`;
+
+exports[`output of every command, text and --json > escalate --wait > json 1`] = `
+"exit 0
+{
+  "ok": true,
+  "waiting": true,
+  "message": "#50 now needs a human, and you keep the claim, waiting on a person.\\nWait in this session for the answer; do not end your turn. Once answered, run: norn resume 50 \\"<answer>\\""
+}"
+`;
+
+exports[`output of every command, text and --json > escalate --wait > text 1`] = `
+"exit 0
+#50 now needs a human, and you keep the claim, waiting on a person.
+Wait in this session for the answer; do not end your turn. Once answered, run: norn resume 50 "<answer>""
 `;
 
 exports[`output of every command, text and --json > escalate without a reason > json 1`] = `
@@ -1923,6 +1954,46 @@ If you finished its step with norn done, or released or escalated it, stop: its 
 Otherwise claim it first with: norn take 50"
 `;
 
+exports[`output of every command, text and --json > resume > json 1`] = `
+"exit 0
+{
+  "ok": true,
+  "message": "#50's answer is recorded and the claim is yours again. Carry on with the step; its briefing still holds."
+}"
+`;
+
+exports[`output of every command, text and --json > resume > text 1`] = `
+"exit 0
+#50's answer is recorded and the claim is yours again. Carry on with the step; its briefing still holds."
+`;
+
+exports[`output of every command, text and --json > resume when nothing waits > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "#50 does not wait on a person, so there is nothing to resume. To ask one and wait: norn escalate 50 \\"<question>\\" --wait"
+}"
+`;
+
+exports[`output of every command, text and --json > resume when nothing waits > text 1`] = `
+"exit 1
+#50 does not wait on a person, so there is nothing to resume. To ask one and wait: norn escalate 50 "<question>" --wait"
+`;
+
+exports[`output of every command, text and --json > resume without an answer > json 1`] = `
+"exit 1
+{
+  "ok": false,
+  "refusal": "The answer is required, so the issue records what was decided. Run:\\n  norn resume 50 \\"<answer>\\""
+}"
+`;
+
+exports[`output of every command, text and --json > resume without an answer > text 1`] = `
+"exit 1
+The answer is required, so the issue records what was decided. Run:
+  norn resume 50 "<answer>""
+`;
+
 exports[`output of every command, text and --json > status of a story with slices > json 1`] = `
 "exit 0
 {
@@ -1934,6 +2005,7 @@ exports[`output of every command, text and --json > status of a story with slice
     "mode": null,
     "blockedBy": [],
     "needsHuman": false,
+    "agentAsks": false,
     "heldSince": null,
     "stale": false,
     "owner": "alice",
@@ -1947,6 +2019,7 @@ exports[`output of every command, text and --json > status of a story with slice
       "mode": "afk",
       "blockedBy": [],
       "needsHuman": false,
+      "agentAsks": false,
       "heldSince": null,
       "stale": false
     },
@@ -1957,6 +2030,7 @@ exports[`output of every command, text and --json > status of a story with slice
       "mode": "hil",
       "blockedBy": [],
       "needsHuman": true,
+      "agentAsks": false,
       "heldSince": "2026-10-13T09:00:00Z",
       "stale": true
     },
@@ -1969,6 +2043,7 @@ exports[`output of every command, text and --json > status of a story with slice
         127
       ],
       "needsHuman": false,
+      "agentAsks": false,
       "heldSince": null,
       "stale": false
     },
@@ -1979,6 +2054,7 @@ exports[`output of every command, text and --json > status of a story with slice
       "mode": "afk",
       "blockedBy": [],
       "needsHuman": false,
+      "agentAsks": false,
       "heldSince": "2026-10-13T11:30:00Z",
       "stale": false
     },
@@ -1989,6 +2065,7 @@ exports[`output of every command, text and --json > status of a story with slice
       "mode": "hil",
       "blockedBy": [],
       "needsHuman": false,
+      "agentAsks": false,
       "heldSince": null,
       "stale": false
     },
@@ -1999,10 +2076,12 @@ exports[`output of every command, text and --json > status of a story with slice
       "mode": "afk",
       "blockedBy": [],
       "needsHuman": false,
+      "agentAsks": false,
       "heldSince": null,
       "stale": false
     }
   ],
+  "asks": [],
   "message": "Story #123 \\"Rate limiting\\": implementation · owner @alice · branch 123-rate-limiting\\nSlices (1 of 6 merged):\\n  #127 \\"Redis store\\"      merge-queue · mode:afk\\n  #128 \\"Limit headers\\"    needs-review · mode:hil · needs-human · held since 09:00 (stale)\\n  #131 \\"Per-key limits\\"   blocked by #127 · mode:afk\\n  #132 \\"Docs\\"             ready-for-agent · mode:afk · held since 11:30\\n  #133 \\"Metrics\\"          needs-human-qa · mode:hil\\n  #134 \\"Old\\"              merged"
 }"
 `;
@@ -2030,12 +2109,14 @@ exports[`output of every command, text and --json > status of a story without sl
     "mode": null,
     "blockedBy": [],
     "needsHuman": false,
+    "agentAsks": false,
     "heldSince": null,
     "stale": false,
     "owner": "alice",
     "branch": "50-search"
   },
   "slices": [],
+  "asks": [],
   "message": "Story #50 \\"Search\\": needs-slicing · owner @alice · branch 50-search\\nNo slices yet."
 }"
 `;
@@ -2057,12 +2138,14 @@ exports[`output of every command, text and --json > status with two state labels
     "mode": null,
     "blockedBy": [],
     "needsHuman": false,
+    "agentAsks": false,
     "heldSince": null,
     "stale": false,
     "owner": null,
     "branch": "9-twice"
   },
   "slices": [],
+  "asks": [],
   "message": "Story #9 \\"Twice\\": needs-plan + needs-slicing (more than one state label) · owner none · branch 9-twice\\nNo slices yet."
 }"
 `;
@@ -2149,7 +2232,7 @@ exports[`output of every command, text and --json > take a ready slice > json 1`
   "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132   (implementation done, PR open)\\n\\nYour claim goes stale 2h after you last took #132, and another session can then take it over.\\nOn a long step, run norn take 132 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-132 -b 123-rate-limiting-132 origin/123-rate-limiting\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132   (implementation done, PR open)\\n\\nYour claim goes stale 2h after you last took #132, and another session can then take it over.\\nOn a long step, run norn take 132 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 132\\nWhen you need a person, run: norn escalate 132 \\"<question>\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2173,6 +2256,8 @@ When implementation is finished, run:
 Your claim goes stale 2h after you last took #132, and another session can then take it over.
 On a long step, run norn take 132 again before then: it refreshes the claim, and you carry on where you are.
 If you have to stop, run: norn release 132
+When you need a person, run: norn escalate 132 "<question>" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 132 "<reason>"
 
 Do not change labels yourself. Only norn changes them."
@@ -2188,7 +2273,7 @@ exports[`output of every command, text and --json > take a slice checked out els
   "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nBranch 123-rate-limiting-132 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132   (implementation done, PR open)\\n\\nYour claim goes stale 2h after you last took #132, and another session can then take it over.\\nOn a long step, run norn take 132 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nBranch 123-rate-limiting-132 is checked out at /elsewhere; work there or switch that checkout to another branch.\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132   (implementation done, PR open)\\n\\nYour claim goes stale 2h after you last took #132, and another session can then take it over.\\nOn a long step, run norn take 132 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 132\\nWhen you need a person, run: norn escalate 132 \\"<question>\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2211,6 +2296,8 @@ When implementation is finished, run:
 Your claim goes stale 2h after you last took #132, and another session can then take it over.
 On a long step, run norn take 132 again before then: it refreshes the claim, and you carry on where you are.
 If you have to stop, run: norn release 132
+When you need a person, run: norn escalate 132 "<question>" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 132 "<reason>"
 
 Do not change labels yourself. Only norn changes them."
@@ -2229,7 +2316,7 @@ exports[`output of every command, text and --json > take a slice for agent QA (a
     "pass",
     "fail"
   ],
-  "message": "You now hold slice #60 \\"QA me\\". Its step is agent QA.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-60 (branch 123-rate-limiting-60)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-60 -b 123-rate-limiting-60 origin/123-rate-limiting\\n\\nInvoke the skill: norn-auto-qa\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 60 --comments\\nSlice PR: 123-rate-limiting-60 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\nYour note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.\\nKeep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.\\nNo person checks this slice after you. A criterion you cannot check is never passed: run norn escalate 60 \\"<reason>\\".\\n\\nWhen agent QA is finished, run one of:\\n  norn done 60 pass \\"<evidence>\\" [--evidence <dir>]   (every criterion passed, moves to the merge queue)\\n  norn done 60 fail \\"<evidence>\\" [--evidence <dir>]   (put the failures with their repros in the note)\\nA note of more than one line, or with quotes, $ or backticks, goes in a file outside the repository: pass --note-file <file> in place of the quoted note.\\n\\nYour claim goes stale 2h after you last took #60, and another session can then take it over.\\nOn a long step, run norn take 60 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 60\\nIf something is wrong and a person is needed, run: norn escalate 60 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #60 \\"QA me\\". Its step is agent QA.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-60 (branch 123-rate-limiting-60)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-60 -b 123-rate-limiting-60 origin/123-rate-limiting\\n\\nInvoke the skill: norn-auto-qa\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 60 --comments\\nSlice PR: 123-rate-limiting-60 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\nYour note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.\\nKeep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.\\nNo person checks this slice after you. A criterion you cannot check is never passed: run norn escalate 60 \\"<reason>\\".\\n\\nWhen agent QA is finished, run one of:\\n  norn done 60 pass \\"<evidence>\\" [--evidence <dir>]   (every criterion passed, moves to the merge queue)\\n  norn done 60 fail \\"<evidence>\\" [--evidence <dir>]   (put the failures with their repros in the note)\\nA note of more than one line, or with quotes, $ or backticks, goes in a file outside the repository: pass --note-file <file> in place of the quoted note.\\n\\nYour claim goes stale 2h after you last took #60, and another session can then take it over.\\nOn a long step, run norn take 60 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 60\\nWhen you need a person, run: norn escalate 60 \\"<question>\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 60 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2257,6 +2344,8 @@ A note of more than one line, or with quotes, $ or backticks, goes in a file out
 Your claim goes stale 2h after you last took #60, and another session can then take it over.
 On a long step, run norn take 60 again before then: it refreshes the claim, and you carry on where you are.
 If you have to stop, run: norn release 60
+When you need a person, run: norn escalate 60 "<question>" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 60 "<reason>"
 
 Do not change labels yourself. Only norn changes them."
@@ -2322,7 +2411,7 @@ exports[`output of every command, text and --json > take a slice for merge > jso
   "skill": "norn-merge",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #127 \\"Redis store\\". Its step is merge.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-127 (branch 123-rate-limiting-127)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n\\nInvoke the skill: norn-merge\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 127 --comments\\nMerge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.\\nThen merge the PR: gh pr merge 123-rate-limiting-127 --merge\\n\\nWhen merge is finished, run:\\n  norn done 127   (slice PR merged into the story branch)\\n\\nYour claim goes stale 2h after you last took #127, and another session can then take it over.\\nOn a long step, run norn take 127 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 127\\nIf something is wrong and a person is needed, run: norn escalate 127 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #127 \\"Redis store\\". Its step is merge.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-127 (branch 123-rate-limiting-127)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-127 -b 123-rate-limiting-127 origin/123-rate-limiting\\n\\nInvoke the skill: norn-merge\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 127 --comments\\nMerge origin/123-rate-limiting into 123-rate-limiting-127, resolving conflicts if needed, and push.\\nThen merge the PR: gh pr merge 123-rate-limiting-127 --merge\\n\\nWhen merge is finished, run:\\n  norn done 127   (slice PR merged into the story branch)\\n\\nYour claim goes stale 2h after you last took #127, and another session can then take it over.\\nOn a long step, run norn take 127 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 127\\nWhen you need a person, run: norn escalate 127 \\"<question>\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 127 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2346,6 +2435,8 @@ When merge is finished, run:
 Your claim goes stale 2h after you last took #127, and another session can then take it over.
 On a long step, run norn take 127 again before then: it refreshes the claim, and you carry on where you are.
 If you have to stop, run: norn release 127
+When you need a person, run: norn escalate 127 "<question>" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 127 "<reason>"
 
 Do not change labels yourself. Only norn changes them."
@@ -2364,7 +2455,7 @@ exports[`output of every command, text and --json > take a slice for review > js
     "approve",
     "request-changes"
   ],
-  "message": "You now hold slice #128 \\"Limit headers\\". Its step is review.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-128 (branch 123-rate-limiting-128)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-128 -b 123-rate-limiting-128 origin/123-rate-limiting\\n\\nInvoke the skill: norn-review\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 128 --comments\\nSlice PR: 123-rate-limiting-128 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\n\\nWhen review is finished, run one of:\\n  norn done 128 approve                        (no requests, moves on to QA by an agent)\\n  norn done 128 request-changes \\"<requests>\\"   (put the requests in the note)\\nA note of more than one line, or with quotes, $ or backticks, goes in a file outside the repository: pass --note-file <file> in place of the quoted note.\\n\\nYour claim goes stale 2h after you last took #128, and another session can then take it over.\\nOn a long step, run norn take 128 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 128\\nIf something is wrong and a person is needed, run: norn escalate 128 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #128 \\"Limit headers\\". Its step is review.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-128 (branch 123-rate-limiting-128)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin 123-rate-limiting && git -C /repo worktree add --no-track /repo/.agents/worktrees/123-rate-limiting-128 -b 123-rate-limiting-128 origin/123-rate-limiting\\n\\nInvoke the skill: norn-review\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 128 --comments\\nSlice PR: 123-rate-limiting-128 into 123-rate-limiting. Diff: git diff origin/123-rate-limiting...HEAD\\n\\nWhen review is finished, run one of:\\n  norn done 128 approve                        (no requests, moves on to QA by an agent)\\n  norn done 128 request-changes \\"<requests>\\"   (put the requests in the note)\\nA note of more than one line, or with quotes, $ or backticks, goes in a file outside the repository: pass --note-file <file> in place of the quoted note.\\n\\nYour claim goes stale 2h after you last took #128, and another session can then take it over.\\nOn a long step, run norn take 128 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 128\\nWhen you need a person, run: norn escalate 128 \\"<question>\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 128 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2389,6 +2480,8 @@ A note of more than one line, or with quotes, $ or backticks, goes in a file out
 Your claim goes stale 2h after you last took #128, and another session can then take it over.
 On a long step, run norn take 128 again before then: it refreshes the claim, and you carry on where you are.
 If you have to stop, run: norn release 128
+When you need a person, run: norn escalate 128 "<question>" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 128 "<reason>"
 
 Do not change labels yourself. Only norn changes them."
@@ -2418,7 +2511,7 @@ exports[`output of every command, text and --json > take a slice outside a story
   "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #66 \\"Orphan\\". Its step is implementation.\\n\\nInvoke the skill: norn-implement\\n#66 is not a sub-issue of another issue, so it has no parent branch, spec or PR to work on. Do not start, and do not finish with norn done: run norn escalate 66 \\"<reason>\\"\\n\\nWhen implementation is finished, run:\\n  norn done 66   (implementation done, PR open)\\n\\nYour claim goes stale 2h after you last took #66, and another session can then take it over.\\nOn a long step, run norn take 66 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 66\\nIf something is wrong and a person is needed, run: norn escalate 66 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #66 \\"Orphan\\". Its step is implementation.\\n\\nInvoke the skill: norn-implement\\n#66 is not a sub-issue of another issue, so it has no parent branch, spec or PR to work on. Do not start, and do not finish with norn done: run norn escalate 66 \\"<reason>\\"\\n\\nWhen implementation is finished, run:\\n  norn done 66   (implementation done, PR open)\\n\\nYour claim goes stale 2h after you last took #66, and another session can then take it over.\\nOn a long step, run norn take 66 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 66\\nWhen you need a person, run: norn escalate 66 \\"<question>\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 66 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2435,6 +2528,8 @@ When implementation is finished, run:
 Your claim goes stale 2h after you last took #66, and another session can then take it over.
 On a long step, run norn take 66 again before then: it refreshes the claim, and you carry on where you are.
 If you have to stop, run: norn release 66
+When you need a person, run: norn escalate 66 "<question>" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 66 "<reason>"
 
 Do not change labels yourself. Only norn changes them."
@@ -2450,7 +2545,7 @@ exports[`output of every command, text and --json > take a slice with a dirty wo
   "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt has uncommitted changes, e.g. from an earlier session. Check git status there before you start.\\nBring it up to date first:\\n  git -C /repo/.agents/worktrees/123-rate-limiting-132 fetch origin 123-rate-limiting-132 && git -C /repo/.agents/worktrees/123-rate-limiting-132 merge --ff-only origin/123-rate-limiting-132\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132   (implementation done, PR open)\\n\\nYour claim goes stale 2h after you last took #132, and another session can then take it over.\\nOn a long step, run norn take 132 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\nIt has uncommitted changes, e.g. from an earlier session. Check git status there before you start.\\nBring it up to date first:\\n  git -C /repo/.agents/worktrees/123-rate-limiting-132 fetch origin 123-rate-limiting-132 && git -C /repo/.agents/worktrees/123-rate-limiting-132 merge --ff-only origin/123-rate-limiting-132\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132   (implementation done, PR open)\\n\\nYour claim goes stale 2h after you last took #132, and another session can then take it over.\\nOn a long step, run norn take 132 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 132\\nWhen you need a person, run: norn escalate 132 \\"<question>\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2475,6 +2570,8 @@ When implementation is finished, run:
 Your claim goes stale 2h after you last took #132, and another session can then take it over.
 On a long step, run norn take 132 again before then: it refreshes the claim, and you carry on where you are.
 If you have to stop, run: norn release 132
+When you need a person, run: norn escalate 132 "<question>" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 132 "<reason>"
 
 Do not change labels yourself. Only norn changes them."
@@ -2493,7 +2590,7 @@ exports[`output of every command, text and --json > take a story for agent QA > 
     "pass",
     "fail"
   ],
-  "message": "You now hold story #61 \\"QA story\\". Its step is agent QA.\\n\\nWork in: /repo/.agents/worktrees/61-qa-story (branch 61-qa-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/61-qa-story -b 61-qa-story origin/main\\n\\nInvoke the skill: norn-auto-qa\\nSpec to work on: .agents/specs/61-qa-story/spec.md\\nStory PR: 61-qa-story into main. Diff: git diff origin/main...HEAD\\nYour note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.\\nKeep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.\\nA person QAs this after you. List in the note what only a person can check,\\nwith what you could prepare: how to run it, a URL, screenshots up to where you had to stop.\\nThose items do not fail the step on their own: pass when everything you could check passed, fail when anything did not.\\n\\nWhen agent QA is finished, run one of:\\n  norn done 61 pass \\"<evidence>\\" [--evidence <dir>]   (every criterion you could check passed; moves on to QA by a person)\\n  norn done 61 fail \\"<evidence>\\" [--evidence <dir>]   (put the failures with their repros in the note)\\nA note of more than one line, or with quotes, $ or backticks, goes in a file outside the repository: pass --note-file <file> in place of the quoted note.\\n\\nYour claim goes stale 2h after you last took #61, and another session can then take it over.\\nOn a long step, run norn take 61 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 61\\nIf something is wrong and a person is needed, run: norn escalate 61 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold story #61 \\"QA story\\". Its step is agent QA.\\n\\nWork in: /repo/.agents/worktrees/61-qa-story (branch 61-qa-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/61-qa-story -b 61-qa-story origin/main\\n\\nInvoke the skill: norn-auto-qa\\nSpec to work on: .agents/specs/61-qa-story/spec.md\\nStory PR: 61-qa-story into main. Diff: git diff origin/main...HEAD\\nYour note is the evidence pack: one line per criterion with what you ran, what you saw and its evidence.\\nKeep screenshots, logs and command output in a directory outside the repository and finish with --evidence <dir>: norn pushes the files and embeds them in the comment. Do not commit them.\\nA person QAs this after you. List in the note what only a person can check,\\nwith what you could prepare: how to run it, a URL, screenshots up to where you had to stop.\\nThose items do not fail the step on their own: pass when everything you could check passed, fail when anything did not.\\n\\nWhen agent QA is finished, run one of:\\n  norn done 61 pass \\"<evidence>\\" [--evidence <dir>]   (every criterion you could check passed; moves on to QA by a person)\\n  norn done 61 fail \\"<evidence>\\" [--evidence <dir>]   (put the failures with their repros in the note)\\nA note of more than one line, or with quotes, $ or backticks, goes in a file outside the repository: pass --note-file <file> in place of the quoted note.\\n\\nYour claim goes stale 2h after you last took #61, and another session can then take it over.\\nOn a long step, run norn take 61 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 61\\nWhen you need a person, run: norn escalate 61 \\"<question>\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 61 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2522,6 +2619,8 @@ A note of more than one line, or with quotes, $ or backticks, goes in a file out
 Your claim goes stale 2h after you last took #61, and another session can then take it over.
 On a long step, run norn take 61 again before then: it refreshes the claim, and you carry on where you are.
 If you have to stop, run: norn release 61
+When you need a person, run: norn escalate 61 "<question>" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 61 "<reason>"
 
 Do not change labels yourself. Only norn changes them."
@@ -2645,7 +2744,7 @@ exports[`output of every command, text and --json > take a story in rework > jso
   "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You now hold story #62 \\"Fix story\\". Its step is fixing.\\n\\nWork in: /repo/.agents/worktrees/62-fix-story (branch 62-fix-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/62-fix-story -b 62-fix-story origin/main\\n\\nInvoke the skill: norn-implement\\nSpec to work on: .agents/specs/62-fix-story/spec.md\\nThis is rework: the latest review or QA comment on #62 lists what to fix. Read the issue: gh issue view 62 --comments\\nCommit the fixes straight onto the story branch 62-fix-story and push them.\\nStory PR: 62-fix-story into main. Diff: git diff origin/main...HEAD\\n\\nWhen fixing is finished, run:\\n  norn done 62   (fixes committed on the story branch, back to review)\\n\\nYour claim goes stale 2h after you last took #62, and another session can then take it over.\\nOn a long step, run norn take 62 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 62\\nIf something is wrong and a person is needed, run: norn escalate 62 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You now hold story #62 \\"Fix story\\". Its step is fixing.\\n\\nWork in: /repo/.agents/worktrees/62-fix-story (branch 62-fix-story)\\nIt does not exist yet. Create it first:\\n  git -C /repo fetch origin main && git -C /repo worktree add --no-track /repo/.agents/worktrees/62-fix-story -b 62-fix-story origin/main\\n\\nInvoke the skill: norn-implement\\nSpec to work on: .agents/specs/62-fix-story/spec.md\\nThis is rework: the latest review or QA comment on #62 lists what to fix. Read the issue: gh issue view 62 --comments\\nCommit the fixes straight onto the story branch 62-fix-story and push them.\\nStory PR: 62-fix-story into main. Diff: git diff origin/main...HEAD\\n\\nWhen fixing is finished, run:\\n  norn done 62   (fixes committed on the story branch, back to review)\\n\\nYour claim goes stale 2h after you last took #62, and another session can then take it over.\\nOn a long step, run norn take 62 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 62\\nWhen you need a person, run: norn escalate 62 \\"<question>\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 62 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2669,6 +2768,8 @@ When fixing is finished, run:
 Your claim goes stale 2h after you last took #62, and another session can then take it over.
 On a long step, run norn take 62 again before then: it refreshes the claim, and you carry on where you are.
 If you have to stop, run: norn release 62
+When you need a person, run: norn escalate 62 "<question>" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 62 "<reason>"
 
 Do not change labels yourself. Only norn changes them."
@@ -2768,7 +2869,7 @@ exports[`output of every command, text and --json > take again with a dirty work
   "skill": "norn-implement",
   "attended": false,
   "outcomes": [],
-  "message": "You already held #132; the claim is refreshed. Carry on with the step where you left off: what is in the worktree is your own work.\\nHere is its briefing again.\\n\\nYou now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132   (implementation done, PR open)\\n\\nYour claim goes stale 2h after you last took #132, and another session can then take it over.\\nOn a long step, run norn take 132 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 132\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
+  "message": "You already held #132; the claim is refreshed. Carry on with the step where you left off: what is in the worktree is your own work.\\nHere is its briefing again.\\n\\nYou now hold slice #132 \\"Docs\\". Its step is implementation.\\n\\nWork in: /repo/.agents/worktrees/123-rate-limiting-132 (branch 123-rate-limiting-132)\\n\\nInvoke the skill: norn-implement\\nSpec: .agents/specs/123-rate-limiting/spec.md (story #123)\\nRead the issue: gh issue view 132 --comments\\nCommit on 123-rate-limiting-132 and push. Open one PR from 123-rate-limiting-132 into 123-rate-limiting if there is none yet:\\n  gh pr create --base 123-rate-limiting --head 123-rate-limiting-132 --title Docs --body 'Part of #123. Slice #132.'\\n\\nWhen implementation is finished, run:\\n  norn done 132   (implementation done, PR open)\\n\\nYour claim goes stale 2h after you last took #132, and another session can then take it over.\\nOn a long step, run norn take 132 again before then: it refreshes the claim, and you carry on where you are.\\nIf you have to stop, run: norn release 132\\nWhen you need a person, run: norn escalate 132 \\"<question>\\" --wait, and wait for the answer in this session.\\nNever end a turn on a question.\\nIf something is wrong and a person is needed, run: norn escalate 132 \\"<reason>\\"\\n\\nDo not change labels yourself. Only norn changes them."
 }"
 `;
 
@@ -2793,6 +2894,8 @@ When implementation is finished, run:
 Your claim goes stale 2h after you last took #132, and another session can then take it over.
 On a long step, run norn take 132 again before then: it refreshes the claim, and you carry on where you are.
 If you have to stop, run: norn release 132
+When you need a person, run: norn escalate 132 "<question>" --wait, and wait for the answer in this session.
+Never end a turn on a question.
 If something is wrong and a person is needed, run: norn escalate 132 "<reason>"
 
 Do not change labels yourself. Only norn changes them."
@@ -2964,7 +3067,7 @@ exports[`output of every command, text and --json > unknown command > json 1`] =
 "exit 2
 {
   "ok": false,
-  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"<note>\\" | --note-file <file>] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --note-file reads the note from <file>;\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"<title>\\" --mode afk|hil [--blocked-by <slice>]...\\n  norn escalate <issue> \\"<reason>\\"   Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
+  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"<note>\\" | --note-file <file>] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --note-file reads the note from <file>;\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"<title>\\" --mode afk|hil [--blocked-by <slice>]...\\n  norn escalate <issue> \\"<reason>\\" [--wait]\\n                                     Set needs-human and release the claim; with --wait,\\n                                     keep it and wait in this session for the answer\\n  norn resume <issue> \\"<answer>\\"     Record the answer to escalate --wait and carry on\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -2981,7 +3084,10 @@ norn runs work through the SDD process. Commands on an issue take its number exp
                                      --note-file reads the note from <file>;
                                      --evidence attaches the QA files in <dir>
   norn add-slice <story> "<title>" --mode afk|hil [--blocked-by <slice>]...
-  norn escalate <issue> "<reason>"   Set needs-human and release the claim
+  norn escalate <issue> "<reason>" [--wait]
+                                     Set needs-human and release the claim; with --wait,
+                                     keep it and wait in this session for the answer
+  norn resume <issue> "<answer>"     Record the answer to escalate --wait and carry on
   norn release <issue>               Give up the claim without a transition
   norn status <story>                Read-only overview of the story and its slices
   norn tidy [--dry-run]              Remove what belongs to closed issues
@@ -2999,7 +3105,7 @@ exports[`output of every command, text and --json > usage > json 1`] = `
 "exit 2
 {
   "ok": false,
-  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"<note>\\" | --note-file <file>] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --note-file reads the note from <file>;\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"<title>\\" --mode afk|hil [--blocked-by <slice>]...\\n  norn escalate <issue> \\"<reason>\\"   Set needs-human and release the claim\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
+  "refusal": "norn runs work through the SDD process. Commands on an issue take its number explicitly.\\n\\n  norn init                          Set up this project: skills, .agents/specs/, labels\\n  norn next <story>                  What can be done on the story now\\n  norn take <issue> [--takeover]     Claim the issue and get the briefing for its step;\\n                                     --takeover takes it from a stopped session of yours\\n  norn done <issue> [outcome] [\\"<note>\\" | --note-file <file>] [--evidence <dir>]\\n                                     Finish the step; norn makes the transition.\\n                                     --note-file reads the note from <file>;\\n                                     --evidence attaches the QA files in <dir>\\n  norn add-slice <story> \\"<title>\\" --mode afk|hil [--blocked-by <slice>]...\\n  norn escalate <issue> \\"<reason>\\" [--wait]\\n                                     Set needs-human and release the claim; with --wait,\\n                                     keep it and wait in this session for the answer\\n  norn resume <issue> \\"<answer>\\"     Record the answer to escalate --wait and carry on\\n  norn release <issue>               Give up the claim without a transition\\n  norn status <story>                Read-only overview of the story and its slices\\n  norn tidy [--dry-run]              Remove what belongs to closed issues\\n  norn dashboard [--port <n>] [--interval <duration>] [--no-open]\\n                                     Watch your work in the browser; Ctrl-C stops it\\n  norn doctor                        Check the whole setup and say what to fix\\n  norn flows export <name>           Copy a built-in flow to .agents/flows/<name>.json to change it\\n  norn --version                     Print the running norn's version\\n  norn --help                        Print this help; so does --help after any command\\n\\nAdd --json for machine-readable output."
 }"
 `;
 
@@ -3016,7 +3122,10 @@ norn runs work through the SDD process. Commands on an issue take its number exp
                                      --note-file reads the note from <file>;
                                      --evidence attaches the QA files in <dir>
   norn add-slice <story> "<title>" --mode afk|hil [--blocked-by <slice>]...
-  norn escalate <issue> "<reason>"   Set needs-human and release the claim
+  norn escalate <issue> "<reason>" [--wait]
+                                     Set needs-human and release the claim; with --wait,
+                                     keep it and wait in this session for the answer
+  norn resume <issue> "<answer>"     Record the answer to escalate --wait and carry on
   norn release <issue>               Give up the claim without a transition
   norn status <story>                Read-only overview of the story and its slices
   norn tidy [--dry-run]              Remove what belongs to closed issues

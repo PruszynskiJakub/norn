@@ -1,5 +1,5 @@
 import type { Mode } from "./flow.js";
-import type { WaitItem } from "./waiting.js";
+import type { AgentPlace, WaitItem } from "./waiting.js";
 import type { Ctx } from "./transitions.js";
 
 export type Channel = "herdr" | "os";
@@ -14,6 +14,8 @@ export interface Gate {
 export type Notification =
   /** `reason` is the needs-human reason norn recorded on the issue, as written there. */
   | { kind: "needs-human"; issue: number; reason: string; url: string }
+  /** The agent holding the issue asked a person `question` and waits in its session, reached at `worktree` or, under `herdr`, by focusing its pane. */
+  | ({ kind: "agent-asks"; issue: number; question: string; url: string } & AgentPlace)
   /** The issue was in `state`, which the flow `flow` no longer has, so norn set needs-human on it. */
   | { kind: "state-left"; issue: number; state: string; flow: string; url: string }
   /** A person QAs it at `gate`. */
@@ -37,6 +39,11 @@ export async function send(ctx: Ctx, notification: Notification): Promise<void> 
 /** needs-human was set on an issue. */
 export async function notifyNeedsHuman(ctx: Ctx, n: number, reason: string) {
   await send(ctx, { kind: "needs-human", issue: n, reason, url: `${await ctx.github.repoUrl()}/issues/${n}` });
+}
+
+/** The agent holding an issue asked a person and waits in its session for the answer. */
+export async function notifyAgentAsks(ctx: Ctx, n: number, question: string, place: AgentPlace) {
+  await send(ctx, { kind: "agent-asks", issue: n, question, url: `${await ctx.github.repoUrl()}/issues/${n}`, ...place });
 }
 
 /** An issue in a state its flow no longer has was handed to a person. */

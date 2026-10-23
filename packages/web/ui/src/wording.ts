@@ -230,37 +230,51 @@ export const FEED = {
 
 export function waitingKind(w: WaitingItem): string {
   switch (w.kind) {
+    case "agent-asks":
+      return "An agent asks";
     case "needs-human":
       return "Escalated";
     case "needs-human-qa":
       return "Your QA";
     default:
-      return unreachable(w.kind);
+      return unreachable(w);
   }
 }
 
 export function waitingHeading(w: WaitingItem): string {
   switch (w.kind) {
+    case "agent-asks":
+      return "An agent asks you, and waits in its session";
     case "needs-human":
       return "Escalated to you";
     case "needs-human-qa":
       return "Waiting for your QA";
     default:
-      return unreachable(w.kind);
+      return unreachable(w);
   }
 }
 
 /** Why an item waits for the developer, in plain words; `x` is the item, when on the board. */
 export function waitingReason(w: WaitingItem, x: Item | undefined): string {
   switch (w.kind) {
+    case "agent-asks":
+      return w.question;
     case "needs-human":
       return w.reason ?? "Someone flagged it needs-human by hand; its comments say why.";
     case "needs-human-qa":
       if (w.issue !== w.story) return "Agent QA passed. A few checks need a person.";
       return x && isSliced(x) ? `Every slice merged and agent QA passed. Your QA closes the ${x.flow}.` : "A few checks need a person.";
     default:
-      return unreachable(w.kind);
+      return unreachable(w);
   }
+}
+
+/** The herdr command that brings the pane of the agent at work on an issue forward. */
+export const focusCommand = (n: number) => `herdr agent focus norn-${n}`;
+
+/** Where to answer an agent that asks: in its session, which works in the worktree when the item has one. */
+export function answerIn(worktree: string | null): string {
+  return worktree ? `Answer in the agent's session, in ${worktree}.` : "Answer in the agent's session.";
 }
 
 const COUNTS = ["Nothing", "One thing", "Two things", "Three things", "Four things", "Five things"];

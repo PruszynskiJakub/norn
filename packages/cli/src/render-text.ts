@@ -17,6 +17,7 @@ import {
   type HandedOverResult,
   type FollowUpTask,
   FOR_HUMAN,
+  type AgentPlace,
   type Holder,
   type Kept,
   LOCAL_CONFIG,
@@ -26,6 +27,7 @@ import {
   type Notification,
   type Refusal,
   type ReleaseResult,
+  type ResumeResult,
   type Removal,
   type Row,
   sh,
@@ -52,6 +54,7 @@ export type Answer =
   | DoneResult
   | EscalateResult
   | ReleaseResult
+  | ResumeResult
   | AddSliceResult
   | NextResult
   | StatusResult
@@ -109,7 +112,10 @@ export const USAGE = [
   "                                     --note-file reads the note from <file>;",
   "                                     --evidence attaches the QA files in <dir>",
   '  norn add-slice <story> "<title>" --mode afk|hil [--blocked-by <slice>]...',
-  '  norn escalate <issue> "<reason>"   Set needs-human and release the claim',
+  '  norn escalate <issue> "<reason>" [--wait]',
+  "                                     Set needs-human and release the claim; with --wait,",
+  "                                     keep it and wait in this session for the answer",
+  '  norn resume <issue> "<answer>"     Record the answer to escalate --wait and carry on',
   "  norn release <issue>               Give up the claim without a transition",
   "  norn status <story>                Read-only overview of the story and its slices",
   "  norn tidy [--dry-run]              Remove what belongs to closed issues",
@@ -129,7 +135,8 @@ export const NEEDS_NUMBER: Record<string, string> = {
   take: "norn take <issue>",
   done: 'norn done <issue> [outcome] ["<note>" | --note-file <file>] [--evidence <dir>]',
   "add-slice": 'norn add-slice <story> "<title>" --mode afk|hil [--blocked-by <slice>]...',
-  escalate: 'norn escalate <issue> "<reason>"',
+  escalate: 'norn escalate <issue> "<reason>" [--wait]',
+  resume: 'norn resume <issue> "<answer>"',
   release: "norn release <issue>",
   status: "norn status <story>",
 };
@@ -317,6 +324,13 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       ];
     case "held-by-other-session":
       return [`#${r.issue} is held by another session (since ${hhmm(r.since)}). Do not work on it or finish it.`];
+    case "waits-on-person":
+      return [
+        `#${r.issue} waits on a person: run norn resume ${r.issue} "<answer>" first`,
+        `Once the person has answered in this session, record the answer with it and carry on. To give the item up instead: norn release ${r.issue}`,
+      ];
+    case "not-waiting":
+      return [`#${r.issue} does not wait on a person, so there is nothing to resume. To ask one and wait: norn escalate ${r.issue} "<question>" --wait`];
     case "outcome-missing":
       return [`${r.step} can end more than one way. Say which.`, "Finish with one of:", ...finishLines(r.finish)];
     case "outcome-unknown":
@@ -377,6 +391,8 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       ];
     case "reason-missing":
       return ["Say why a human is needed. Run:", `  norn escalate ${r.issue} "<reason>"`];
+    case "answer-missing":
+      return ["The answer is required, so the issue records what was decided. Run:", `  norn resume ${r.issue} "<answer>"`];
     case "add-slice-usage":
       return ["add-slice needs a title and a mode. Run:", `  norn add-slice ${r.story} "<title>" --mode afk|hil [--blocked-by <slice>]...`];
     case "story-not-slicing":
@@ -605,7 +621,14 @@ export function renderAnswer(a: Answer): string[] {
         "Do not work on it further. A person picks it up with the norn-resolve skill and moves it to a state of the flow.",
       ];
     case "escalated":
-      return [`#${a.issue} now needs a human. The claim is released.`, "Do not work on it further. A person picks it up with the norn-resolve skill."];
+      return a.waiting
+        ? [
+            `#${a.issue} now needs a human, and you keep the claim, waiting on a person.`,
+            `Wait in this session for the answer; do not end your turn. Once answered, run: norn resume ${a.issue} "<answer>"`,
+          ]
+        : [`#${a.issue} now needs a human. The claim is released.`, "Do not work on it further. A person picks it up with the norn-resolve skill."];
+    case "resumed":
+      return [`#${a.issue}'s answer is recorded and the claim is yours again. Carry on with the step; its briefing still holds.`];
     case "released":
       return [`Released #${a.issue}. Its state is unchanged. Do not work on it further.`];
     case "slice-added": {
@@ -816,6 +839,10 @@ export function renderBriefing(b: Briefing, refresh = false): string[] {
     `Your claim goes stale ${duration(b.staleAfterMs)} after you last took #${n}, and another session can then take it over.`,
     `On a long step, run norn take ${n} again before then: it refreshes the claim, and you carry on where you are.`,
     `If you have to stop, run: norn release ${n}`,
+    // Unattended, a question left in the session reaches nobody; escalating keeps the claim and notifies the person.
+    ...(step.attended
+      ? []
+      : [`When you need a person, run: norn escalate ${n} "<question>" --wait, and wait for the answer in this session.`, "Never end a turn on a question."]),
     `If something is wrong and a person is needed, run: norn escalate ${n} "<reason>"`,
     "",
     "Do not change labels yourself. Only norn changes them.",
@@ -879,8 +906,9 @@ function renderStatus(s: StatusResult): string[] {
     const state = rowState(r);
     const parts = [state === "blocked" && r.blockedBy.length ? `blocked by ${issues(r.blockedBy)}` : state];
     if (r.mode && state !== "merged" && state !== "closed") parts.push(`mode:${r.mode}`);
-    if (r.needsHuman) parts.push("needs-human");
-    if (r.heldSince) parts.push(`held since ${hhmm(r.heldSince)}${r.stale ? " (stale)" : ""}`);
+    if (r.agentAsks) parts.push("an agent waits on your answer");
+    else if (r.needsHuman) parts.push("needs-human");
+    if (r.heldSince && !r.agentAsks) parts.push(`held since ${hhmm(r.heldSince)}${r.stale ? " (stale)" : ""}`);
     return parts.join(" · ");
   };
   const { story, slices } = s;
@@ -888,7 +916,7 @@ function renderStatus(s: StatusResult): string[] {
     `${capitalise(story.flow ?? "issue")} #${story.number} "${story.title}": ${describe(story)}`,
     `owner ${story.owner ? `@${story.owner}` : "none"}`,
   ];
-  const lines = [[...head, ...(story.branch ? [`branch ${story.branch}`] : [])].join(" · ")];
+  const lines = [[...head, ...(story.branch ? [`branch ${story.branch}`] : [])].join(" · "), ...asksLines(s.asks)];
   if (slices.length) {
     lines.push(`Slices (${slices.filter((r) => r.status === "merged").length} of ${slices.length} merged):`);
     const names = slices.map((r) => `#${r.number} "${r.title}"`);
@@ -968,9 +996,28 @@ export function holderText(h: Holder) {
   return `${who} (since ${hhmm(h.since)})`;
 }
 
+/** How long something has waited, e.g. 25m, 5h 10m or 2d 3h. */
+export function waited(ms: number) {
+  const m = Math.floor(ms / 60_000);
+  if (m < 60) return `${m}m`;
+  const h = Math.floor(m / 60);
+  if (h < 24) return m % 60 ? `${h}h ${m % 60}m` : `${h}h`;
+  return h % 24 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h / 24}d`;
+}
+
+/** The herdr command that focuses the pane of the agent at work on an issue. */
+export const focusCommand = (n: number) => `herdr agent focus norn-${n}`;
+
+/** How a person reaches the agent that waits on them: its worktree and, under herdr, the command that focuses it. */
+const reachText = (n: number, p: AgentPlace) => [...(p.worktree ? [`worktree ${p.worktree}`] : []), ...(p.herdr ? [focusCommand(n)] : [])].join(", ");
+
 /** What an item waits on, as said after its number. */
 export function waitDetail(w: WaitItem): string {
   switch (w.reason) {
+    case "agent-asks": {
+      const reach = reachText(w.issue, w);
+      return `waits on you, an agent asked (${waited(w.waitedMs)}): ${w.question.replace(/\s+/g, " ").trim()}${reach ? ` — ${reach}` : ""}`;
+    }
     case "blocked":
       return `is blocked by ${issues(w.blockers)}`;
     case "needs-human":
@@ -1007,7 +1054,7 @@ function humanHandOff(w: WaitItem): string[] {
     ...(w.createWorktree ? [`      Create the worktree: ${w.createWorktree}`] : []),
     `      herdr agent start norn-${w.issue} --kind claude --pane <pane of ${w.worktree}>`,
     `      herdr agent prompt norn-${w.issue} "norn-drive ${w.issue}"`,
-    `      herdr agent focus norn-${w.issue}`,
+    `      ${focusCommand(w.issue)}`,
   ];
 }
 
@@ -1023,16 +1070,23 @@ function humanDetail(w: WaitItem) {
 }
 
 function waitLine(w: WaitItem) {
+  if (w.reason === "agent-asks") return `  - ${waitText(w)}. Answer it in the agent's session; do not take it.`;
   // Inside its worktree this session is where the user does it, so it is not told off.
   const dont = "here" in w && w.here ? "" : " Do not take it.";
   if (w.reason === "needs-human" || w.reason === "human-qa") return `  - ${humanDetail(w)}.${dont}`;
   return `  - ${waitText(w)}.`;
 }
 
+/** What agents ask the user, listed first and apart from the rest. */
+function asksLines(asks: WaitItem[]): string[] {
+  return asks.length ? ["Agents wait on your answer:", ...asks.map(waitLine)] : [];
+}
+
 function renderNothingLeft(r: NextReport): string {
-  const human = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason));
+  const human = r.waiting.filter((w) => FOR_HUMAN.includes(w.reason) && w.reason !== "agent-asks");
   const blocked = r.waiting.filter((w) => w.reason === "blocked");
   const out = [...r.notes.flatMap(renderEvent), `${subject(r)}: nothing left that you can do.`];
+  out.push(...asksLines(r.waiting.filter((w) => w.reason === "agent-asks")));
   if (human.length) out.push("Waiting for a human:", ...human.flatMap((w) => [`  - ${humanDetail(w)}.`, ...humanHandOff(w)]));
   if (blocked.length) out.push("Blocked until then:", ...blocked.map(waitLine));
   out.push(`Stop here and report to the user.${r.notified ? " norn has already notified them." : ""}`);
@@ -1068,6 +1122,9 @@ export function renderNext(r: NextReport): string {
   let head = `${subject(r)} is in ${r.state ?? "no state"}.`;
   if (r.slices.total) head += ` ${r.slices.merged} of ${r.slices.total} slices are merged into ${r.branch}.`;
   out.push(wrap(head), "");
+  // What agents ask comes before anything to start, so the user answers them first.
+  const asks = asksLines(r.waiting.filter((w) => w.reason === "agent-asks"));
+  if (asks.length) out.push(...asks, "");
 
   if (r.start.length === 0) {
     out.push(`Nothing can be started now. Wait for the running items to finish, then run norn next ${r.issue} again.`);
@@ -1117,7 +1174,7 @@ export function renderNext(r: NextReport): string {
             `    Hand the ${r.flow} to an agent in its worktree, which drives it on with the user:`,
             `      ${start}`,
             `      herdr agent prompt norn-${s.issue} "norn-drive ${r.issue}"`,
-            `      herdr agent focus norn-${s.issue}`,
+            `      ${focusCommand(s.issue)}`,
           );
         }
       }
@@ -1125,9 +1182,10 @@ export function renderNext(r: NextReport): string {
       if (!prompted) out.push(s.attended ? `    Take it with: ${s.command}` : `    Its agent starts with: ${s.command}`);
     }
   }
-  if (r.waiting.length) {
+  const rest = r.waiting.filter((w) => w.reason !== "agent-asks");
+  if (rest.length) {
     out.push("", "Waiting, nothing to do for you:");
-    for (const w of r.waiting) out.push(waitLine(w), ...humanHandOff(w));
+    for (const w of rest) out.push(waitLine(w), ...humanHandOff(w));
   }
   if (r.start.some((s) => !s.attended)) out.push("", `Each phase gets a new agent. When an item is done, run norn next ${r.issue} again.`);
   return out.join("\n");
@@ -1140,6 +1198,10 @@ export function renderNotification(n: Notification): { title: string; body: stri
   switch (n.kind) {
     case "needs-human":
       return { title: `norn: #${n.issue} needs you`, body: `${n.reason}\n${n.url}` };
+    case "agent-asks": {
+      const reach = reachText(n.issue, n);
+      return { title: `norn: an agent on #${n.issue} asks you`, body: `${n.question}\nAnswer in its session${reach ? `: ${reach}` : ""}\n${n.url}` };
+    }
     case "needs-human-qa":
       return { title: `norn: #${n.issue} needs you`, body: `needs human QA (${gateText(n.gate)})\n${n.url}` };
     case "state-left":

@@ -5,9 +5,11 @@ import { type Flow, flowNameOf, flowStatesOf, modeOf, uses } from "./flow.js";
 import { loadFlow, repositoryFlows, type SourcedFlow } from "./flow-loading.js";
 import type { LoadedFlow } from "./flow-validation.js";
 import type { ObservedIssue, ObservedStory } from "./github.js";
+import { agentPlace } from "./location.js";
 import { recordedSlug } from "./slug.js";
-import { slugify, storyBranch } from "./text.js";
+import { sliceBranch, slugify, storyBranch } from "./text.js";
 import { type Ctx, fixRounds, lastNeedsHumanReason, needsHumanIn, parseTransitionComment } from "./transitions.js";
+import type { AgentPlace } from "./waiting.js";
 
 /** Who holds an item's claim now. */
 export interface ClaimHolder {
@@ -56,22 +58,32 @@ export interface BoardStory extends BoardItem {
   slices: BoardItem[];
 }
 
-/** An item waiting for the developer, with the command that picks it up. */
-export interface WaitingItem {
+/** An item waiting for the developer: one an agent of theirs asks about, or one with the command that picks it up. */
+export type WaitingItem = {
   issue: number;
   story: number;
   title: string;
-  kind: "needs-human" | "needs-human-qa";
-  /** The reason norn recorded for needs-human, opaque; null for needs-human-qa or a flag set by hand. */
-  reason: string | null;
-  /** When it started waiting, as norn's comments record it; null when unknown. */
+  /** When it started waiting, as norn's comments or the claim record it; null when unknown. */
   since: string | null;
-  /** What to tell an agent, e.g. "norn-drive 61". */
-  command: string;
-}
+} & (
+  | {
+      kind: "needs-human" | "needs-human-qa";
+      /** The reason norn recorded for needs-human, opaque; null for needs-human-qa or a flag set by hand. */
+      reason: string | null;
+      /** What to tell an agent, e.g. "norn-drive 61". */
+      command: string;
+    }
+  | ({
+      /** A session of the developer's holds it and waits for their answer, asked with escalate --wait. It is answered in that session, so nothing takes it. */
+      kind: "agent-asks";
+      question: string;
+      /** The session that asks, and waits for the answer. */
+      holder: ClaimHolder;
+    } & AgentPlace)
+);
 
-/** The claim refs of one read, passed back to the next so it can tell what changed. */
-export type ClaimSnapshot = { issue: number; sha: string; login: string; session: string; since: string }[];
+/** The claim refs of one read, passed back to the next so it can tell what changed; `waiting` when the holder waits on an answer. */
+export type ClaimSnapshot = { issue: number; sha: string; login: string; session: string; since: string; waiting?: true }[];
 
 /** One read of the developer's work, for the dashboard. */
 export interface Observation {
@@ -159,19 +171,45 @@ export async function observe(given: Ctx, opts: { since?: string | null; previou
   const mine = (s: ObservedStory) =>
     [s, ...s.subIssues].some((i) => claims.get(i.number)?.holder === me) ||
     (s.assignees.includes(me) && (s.state === "open" || (s.closedAt ?? "") >= closedSince));
-  const board: BoardStory[] = ours.filter(mine).map((s) => {
-    const slug = recordedSlug(s.nornComments.map((c) => c.body)) ?? slugify(s.title);
-    return {
-      ...item(s),
-      owner: s.assignees[0] ?? null,
-      branch: flowFor(s)?.workspace === "own" ? storyBranch(s.number, slug) : null,
-      slices: slicesOf(s).map(item),
-    };
-  });
+  const slugOf = (s: ObservedStory) => recordedSlug(s.nornComments.map((c) => c.body)) ?? slugify(s.title);
+  /** The branch an item of story `s` is worked on, as its flow's workspace names it; null when it has none. */
+  const branchOf = (s: ObservedStory, i: ObservedIssue): string | null => {
+    const workspace = flowFor(i)?.workspace;
+    if (i === s) return workspace === "own" ? storyBranch(s.number, slugOf(s)) : null;
+    return workspace === "parent" ? sliceBranch(s.number, slugOf(s), i.number) : null;
+  };
+  const board: BoardStory[] = ours.filter(mine).map((s) => ({
+    ...item(s),
+    owner: s.assignees[0] ?? null,
+    branch: branchOf(s, s),
+    slices: slicesOf(s).map(item),
+  }));
   const waiting: WaitingItem[] = [];
+  for (const s of ours.filter(mine)) {
+    for (const i of [s, ...slicesOf(s)]) {
+      if (i.state !== "open") continue;
+      const claim = claims.get(i.number);
+      // Only my own agents' questions: another person's agent asks them, in their session.
+      if (!claim?.waiting || claim.holder !== me) continue;
+      const asked = claim.waiting;
+      waiting.push({
+        issue: i.number,
+        story: s.number,
+        title: i.title,
+        kind: "agent-asks",
+        question: asked.question,
+        since: new Date(asked.since).toISOString(),
+        holder: holder(i.number)!,
+        // Where norn next and the notification send the person, so all three agree.
+        ...(await agentPlace(i, ctx, flowFor(i))),
+      });
+    }
+  }
   for (const s of ours.filter((s) => s.assignees.includes(me) && s.state === "open")) {
     for (const i of [s, ...slicesOf(s)]) {
       if (i.state !== "open") continue;
+      // An agent waits on a person in its session: whoever it asks answers there, not in a new one.
+      if (claims.get(i.number)?.waiting) continue;
       const flow = flowFor(i);
       const states = flow ? flowStatesOf(i, flow) : [];
       // At a human gate, a person QAs it.
@@ -193,10 +231,18 @@ export async function observe(given: Ctx, opts: { since?: string | null; previou
       });
     }
   }
-  // Escalations first, then the longest waiting.
-  waiting.sort((a, b) => (a.kind === b.kind ? (a.since ?? "").localeCompare(b.since ?? "") : a.kind === "needs-human" ? -1 : 1));
+  // Agents waiting on an answer first, then escalations, then the longest waiting.
+  const order: WaitingItem["kind"][] = ["agent-asks", "needs-human", "needs-human-qa"];
+  waiting.sort((a, b) => order.indexOf(a.kind) - order.indexOf(b.kind) || (a.since ?? "").localeCompare(b.since ?? ""));
 
-  const snapshot: ClaimSnapshot = [...claims].map(([issue, c]) => ({ issue, sha: c.sha, login: c.holder, session: c.session, since: c.since }));
+  const snapshot: ClaimSnapshot = [...claims].map(([issue, c]) => ({
+    issue,
+    sha: c.sha,
+    login: c.holder,
+    session: c.session,
+    since: c.since,
+    ...(c.waiting && { waiting: true as const }),
+  }));
   const feed = ours.filter(mine).flatMap((s) => feedOf(s, { flows: valid, maxFixRounds: ctx.config.maxFixRounds, since: opts.since ?? null }));
   if (opts.previous) feed.push(...claimEvents(board, opts.previous, snapshot, now, ctx.config.staleAfterMs));
 
@@ -223,7 +269,8 @@ function gated(flow: Flow, issue: ObservedIssue): boolean {
 /**
  * Claim events from two reads of the claim refs, for items on the board. A
  * claim is taken when its ref is new or points at a new commit, released when
- * its ref is gone, and stale once it outlives staleAfter after the last read.
+ * its ref is gone, and stale once it outlives staleAfter after the last read,
+ * unless it waits on an answer, as isStale has it.
  */
 function claimEvents(board: BoardStory[], last: Pick<Observation, "at" | "claims">, current: ClaimSnapshot, now: Date, staleAfterMs: number): FeedEvent[] {
   const previous = last.claims;
@@ -242,7 +289,7 @@ function claimEvents(board: BoardStory[], last: Pick<Observation, "at" | "claims
     if (before.get(c.issue)?.sha !== c.sha) event(c, "taken", c.since);
     const staleAt = new Date(Date.parse(c.since) + staleAfterMs).toISOString();
     // Stale since the last read, not since the feed's `since`: that reaches back before it, and the claim was stale then already.
-    if (staleAt <= now.toISOString() && staleAt > last.at) event(c, "stale", staleAt);
+    if (!c.waiting && staleAt <= now.toISOString() && staleAt > last.at) event(c, "stale", staleAt);
   }
   return events;
 }

@@ -132,6 +132,85 @@ describe("observe: waiting for me", () => {
       { issue: 13, story: 10, title: "Docs", kind: "needs-human-qa", reason: null, since: "2026-10-13T12:05:00.000Z", command: "norn-drive 13" },
     ]);
   });
+
+  test("lists an agent's question first, with since when, its worktree and whether it runs under herdr", async () => {
+    const w = story();
+    w.workspace.env = { HERDR_ENV: "1" };
+    w.github.seedIssue({ number: 13, title: "Docs", labels: ["type:slice", "mode:hil", "needs-qa"], assignees: ["alice"] });
+    w.github.parents.set(13, 10);
+    await w.norn("take", "13");
+    await w.norn("done", "13", "pass", "All criteria pass");
+    w.github.seedIssue({ number: 14, title: "Headers", labels: ["type:slice", "mode:afk", "ready-for-agent"], assignees: ["alice"] });
+    w.github.parents.set(14, 10);
+    w.setNow("2026-10-13T12:05:00Z");
+    await w.as("s2")("take", "14");
+    await w.as("s2")("escalate", "14", "Which headers?");
+    w.setNow("2026-10-13T12:10:00Z");
+    await w.norn("take", "11");
+    await w.norn("escalate", "11", "Keep the old flag as an alias?", "--wait");
+    w.setNow("2026-10-13T17:00:00Z");
+
+    const res = await observe(await w.ctx(), {});
+
+    expect(res.waiting.map((x) => `${x.issue} ${x.kind}`)).toEqual(["11 agent-asks", "14 needs-human", "13 needs-human-qa"]);
+    expect(res.waiting[0]).toEqual({
+      issue: 11,
+      story: 10,
+      title: "Redis store",
+      kind: "agent-asks",
+      question: "Keep the old flag as an alias?",
+      since: "2026-10-13T12:10:00.000Z",
+      holder: { login: "alice", session: "session-1", since: "2026-10-13T12:10:00.000Z", stale: false },
+      worktree: "/repo/.agents/worktrees/10-rate-limiting-11",
+      herdr: true,
+    });
+    const held = res.board[0].slices.find((s) => s.number === 11)!.holder!;
+    expect(held.stale).toBe(false);
+  });
+
+  test("an agent's question on a slice with its own workspace names the worktree norn next names", async () => {
+    const w = story();
+    // A slice worked on a branch of its own, rather than one off its story's.
+    w.github.seedFlow("slice", {
+      description: "A slice on its own branch.",
+      start: "ready-for-agent",
+      workspace: "own",
+      states: { "ready-for-agent": { skill: "norn-implement", attended: false, outcomes: { "": { to: "closed", means: "built" } } } },
+    });
+    await w.norn("take", "11");
+    await w.norn("escalate", "11", "Which store?", "--wait");
+
+    const res = await observe(await w.ctx(), {});
+
+    expect(res.waiting[0]).toMatchObject({ issue: 11, kind: "agent-asks", worktree: "/repo/.agents/worktrees/11-redis-store" });
+  });
+
+  test("an agent's question outside herdr says so, and a question another person's agent asks is not mine", async () => {
+    const w = story();
+    w.workspace.env = {};
+    // My story, its question asked by bob's agent: bob answers it in his session.
+    w.github.seedIssue({ number: 20, title: "Two", labels: ["type:story", "needs-slicing", "needs-human"], assignees: ["alice"] });
+    const asked = { question: "Two slices?", since: "2026-10-13T11:00:00Z" };
+    w.github.claims.set(20, { holder: "bob", session: "bob-session", since: "2026-10-13T11:00:00Z", waiting: asked });
+    await w.norn("take", "11");
+    await w.norn("escalate", "11", "Which store?", "--wait");
+
+    const res = await observe(await w.ctx(), {});
+
+    expect(res.waiting).toEqual([
+      {
+        issue: 11,
+        story: 10,
+        title: "Redis store",
+        kind: "agent-asks",
+        question: "Which store?",
+        since: "2026-10-13T12:00:00.000Z",
+        holder: { login: "alice", session: "session-1", since: "2026-10-13T12:00:00.000Z", stale: false },
+        worktree: "/repo/.agents/worktrees/10-rate-limiting-11",
+        herdr: false,
+      },
+    ]);
+  });
 });
 
 describe("observe: outcomes and their remarks", () => {
@@ -269,6 +348,23 @@ describe("observe: the feed", () => {
     expect(res.feed.find((e) => e.kind === "pr")!.url).toBe("https://github.com/acme/app/pull/1002");
   });
 
+  test("a question answered with resume shows as needs-human raised and resolved, not as an outcome", async () => {
+    const w = setup({ now: "2026-10-13T12:00:00Z" });
+    w.github.seedIssue({ number: 10, title: "Rate limiting", labels: ["type:story", "needs-slicing"], assignees: ["alice"] });
+    await w.norn("take", "10");
+    w.setNow("2026-10-13T12:01:00Z");
+    await w.norn("escalate", "10", "Two slices?", "--wait");
+    w.setNow("2026-10-13T12:02:00Z");
+    await w.norn("resume", "10", "Yes");
+
+    const res = await observe(await w.ctx(), {});
+
+    expect([...res.feed].reverse().map((e) => (e.kind === "needs-human" ? `${e.action} ${e.reason ?? ""}`.trim() : e.kind))).toEqual([
+      'raised asked: "Two slices?"',
+      "resolved",
+    ]);
+  });
+
   test("with since, only what happened after it", async () => {
     const w = await history();
 
@@ -327,6 +423,19 @@ describe("observe: claims", () => {
 
     expect(claims(third)).toEqual([["stale", 12, "s2", "2026-10-13T14:05:00.000Z", "alice"]]);
     expect(third.board[0].slices[1].holder).toMatchObject({ session: "s2", stale: true });
+  });
+
+  test("a claim waiting on an answer never goes stale in the feed", async () => {
+    const w = story();
+    await w.norn("take", "11");
+    await w.norn("escalate", "11", "Which store?", "--wait");
+    const first = await observe(await w.ctx(), {});
+
+    w.setNow("2026-10-13T14:10:00Z");
+    const second = await observe(await w.ctx(), { since: first.at, previous: first });
+
+    expect(second.feed.filter((e) => e.kind === "claim" && e.action === "stale")).toEqual([]);
+    expect(second.board[0].slices[0].holder).toMatchObject({ stale: false });
   });
 });
 

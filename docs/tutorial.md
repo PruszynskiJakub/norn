@@ -53,7 +53,7 @@ It stops when the story reaches `needs-human-qa`, which is always yours, or when
 npx norn dashboard
 ```
 
-For a `needs-human` issue or an item in `needs-human-qa`, ask your agent `norn-drive <issue>`.
+For a `needs-human` issue or an item in `needs-human-qa`, ask your agent `norn-drive <issue>`. When the dashboard says an agent asks, it waits for your answer in its own session: answer it there, and it carries on. Under herdr, `herdr agent focus norn-<issue>` takes you to it.
 
 ## 6. Merge the story
 

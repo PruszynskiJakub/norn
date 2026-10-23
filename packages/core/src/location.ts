@@ -4,6 +4,7 @@ import type { GitHub, Issue } from "./github.js";
 
 import { storySlug, type Slugs } from "./slug.js";
 import { sh, sliceBranch, storyBranch, worktreePath } from "./text.js";
+import type { AgentPlace } from "./waiting.js";
 import type { Provider, Workspace } from "./workspace.js";
 
 /** Where an issue's work happens: its branch, the branch it starts from, and its worktree. */
@@ -40,6 +41,19 @@ export async function locate(
     return { branch, base: storyBranch(story.number, slug), worktree: worktreePath(branch), story, slug };
   }
   return null;
+}
+
+/** Where a person reaches the agent at work on an issue: its worktree, and whether it runs under herdr. */
+export async function agentPlace(
+  issue: Issue,
+  ctx: { github: GitHub; slugs: Slugs; config: { baseBranch: string; provider: Provider }; workspace: { root: string } },
+  flow: Flow | null,
+): Promise<AgentPlace> {
+  const loc = await locate(issue, ctx, flow);
+  return {
+    worktree: loc ? join(ctx.workspace.root, loc.worktree) : null,
+    herdr: ctx.config.provider === "herdr",
+  };
 }
 
 /** Where the item's branch exists already: in this clone, on GitHub, both, or nowhere yet. */
