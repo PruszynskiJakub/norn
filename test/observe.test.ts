@@ -269,6 +269,23 @@ describe("observe: the feed", () => {
     expect(res.feed.find((e) => e.kind === "pr")!.url).toBe("https://github.com/acme/app/pull/1002");
   });
 
+  test("a question answered with resume shows as needs-human raised and resolved, not as an outcome", async () => {
+    const w = setup({ now: "2026-10-13T12:00:00Z" });
+    w.github.seedIssue({ number: 10, title: "Rate limiting", labels: ["type:story", "needs-slicing"], assignees: ["alice"] });
+    await w.norn("take", "10");
+    w.setNow("2026-10-13T12:01:00Z");
+    await w.norn("escalate", "10", "Two slices?", "--wait");
+    w.setNow("2026-10-13T12:02:00Z");
+    await w.norn("resume", "10", "Yes");
+
+    const res = await observe(await w.ctx(), {});
+
+    expect([...res.feed].reverse().map((e) => (e.kind === "needs-human" ? `${e.action} ${e.reason ?? ""}`.trim() : e.kind))).toEqual([
+      'raised asked: "Two slices?"',
+      "resolved",
+    ]);
+  });
+
   test("with since, only what happened after it", async () => {
     const w = await history();
 

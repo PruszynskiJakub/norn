@@ -16,7 +16,8 @@ norn answers in prose written as instructions to the agent, always in the same o
 | [`norn doctor`](#norn-doctor) | Check the whole setup and say what to fix |
 | [`norn flows export <name>`](#norn-flows-export) | Copy a built-in flow into the repository to change it |
 | [`norn add-slice <story> "title"`](#norn-add-slice) | Create a slice (used by the `norn-slice` skill) |
-| [`norn escalate <issue> "reason"`](#norn-escalate) | Set `needs-human` and release the claim |
+| [`norn escalate <issue> "reason" [--wait]`](#norn-escalate) | Set `needs-human` and release the claim, or with `--wait` keep it and wait for the answer |
+| [`norn resume <issue> "answer"`](#norn-resume) | Record the answer to `escalate --wait` and carry on |
 | [`norn release <issue>`](#norn-release) | Give up the claim without a transition |
 
 `norn --version` prints the running norn's version. `norn --help`, or `--help` (`-h`) after any command, prints the list of commands and runs nothing.
@@ -218,10 +219,22 @@ Creates a slice as a sub-issue of the story, with its labels, the story's assign
 ## norn escalate
 
 ```sh
-npx norn escalate <issue> "reason"
+npx norn escalate <issue> "reason" [--wait]
 ```
 
-Sets `needs-human` with the reason as a comment and releases the claim. A person clears it with `norn-drive <issue>`, which runs the `norn-resolve` skill.
+Sets `needs-human` with the reason as a comment, notifies you and releases the claim. A person clears it with `norn-drive <issue>`, which runs the `norn-resolve` skill.
+
+With `--wait`, the reason is a question and the session keeps its claim, marked as waiting on a person: a [waiting claim](../CONTEXT.md). The comment says `asked: "<question>"`, and the notification is the same. You answer in the agent's own session; if you answered on the issue, tell the agent. The agent then records the answer with [`norn resume`](#norn-resume) and carries on in the same step, with its context intact.
+
+A waiting claim never goes stale, so no other session takes it over however long it waits. While it waits, `norn done`, another `norn escalate` and `norn take` from the same session are refused until it resumes. `norn release` still gives the item up; it then keeps `needs-human` for the resolve step, as after a plain escalate. If the waiting session died, `norn take <issue> --takeover` from another session of yours frees it, into the same resolve step.
+
+## norn resume
+
+```sh
+npx norn resume <issue> "answer"
+```
+
+Ends the wait of `escalate --wait`: comments `norn: <state> → <state> (needs-human answered)` with the answer under it, clears `needs-human`, puts `in-progress` back and refreshes the claim. The step and its briefing are unchanged, so the agent carries on without a new `norn take`. The answer is required, so the issue always records what was decided. It is refused when the session does not hold the claim, or when its claim does not wait.
 
 ## norn release
 

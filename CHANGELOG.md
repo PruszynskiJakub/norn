@@ -4,6 +4,11 @@ All notable changes to norn are documented here. The format follows [Keep a Chan
 
 ## [Unreleased]
 
+### Added
+
+- `norn escalate <issue> "question" --wait`: an agent asks a person and keeps its claim, marked as waiting on them. It sets `needs-human`, comments `asked: "<question>"` and notifies you as escalate does. A waiting claim never goes stale; while it waits, `done`, `escalate` and `take` from the same session are refused, `release` gives the item up, and `take --takeover` from another of your sessions frees a dead one into the resolve step. Without `--wait`, escalate is unchanged.
+- `norn resume <issue> "answer"`: records the answer to `escalate --wait` as a `needs-human answered` comment, clears `needs-human`, puts `in-progress` back and refreshes the claim, so the agent carries on in the same step.
+
 ## [0.10.1] - 2026-10-17
 
 ### Fixed

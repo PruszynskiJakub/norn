@@ -101,6 +101,26 @@ describe("GhGitHub claims", () => {
     expect(ref.input).toEqual({ sha: "c3", force: false });
   });
 
+  test("a waiting claim's marker survives the claim commit round trip", async () => {
+    const record = { holder: "a", session: "s", since: "t", waiting: { question: "Keep it?", since: "t2" } };
+    let message = "";
+    const { exec } = scripted((c) => {
+      if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t" } };
+      if (path(c).endsWith("/git/commits")) {
+        message = (c.input as { message: string }).message;
+        return { stdout: { sha: "c1" } };
+      }
+      if (path(c).endsWith("/git/refs/norn/claims/131")) return { stdout: { ref: "refs/norn/claims/131" } };
+      if (path(c) === "repos/{owner}/{repo}/git/ref/norn/claims/131") return { stdout: { object: { sha: "c1" } } };
+      if (path(c) === "repos/{owner}/{repo}/git/commits/c1") return { stdout: { message } };
+    });
+    const gh = new GhGitHub(exec);
+
+    expect(await gh.replaceClaim(131, "mine1", record)).toBe(true);
+
+    expect(await gh.readClaim(131)).toEqual({ ...record, sha: "c1" });
+  });
+
   test("replaceClaim loses when the ref has moved since it was read", async () => {
     const { exec } = scripted((c) => {
       if (path(c).endsWith("/git/trees")) return { stdout: { sha: "t" } };

@@ -10,6 +10,7 @@ import {
   providerRefusal,
   type Refusal,
   release,
+  resume,
   type Slugs,
   status,
   take,
@@ -110,7 +111,9 @@ async function command(cmd: string, rest: string[], flags: Record<string, string
     case "tidy":
       return tidy(ctx, bools.has("dry-run"));
     case "escalate":
-      return escalate(ctx, n, rest[1]);
+      return escalate(ctx, n, rest[1], { wait: bools.has("wait") });
+    case "resume":
+      return resume(ctx, n, rest[1]);
     case "release":
       return release(ctx, n);
     case "next":

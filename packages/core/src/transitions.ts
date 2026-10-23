@@ -18,6 +18,10 @@ export function needsHumanLine(reason: string) {
   return `${NEEDS_HUMAN_MARK}${oneLine(reason)}`;
 }
 
+/** The brackets of a transition that only clears needs-human: resolved by a person in the resolve step, or answered to an agent that waited. */
+export const NEEDS_HUMAN_RESOLVED = "needs-human resolved";
+export const NEEDS_HUMAN_ANSWERED = "needs-human answered";
+
 /** Says on a transition comment which states the issue's mode skipped, each of them for the other mode. */
 export function skipLine(skipped: string[], mode: Mode): string {
   const other = mode === "afk" ? "hil" : "afk";
@@ -116,7 +120,7 @@ export interface TransitionComment {
   from: string;
   /** The state after, "closed", or "closed as not planned". */
   to: string;
-  /** What is in the brackets: the outcome word, "automatic" or "needs-human resolved"; null for none. */
+  /** What is in the brackets: the outcome word, "automatic", "needs-human resolved" or "needs-human answered"; null for none. */
   why: string | null;
   /** The note after the markers, as written; null for none. */
   note: string | null;
@@ -196,10 +200,8 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, { w
   const from = (flow ? (flowStatesOf(issue, flow)[0] ?? left) : null) ?? "triage";
   // The resolve step has no outcome word and keeps the state; say what it did.
   const resolved = !word && issue.labels.includes("needs-human") && !outcome.needsHuman;
-  const why = word || (resolved ? "needs-human resolved" : "");
-  const comment = [`norn: ${from} → ${outcome.to === "not-planned" ? "closed as not planned" : outcome.to}${why ? ` (${why})` : ""}`];
-  const spec = await specLink(ctx, issue, flow);
-  if (spec) comment.push("", `Spec: ${spec}`);
+  const why = word || (resolved ? NEEDS_HUMAN_RESOLVED : "");
+  const comment = await commentHead(ctx, issue, flow, from, outcome.to === "not-planned" ? "closed as not planned" : outcome.to, why);
   // Triage gives the issue its flow, which it enters here.
   const into = flow ?? (outcome.flow ? validFlow(await loadFlow(ctx, outcome.flow)) : null);
   // An issue whose flow gives it a branch of its own records its slug the first time norn writes on it, triage included.
@@ -234,6 +236,20 @@ export async function applyOutcome(ctx: Ctx, issue: Issue, outcome: Outcome, { w
     if (outcome.needsHuman) await notifyNeedsHuman(ctx, n, outcome.needsHuman);
     else if (outcome.notify && named) await notifyHumanQa(ctx, n, { flow: named.name, mode: flow?.states[outcome.to]?.when ?? null });
   }
+}
+
+/** The comment of norn resume: the issue stays in its state, with needs-human answered and the answer as the note. */
+export async function answeredComment(ctx: Ctx, issue: Issue, flow: Flow | null, answer: string): Promise<string> {
+  const state = (flow ? flowStatesOf(issue, flow)[0] : null) ?? "triage";
+  return [...(await commentHead(ctx, issue, flow, state, state, NEEDS_HUMAN_ANSWERED)), "", answer].join("\n");
+}
+
+/** The first lines of a transition comment: the move and why, then the spec link in its own paragraph. */
+async function commentHead(ctx: Ctx, issue: Issue, flow: Flow | null, from: string, to: string, why: string): Promise<string[]> {
+  const head = [`norn: ${from} → ${to}${why ? ` (${why})` : ""}`];
+  const spec = await specLink(ctx, issue, flow);
+  if (spec) head.push("", `Spec: ${spec}`);
+  return head;
 }
 
 /** Runs fn; a failure becomes an event instead of an error. `retry` is the story whose norn next retries it. */

@@ -26,6 +26,7 @@ import {
   type Notification,
   type Refusal,
   type ReleaseResult,
+  type ResumeResult,
   type Removal,
   type Row,
   sh,
@@ -52,6 +53,7 @@ export type Answer =
   | DoneResult
   | EscalateResult
   | ReleaseResult
+  | ResumeResult
   | AddSliceResult
   | NextResult
   | StatusResult
@@ -108,7 +110,10 @@ export const USAGE = [
   "                                     Finish the step; norn makes the transition.",
   "                                     --evidence attaches the QA files in <dir>",
   '  norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
-  '  norn escalate <issue> "reason"     Set needs-human and release the claim',
+  '  norn escalate <issue> "reason" [--wait]',
+  "                                     Set needs-human and release the claim; with --wait,",
+  "                                     keep it and wait in this session for the answer",
+  '  norn resume <issue> "answer"       Record the answer to escalate --wait and carry on',
   "  norn release <issue>               Give up the claim without a transition",
   "  norn status <story>                Read-only overview of the story and its slices",
   "  norn tidy [--dry-run]              Remove what belongs to closed issues",
@@ -128,7 +133,8 @@ export const NEEDS_NUMBER: Record<string, string> = {
   take: "norn take <issue>",
   done: 'norn done <issue> [outcome] ["note"] [--evidence <dir>]',
   "add-slice": 'norn add-slice <story> "title" --mode afk|hil [--blocked-by <issue>]...',
-  escalate: 'norn escalate <issue> "reason"',
+  escalate: 'norn escalate <issue> "reason" [--wait]',
+  resume: 'norn resume <issue> "answer"',
   release: "norn release <issue>",
   status: "norn status <story>",
 };
@@ -304,6 +310,13 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       return [`You do not hold #${r.issue}. Claim it first with: norn take ${r.issue}`];
     case "held-by-other-session":
       return [`#${r.issue} is held by another session (since ${hhmm(r.since)}). Do not work on it or finish it.`];
+    case "waits-on-person":
+      return [
+        `#${r.issue} waits on a person: run norn resume ${r.issue} "<answer>" first`,
+        `Once the person has answered in this session, record the answer with it and carry on. To give the item up instead: norn release ${r.issue}`,
+      ];
+    case "not-waiting":
+      return [`#${r.issue} does not wait on a person, so there is nothing to resume. To ask one and wait: norn escalate ${r.issue} "question" --wait`];
     case "outcome-missing":
       return [`${r.step} can end more than one way. Say which.`, "Finish with one of:", ...finishLines(r.finish)];
     case "outcome-unknown":
@@ -359,6 +372,8 @@ export function renderRefusal(r: Refusal | CliRefusal): string[] {
       ];
     case "reason-missing":
       return ["Say why a human is needed. Run:", `  norn escalate ${r.issue} "reason"`];
+    case "answer-missing":
+      return ["The answer is required, so the issue records what was decided. Run:", `  norn resume ${r.issue} "<answer>"`];
     case "add-slice-usage":
       return ["add-slice needs a title and a mode. Run:", `  norn add-slice ${r.story} "title" --mode afk|hil [--blocked-by <issue>]...`];
     case "story-not-slicing":
@@ -587,7 +602,14 @@ export function renderAnswer(a: Answer): string[] {
         "Do not work on it further. A person picks it up with the norn-resolve skill and moves it to a state of the flow.",
       ];
     case "escalated":
-      return [`#${a.issue} now needs a human. The claim is released.`, "Do not work on it further. A person picks it up with the norn-resolve skill."];
+      return a.waiting
+        ? [
+            `#${a.issue} now needs a human, and you keep the claim, waiting on a person.`,
+            `Wait in this session for the answer; do not end your turn. Once answered, run: norn resume ${a.issue} "<answer>"`,
+          ]
+        : [`#${a.issue} now needs a human. The claim is released.`, "Do not work on it further. A person picks it up with the norn-resolve skill."];
+    case "resumed":
+      return [`#${a.issue}'s answer is recorded and the claim is yours again. Carry on with the step; its briefing still holds.`];
     case "released":
       return [`Released #${a.issue}. Its state is unchanged. Do not work on it further.`];
     case "slice-added": {

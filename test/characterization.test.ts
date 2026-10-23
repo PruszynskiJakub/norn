@@ -40,6 +40,13 @@ function slicing(w: World) {
   w.github.seedIssue({ number: 50, title: "Search", labels: ["type:story", "needs-slicing"], assignees: ["alice"] });
 }
 
+/** #50 in slicing, whose session asked a person with escalate --wait. */
+async function waiting(w: World) {
+  slicing(w);
+  await w.norn("take", "50");
+  await w.norn("escalate", "50", "Two slices or three?", "--wait");
+}
+
 function provider(w: World, env: Record<string, string>) {
   w.workspace.env = env;
 }
@@ -584,6 +591,27 @@ const scenarios: Scenario[] = [
     },
     argv: ["escalate", "50", "the spec\ncontradicts itself"],
   },
+  {
+    name: "escalate --wait",
+    arrange: async (w) => {
+      slicing(w);
+      await w.norn("take", "50");
+    },
+    argv: ["escalate", "50", "Two slices or three?", "--wait"],
+  },
+  { name: "done while waiting on a person", arrange: waiting, argv: ["done", "50"] },
+
+  // resume
+  { name: "resume without an answer", arrange: waiting, argv: ["resume", "50"] },
+  {
+    name: "resume when nothing waits",
+    arrange: async (w) => {
+      slicing(w);
+      await w.norn("take", "50");
+    },
+    argv: ["resume", "50", "Three"],
+  },
+  { name: "resume", arrange: waiting, argv: ["resume", "50", "Three"] },
 
   // release
   { name: "release without the claim", arrange: slicing, argv: ["release", "50"] },
