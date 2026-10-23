@@ -152,7 +152,7 @@ npx norn dashboard [--port <n>] [--interval <duration>] [--no-open]
 
 Serves a read-only page on `127.0.0.1` over your norn work in this repository and opens it in your browser:
 
-- what needs you (`needs-human` and `needs-human-qa`), each with its `norn-drive` command;
+- what needs you: first what your agents ask with `escalate --wait`, each with its question, its worktree and, under herdr, the `herdr agent focus` command that brings its pane forward; then `needs-human` and `needs-human-qa`, each with its `norn-drive` command;
 - what is worth a look: stale claims and items one fix round from the limit;
 - your stories with their slices and progress;
 - a feed of what happened, with the agents' implement, review and QA remarks and links to their evidence;
