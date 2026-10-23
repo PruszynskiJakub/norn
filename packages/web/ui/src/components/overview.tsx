@@ -1,9 +1,13 @@
+import type { WaitingItem } from "@norn/core";
 import { cn } from "../lib/utils.ts";
 import { isDone, nearLimitItems, quietItems } from "../model.ts";
 import { useView } from "../view.ts";
 import { WORTH_A_LOOK, ago, fixRoundsUsed, heroSub, heroTitle, quietFor, waitingKind, waitingReason } from "../wording.ts";
-import { CopyCommand } from "./copy-command.tsx";
 import { StateDot } from "./sidebar.tsx";
+import { WaitingAction } from "./waiting-action.tsx";
+
+/** An agent that asks stands apart from the escalations it also counts as. */
+const KIND_TONE: Record<WaitingItem["kind"], string> = { "agent-asks": "text-live", "needs-human": "text-bad", "needs-human-qa": "text-warn" };
 
 /** The one thing the page wants read first: what needs the developer, then what looks stuck. */
 export function Hero() {
@@ -16,35 +20,32 @@ export function Hero() {
     <div>
       <h1 className="mt-0 mb-1.5 font-semibold text-[26px] leading-[1.25] tracking-[-0.02em]">{heroTitle(state.waiting.length)}</h1>
       <p className="mt-0 mb-[22px] text-muted-foreground">{heroSub(working, quiet.length)}</p>
-      {state.waiting.map((w) => {
-        const escalated = w.kind === "needs-human";
-        return (
-          // biome-ignore lint/a11y/useSemanticElements: the card holds a copy button, and a button cannot contain another.
-          <div
-            key={w.issue}
-            role="button"
-            tabIndex={0}
-            onClick={() => select(w.issue)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                select(w.issue);
-              }
-            }}
-            className="mb-2.5 grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 rounded-[14px] border border-border bg-card px-[18px] py-4 transition-[border-color,box-shadow] hover:border-faint hover:shadow-[0_2px_10px_rgba(0,0,0,.04)]"
-          >
-            <div className="font-medium text-[15.5px]">{w.title}</div>
-            <div className="col-start-1 text-[14px] text-muted-foreground">{waitingReason(w, item(w.issue))}</div>
-            <div className="col-start-2 row-span-2 row-start-1 flex flex-col items-end gap-1.5">
-              <span className={cn("font-medium text-[12.5px]", escalated ? "text-bad" : "text-warn")}>
-                {waitingKind(w)}
-                {w.since && ` · ${ago(w.since, now)}`}
-              </span>
-              <CopyCommand command={w.command} />
-            </div>
+      {state.waiting.map((w) => (
+        // biome-ignore lint/a11y/useSemanticElements: the card holds a copy button, and a button cannot contain another.
+        <div
+          key={w.issue}
+          role="button"
+          tabIndex={0}
+          onClick={() => select(w.issue)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") {
+              e.preventDefault();
+              select(w.issue);
+            }
+          }}
+          className="mb-2.5 grid cursor-pointer grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 rounded-[14px] border border-border bg-card px-[18px] py-4 transition-[border-color,box-shadow] hover:border-faint hover:shadow-[0_2px_10px_rgba(0,0,0,.04)]"
+        >
+          <div className="font-medium text-[15.5px]">{w.title}</div>
+          <div className="col-start-1 text-[14px] text-muted-foreground">{waitingReason(w, item(w.issue))}</div>
+          <div className="col-start-2 row-span-2 row-start-1 flex flex-col items-end gap-1.5">
+            <span className={cn("font-medium text-[12.5px]", KIND_TONE[w.kind])}>
+              {waitingKind(w)}
+              {w.since && ` · ${ago(w.since, now)}`}
+            </span>
+            <WaitingAction w={w} className="items-end text-right" />
           </div>
-        );
-      })}
+        </div>
+      ))}
       {(quiet.length > 0 || close.length > 0) && (
         <div className="mt-[26px]">
           <h3 className="mt-0 mb-2.5 font-medium text-[13px] text-faint">{WORTH_A_LOOK}</h3>
