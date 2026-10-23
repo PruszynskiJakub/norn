@@ -266,12 +266,12 @@ describe("humanGate", () => {
     const out = (await w.norn("take", "40")).stdout;
 
     expect(out).toContain(
-      "Run the app from 40-crash-on-empty-input on this machine and walk the user through what is left, plus anything in the evidence they question.",
+      "Run the change from 40-crash-on-empty-input on this machine and walk the user through what is left, plus anything in the evidence they question.",
     );
     expect(out).toContain("Tie each remark the user brings to a criterion; a remark on a criterion fails it.");
     expect(out).toContain('  follow up (the default): gh issue create --title "<remark>" --body "From QA of #40: <remark>" (it goes through triage)');
     expect(out).toContain("Every failure needs a repro. Keep screenshots, logs and command output in a directory outside the repository");
-    expect(out).toContain('norn done 40 fail "repro" [--evidence <dir>]');
+    expect(out).toContain('norn done 40 fail "<repro>" [--evidence <dir>]');
   });
 
   test("without a workspace, the app runs where the person is", async () => {
@@ -282,7 +282,7 @@ describe("humanGate", () => {
 
     const out = (await w.norn("take", "40")).stdout;
 
-    expect(out).toContain("Run the app on this machine and walk the user through what is left");
+    expect(out).toContain("Run the change on this machine and walk the user through what is left");
   });
 
   test("evidence can be attached when the gate finishes", async () => {
@@ -416,7 +416,7 @@ describe("norn next on an issue of a flow", () => {
         "",
         '  - Bug #40 "Crash on empty input" is in reviewing: reviewing.',
         "    Worktree: /repo/.agents/worktrees/40-crash-on-empty-input",
-        "    Start it with: norn take 40",
+        "    Its agent starts with: norn take 40",
         "",
         "Each phase gets a new agent. When an item is done, run norn next 40 again.",
       ].join("\n"),

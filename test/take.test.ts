@@ -158,7 +158,9 @@ describe("taking an issue this session already holds", () => {
     const res = await w.norn("take", "131");
 
     expect(res.exitCode).toBe(0);
-    expect(res.stdout).toMatch(/^You already held #131; the claim is refreshed\. Here is its briefing again\.\n\nYou now hold slice #131/);
+    expect(res.stdout).toMatch(
+      /^You already held #131; the claim is refreshed\. Carry on with the step where you left off: what is in the worktree is your own work\.\nHere is its briefing again\.\n\nYou now hold slice #131/,
+    );
     expect(w.github.claim(131)).toMatchObject({ session: "session-1", since: "2026-10-13T11:30:00.000Z" });
   });
 

@@ -172,7 +172,7 @@ const slices: Behaviour = {
     const n = issue.number;
     return [
       "Create the slices in dependency order, blockers first, one command per slice:",
-      `  norn add-slice ${n} "title" --mode afk|hil [--blocked-by <slice>]...`,
+      `  norn add-slice ${n} "<title>" --mode afk|hil [--blocked-by <slice>]...`,
       "  --mode afk when an agent can verify every criterion, hil when a person must also look at it.",
       "Then give each slice its body: gh issue edit <slice> --body-file <file>",
       ...(loc ? [`Push ${loc.branch} once the slices exist, so slice PRs can target it.`] : []),
@@ -358,11 +358,11 @@ export const EVIDENCE_FILES =
 /** How a person QAs issue n with the user, running the app from `branch`, or where they are without one. */
 export function humanQaLines(n: number, branch: string | null): string[] {
   return [
-    `Run the app${branch ? ` from ${branch}` : ""} on this machine and walk the user through what is left, plus anything in the evidence they question.`,
+    `Run the change${branch ? ` from ${branch}` : ""} on this machine and walk the user through what is left, plus anything in the evidence they question.`,
     "Tie each remark the user brings to a criterion; a remark on a criterion fails it. For a remark outside the criteria, the user decides:",
     `  follow up (the default): gh issue create --title "<remark>" --body "From QA of #${n}: <remark>" (it goes through triage)`,
     "  pull it in: it fails this item, like a criterion",
-    "  drop it: say so in the note",
+    `  drop it: name it in the note; an outcome that needs no note still takes one: norn done ${n} <outcome> "<note>"`,
     `Every failure needs a repro. ${EVIDENCE_FILES}`,
   ];
 }

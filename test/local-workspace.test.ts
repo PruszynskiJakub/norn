@@ -52,6 +52,17 @@ describe("LocalWorkspace", () => {
     expect(await ws.readEvidence("qa/shot.png")).toBeNull();
   });
 
+  test("readNote reads a file relative to where norn runs, and no directory or missing file", async () => {
+    const cwd = mkdtempSync(join(tmpdir(), "norn-note-"));
+    mkdirSync(join(cwd, "qa"));
+    writeFileSync(join(cwd, "note.md"), "line 1\n`npm test` $HOME\n");
+    const ws = new LocalWorkspace("/repo", {}, scripted(() => ({})).run, cwd);
+    expect(await ws.readNote("note.md")).toBe("line 1\n`npm test` $HOME\n");
+    expect(await ws.readNote(join(cwd, "note.md"))).toBe("line 1\n`npm test` $HOME\n");
+    expect(await ws.readNote("qa")).toBeNull();
+    expect(await ws.readNote("missing.md")).toBeNull();
+  });
+
   test("worktreeExists looks the path up in git's worktree list", async () => {
     const { run } = scripted(() => ({
       stdout: "worktree /repo\nHEAD abc\nbranch refs/heads/main\n\nworktree /repo/.agents/worktrees/123-x\nHEAD def\n",

@@ -68,4 +68,9 @@ export class FakeWorkspace implements Workspace {
   async readEvidence(dir: string) {
     return this.evidence.get(dir) ?? null;
   }
+  /** Note files for norn done --note-file, by the path given. */
+  notes = new Map<string, string>();
+  async readNote(path: string) {
+    return this.notes.get(path) ?? null;
+  }
 }
