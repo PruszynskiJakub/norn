@@ -76,6 +76,8 @@ export type WaitingItem = {
       /** A session of the developer's holds it and waits for their answer, asked with escalate --wait. It is answered in that session, so nothing takes it. */
       kind: "agent-asks";
       question: string;
+      /** The session that asks, and waits for the answer. */
+      holder: ClaimHolder;
       /** Absolute path of the agent's worktree; null when the item has none. */
       worktree: string | null;
       /** Under herdr, the command that brings the agent's pane forward; null elsewhere. */
@@ -201,6 +203,7 @@ export async function observe(given: Ctx, opts: { since?: string | null; previou
         kind: "agent-asks",
         question: asked.question,
         since: new Date(asked.since).toISOString(),
+        holder: holder(i.number)!,
         worktree: branch ? join(ctx.workspace.root, worktreePath(branch)) : null,
         focus: ctx.config.provider === "herdr" ? `herdr agent focus norn-${i.number}` : null,
       });

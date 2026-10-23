@@ -269,7 +269,7 @@ export function waitingReason(w: WaitingItem, x: Item | undefined): string {
   }
 }
 
-/** Where to answer an agent that asks: its worktree, when the dashboard has no command that brings it forward. */
+/** Where to answer an agent that asks: in its session, which works in the worktree when the item has one. */
 export function answerIn(worktree: string | null): string {
   return worktree ? `Answer in the agent's session, in ${worktree}.` : "Answer in the agent's session.";
 }

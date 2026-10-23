@@ -160,6 +160,7 @@ describe("observe: waiting for me", () => {
       kind: "agent-asks",
       question: "Keep the old flag as an alias?",
       since: "2026-10-13T12:10:00.000Z",
+      holder: { login: "alice", session: "session-1", since: "2026-10-13T12:10:00.000Z", stale: false },
       worktree: "/repo/.agents/worktrees/10-rate-limiting-11",
       focus: "herdr agent focus norn-11",
     });
@@ -187,6 +188,7 @@ describe("observe: waiting for me", () => {
         kind: "agent-asks",
         question: "Which store?",
         since: "2026-10-13T12:00:00.000Z",
+        holder: { login: "alice", session: "session-1", since: "2026-10-13T12:00:00.000Z", stale: false },
         worktree: "/repo/.agents/worktrees/10-rate-limiting-11",
         focus: null,
       },
